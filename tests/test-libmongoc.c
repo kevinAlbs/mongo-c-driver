@@ -43,6 +43,8 @@ test_buffer_install (TestSuite *suite);
 extern void
 test_bulk_install (TestSuite *suite);
 extern void
+test_change_stream_install (TestSuite* suite);
+extern void
 test_client_install (TestSuite *suite);
 extern void
 test_client_max_staleness_install (TestSuite *suite);
@@ -1973,6 +1975,7 @@ main (int argc, char *argv[])
    test_array_install (&suite);
    test_async_install (&suite);
    test_buffer_install (&suite);
+   test_change_stream_install (&suite);
    test_client_install (&suite);
    test_client_max_staleness_install (&suite);
    test_client_pool_install (&suite);

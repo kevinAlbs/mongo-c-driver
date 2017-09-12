@@ -23,6 +23,7 @@ MONGOC_DEF_FILES = \
 INST_H_FILES = \
 	src/mongoc/mongoc-apm.h \
 	src/mongoc/mongoc-bulk-operation.h \
+	src/mongoc/mongoc-change-stream.h \
 	src/mongoc/mongoc-client.h \
 	src/mongoc/mongoc-client-pool.h \
 	src/mongoc/mongoc-collection.h \
@@ -158,6 +159,7 @@ libmongoc_la_SOURCES = \
 	src/mongoc/mongoc-buffer.c \
 	src/mongoc/mongoc-bulk-operation.c \
 	src/mongoc/mongoc-b64.c \
+	src/mongoc/mongoc-change-stream.c \
 	src/mongoc/mongoc-client.c \
 	src/mongoc/mongoc-client-pool.c \
 	src/mongoc/mongoc-cluster.c \

@@ -32,6 +32,7 @@
 #include "mongoc-read-concern.h"
 #include "mongoc-write-concern.h"
 #include "mongoc-find-and-modify.h"
+#include "mongoc-change-stream.h"
 
 
 BSON_BEGIN_DECLS
@@ -267,7 +268,8 @@ mongoc_collection_validate (mongoc_collection_t *collection,
                             const bson_t *options,
                             bson_t *reply,
                             bson_error_t *error);
-
+MONGOC_EXPORT (mongoc_change_stream_t*)
+mongoc_collection_watch (mongoc_collection_t* coll, bson_t* pipeline, bson_t* opts);
 
 BSON_END_DECLS
 

@@ -1869,6 +1869,8 @@ _mongoc_cluster_stream_for_optype (mongoc_cluster_t *cluster,
    }
 
    if (!mongoc_cluster_check_interval (cluster, server_id)) {
+      /* TODO: maybe this is important. If this retries server selection once,
+       * are we already spec compliant with retry logic? */
       /* Server Selection Spec: try once more */
       server_id =
          mongoc_topology_select_server_id (topology, optype, read_prefs, error);

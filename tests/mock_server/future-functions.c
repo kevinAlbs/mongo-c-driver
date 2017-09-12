@@ -718,6 +718,27 @@ background_mongoc_client_get_gridfs (void *data)
    return NULL;
 }
 
+static void *
+background_mongoc_collection_watch (void *data)
+{
+   future_t *future = (future_t *) data;
+   future_value_t return_value;
+
+   return_value.type = future_value_mongoc_change_stream_ptr_type;
+
+   future_value_set_mongoc_change_stream_ptr (
+      &return_value,
+      mongoc_collection_watch (
+         future_value_get_mongoc_collection_ptr (future_get_param (future, 0)),
+         future_value_get_bson_ptr (future_get_param (future, 1)),
+         future_value_get_bson_ptr (future_get_param (future, 2))
+      ));
+
+   future_resolve (future, return_value);
+
+   return NULL;
+}
+
 
 
 future_t *
@@ -1587,6 +1608,28 @@ future_client_get_gridfs (
       future_get_param (future, 3), error);
    
    future_start (future, background_mongoc_client_get_gridfs);
+   return future;
+}
+
+future_t *
+future_collection_watch (
+   mongoc_collection_ptr coll,
+   bson_ptr pipeline,
+   bson_ptr opts)
+{
+   future_t *future = future_new (future_value_mongoc_change_stream_ptr_type,
+                                  3);
+   
+   future_value_set_mongoc_collection_ptr (
+      future_get_param (future, 0), coll);
+   
+   future_value_set_bson_ptr (
+      future_get_param (future, 1), pipeline);
+   
+   future_value_set_bson_ptr (
+      future_get_param (future, 2), opts);
+   
+   future_start (future, background_mongoc_collection_watch);
    return future;
 }
 
