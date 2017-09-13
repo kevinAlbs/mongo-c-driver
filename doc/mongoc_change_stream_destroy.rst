@@ -16,4 +16,4 @@ Destroys a change stream and associated data.
 Parameters
 ----------
 
-* ``stream``:
+* ``stream``: An allocated ``mongoc_change_stream_t``

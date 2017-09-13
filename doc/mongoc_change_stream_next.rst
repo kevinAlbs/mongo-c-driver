@@ -12,6 +12,8 @@ Synopsis
   mongoc_change_stream_next (mongoc_change_stream_t* stream,
                              const bson_t** doc);
 
+This will block for a maximum of ``maxAwaitTimeMS`` as specified in the options when created, or the default server timeout if omitted. If data is returned it will return sooner. If no data is returned it will return ``false``.
+
 Parameters
 ----------
 

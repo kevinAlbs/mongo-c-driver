@@ -11,7 +11,7 @@ Synopsis
    #include <mongoc.h>
    typedef struct _mongoc_change_stream_t mongoc_change_stream_t;
 
-``mongoc_change_stream_t`` provides access to a collection change stream. It has similar behavior to a cursor created with the flags: ``MONGOC_QUERY_TAILABLE_CURSOR | MONGOC_QUERY_AWAIT_CURSOR``.
+:symbol:``mongoc_change_stream_t`` provides access to a collection change stream. It has similar behavior to a cursor created with the flags: ``MONGOC_QUERY_TAILABLE_CURSOR | MONGOC_QUERY_AWAIT_CURSOR``.
 
 .. warning::
 

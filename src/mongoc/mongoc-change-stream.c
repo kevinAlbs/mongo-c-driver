@@ -10,7 +10,8 @@ struct _mongoc_change_stream_t {
    bson_t agg_opts;
    mongoc_error_code_t err; /* defer creating error strings until user needs to retrieve it */
    mongoc_cursor_t* cursor;
-   mongoc_collection_t* coll; /* stores the original read preference */
+   mongoc_collection_t* coll;
+   mongoc_read_prefs_t* read_prefs;
    int32_t maxAwaitTimeMS; /* TODO: this should be int64_t */
 };
 
@@ -18,11 +19,9 @@ bool mongoc_change_stream_next(mongoc_change_stream_t* stream, const bson_t **bs
    BSON_ASSERT(bson);
    bool succeeded = mongoc_cursor_next(stream->cursor, bson);
    if (!succeeded) {
-      printf("Failed, retrying...\n");
-
       bson_error_t err;
       mongoc_cursor_error(stream->cursor, &err);
-      printf("Got error code %d with message %s\n", err.code, err.message);
+      printf("Got error code %d with message %s\n", err.code, err.code ? err.message : "");
       /* TODO: Check if this is a resumable error, don't just blindly retry once. */
 
       /* TODO: should kill cursor, retry establishing the cursor */
@@ -84,7 +83,7 @@ void mongoc_change_stream_destroy(mongoc_change_stream_t* stream) {
 }
 
 static void _mongoc_change_stream_make_cursor(mongoc_change_stream_t* stream) {
-   /* use the collection inherited read preferences */
+   /* use the collection read preferences */
    stream->cursor = mongoc_collection_aggregate(stream->coll, MONGOC_QUERY_TAILABLE_CURSOR | MONGOC_QUERY_AWAIT_DATA, &stream->pipeline, &stream->agg_opts, NULL);
    if (stream->maxAwaitTimeMS >= 0) {
       mongoc_cursor_set_max_await_time_ms (stream->cursor,
@@ -111,6 +110,7 @@ mongoc_change_stream_t* _mongoc_change_stream_new(const mongoc_collection_t* col
    bson_init(&stream->agg_opts);
    bson_init(&stream->pipeline);
    bson_init(&stream->resume_token); /* gets destroyed on first iteration */
+   stream->read_prefs = mongoc_read_prefs_copy(mongoc_collection_get_read_prefs(coll));
 
    /*
     * opts consists of:
