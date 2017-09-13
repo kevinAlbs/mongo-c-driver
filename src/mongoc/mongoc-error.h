@@ -47,6 +47,7 @@ typedef enum {
    MONGOC_ERROR_SERVER_SELECTION,
    MONGOC_ERROR_WRITE_CONCERN,
    MONGOC_ERROR_SERVER, /* Error API Version 2 only */
+   MONGOC_CHANGE_STREAM, /* I have a feeling I shouldn't mess with this enum */
 } mongoc_error_domain_t;
 
 
@@ -108,6 +109,8 @@ typedef enum {
    MONGOC_ERROR_WRITE_CONCERN_ERROR = 64,
 
    MONGOC_ERROR_DUPLICATE_KEY = 11000,
+
+   MONGOC_ERROR_CHANGE_STREAM_NO_RESUME_TOKEN
 } mongoc_error_code_t;
 
 

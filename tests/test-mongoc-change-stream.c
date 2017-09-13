@@ -34,6 +34,10 @@ static void test_change_stream_watch () {
 
    future_wait(future);
 
+   mongoc_change_stream_t* change_stream = future_get_mongoc_change_stream_ptr (future);
+
+   mongoc_change_stream_destroy(change_stream);
+
    future_destroy (future);
    request_destroy (request);
    mongoc_client_destroy (client);

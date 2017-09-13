@@ -1,6 +1,6 @@
 // TODO get a copy of the most recent license
 #include "mongoc-macros.h"
-#include "mongoc-cursor.h"
+#include "mongoc-collection.h"
 
 #ifndef LIBMONGOC_MONGOC_CHANGE_STREAM_H
 #define LIBMONGOC_MONGOC_CHANGE_STREAM_H
@@ -17,6 +17,6 @@ MONGOC_EXPORT(bool)
 mongoc_change_stream_error(const mongoc_change_stream_t*, bson_error_t*);
 
 // Private, only used by mongoc_collection_watch
-mongoc_change_stream_t* _mongoc_change_stream_new(mongoc_cursor_t* cursor, bson_t* pipeline, bson_t* opts);
+mongoc_change_stream_t* _mongoc_change_stream_new(const mongoc_collection_t* coll, const bson_t* pipeline, const bson_t* opts);
 
 #endif //LIBMONGOC_MONGOC_CHANGE_STREAM_H

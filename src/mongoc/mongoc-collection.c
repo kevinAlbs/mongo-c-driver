@@ -2673,9 +2673,7 @@ mongoc_collection_find_and_modify (mongoc_collection_t *collection,
 }
 
 MONGOC_EXPORT (mongoc_change_stream_t*)
-mongoc_collection_watch (mongoc_collection_t* coll, bson_t* pipeline, bson_t* opts)
+mongoc_collection_watch (const mongoc_collection_t* coll, const bson_t* pipeline, const bson_t* opts)
 {
-   /* use the collection inherited read preferences */
-   mongoc_cursor_t* cursor = mongoc_collection_aggregate(coll, MONGOC_QUERY_TAILABLE_CURSOR | MONGOC_QUERY_AWAIT_DATA, pipeline, opts, NULL);
-   return _mongoc_change_stream_new(cursor, pipeline, opts);
+   return _mongoc_change_stream_new(coll, pipeline, opts);
 }

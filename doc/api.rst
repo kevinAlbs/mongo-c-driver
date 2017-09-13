@@ -11,6 +11,7 @@ API Reference
    lifecycle
    mongoc_version
    mongoc_bulk_operation_t
+   mongoc_change_stream_t
    mongoc_client_pool_t
    mongoc_client_t
    mongoc_collection_t
