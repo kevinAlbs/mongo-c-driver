@@ -5,9 +5,9 @@
 #include "TestSuite.h"
 
 static void test_change_stream_watch () {
+   /* TODO: I predict the cursor is sending a SLAVE_OK flag since this is not a replica set */
    mock_server_t *server;
    request_t *request;
-   mongoc_uri_t *uri;
    future_t *future;
    mongoc_client_t *client;
 
@@ -23,25 +23,40 @@ static void test_change_stream_watch () {
    // I believe this will not incur any communication.
    mongoc_collection_t* coll = mongoc_client_get_collection(client, "testdb", "testcoll");
 
-   future = future_collection_watch(coll, NULL, NULL);
+   mongoc_change_stream_t* stream = mongoc_collection_watch(coll, NULL, NULL);
+
+   bson_t* bson;
+
+   future = future_change_stream_next (stream, &bson);
 
    request = mock_server_receives_command (server,
                                            "testdb",
-                                           MONGOC_QUERY_TAILABLE_CURSOR | MONGOC_QUERY_AWAIT_DATA,
-                                           "{ aggregate: 'testcoll', pipeline: [ {$changeStream: {} } ] }");
+                                           MONGOC_QUERY_SLAVE_OK,
+                                           "{ 'aggregate' : 'testcoll', 'pipeline' : [ { '$changeStream' : {  } } ], 'cursor' : {  } }");
 
-   mock_server_replies_simple (request, "[]");
+   printf("Mock server received command\n");
+   mock_server_replies_simple (request, "{'cursor' : {'id' : 123,'ns' : 'testdb.testcoll','firstBatch' : []},'ok' : 1 }");
+   request = mock_server_receives_command (server, "testdb", MONGOC_QUERY_SLAVE_OK, "{ 'getMore' : 123, 'collection' : 'testcoll' }");
+   mock_server_replies_simple (request, "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
 
    future_wait(future);
 
-   mongoc_change_stream_t* change_stream = future_get_mongoc_change_stream_ptr (future);
+   bool ret = future_get_bool (future);
 
-   mongoc_change_stream_destroy(change_stream);
+   ASSERT (!ret);
+
+   future = future_change_stream_destroy (stream);
+
+
+   mock_server_receives_command(server, "testdb", MONGOC_QUERY_SLAVE_OK, "{ 'killCursors' : 'testcoll', 'cursors' : [ 123 ] }");
+   mock_server_replies_simple(request, "{ 'cursorsKilled': [123] }");
+
+
+   future_wait(future);
 
    future_destroy (future);
    request_destroy (request);
    mongoc_client_destroy (client);
-   mongoc_uri_destroy (uri);
    mock_server_destroy (server);
 }
 

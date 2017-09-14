@@ -210,6 +210,10 @@ _mongoc_cursor_error_document (mongoc_cursor_t *cursor,
 void
 _mongoc_cursor_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host);
 
+bool
+_mongoc_cursor_set_opt_int64 (mongoc_cursor_t *cursor,
+                              const char *option,
+                              int64_t value);
 
 BSON_END_DECLS
 

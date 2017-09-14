@@ -211,9 +211,7 @@ _mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
       option maxAwaitTimeMS. If no maxAwaitTimeMS is specified, the driver
       SHOULD not set maxTimeMS on the getMore command."
     */
-   await_data = _mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_TAILABLE) &&
-                _mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_AWAIT_DATA);
-
+   await_data = _mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_AWAIT_DATA);
 
    if (await_data) {
       max_await_time_ms =

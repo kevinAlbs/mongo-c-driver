@@ -341,7 +341,16 @@ future_functions = [
                     "mongoc_collection_watch",
                     [param("mongoc_collection_ptr", "coll"),
                     param("bson_ptr", "pipeline"),
-                    param("bson_ptr", "opts")])
+                    param("bson_ptr", "opts")]),
+
+    future_function("bool",
+                    "mongoc_change_stream_next",
+                    [param("mongoc_change_stream_ptr", "stream"),
+                     param("const_bson_ptr_ptr", "bson")]),
+
+    future_function("void",
+                    "mongoc_change_stream_destroy",
+                    [param("mongoc_change_stream_ptr", "stream")]),
 ]
 
 

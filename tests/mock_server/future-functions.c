@@ -739,6 +739,42 @@ background_mongoc_collection_watch (void *data)
    return NULL;
 }
 
+static void *
+background_mongoc_change_stream_next (void *data)
+{
+   future_t *future = (future_t *) data;
+   future_value_t return_value;
+
+   return_value.type = future_value_bool_type;
+
+   future_value_set_bool (
+      &return_value,
+      mongoc_change_stream_next (
+         future_value_get_mongoc_change_stream_ptr (future_get_param (future, 0)),
+         future_value_get_const_bson_ptr_ptr (future_get_param (future, 1))
+      ));
+
+   future_resolve (future, return_value);
+
+   return NULL;
+}
+
+static void *
+background_mongoc_change_stream_destroy (void *data)
+{
+   future_t *future = (future_t *) data;
+   future_value_t return_value;
+
+   return_value.type = future_value_void_type;
+
+   mongoc_change_stream_destroy (
+      future_value_get_mongoc_change_stream_ptr (future_get_param (future, 0)));
+
+   future_resolve (future, return_value);
+
+   return NULL;
+}
+
 
 
 future_t *
@@ -1630,6 +1666,38 @@ future_collection_watch (
       future_get_param (future, 2), opts);
    
    future_start (future, background_mongoc_collection_watch);
+   return future;
+}
+
+future_t *
+future_change_stream_next (
+   mongoc_change_stream_ptr stream,
+   const_bson_ptr_ptr bson)
+{
+   future_t *future = future_new (future_value_bool_type,
+                                  2);
+   
+   future_value_set_mongoc_change_stream_ptr (
+      future_get_param (future, 0), stream);
+   
+   future_value_set_const_bson_ptr_ptr (
+      future_get_param (future, 1), bson);
+   
+   future_start (future, background_mongoc_change_stream_next);
+   return future;
+}
+
+future_t *
+future_change_stream_destroy (
+   mongoc_change_stream_ptr stream)
+{
+   future_t *future = future_new (future_value_void_type,
+                                  1);
+   
+   future_value_set_mongoc_change_stream_ptr (
+      future_get_param (future, 0), stream);
+   
+   future_start (future, background_mongoc_change_stream_destroy);
    return future;
 }
 

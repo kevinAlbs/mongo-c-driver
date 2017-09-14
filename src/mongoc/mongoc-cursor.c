@@ -53,7 +53,7 @@ _mongoc_cursor_find_command (mongoc_cursor_t *cursor,
                              mongoc_server_stream_t *server_stream);
 
 
-static bool
+bool
 _mongoc_cursor_set_opt_int64 (mongoc_cursor_t *cursor,
                               const char *option,
                               int64_t value)
@@ -925,6 +925,20 @@ _mongoc_cursor_flags (mongoc_cursor_t *cursor,
 
    *flags = MONGOC_QUERY_NONE;
 
+   if (cursor->slave_ok) {
+      *flags |= MONGOC_QUERY_SLAVE_OK;
+   } else if (cursor->server_id_set &&
+              (stream->topology_type == MONGOC_TOPOLOGY_RS_WITH_PRIMARY ||
+               stream->topology_type == MONGOC_TOPOLOGY_RS_NO_PRIMARY) &&
+              stream->sd->type != MONGOC_SERVER_RS_PRIMARY) {
+      *flags |= MONGOC_QUERY_SLAVE_OK;
+   }
+
+   if (cursor->is_command) {
+      /* aggregate, including $changeStream, or listCollections/Databases */
+      return true;
+   }
+
    if (!bson_iter_init (&iter, &cursor->opts)) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_BSON,
@@ -949,15 +963,6 @@ _mongoc_cursor_flags (mongoc_cursor_t *cursor,
       } else if (!strcmp (key, MONGOC_CURSOR_TAILABLE)) {
          ADD_FLAG (flags, MONGOC_QUERY_TAILABLE_CURSOR);
       }
-   }
-
-   if (cursor->slave_ok) {
-      *flags |= MONGOC_QUERY_SLAVE_OK;
-   } else if (cursor->server_id_set &&
-              (stream->topology_type == MONGOC_TOPOLOGY_RS_WITH_PRIMARY ||
-               stream->topology_type == MONGOC_TOPOLOGY_RS_NO_PRIMARY) &&
-              stream->sd->type != MONGOC_SERVER_RS_PRIMARY) {
-      *flags |= MONGOC_QUERY_SLAVE_OK;
    }
 
    return true;

@@ -452,6 +452,8 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
       mongoc_apm_command_started_cleanup (&started_event);
    }
 
+   printf ("mongoc_cluster_run_command_monitored: %s\n", bson_as_json (parts->assembled.command, NULL));
+
    if (server_stream->sd->max_wire_version >= WIRE_VERSION_OP_MSG) {
       retval = mongoc_cluster_run_opmsg (
          cluster, server_stream, &parts->assembled, reply, error);

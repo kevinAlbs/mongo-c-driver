@@ -20,14 +20,20 @@ int main() {
    coll = mongoc_client_get_collection(client, "db", "coll");
 
    // Test with a long await time. Insert into db.coll to see messages.
-   bson_t* opts = BCON_NEW("maxAwaitTimeMS", BCON_INT32(10000));
+   bson_t* opts = BCON_NEW("maxAwaitTimeMS", BCON_INT64(10000));
    stream = mongoc_collection_watch(coll, NULL, opts);
    bson_destroy (opts);
 
    printf("Waiting for changes for a max of 10 seconds...\n");
-   while (mongoc_change_stream_next(stream, &doc)) {
-      printf("Got document: %s\n", bson_as_json(doc, NULL));
-   }
+
+   printf("First call\n");
+   mongoc_change_stream_next(stream, &doc);
+   printf("Second call\n");
+   //mongoc_change_stream_next(stream, &doc);
+
+   //while (mongoc_change_stream_next(stream, &doc)) {
+     // printf("Got document: %s\n", bson_as_json(doc, NULL));
+   //}
 
    if (mongoc_change_stream_error(stream, &err)) {
       printf("Error: %s\n", err.message);

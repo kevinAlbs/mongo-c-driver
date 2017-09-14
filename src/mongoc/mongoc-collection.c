@@ -62,7 +62,8 @@
 static mongoc_cursor_t *
 _mongoc_collection_cursor_new (mongoc_collection_t *collection,
                                mongoc_query_flags_t flags,
-                               const mongoc_read_prefs_t *prefs)
+                               const mongoc_read_prefs_t *prefs,
+                               bool is_command)
 {
    return _mongoc_cursor_new (collection->client,
                               collection->ns,
@@ -70,7 +71,7 @@ _mongoc_collection_cursor_new (mongoc_collection_t *collection,
                               0,     /* skip */
                               0,     /* limit */
                               0,     /* batch_size */
-                              false, /* is_command */
+                              is_command,
                               NULL,  /* query */
                               NULL,  /* fields */
                               prefs, /* read prefs */
@@ -337,7 +338,7 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
       read_prefs = collection->read_prefs;
    }
 
-   cursor = _mongoc_collection_cursor_new (collection, flags, read_prefs);
+   cursor = _mongoc_collection_cursor_new (collection, flags, read_prefs, true);
    mongoc_cmd_parts_init (&parts, collection->db, flags, &command);
    parts.read_prefs = read_prefs;
 
@@ -436,6 +437,7 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
       }
 
       /* omits "serverId" */
+      printf ("mongoc_collection_aggregate_opts: %s\n", bson_as_json (opts, NULL));
       ok = mongoc_cmd_parts_append_opts (
          &parts, &iter, server_stream->sd->max_wire_version, &cursor->error);
 
@@ -469,6 +471,7 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
    }
 
    mongoc_cmd_parts_assemble (&parts, server_stream);
+   printf ("mongoc_collection_aggregate, assembled command: %s\n", bson_as_json (parts.assembled.command, NULL));
 
    if (use_cursor) {
       _mongoc_cursor_cursorid_init (cursor, parts.assembled.command);
@@ -1467,7 +1470,7 @@ mongoc_collection_find_indexes (mongoc_collection_t *collection,
     * "listIndexes can be run on a secondary" when directly connected but
     * "run listIndexes on the primary node in replicaSet mode". */
    cursor = _mongoc_collection_cursor_new (
-      collection, MONGOC_QUERY_SLAVE_OK, NULL /* read prefs */);
+      collection, MONGOC_QUERY_SLAVE_OK, NULL /* read prefs */, true);
    _mongoc_cursor_cursorid_init (cursor, &cmd);
 
    if (_mongoc_cursor_cursorid_prime (cursor)) {
@@ -1483,7 +1486,7 @@ mongoc_collection_find_indexes (mongoc_collection_t *collection,
             error->code = 0;
             error->domain = 0;
             cursor = _mongoc_collection_cursor_new (
-               collection, MONGOC_QUERY_SLAVE_OK, NULL /* read prefs */);
+               collection, MONGOC_QUERY_SLAVE_OK, NULL /* read prefs */, true);
 
             _mongoc_cursor_array_init (cursor, NULL, NULL);
             _mongoc_cursor_array_set_bson (cursor, &empty_arr);
