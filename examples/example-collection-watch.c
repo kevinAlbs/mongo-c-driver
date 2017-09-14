@@ -10,30 +10,18 @@ int main() {
 
    mongoc_init();
 
-   /* Assumes a three node replica set named rs0 all on localhost.
-    * Use mtools to make a simple replica set.
-    * mlaunch init --replicaset --nodes 3 --name rs0 --priority --hostname localhost --dir replsetDir
-    */
    client = mongoc_client_new("mongodb://localhost:27017,localhost:27018,localhost:27019/db?replicaSet=rs0");
-   if (!client) return 1;
+   if (!client) {
+      printf("Could not connect to replica set\n");
+      return 1;
+   }
 
    coll = mongoc_client_get_collection(client, "db", "coll");
+   stream = mongoc_collection_watch(coll, NULL, NULL);
 
-   // Test with a long await time. Insert into db.coll to see messages.
-   bson_t* opts = BCON_NEW("maxAwaitTimeMS", BCON_INT64(10000));
-   stream = mongoc_collection_watch(coll, NULL, opts);
-   bson_destroy (opts);
-
-   printf("Waiting for changes for a max of 10 seconds...\n");
-
-   printf("First call\n");
-   mongoc_change_stream_next(stream, &doc);
-   printf("Second call\n");
-   //mongoc_change_stream_next(stream, &doc);
-
-   //while (mongoc_change_stream_next(stream, &doc)) {
-     // printf("Got document: %s\n", bson_as_json(doc, NULL));
-   //}
+   while (mongoc_change_stream_next(stream, &doc)) {
+      printf("Got document: %s\n", bson_as_json(doc, NULL));
+   }
 
    if (mongoc_change_stream_error(stream, &err)) {
       printf("Error: %s\n", err.message);
@@ -41,6 +29,7 @@ int main() {
    }
 
    mongoc_change_stream_destroy(stream);
+   mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
    mongoc_cleanup();
 }

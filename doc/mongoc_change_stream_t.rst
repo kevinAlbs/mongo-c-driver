@@ -11,11 +11,17 @@ Synopsis
    #include <mongoc.h>
    typedef struct _mongoc_change_stream_t mongoc_change_stream_t;
 
-:symbol:``mongoc_change_stream_t`` provides access to a collection change stream. It has similar behavior to a cursor created with the flags: ``MONGOC_QUERY_TAILABLE_CURSOR | MONGOC_QUERY_AWAIT_CURSOR``.
+.. TODO add documentation link when available.
+
+:symbol:`mongoc_change_stream_t` is a handle to a change stream. A collection
+change stream can be obtained using :symbol:`mongoc_collection_watch`. For more
+information see the `MongoDB Change Stream <http://example.com>`_ documentation.
 
 .. warning::
 
-   Although it is possible to create a change stream using mongoc_collection_aggregate, it is recommended to use the mongoc_change_stream_t API.
+   It is recommended to use a :symbol:`mongoc_change_stream_t` and its
+   corresponding functions instead of a raw aggregation with a ``$changeStream``
+   stage.
 
 
 Example
@@ -35,5 +41,5 @@ Example
 
     mongoc_collection_watch
     mongoc_change_stream_next
-    mongoc_change_stream_error
+    mongoc_change_stream_error_document
     mongoc_change_stream_destroy
