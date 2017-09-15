@@ -1,9 +1,14 @@
+/*
+ * TODO: either merge changes from last review or delete this when rebasing.
+ */
 #include <bson.h>
 #include <mongoc.h>
 
 int main() {
    bson_t* doc;
+   bson_t empty = BSON_INITIALIZER;
    bson_error_t err;
+   const bson_t* err_doc;
    mongoc_client_t* client;
    mongoc_collection_t* coll;
    mongoc_change_stream_t* stream;
@@ -17,13 +22,13 @@ int main() {
    }
 
    coll = mongoc_client_get_collection(client, "db", "coll");
-   stream = mongoc_collection_watch(coll, NULL, NULL);
+   stream = mongoc_collection_watch(coll, &empty, NULL);
 
    while (mongoc_change_stream_next(stream, &doc)) {
       printf("Got document: %s\n", bson_as_json(doc, NULL));
    }
 
-   if (mongoc_change_stream_error(stream, &err)) {
+   if (mongoc_change_stream_error_document(stream, &err, &err_doc)) {
       printf("Error: %s\n", err.message);
       return 1;
    }
