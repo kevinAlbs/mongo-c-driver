@@ -4,12 +4,18 @@
 #include "mongoc-cursor.h"
 #include "mongoc-cursor-private.h"
 
+#define SET_BSON_ERR(_str) \
+bson_set_error(&stream->err, MONGOC_ERROR_CURSOR, MONGOC_ERROR_BSON, "Could not set " _str); \
+return false;
 
-//#define SET_BSON_OR_ERR (_dst, _str) \
-//do { \
-//if(!BSON_APPEND_VALUE( _dst, _str, &iter)) { \
-//bson_set_error(&stream->err, MONGOC_ERROR_CURSOR, MONGOC_ERROR_BSON, "Could not set " _str); \
-//} while (false);
+
+#define SET_BSON_OR_ERR(_dst, _str) \
+do { \
+   if(!BSON_APPEND_VALUE(_dst, _str, bson_iter_value(&iter))) { \
+      SET_BSON_ERR(_str); \
+   } \
+} \
+while (0);
 
 
 struct _mongoc_change_stream_t {
@@ -23,7 +29,7 @@ struct _mongoc_change_stream_t {
    bson_error_t err;
    bson_t err_doc;
 
-   mongoc_cursor_t *cursor;
+   mongoc_cursor_t *cursor; /* will not be null */
    mongoc_collection_t *coll;
    int64_t maxAwaitTimeMS;
 };
@@ -89,17 +95,16 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
 
    if (!mongoc_cursor_next (stream->cursor, bson)) {
       const bson_t* err_doc;
-      if (!mongoc_cursor_error_document (stream->cursor, &stream->err, &err_doc)) {
-         bson_destroy(&stream->err_doc);
-         bson_copy_to(err_doc, &stream->err_doc);
+      bson_error_t err;
+      bool resumable = false;
+
+      if (!mongoc_cursor_error_document (stream->cursor, &err, &err_doc)) {
+         /* No error occurred, just no documents left */
          return false;
       }
 
-      printf ("Got error code %d with message %s\n",
-              stream->err.code,
-              stream->err.code ? stream->err.message : "");
+      printf ("Got error\n");
 
-      bool resumable = false;
       /* An error is resumable if it is not a server error, or if it has error
        * code 43 (cursor not found) or is "not master" */
       if (!bson_empty(err_doc)) {
@@ -108,11 +113,10 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
          if (bson_iter_init_find(&iter, err_doc, "errmsg") && BSON_ITER_HOLDS_UTF8(&iter))
          {
             int len;
-            char *errmsg = bson_iter_utf8(&iter, &len);
+            const char *errmsg = bson_iter_utf8(&iter, &len);
             if (bson_utf8_validate(errmsg, len, false) && strncmp(errmsg, "notmaster", len) == 0) {
                resumable = true;
             }
-            bson_free (errmsg);
          }
 
          if (bson_iter_init_find (&iter, err_doc, "code") && BSON_ITER_HOLDS_INT(&iter)) {
@@ -131,12 +135,14 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
          printf ("Trying to resume\n");
          mongoc_cursor_destroy (stream->cursor);
          _mongoc_change_stream_make_cursor (stream);
-         if (!stream->cursor || !mongoc_cursor_next (stream->cursor, bson)) {
-            resumable = mongoc_cursor_error_document (stream->cursor, &stream->err, &err_doc);
+         if (!mongoc_cursor_next (stream->cursor, bson)) {
+            resumable = mongoc_cursor_error_document (stream->cursor, &err, &err_doc);
          }
       }
 
       if (!resumable) {
+         stream->err_occurred = true;
+         stream->err = err;
          bson_destroy(&stream->err_doc);
          bson_copy_to(err_doc, &stream->err_doc);
          return false;
@@ -181,10 +187,7 @@ mongoc_change_stream_destroy (mongoc_change_stream_t *stream)
    bson_destroy (&stream->appended_pipeline);
    bson_destroy (&stream->agg_opts);
    bson_destroy (&stream->err_doc);
-   if (stream->cursor)
-   {
-      mongoc_cursor_destroy (stream->cursor);
-   }
+   mongoc_cursor_destroy (stream->cursor);
    bson_free (stream);
 }
 
@@ -196,8 +199,8 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
    BSON_ASSERT (coll);
    BSON_ASSERT (pipeline);
 
-   mongoc_change_stream_t *stream =
-      (mongoc_change_stream_t *) bson_malloc (sizeof (mongoc_change_stream_t));
+   mongoc_change_stream_t *stream = (mongoc_change_stream_t *) bson_malloc (
+      sizeof (mongoc_change_stream_t));
    stream->maxAwaitTimeMS = -1;
    stream->coll = mongoc_collection_copy (coll);
    bson_copy_to (pipeline, &stream->appended_pipeline);
@@ -205,7 +208,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
    bson_init (&stream->agg_opts);
    bson_init (&stream->resume_token);
    bson_init (&stream->err_doc);
-   /* TODO: stream->err = {0}; // I think this is a compound literal if I cast it. */
+   memset (&stream->err, 0, sizeof (bson_error_t));
    stream->cursor = NULL;
    stream->err_occurred = false;
 
@@ -223,31 +226,26 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
       bson_iter_init (&iter, opts);
 
       if (bson_iter_init_find (&iter, opts, "fullDocument")) {
-         /* TODO: use defines and follow suit with others. */
-         if (!BSON_APPEND_VALUE(&stream->change_stream_stage_opts, "fullDocument", bson_iter_value(&iter))) {
-            bson_set_error (&stream->err, MONGOC_ERROR_CURSOR, MONGOC_ERROR_COMMAND_INVALID_ARG, "Could not append 'fullDocument'");
-            stream->err_occurred = true;
-            return false;
-         }
+         SET_BSON_OR_ERR (&stream->change_stream_stage_opts, "fullDocument");
       } else {
-         BSON_APPEND_UTF8(&stream->change_stream_stage_opts, "fullDocument", "default");
+         if (!BSON_APPEND_UTF8(&stream->change_stream_stage_opts,
+                               "fullDocument", "default")) {
+            SET_BSON_ERR ("fullDocument");
+         }
       }
 
       if (bson_iter_init_find (&iter, opts, "resumeAfter")) {
-         BSON_APPEND_VALUE (
-            &stream->resume_token, "resumeAfter", bson_iter_value (&iter));
+         SET_BSON_OR_ERR (&stream->resume_token, "resumeAfter");
       }
 
       if (bson_iter_init_find (&iter, opts, "batchSize")) {
-         /* TODO: mongoc_collection_aggregate appends the cursor subdoc for
-          * batchSize, we should document this unless this is expected. */
-         BSON_APPEND_VALUE (
-            &stream->agg_opts, "batchSize", bson_iter_value (&iter));
+         /* TODO: mongoc_collection_aggregate appends the cursor subdoc, document? */
+         SET_BSON_OR_ERR (&stream->agg_opts, "batchSize");
       }
 
       if (bson_iter_init_find (&iter, opts, "collation")) {
-         BSON_APPEND_VALUE (
-            &stream->agg_opts, "collation", bson_iter_value (&iter));
+         BSON_APPEND_VALUE (&stream->agg_opts, "collation",
+                            bson_iter_value (&iter));
       }
 
       if (bson_iter_init_find (&iter, opts, "maxAwaitTimeMS")) {
@@ -260,7 +258,9 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
       }
    }
 
-   _mongoc_change_stream_make_cursor (stream);
+   if (!stream->err_occurred) {
+      _mongoc_change_stream_make_cursor (stream);
+   }
 
    return stream;
 }
