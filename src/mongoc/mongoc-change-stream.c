@@ -89,52 +89,61 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
 
    if (!mongoc_cursor_next (stream->cursor, bson)) {
       const bson_t* err_doc;
-      if (mongoc_cursor_error_document (stream->cursor, &stream->err, &err_doc)) {
-         printf ("Got error code %d with message %s\n",
-                 stream->err.code,
-                 stream->err.code ? stream->err.message : "");
+      if (!mongoc_cursor_error_document (stream->cursor, &stream->err, &err_doc)) {
+         bson_destroy(&stream->err_doc);
+         bson_copy_to(err_doc, &stream->err_doc);
+         return false;
+      }
 
-         bool resumable = true;
-         if (!bson_empty(err_doc)) {
-            bson_copy_to(err_doc, &stream->err_doc);
-            /* TODO: Check if this is not an isMaster or does not have error code 43 */
+      printf ("Got error code %d with message %s\n",
+              stream->err.code,
+              stream->err.code ? stream->err.message : "");
+
+      bool resumable = false;
+      /* An error is resumable if it is not a server error, or if it has error
+       * code 43 (cursor not found) or is "not master" */
+      if (!bson_empty(err_doc)) {
+         /* This is a server error */
+         bson_iter_t iter;
+         if (bson_iter_init_find(&iter, err_doc, "errmsg") && BSON_ITER_HOLDS_UTF8(&iter))
+         {
+            int len;
+            char *errmsg = bson_iter_utf8(&iter, &len);
+            if (bson_utf8_validate(errmsg, len, false) && strncmp(errmsg, "notmaster", len) == 0) {
+               resumable = true;
+            }
+            bson_free (errmsg);
          }
 
-         /*
-          * Any error encountered which is not a server error, with the exception
-          * of server responses with the message “not master” or error code 43
-          * (cursor not found).
-          * An example might be a timeout error, or network error.
-          */
-         /*
-          * Once a ChangeStream has encountered a resumable error, it MUST attempt
-          to resume one time. The process for resuming MUST follow these steps:
-            - Perform server selection
-            - Connect to selected server
-            - Execute the known aggregation command, specifying a resumeAfter with
-          the last known resumeToken
-            A driver SHOULD attempt to kill the cursor on the server on which the
-          cursor is opened during the resume process, and MUST NOT attempt to kill
-          the cursor on any other server.
-          */
-         if (resumable) {
-            printf ("Trying to resume\n");
-            mongoc_cursor_destroy (stream->cursor);
-            _mongoc_change_stream_make_cursor (stream);
-            if (!stream->cursor || !mongoc_cursor_next (stream->cursor, bson)) {
-               /* will not retry again */
-               if (mongoc_cursor_error_document (stream->cursor, &stream->err, &stream->err_doc)) {
-                  stream->err_occurred = true;
-                  return false;
-               }
+         if (bson_iter_init_find (&iter, err_doc, "code") && BSON_ITER_HOLDS_INT(&iter)) {
+            if (bson_iter_int64(&iter) == 43) {
+               resumable = true;
             }
          }
-      } else {
+      }
+      else
+      {
+         /* This is a client error */
+         resumable = true;
+      }
+
+      if (resumable) {
+         printf ("Trying to resume\n");
+         mongoc_cursor_destroy (stream->cursor);
+         _mongoc_change_stream_make_cursor (stream);
+         if (!stream->cursor || !mongoc_cursor_next (stream->cursor, bson)) {
+            resumable = mongoc_cursor_error_document (stream->cursor, &stream->err, &err_doc);
+         }
+      }
+
+      if (!resumable) {
+         bson_destroy(&stream->err_doc);
+         bson_copy_to(err_doc, &stream->err_doc);
          return false;
       }
    }
 
-   bson_iter_t iter; /* I bet commas are c99 */
+   bson_iter_t iter;
    if (!bson_iter_init_find (&iter, *bson, "resumeAfter")) {
       stream->err_occurred = true;
       bson_set_error (&stream->err, MONGOC_ERROR_CURSOR, MONGOC_ERROR_CHANGE_STREAM_NO_RESUME_TOKEN, "Cannot provide resume functionality when the resume token is missing");
@@ -171,6 +180,7 @@ mongoc_change_stream_destroy (mongoc_change_stream_t *stream)
    bson_destroy (&stream->resume_token);
    bson_destroy (&stream->appended_pipeline);
    bson_destroy (&stream->agg_opts);
+   bson_destroy (&stream->err_doc);
    if (stream->cursor)
    {
       mongoc_cursor_destroy (stream->cursor);
@@ -194,6 +204,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
    bson_init (&stream->change_stream_stage_opts);
    bson_init (&stream->agg_opts);
    bson_init (&stream->resume_token);
+   bson_init (&stream->err_doc);
    /* TODO: stream->err = {0}; // I think this is a compound literal if I cast it. */
    stream->cursor = NULL;
    stream->err_occurred = false;
