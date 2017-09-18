@@ -5,6 +5,167 @@
 #include "mock_server/future-functions.h"
 #include "TestSuite.h"
 
+#define DESTROY_CHANGE_STREAM(cursor_id) \
+future = future_change_stream_destroy (stream); \
+request = mock_server_receives_command(server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'killCursors' : 'coll', 'cursors' : [ " cursor_id " ] }"); \
+mock_server_replies_simple(request, "{ 'cursorsKilled': [ " cursor_id " ] }"); \
+future_wait(future); \
+future_destroy (future); \
+request_destroy (request);
+
+/* $changeStream must be the first stage in a change stream pipeline sent
+ * to the server */
+static void test_change_stream_pipeline () {
+   mock_server_t *server;
+   request_t *request;
+   future_t *future;
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   const bson_t* next_doc = NULL;
+   bson_t empty_pipeline = BSON_INITIALIZER;
+   bson_t *nonempty_pipeline = BCON_NEW("pipeline", "[", "{", "$project", "{", "ns", BCON_BOOL(false), "}", "}", "]");
+   mongoc_change_stream_t* stream;
+
+   printf("test_change_stream_pipeline\n");
+
+   server = mock_server_with_autoismaster(5);
+   mock_server_run(server);
+
+   client = mongoc_client_new_from_uri (mock_server_get_uri (server));
+   ASSERT (client);
+
+   coll = mongoc_client_get_collection(client, "db", "coll");
+   ASSERT (coll);
+
+   stream = mongoc_collection_watch(coll, &empty_pipeline, NULL);
+   bson_destroy (&empty_pipeline);
+   future = future_change_stream_next (stream, &next_doc);
+
+   request = mock_server_receives_command (server,
+                                           "db",
+                                           MONGOC_QUERY_SLAVE_OK,
+                                           "{"
+                                              "'aggregate' : 'coll',"
+                                              "'pipeline' : "
+                                              "   ["
+                                              "      { '$changeStream':{} }"
+                                              "   ],"
+                                              "'cursor' : {}"
+                                              "}");
+
+   mock_server_replies_simple (request, "{'cursor' : {'id' : 123,'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
+   request_destroy (request);
+   request = mock_server_receives_command (server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'getMore' : 123, 'collection' : 'coll' }");
+   mock_server_replies_simple (request, "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
+   future_wait(future);
+   ASSERT (!future_get_bool (future));
+   ASSERT (!mongoc_change_stream_error_document(stream, NULL, NULL));
+   ASSERT (next_doc == NULL);
+   future_destroy (future);
+   request_destroy (request);
+
+   /* Another call to next should produce another getMore */
+   future = future_change_stream_next (stream, &next_doc);
+   request = mock_server_receives_command (server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'getMore' : 123, 'collection' : 'coll' }");
+   mock_server_replies_simple (request, "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
+   future_wait(future);
+
+   ASSERT (!future_get_bool (future));
+   ASSERT (!mongoc_change_stream_error_document(stream, NULL, NULL));
+   ASSERT (next_doc == NULL);
+   future_destroy (future);
+   request_destroy (request);
+
+   DESTROY_CHANGE_STREAM("123");
+
+   /* Test non-empty pipeline */
+   stream = mongoc_collection_watch(coll, nonempty_pipeline, NULL);
+   future = future_change_stream_next (stream, &next_doc);
+
+   request = mock_server_receives_command (server,
+                                           "db",
+                                           MONGOC_QUERY_SLAVE_OK,
+                                           "{"
+                                              "'aggregate' : 'coll',"
+                                              "'pipeline' : "
+                                              "   ["
+                                              "      { '$changeStream':{} },"
+                                              "      { '$project': { 'ns': false } }"
+                                              "   ],"
+                                              "'cursor' : {}"
+                                              "}");
+   mock_server_replies_simple (request, "{'cursor' : {'id' : 123, 'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
+   request = mock_server_receives_command (server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'getMore' : 123, 'collection' : 'coll' }");
+   mock_server_replies_simple (request, "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
+   future_wait(future);
+   ASSERT (!future_get_bool (future));
+   ASSERT (!mongoc_change_stream_error_document(stream, NULL, NULL));
+   ASSERT (next_doc == NULL);
+   future_destroy (future);
+   request_destroy (request);
+
+   DESTROY_CHANGE_STREAM("123");
+
+   mongoc_client_destroy (client);
+   mongoc_collection_destroy (coll);
+   mock_server_destroy (server);
+}
+
+/* The watch helper must not throw a custom exception when executed against a
+ * single server topology, but instead depend on a server error */
+static void test_change_stream_single_server () {
+   mock_server_t *server;
+   request_t *request;
+   future_t *future;
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   const bson_t* next_doc = NULL;
+   bson_t empty_pipeline = BSON_INITIALIZER;
+   mongoc_change_stream_t* stream;
+
+   server = mock_server_with_autoismaster(5);
+   mock_server_run(server);
+
+   client = mongoc_client_new_from_uri (mock_server_get_uri (server));
+      ASSERT (client);
+
+   coll = mongoc_client_get_collection(client, "db", "coll");
+      ASSERT (coll);
+
+   stream = mongoc_collection_watch(coll, &empty_pipeline, NULL);
+   future = future_change_stream_next (stream, &next_doc);
+
+   request = mock_server_receives_command (server,
+                                           "db",
+                                           MONGOC_QUERY_SLAVE_OK,
+                                           "{"
+                                              "'aggregate' : 'coll',"
+                                              "'pipeline' : "
+                                              "   ["
+                                              "      { '$changeStream':{} }"
+                                              "   ],"
+                                              "'cursor' : {}"
+                                              "}");
+
+   mock_server_replies_simple (request, "{'errmsg' : 'The $changeStream stage is only supported on replica sets', 'code': 40573,'ok' : 0 }");
+   future_wait(future);
+   ASSERT (!future_get_bool (future));
+   ASSERT (mongoc_change_stream_error_document(stream, NULL, NULL));
+   ASSERT (next_doc == NULL);
+   future_destroy (future);
+   request_destroy (request);
+
+   /* Destroying change stream will not issue a kill cursor. */
+   future = future_change_stream_destroy (stream);
+   future_wait(future);
+   future_destroy (future);
+
+   mongoc_client_destroy (client);
+   mongoc_collection_destroy (coll);
+   mock_server_destroy (server);
+}
+
+
 /* Test a basic unadorned change_stream */
 static void test_change_stream_watch () {
    mock_server_t *server;
@@ -97,7 +258,7 @@ static void test_change_stream_resumable_error () {
                                            MONGOC_QUERY_SLAVE_OK,
                                            "{ 'aggregate' : 'coll', 'pipeline' : [ { '$changeStream' : {  } } ], 'cursor' : {  } }");
 
-   mock_server_replies_simple (request, "{'cursor' : {'id' : 123,'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
+   mock_server_replies_simple (request, "{'cursor' : {'id' : 123, 'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
    request = mock_server_receives_command (server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'getMore' : 123, 'collection' : 'coll' }");
    mock_server_replies_simple (request, "{ 'code': 10107, 'errmsg': 'not master', 'ok': 0 }");
 
@@ -105,9 +266,11 @@ static void test_change_stream_resumable_error () {
     * cursor and establish a new one with the same command.
     */
 
+   /* Kill cursor */
    mock_server_receives_command(server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'killCursors' : 'coll', 'cursors' : [ 123 ] }");
    mock_server_replies_simple(request, "{ 'cursorsKilled': [123] }");
 
+   /* Retry command */
    request = mock_server_receives_command (server,
                                            "db",
                                            MONGOC_QUERY_SLAVE_OK,
@@ -130,12 +293,12 @@ static void test_change_stream_resumable_error () {
    mock_server_receives_command(server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'killCursors' : 'coll', 'cursors' : [ 124 ] }");
    mock_server_replies_simple(request, "{ 'cursorsKilled': [124] }");
 
-   /* Re-establish connection */
+   /* Retry command */
    request = mock_server_receives_command (server,
                                            "db",
                                            MONGOC_QUERY_SLAVE_OK,
                                            "{ 'aggregate' : 'coll', 'pipeline' : [ { '$changeStream' : {  } } ], 'cursor' : {  } }");
-   mock_server_replies_simple (request, "{'cursor' : {'id' : 125,'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
+   mock_server_replies_simple (request, "{'cursor' : {'id' : 125, 'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
    request = mock_server_receives_command (server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'getMore' : 125, 'collection' : 'coll' }");
    mock_server_replies_simple (request, "{ 'code': 10107, 'errmsg': 'not master', 'ok': 0 }");
 
@@ -201,6 +364,8 @@ static void test_example() {
 }
 
 void test_change_stream_install (TestSuite* testSuite) {
+   TestSuite_AddMockServerTest (testSuite, "/changestream/pipeline", test_change_stream_pipeline);
+   TestSuite_AddMockServerTest (testSuite, "/changestream/single_server", test_change_stream_single_server);
    TestSuite_AddMockServerTest (testSuite, "/changestream/watch", test_change_stream_watch);
    TestSuite_AddMockServerTest (testSuite, "/changestream/resumable_error", test_change_stream_resumable_error);
    // TestSuite_AddMockServerTest (testSuite, "/changestream/playing", test_example);

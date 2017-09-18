@@ -39,37 +39,54 @@ struct _mongoc_change_stream_t {
 static void
 _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
 {
-   bson_t change_stream_stage;
+   bson_t *change_stream_stage; /* { $changeStream: <change_stream_doc> } */
+   bson_t change_stream_doc;   /* { pipeline: <pipeline_array> */
+   bson_t pipeline_array;
    bson_t pipeline;
+   bson_iter_t iter;
 
    /* We construct the pipeline here, since we need to reconstruct when
     * we retry to add the updated resume token
     */
    if (!bson_empty (&stream->change_stream_stage_opts)) {
-      bson_copy_to (&stream->change_stream_stage_opts, &change_stream_stage);
+      bson_copy_to (&stream->change_stream_stage_opts, &change_stream_doc);
    } else {
-      bson_init (&change_stream_stage);
+      bson_init (&change_stream_doc);
    }
 
    if (!bson_empty (&stream->resume_token)) {
-      bson_concat (&change_stream_stage, &stream->resume_token);
+      bson_concat (&change_stream_doc, &stream->resume_token);
    }
 
    bson_init (&pipeline);
-   BCON_APPEND (&pipeline,
-                "pipeline",
-                "[",
-                "{",
-                "$changeStream",
-                BCON_DOCUMENT (&change_stream_stage),
-                "}",
-                "]");
-   bson_destroy (&change_stream_stage);
+   bson_append_array_begin (&pipeline, "pipeline", -1, &pipeline_array);
+
+   change_stream_stage = BCON_NEW("$changeStream", BCON_DOCUMENT(&change_stream_doc));
+   BSON_APPEND_DOCUMENT(&pipeline_array, "0", change_stream_stage);
+   bson_destroy (&change_stream_doc);
+   bson_destroy (change_stream_stage);
 
    /* Append user pipeline if it exists */
-   if (!bson_empty (&stream->appended_pipeline)) {
-      BSON_APPEND_ARRAY (&pipeline, "pipeline", &stream->appended_pipeline);
+   if (bson_iter_init_find(&iter, &stream->appended_pipeline, "pipeline") && BSON_ITER_HOLDS_ARRAY(&iter)) {
+      bson_iter_t child_iter;
+      uint32_t key_int = 1;
+      char buf[16];
+      const char *key_str;
+
+      bson_iter_recurse(&iter, &child_iter);
+      while (bson_iter_next(&child_iter)) {
+         if (BSON_ITER_HOLDS_DOCUMENT(&child_iter)) {
+            size_t keyLen = bson_uint32_to_string(key_int, &key_str, buf, sizeof(buf));
+            bson_append_value(&pipeline_array, key_str, keyLen, bson_iter_value(&child_iter));
+            ++key_int;
+         }
+      }
    }
+
+   bson_append_array_end (&pipeline, &pipeline_array);
+   printf("Done constructing pipeline\n");
+   printf("The thing I have created is %s\n", bson_as_json(&pipeline, NULL));
+
 
    stream->cursor = mongoc_collection_aggregate (stream->coll,
                                                  MONGOC_QUERY_TAILABLE_CURSOR |
@@ -222,7 +239,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
       (mongoc_change_stream_t *) bson_malloc (sizeof (mongoc_change_stream_t));
    stream->maxAwaitTimeMS = -1;
    stream->coll = mongoc_collection_copy (coll);
-   bson_copy_to (pipeline, &stream->appended_pipeline);
+   bson_init (&stream->appended_pipeline);
    bson_init (&stream->change_stream_stage_opts);
    bson_init (&stream->agg_opts);
    bson_init (&stream->resume_token);
@@ -264,8 +281,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
       }
 
       if (bson_iter_init_find (&iter, opts, "collation")) {
-         BSON_APPEND_VALUE (
-            &stream->agg_opts, "collation", bson_iter_value (&iter));
+         SET_BSON_OR_ERR (&stream->agg_opts, "collation");
       }
 
       if (bson_iter_init_find (&iter, opts, "maxAwaitTimeMS")) {
@@ -275,6 +291,13 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
          } else if (BSON_ITER_HOLDS_INT64 (&iter)) {
             stream->maxAwaitTimeMS = bson_iter_int64 (&iter);
          }
+      }
+   }
+
+   if (!bson_empty(pipeline)) {
+      bson_iter_t iter;
+      if (bson_iter_init_find (&iter, pipeline, "pipeline")) {
+         SET_BSON_OR_ERR (&stream->appended_pipeline, "pipeline");
       }
    }
 
