@@ -437,7 +437,7 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
       }
 
       /* omits "serverId" */
-      printf ("mongoc_collection_aggregate_opts: %s\n", bson_as_json (opts, NULL));
+      //printf ("mongoc_collection_aggregate_opts: %s\n", bson_as_json (opts, NULL));
       ok = mongoc_cmd_parts_append_opts (
          &parts, &iter, server_stream->sd->max_wire_version, &cursor->error);
 
@@ -471,7 +471,7 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
    }
 
    mongoc_cmd_parts_assemble (&parts, server_stream);
-   printf ("mongoc_collection_aggregate, assembled command: %s\n", bson_as_json (parts.assembled.command, NULL));
+   //printf ("mongoc_collection_aggregate, assembled command: %s\n", bson_as_json (parts.assembled.command, NULL));
 
    if (use_cursor) {
       _mongoc_cursor_cursorid_init (cursor, parts.assembled.command);
