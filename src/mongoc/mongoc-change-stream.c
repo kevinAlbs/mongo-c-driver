@@ -20,10 +20,9 @@
    } while (0);
 
 
-/* TODO: move this to private */
+/* TODO: move this to private .h file */
 struct _mongoc_change_stream_t {
-   /* lightly parsed user options */
-   bson_t appended_pipeline;
+   bson_t pipeline_to_append;
    bson_t change_stream_stage_opts;
    bson_t agg_opts;
    bson_t resume_token; /* empty, or has resumeAfter: doc */
@@ -68,7 +67,7 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
    bson_destroy (change_stream_stage);
 
    /* Append user pipeline if it exists */
-   if (bson_iter_init_find(&iter, &stream->appended_pipeline, "pipeline") && BSON_ITER_HOLDS_ARRAY(&iter)) {
+   if (bson_iter_init_find(&iter, &stream->pipeline_to_append, "pipeline") && BSON_ITER_HOLDS_ARRAY(&iter)) {
       bson_iter_t child_iter;
       uint32_t key_int = 1;
       char buf[16];
@@ -85,6 +84,7 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
    }
 
    bson_append_array_end (&pipeline, &pipeline_array);
+   bson_destroy(&pipeline_array);
 
    stream->cursor = mongoc_collection_aggregate (stream->coll,
                                                  MONGOC_QUERY_TAILABLE_CURSOR |
@@ -92,6 +92,9 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
                                                  &pipeline,
                                                  &stream->agg_opts,
                                                  NULL);
+
+   bson_destroy(&pipeline);
+
    if (stream->maxAwaitTimeMS >= 0) {
       _mongoc_cursor_set_opt_int64 (stream->cursor,
                                     MONGOC_CURSOR_MAX_AWAIT_TIME_MS,
@@ -215,7 +218,7 @@ mongoc_change_stream_error_document (const mongoc_change_stream_t *stream,
 void
 mongoc_change_stream_destroy (mongoc_change_stream_t *stream)
 {
-   bson_destroy (&stream->appended_pipeline);
+   bson_destroy (&stream->pipeline_to_append);
    bson_destroy (&stream->change_stream_stage_opts);
    bson_destroy (&stream->agg_opts);
    bson_destroy (&stream->resume_token);
@@ -237,7 +240,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
       (mongoc_change_stream_t *) bson_malloc (sizeof (mongoc_change_stream_t));
    stream->maxAwaitTimeMS = -1;
    stream->coll = mongoc_collection_copy (coll);
-   bson_init (&stream->appended_pipeline);
+   bson_init (&stream->pipeline_to_append);
    bson_init (&stream->change_stream_stage_opts);
    bson_init (&stream->agg_opts);
    bson_init (&stream->resume_token);
@@ -295,7 +298,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
    if (!bson_empty(pipeline)) {
       bson_iter_t iter;
       if (bson_iter_init_find (&iter, pipeline, "pipeline")) {
-         SET_BSON_OR_ERR (&stream->appended_pipeline, "pipeline");
+         SET_BSON_OR_ERR (&stream->pipeline_to_append, "pipeline");
       }
    }
 

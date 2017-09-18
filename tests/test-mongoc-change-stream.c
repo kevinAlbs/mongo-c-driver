@@ -760,14 +760,8 @@ void test_change_stream_server_selection (void) {
 //   mock_server_destroy (server);
 }
 
-void test_change_stream_options ()
+void test_change_stream_options (void)
 {
-   const char* change_stream_cmd = "{"
-      "'aggregate' : 'coll',"
-      "'pipeline' : "
-      "   [ { '$changeStream':{%s} } ],"
-      "'cursor' : {}"
-      "}";
    mock_server_t *server;
    request_t *request;
    future_t *future;
@@ -785,15 +779,31 @@ void test_change_stream_options ()
    coll = mongoc_client_get_collection (client, "db", "coll");
       ASSERT (coll);
 
+   bson_t *opts = BCON_NEW("batchSize", BCON_INT32(10));
    mongoc_change_stream_t *stream =
-      mongoc_collection_watch (coll, &empty, NULL);
+      mongoc_collection_watch (coll, &empty, opts);
    future = future_change_stream_next (stream, &next_doc);
 
+   /*
+    * fullDocument: 'default'|'updateLookup', passed to $changeStream stage
+    * resumeAfter: optional<Doc>, passed to $changeStream stage
+    * maxAwaitTimeMS: Optional<Int64>, passed to cursor
+    * batchSize: Optional<Int32>, passed as agg option, {cursor: { batchSize: }}
+    * collation: Optional<Document>, passed as agg option
+    */
+   
+   /* batchSize */
    request = mock_server_receives_command (server,
                                            "db",
                                            MONGOC_QUERY_SLAVE_OK,
-                                           change_stream_cmd
-                                           );
+                                           "{"
+                                              "'aggregate' : 'coll',"
+                                              "'pipeline' : "
+                                              "   ["
+                                              "      { '$changeStream':{} }"
+                                              "   ],"
+                                              "'cursor' : { 'batchSize': 10 }"
+                                              "}");
 
    mock_server_replies_simple (
       request,
@@ -811,28 +821,9 @@ void test_change_stream_options ()
       ASSERT (!mongoc_change_stream_error_document (stream, NULL, NULL));
       ASSERT (next_doc == NULL);
 
-   future_destroy(future);
-   request_destroy (request);
-
-   /* Another call to next should produce another getMore */
-   future = future_change_stream_next (stream, &next_doc);
-   request = mock_server_receives_command (
-      server,
-      "db",
-      MONGOC_QUERY_SLAVE_OK,
-      "{ 'getMore' : 123, 'collection' : 'coll' }");
-   mock_server_replies_simple (request,
-                               "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
-   future_wait (future);
-
-      ASSERT (!future_get_bool (future));
-      ASSERT (!mongoc_change_stream_error_document (stream, NULL, NULL));
-      ASSERT (next_doc == NULL);
-
-   future_destroy(future);
-   request_destroy (request);
-
    DESTROY_CHANGE_STREAM ("123");
+
+
 
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
@@ -867,8 +858,12 @@ test_change_stream_install (TestSuite *testSuite)
 
    /* TODO */
    TestSuite_AddMockServerTest (testSuite,
-                                "/changestream/test_change_stream_server_selection",
+                                "/changestream/server_selection",
                                 test_change_stream_server_selection);
+
+   TestSuite_AddMockServerTest (testSuite,
+                               "/changestream/options",
+                               test_change_stream_options);
 
 //   TestSuite_AddMockServerTest (testSuite,
 //                               "/changestream/test_change_stream_initial_empty_batch",

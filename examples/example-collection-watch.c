@@ -25,7 +25,9 @@ int main() {
    stream = mongoc_collection_watch(coll, &empty, NULL);
 
    while (mongoc_change_stream_next(stream, &doc)) {
-      printf("Got document: %s\n", bson_as_json(doc, NULL));
+      char *str = bson_as_json(doc, NULL);
+      printf("Got document: %s\n", str);
+      bson_free(str);
    }
 
    if (mongoc_change_stream_error_document(stream, &err, &err_doc)) {
