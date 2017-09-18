@@ -1,7 +1,6 @@
 #include <bson.h>
 #include "mongoc-change-stream.h"
 #include "mongoc-error.h"
-#include "mongoc-cursor.h"
 #include "mongoc-cursor-private.h"
 
 #define SET_BSON_ERR(_str)                 \
@@ -9,7 +8,7 @@
                    MONGOC_ERROR_CURSOR,    \
                    MONGOC_ERROR_BSON,      \
                    "Could not set " _str); \
-   return false;
+   stream->err_occurred = true;
 
 
 #define SET_BSON_OR_ERR(_dst, _str)                                   \
@@ -39,52 +38,54 @@ struct _mongoc_change_stream_t {
 static void
 _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
 {
-   bson_t *change_stream_stage; /* { $changeStream: <change_stream_doc> } */
-   bson_t change_stream_doc;   /* { pipeline: <pipeline_array> */
-   bson_t pipeline_array;
-   bson_t pipeline;
+   bson_t change_stream_stage; /* { $changeStream: <change_stream_doc> } */
+   bson_t change_stream_doc;
+   bson_t pipeline; /* { pipeline: <pipeline_array> */
+   bson_t pipeline_array; /* { 0: {...}, 1: {...}, ... } */
    bson_iter_t iter;
 
-   /* We construct the pipeline here, since we need to reconstruct when
-    * we retry to add the updated resume token
+   BSON_ASSERT (stream);
+
+   /* Construct the pipeline here, since we need to reconstruct during
+    * a retry to add the updated resumeAfter token.
     */
-   if (!bson_empty (&stream->change_stream_stage_opts)) {
-      bson_copy_to (&stream->change_stream_stage_opts, &change_stream_doc);
-   } else {
-      bson_init (&change_stream_doc);
-   }
+   bson_copy_to (&stream->change_stream_stage_opts, &change_stream_doc);
+   bson_init (&change_stream_stage);
+   bson_init (&pipeline);
 
    if (!bson_empty (&stream->resume_token)) {
       bson_concat (&change_stream_doc, &stream->resume_token);
    }
 
-   bson_init (&pipeline);
-   bson_append_array_begin (&pipeline, "pipeline", -1, &pipeline_array);
-
-   change_stream_stage = BCON_NEW("$changeStream", BCON_DOCUMENT(&change_stream_doc));
-   BSON_APPEND_DOCUMENT(&pipeline_array, "0", change_stream_stage);
+   BSON_APPEND_DOCUMENT (&change_stream_stage, "$changeStream", &change_stream_doc);
    bson_destroy (&change_stream_doc);
-   bson_destroy (change_stream_stage);
+
+   bson_append_array_begin (&pipeline, "pipeline", -1, &pipeline_array);
+   BSON_APPEND_DOCUMENT (&pipeline_array, "0", &change_stream_stage);
+   bson_destroy (&change_stream_stage);
 
    /* Append user pipeline if it exists */
-   if (bson_iter_init_find(&iter, &stream->pipeline_to_append, "pipeline") && BSON_ITER_HOLDS_ARRAY(&iter)) {
+   if (bson_iter_init_find (&iter, &stream->pipeline_to_append, "pipeline") &&
+       BSON_ITER_HOLDS_ARRAY (&iter)) {
       bson_iter_t child_iter;
       uint32_t key_int = 1;
       char buf[16];
       const char *key_str;
 
-      bson_iter_recurse(&iter, &child_iter);
-      while (bson_iter_next(&child_iter)) {
-         if (BSON_ITER_HOLDS_DOCUMENT(&child_iter)) {
-            size_t keyLen = bson_uint32_to_string(key_int, &key_str, buf, sizeof(buf));
-            bson_append_value(&pipeline_array, key_str, keyLen, bson_iter_value(&child_iter));
+      bson_iter_recurse (&iter, &child_iter);
+      while (bson_iter_next (&child_iter)) {
+         if (BSON_ITER_HOLDS_DOCUMENT (&child_iter)) {
+            size_t keyLen =
+               bson_uint32_to_string (key_int, &key_str, buf, sizeof (buf));
+            bson_append_value (
+               &pipeline_array, key_str, keyLen, bson_iter_value (&child_iter));
             ++key_int;
          }
       }
    }
 
    bson_append_array_end (&pipeline, &pipeline_array);
-   bson_destroy(&pipeline_array);
+   bson_destroy (&pipeline_array);
 
    stream->cursor = mongoc_collection_aggregate (stream->coll,
                                                  MONGOC_QUERY_TAILABLE_CURSOR |
@@ -93,7 +94,7 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
                                                  &stream->agg_opts,
                                                  NULL);
 
-   bson_destroy(&pipeline);
+   bson_destroy (&pipeline);
 
    if (stream->maxAwaitTimeMS >= 0) {
       _mongoc_cursor_set_opt_int64 (stream->cursor,
@@ -105,6 +106,8 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
 bool
 mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
 {
+   bson_iter_t iter;
+
    BSON_ASSERT (stream);
    BSON_ASSERT (bson);
 
@@ -122,8 +125,7 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
          return false;
       }
 
-      printf ("Got error\n");
-
+      printf("Error occurred\n");
       /* An error is resumable if it is not a server error, or if it has error
        * code 43 (cursor not found) or is "not master" */
       if (!bson_empty (err_doc)) {
@@ -165,7 +167,7 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
       }
 
       if (!resumable) {
-         printf("Unrecoverable error\n");
+         printf ("Unrecoverable error\n");
          stream->err_occurred = true;
          stream->err = err;
          bson_destroy (&stream->err_doc);
@@ -176,7 +178,6 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
 
    /* We have received documents, either from the first call to next
     * or after a resume. */
-   bson_iter_t iter;
    if (!bson_iter_init_find (&iter, *bson, "_id")) {
       stream->err_occurred = true;
       bson_set_error (&stream->err,
@@ -187,9 +188,7 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
       return false;
    }
 
-   /* We need to copy the resume token, as the next call to mongoc_cursor_next
-    * invalidates */
-
+   /* Copy the resume token */
    bson_destroy (&stream->resume_token);
    bson_init (&stream->resume_token);
    BSON_APPEND_VALUE (
@@ -202,7 +201,8 @@ mongoc_change_stream_error_document (const mongoc_change_stream_t *stream,
                                      bson_error_t *err,
                                      const bson_t **bson)
 {
-   /* if we have change stream specific errors, return them first */
+   BSON_ASSERT (stream);
+
    if (stream->err_occurred) {
       if (err) {
          *err = stream->err;
@@ -218,13 +218,14 @@ mongoc_change_stream_error_document (const mongoc_change_stream_t *stream,
 void
 mongoc_change_stream_destroy (mongoc_change_stream_t *stream)
 {
+   BSON_ASSERT (stream);
    bson_destroy (&stream->pipeline_to_append);
    bson_destroy (&stream->change_stream_stage_opts);
    bson_destroy (&stream->agg_opts);
    bson_destroy (&stream->resume_token);
    bson_destroy (&stream->err_doc);
    mongoc_cursor_destroy (stream->cursor);
-   mongoc_collection_destroy(stream->coll);
+   mongoc_collection_destroy (stream->coll);
    bson_free (stream);
 }
 
@@ -233,11 +234,12 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
                            const bson_t *pipeline,
                            const bson_t *opts)
 {
+   mongoc_change_stream_t *stream =
+      (mongoc_change_stream_t *) bson_malloc (sizeof (mongoc_change_stream_t));
+
    BSON_ASSERT (coll);
    BSON_ASSERT (pipeline);
 
-   mongoc_change_stream_t *stream =
-      (mongoc_change_stream_t *) bson_malloc (sizeof (mongoc_change_stream_t));
    stream->maxAwaitTimeMS = -1;
    stream->coll = mongoc_collection_copy (coll);
    bson_init (&stream->pipeline_to_append);
@@ -260,7 +262,6 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
 
    if (opts) {
       bson_iter_t iter;
-      bson_iter_init (&iter, opts);
 
       if (bson_iter_init_find (&iter, opts, "fullDocument")) {
          SET_BSON_OR_ERR (&stream->change_stream_stage_opts, "fullDocument");
@@ -276,8 +277,6 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
       }
 
       if (bson_iter_init_find (&iter, opts, "batchSize")) {
-         /* TODO: mongoc_collection_aggregate appends the cursor subdoc,
-          * document? */
          SET_BSON_OR_ERR (&stream->agg_opts, "batchSize");
       }
 
@@ -295,7 +294,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
       }
    }
 
-   if (!bson_empty(pipeline)) {
+   if (!bson_empty (pipeline)) {
       bson_iter_t iter;
       if (bson_iter_init_find (&iter, pipeline, "pipeline")) {
          SET_BSON_OR_ERR (&stream->pipeline_to_append, "pipeline");
