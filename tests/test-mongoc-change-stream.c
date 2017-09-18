@@ -52,7 +52,7 @@ test_change_stream_watch ()
                                            "{"
                                               "'aggregate' : 'coll',"
                                               "'pipeline' : "
-                                              "   [ { '$changeStream':{} } ],"
+                                              "   [ { '$changeStream':{ 'fullDocument' : 'default' } } ],"
                                               "'cursor' : {}"
                                               "}");
 
@@ -201,7 +201,7 @@ test_change_stream_pipeline ()
                                            "'aggregate' : 'coll',"
                                            "'pipeline' : "
                                            "   ["
-                                           "      { '$changeStream':{} }"
+                                           "      { '$changeStream':{ 'fullDocument' : 'default' } }"
                                            "   ],"
                                            "'cursor' : {}"
                                            "}");
@@ -255,7 +255,7 @@ test_change_stream_pipeline ()
                                     "'aggregate' : 'coll',"
                                     "'pipeline' : "
                                     "   ["
-                                    "      { '$changeStream':{} },"
+                                    "      { '$changeStream':{ 'fullDocument' : 'default' } },"
                                     "      { '$project': { 'ns': false } }"
                                     "   ],"
                                     "'cursor' : {}"
@@ -317,7 +317,7 @@ test_change_stream_single_server ()
                                            "'aggregate' : 'coll',"
                                            "'pipeline' : "
                                            "   ["
-                                           "      { '$changeStream':{} }"
+                                           "      { '$changeStream':{ 'fullDocument' : 'default' } }"
                                            "   ],"
                                            "'cursor' : {}"
                                            "}");
@@ -375,7 +375,7 @@ test_change_stream_track_resume_token ()
                                               "'aggregate' : 'coll',"
                                               "'pipeline' : "
                                               "   ["
-                                              "      { '$changeStream':{} }"
+                                              "      { '$changeStream':{ 'fullDocument' : 'default' } }"
                                               "   ],"
                                               "'cursor' : {}"
                                               "}");
@@ -484,7 +484,7 @@ test_change_stream_missing_resume_token () {
                                               "'aggregate' : 'coll',"
                                               "'pipeline' : "
                                               "   ["
-                                              "      { '$changeStream':{} }"
+                                              "      { '$changeStream':{ 'fullDocument' : 'default' } }"
                                               "   ],"
                                               "'cursor' : {}"
                                               "}");
@@ -539,7 +539,7 @@ test_change_stream_resumable_error ()
 
    request = mock_server_receives_command (
       server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'aggregate' : 'coll', 'pipeline' "
-         ": [ { '$changeStream' : {  } } ], "
+         ": [ { '$changeStream' : { 'fullDocument' : 'default' } } ], "
          "'cursor' : {  } }");
 
    mock_server_replies_simple (request, "{'cursor' : {'id' : 123, 'ns' : "
@@ -570,7 +570,7 @@ test_change_stream_resumable_error ()
    /* Retry command */
    request = mock_server_receives_command (
       server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'aggregate' : 'coll', 'pipeline' "
-         ": [ { '$changeStream' : {  } } ], "
+         ": [ { '$changeStream' : { 'fullDocument' : 'default' } } ], "
          "'cursor' : {  } }");
    mock_server_replies_simple (
       request,
@@ -609,7 +609,7 @@ test_change_stream_resumable_error ()
    /* Retry command */
    request = mock_server_receives_command (
       server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'aggregate' : 'coll', 'pipeline' "
-         ": [ { '$changeStream' : {  } } ], "
+         ": [ { '$changeStream' : { 'fullDocument' : 'default' } } ], "
          "'cursor' : {  } }");
    mock_server_replies_simple (request, "{'cursor' : {'id' : 125, 'ns' : "
       "'db.coll','firstBatch' : []},'ok' : 1 "
@@ -672,7 +672,7 @@ test_change_stream_nonresumable_error ()
 
    request = mock_server_receives_command (
       server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'aggregate' : 'coll', 'pipeline' "
-         ": [ { '$changeStream' : {  } } ], "
+         ": [ { '$changeStream' : { 'fullDocument' : 'default' } } ], "
          "'cursor' : {  } }");
 
    mock_server_replies_simple (request, "{'cursor' : {'id' : 123, 'ns' : "
@@ -732,7 +732,7 @@ void test_change_stream_server_selection (void) {
 //
 //   request = mock_server_receives_command (
 //      server, "db", MONGOC_QUERY_SLAVE_OK, "{ 'aggregate' : 'coll', 'pipeline' "
-//         ": [ { '$changeStream' : {  } } ], "
+//         ": [ { '$changeStream' : { 'fullDocument' : 'default' } } ], "
 //         "'cursor' : {  } }");
 //
 //   mock_server_replies_simple (request, "{'cursor' : {'id' : 123, 'ns' : "
@@ -779,10 +779,6 @@ void test_change_stream_options (void)
    coll = mongoc_client_get_collection (client, "db", "coll");
       ASSERT (coll);
 
-   bson_t *opts = BCON_NEW("batchSize", BCON_INT32(10));
-   mongoc_change_stream_t *stream =
-      mongoc_collection_watch (coll, &empty, opts);
-   future = future_change_stream_next (stream, &next_doc);
 
    /*
     * fullDocument: 'default'|'updateLookup', passed to $changeStream stage
@@ -791,8 +787,13 @@ void test_change_stream_options (void)
     * batchSize: Optional<Int32>, passed as agg option, {cursor: { batchSize: }}
     * collation: Optional<Document>, passed as agg option
     */
-   
-   /* batchSize */
+
+   /* fullDocument */
+   bson_t *opts = BCON_NEW("fullDocument", "updateLookup");
+   mongoc_change_stream_t *stream =
+      mongoc_collection_watch (coll, &empty, opts);
+   future = future_change_stream_next (stream, &next_doc);
+
    request = mock_server_receives_command (server,
                                            "db",
                                            MONGOC_QUERY_SLAVE_OK,
@@ -800,14 +801,15 @@ void test_change_stream_options (void)
                                               "'aggregate' : 'coll',"
                                               "'pipeline' : "
                                               "   ["
-                                              "      { '$changeStream':{} }"
+                                              "      { '$changeStream':{ 'fullDocument' : 'updateLookup' } }"
                                               "   ],"
-                                              "'cursor' : { 'batchSize': 10 }"
+                                              "'cursor' : { }"
                                               "}");
 
    mock_server_replies_simple (
       request,
       "{'cursor' : {'id' : 123,'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
+   request_destroy (request);
    request = mock_server_receives_command (
       server,
       "db",
@@ -815,6 +817,121 @@ void test_change_stream_options (void)
       "{ 'getMore' : 123, 'collection' : 'coll' }");
    mock_server_replies_simple (request,
                                "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
+   request_destroy (request);
+
+   future_wait (future);
+      ASSERT (!future_get_bool (future));
+      ASSERT (!mongoc_change_stream_error_document (stream, NULL, NULL));
+      ASSERT (next_doc == NULL);
+
+   DESTROY_CHANGE_STREAM ("123");
+   bson_destroy(opts);
+
+   /* resumeAfter */
+   opts = BCON_NEW("resumeAfter", "{", "_id", BCON_UTF8("test_1"), "}");
+   stream = mongoc_collection_watch (coll, &empty, opts);
+   future = future_change_stream_next (stream, &next_doc);
+
+   request = mock_server_receives_command (server,
+                                           "db",
+                                           MONGOC_QUERY_SLAVE_OK,
+                                           "{"
+                                              "'aggregate' : 'coll',"
+                                              "'pipeline' : "
+                                              "   ["
+                                              "      { '$changeStream':{ 'fullDocument' : 'default', 'resumeAfter': {'_id': 'test_1'} } }"
+                                              "   ],"
+                                              "'cursor' : { }"
+                                              "}");
+
+   mock_server_replies_simple (
+      request,
+      "{'cursor' : {'id' : 123,'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
+   request_destroy (request);
+   request = mock_server_receives_command (
+      server,
+      "db",
+      MONGOC_QUERY_SLAVE_OK,
+      "{ 'getMore' : 123, 'collection' : 'coll' }");
+   mock_server_replies_simple (request,
+                               "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
+   request_destroy (request);
+
+   future_wait (future);
+      ASSERT (!future_get_bool (future));
+      ASSERT (!mongoc_change_stream_error_document (stream, NULL, NULL));
+      ASSERT (next_doc == NULL);
+
+   DESTROY_CHANGE_STREAM ("123");
+   bson_destroy(opts);
+
+   /* maxAwaitTimeMS */
+   opts = BCON_NEW("maxAwaitTimeMS", BCON_INT64(5000));
+   stream = mongoc_collection_watch (coll, &empty, opts);
+   future = future_change_stream_next (stream, &next_doc);
+
+   request = mock_server_receives_command (server,
+                                           "db",
+                                           MONGOC_QUERY_SLAVE_OK,
+                                           "{"
+                                              "'aggregate' : 'coll',"
+                                              "'pipeline' : "
+                                              "   ["
+                                              "      { '$changeStream':{ 'fullDocument' : 'default' } }"
+                                              "   ],"
+                                              "'cursor' : { }"
+                                              "}");
+
+   mock_server_replies_simple (
+      request,
+      "{'cursor' : {'id' : 123,'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
+   request_destroy (request);
+   request = mock_server_receives_command (
+      server,
+      "db",
+      MONGOC_QUERY_SLAVE_OK,
+      "{ 'getMore' : 123, 'collection' : 'coll', 'maxTimeMS': 5000}");
+   mock_server_replies_simple (request,
+                               "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
+   request_destroy (request);
+
+   future_wait (future);
+      ASSERT (!future_get_bool (future));
+      ASSERT (!mongoc_change_stream_error_document (stream, NULL, NULL));
+      ASSERT (next_doc == NULL);
+
+   DESTROY_CHANGE_STREAM ("123");
+   bson_destroy(opts);
+
+   /* batchSize */
+   opts = BCON_NEW("batchSize", BCON_INT32(10));
+   stream = mongoc_collection_watch (coll, &empty, opts);
+   future = future_change_stream_next (stream, &next_doc);
+
+   request = mock_server_receives_command (server,
+                                           "db",
+                                           MONGOC_QUERY_SLAVE_OK,
+                                           "{"
+                                              "'aggregate' : 'coll',"
+                                              "'pipeline' : "
+                                              "   ["
+                                              "      { '$changeStream':{ 'fullDocument' : 'default' } }"
+                                              "   ],"
+                                              "'cursor' : { 'batchSize': 10 }"
+                                              "}");
+
+   mock_server_replies_simple (
+      request,
+      "{'cursor' : {'id' : 123,'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
+   request_destroy (request);
+   request = mock_server_receives_command (
+      server,
+      "db",
+      MONGOC_QUERY_SLAVE_OK,
+      "{ 'getMore' : 123, 'collection' : 'coll' }");
+   mock_server_replies_simple (request,
+                               "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
+   request_destroy (request);
 
    future_wait (future);
       ASSERT (!future_get_bool (future));
@@ -823,6 +940,44 @@ void test_change_stream_options (void)
 
    DESTROY_CHANGE_STREAM ("123");
 
+
+   /* collation */
+   opts = BCON_NEW("collation", "{", "locale", BCON_UTF8("en"), "}");
+   stream = mongoc_collection_watch (coll, &empty, opts);
+   future = future_change_stream_next (stream, &next_doc);
+
+   request = mock_server_receives_command (server,
+                                           "db",
+                                           MONGOC_QUERY_SLAVE_OK,
+                                           "{"
+                                              "'aggregate' : 'coll',"
+                                              "'pipeline' : "
+                                              "   ["
+                                              "      { '$changeStream':{ 'fullDocument' : 'default' } }"
+                                              "   ],"
+                                              "'cursor' : {},"
+                                              "'collation': { 'locale': 'en' }"
+                                              "}");
+
+   mock_server_replies_simple (
+      request,
+      "{'cursor' : {'id' : 123,'ns' : 'db.coll','firstBatch' : []},'ok' : 1 }");
+   request_destroy (request);
+   request = mock_server_receives_command (
+      server,
+      "db",
+      MONGOC_QUERY_SLAVE_OK,
+      "{ 'getMore' : 123, 'collection' : 'coll' }");
+   mock_server_replies_simple (request,
+                               "{ 'cursor' : { 'nextBatch' : [] }, 'ok': 1 }");
+   request_destroy (request);
+
+   future_wait (future);
+      ASSERT (!future_get_bool (future));
+      ASSERT (!mongoc_change_stream_error_document (stream, NULL, NULL));
+      ASSERT (next_doc == NULL);
+
+   DESTROY_CHANGE_STREAM ("123");
 
 
    mongoc_collection_destroy (coll);
