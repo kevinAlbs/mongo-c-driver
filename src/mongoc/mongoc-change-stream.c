@@ -20,6 +20,7 @@
    } while (0);
 
 
+/* TODO: move this to private */
 struct _mongoc_change_stream_t {
    /* lightly parsed user options */
    bson_t appended_pipeline;
@@ -84,9 +85,6 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
    }
 
    bson_append_array_end (&pipeline, &pipeline_array);
-   printf("Done constructing pipeline\n");
-   printf("The thing I have created is %s\n", bson_as_json(&pipeline, NULL));
-
 
    stream->cursor = mongoc_collection_aggregate (stream->coll,
                                                  MONGOC_QUERY_TAILABLE_CURSOR |
