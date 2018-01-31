@@ -20,7 +20,9 @@ struct result {
    bool finished;
 };
 
-static mongoc_stream_t* get_localhost_stream (uint16_t port) {
+static mongoc_stream_t *
+get_localhost_stream (uint16_t port)
+{
    int errcode;
    int r;
    struct sockaddr_in server_addr = {0};
@@ -38,7 +40,7 @@ static mongoc_stream_t* get_localhost_stream (uint16_t port) {
    if (!(r == 0 || MONGOC_ERRNO_IS_AGAIN (errcode))) {
       fprintf (stderr,
                "mongoc_socket_connect unexpected return: "
-                  "%d (errno: %d)\n",
+               "%d (errno: %d)\n",
                r,
                errcode);
       fflush (stderr);
@@ -204,12 +206,11 @@ test_large_ismaster_helper (mongoc_async_cmd_result_t result,
    ASSERT_CMPINT (result, ==, MONGOC_ASYNC_CMD_SUCCESS);
 
    BSON_ASSERT (bson_iter_init_find (&iter, bson, "ismaster"));
-   BSON_ASSERT (BSON_ITER_HOLDS_BOOL (&iter) && bson_iter_bool(&iter));
-
+   BSON_ASSERT (BSON_ITER_HOLDS_BOOL (&iter) && bson_iter_bool (&iter));
 }
 
 static void
-test_large_ismaster (void* ctx)
+test_large_ismaster (void *ctx)
 {
    mongoc_async_t *async;
    mongoc_stream_t *sock_stream;
@@ -222,11 +223,11 @@ test_large_ismaster (void* ctx)
    BSON_ASSERT (bson_append_int32 (&q, "isMaster", 8, 1));
    while (q.len < 1024 * 1024) {
       char buf[11];
-      snprintf(buf, sizeof(buf), "key_%06d", i++);
+      snprintf (buf, sizeof (buf), "key_%06d", i++);
       BSON_APPEND_INT32 (&q, buf, 0);
    }
 
-   sock_stream = get_localhost_stream (test_framework_get_port());
+   sock_stream = get_localhost_stream (test_framework_get_port ());
 
    async = mongoc_async_new ();
    mongoc_async_cmd_new (async,

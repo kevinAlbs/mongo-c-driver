@@ -292,7 +292,10 @@ _mongoc_async_cmd_phase_send (mongoc_async_cmd_t *acmd)
    bytes = mongoc_stream_writev (acmd->stream, iovec, niovec, 0);
 
    if (bytes < 0) {
-      bson_set_error (&acmd->error, MONGOC_ERROR_STREAM, MONGOC_ERROR_STREAM_SOCKET, "Failed to write rpc bytes.");
+      bson_set_error (&acmd->error,
+                      MONGOC_ERROR_STREAM,
+                      MONGOC_ERROR_STREAM_SOCKET,
+                      "Failed to write rpc bytes.");
       return MONGOC_ASYNC_CMD_ERROR;
    }
 
