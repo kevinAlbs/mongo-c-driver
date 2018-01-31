@@ -253,12 +253,12 @@ mongoc_async_cmd_result_t
 _mongoc_async_cmd_phase_send (mongoc_async_cmd_t *acmd)
 {
    int total_bytes = 0;
-   int accumulator;
+   int offset;
    int bytes;
    int i;
    bool used_temp_iovec = false;
    /* if a continued write, then iovec will be set to a temporary copy */
-   mongoc_iovec_t* iovec = acmd->iovec;
+   mongoc_iovec_t *iovec = acmd->iovec;
    size_t niovec = acmd->niovec;
 
    for (i = 0; i < acmd->niovec; i++) {
@@ -267,38 +267,39 @@ _mongoc_async_cmd_phase_send (mongoc_async_cmd_t *acmd)
 
    if (acmd->bytes_written > 0) {
       BSON_ASSERT (acmd->bytes_written < total_bytes);
-      printf("bytes written is %d\n", acmd->bytes_written);
-      /* if bytes have been written before, set the offsets */
-      accumulator = acmd->bytes_written;
+      /* if bytes have been written before, compute the offset in the next
+       * iovec entry to be written. */
+      offset = acmd->bytes_written;
+
+      /* subtract the lengths of all iovec entries written so far. */
       for (i = 0; i < acmd->niovec; i++) {
-         if (accumulator < acmd->iovec[i].iov_len) {
+         if (offset < acmd->iovec[i].iov_len) {
             break;
          }
-         accumulator -= acmd->iovec[i].iov_len;
+         offset -= acmd->iovec[i].iov_len;
       }
+
+      BSON_ASSERT (i < acmd->niovec);
+
+      /* create a new iovec with the remaining data to be written. */
       niovec = acmd->niovec - i;
-      /* create a new iovec */
-      iovec = bson_malloc(niovec * sizeof(mongoc_iovec_t));
-      memcpy(iovec, acmd->iovec + i, sizeof(mongoc_iovec_t) * niovec);
-      printf("accumulator=%d\n", accumulator);
-      iovec[0].iov_base += accumulator;
-      iovec[0].iov_len -= accumulator;
+      iovec = bson_malloc (niovec * sizeof (mongoc_iovec_t));
+      memcpy (iovec, acmd->iovec + i, niovec * sizeof (mongoc_iovec_t));
+      iovec[0].iov_base += offset;
+      iovec[0].iov_len -= offset;
       used_temp_iovec = true;
    }
 
    /* go to offset */
-
-   bytes = mongoc_stream_writev (
-      acmd->stream, iovec, niovec, 0);
+   bytes = mongoc_stream_writev (acmd->stream, iovec, niovec, 0);
 
    BSON_ASSERT (bytes > 0);
 
    acmd->bytes_written += bytes;
 
    if (acmd->bytes_written < total_bytes) {
-      printf("continuing\n");
       if (used_temp_iovec) {
-         bson_free(iovec);
+         bson_free (iovec);
       }
       return MONGOC_ASYNC_CMD_IN_PROGRESS;
    }
@@ -310,7 +311,7 @@ _mongoc_async_cmd_phase_send (mongoc_async_cmd_t *acmd)
    acmd->cmd_started = bson_get_monotonic_time ();
 
    if (used_temp_iovec) {
-      bson_free(iovec);
+      bson_free (iovec);
    }
    return MONGOC_ASYNC_CMD_IN_PROGRESS;
 }
