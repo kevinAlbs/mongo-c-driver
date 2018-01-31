@@ -20,6 +20,34 @@ struct result {
    bool finished;
 };
 
+static mongoc_stream_t* get_localhost_stream (uint16_t port) {
+   int errcode;
+   int r;
+   struct sockaddr_in server_addr = {0};
+   mongoc_socket_t *conn_sock;
+   conn_sock = mongoc_socket_new (AF_INET, SOCK_STREAM, 0);
+   BSON_ASSERT (conn_sock);
+
+   server_addr.sin_family = AF_INET;
+   server_addr.sin_port = htons (port);
+   server_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+   r = mongoc_socket_connect (
+      conn_sock, (struct sockaddr *) &server_addr, sizeof (server_addr), 0);
+
+   errcode = mongoc_socket_errno (conn_sock);
+   if (!(r == 0 || MONGOC_ERRNO_IS_AGAIN (errcode))) {
+      fprintf (stderr,
+               "mongoc_socket_connect unexpected return: "
+                  "%d (errno: %d)\n",
+               r,
+               errcode);
+      fflush (stderr);
+      abort ();
+   }
+
+   return mongoc_stream_socket_new (conn_sock);
+}
+
 
 static void
 test_ismaster_helper (mongoc_async_cmd_result_t result,
@@ -49,15 +77,11 @@ test_ismaster_impl (bool with_ssl)
    mock_server_t *servers[NSERVERS];
    mongoc_async_t *async;
    mongoc_stream_t *sock_streams[NSERVERS];
-   mongoc_socket_t *conn_sock;
    mongoc_async_cmd_setup_t setup = NULL;
    void *setup_ctx = NULL;
-   struct sockaddr_in server_addr = {0};
    uint16_t ports[NSERVERS];
    struct result results[NSERVERS];
-   int r;
    int i;
-   int errcode;
    int offset;
    int server_id;
    bson_t q = BSON_INITIALIZER;
@@ -95,27 +119,7 @@ test_ismaster_impl (bool with_ssl)
    async = mongoc_async_new ();
 
    for (i = 0; i < NSERVERS; i++) {
-      conn_sock = mongoc_socket_new (AF_INET, SOCK_STREAM, 0);
-      BSON_ASSERT (conn_sock);
-
-      server_addr.sin_family = AF_INET;
-      server_addr.sin_port = htons (ports[i]);
-      server_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
-      r = mongoc_socket_connect (
-         conn_sock, (struct sockaddr *) &server_addr, sizeof (server_addr), 0);
-
-      errcode = mongoc_socket_errno (conn_sock);
-      if (!(r == 0 || MONGOC_ERRNO_IS_AGAIN (errcode))) {
-         fprintf (stderr,
-                  "mongoc_socket_connect unexpected return: "
-                  "%d (errno: %d)\n",
-                  r,
-                  errcode);
-         fflush (stderr);
-         abort ();
-      }
-
-      sock_streams[i] = mongoc_stream_socket_new (conn_sock);
+      sock_streams[i] = get_localhost_stream (ports[i]);
 
 #ifdef MONGOC_ENABLE_SSL
       if (with_ssl) {
@@ -209,56 +213,25 @@ test_large_ismaster (void* ctx)
 {
    mongoc_async_t *async;
    mongoc_stream_t *sock_stream;
-   mongoc_socket_t *conn_sock;
-   mongoc_async_cmd_setup_t setup = NULL;
-   struct sockaddr_in server_addr = {0};
-   int i;
-   int r;
-   int errcode;
+   int i = 0;
    bson_t q = BSON_INITIALIZER;
 
-
    /* Inflate the size of the isMaster message with other fields to ~1MB.
-    * mongod should ignore them, but this tests that CDRIVER-2483 is fixed
+    * mongod should ignore them, but this tests that CDRIVER-2483 is fixed.
     */
    BSON_ASSERT (bson_append_int32 (&q, "isMaster", 8, 1));
-   for (i = 0; i < (1 << 16); i++) {
+   while (q.len < 1024 * 1024) {
       char buf[11];
-      /* each field is 1 byte for type + 11 bytes for key + 4 bytes for int32.
-       * That is 2^4 bytes per field. Make 2^16 of to total 2^20 bytes
-       * or 1MB */
-      snprintf (buf, 11, "key_%06d", i);
-      BSON_APPEND_INT32 (&q, buf, i);
+      snprintf(buf, sizeof(buf), "key_%06d", i++);
+      BSON_APPEND_INT32 (&q, buf, 0);
    }
 
-   ASSERT_CMPINT (1048595, ==, q.len);
-
-   conn_sock = mongoc_socket_new (AF_INET, SOCK_STREAM, 0);
-   BSON_ASSERT (conn_sock);
-
-   server_addr.sin_family = AF_INET;
-   server_addr.sin_port = htons (test_framework_get_port ());
-   server_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
-   r = mongoc_socket_connect (
-      conn_sock, (struct sockaddr *) &server_addr, sizeof (server_addr), 0);
-
-   errcode = mongoc_socket_errno (conn_sock);
-   if (!(r == 0 || MONGOC_ERRNO_IS_AGAIN (errcode))) {
-      fprintf (stderr,
-               "mongoc_socket_connect unexpected return: "
-               "%d (errno: %d)\n",
-               r,
-               errcode);
-      fflush (stderr);
-      abort ();
-   }
-
-   sock_stream = mongoc_stream_socket_new (conn_sock);
+   sock_stream = get_localhost_stream (test_framework_get_port());
 
    async = mongoc_async_new ();
    mongoc_async_cmd_new (async,
                          sock_stream,
-                         setup,
+                         NULL,
                          NULL,
                          "admin",
                          &q,
@@ -267,6 +240,9 @@ test_large_ismaster (void* ctx)
                          TIMEOUT);
 
    mongoc_async_run (async);
+   mongoc_async_destroy (async);
+   mongoc_stream_destroy (sock_stream);
+   bson_destroy (&q);
 }
 
 

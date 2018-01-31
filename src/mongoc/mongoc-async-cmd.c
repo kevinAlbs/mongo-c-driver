@@ -291,14 +291,18 @@ _mongoc_async_cmd_phase_send (mongoc_async_cmd_t *acmd)
 
    bytes = mongoc_stream_writev (acmd->stream, iovec, niovec, 0);
 
-   BSON_ASSERT (bytes > 0);
+   if (bytes < 0) {
+      bson_set_error (&acmd->error, MONGOC_ERROR_STREAM, MONGOC_ERROR_STREAM_SOCKET, "Failed to write rpc bytes.");
+      return MONGOC_ASYNC_CMD_ERROR;
+   }
 
    acmd->bytes_written += bytes;
 
+   if (used_temp_iovec) {
+      bson_free (iovec);
+   }
+
    if (acmd->bytes_written < total_bytes) {
-      if (used_temp_iovec) {
-         bson_free (iovec);
-      }
       return MONGOC_ASYNC_CMD_IN_PROGRESS;
    }
 
@@ -308,9 +312,6 @@ _mongoc_async_cmd_phase_send (mongoc_async_cmd_t *acmd)
 
    acmd->cmd_started = bson_get_monotonic_time ();
 
-   if (used_temp_iovec) {
-      bson_free (iovec);
-   }
    return MONGOC_ASYNC_CMD_IN_PROGRESS;
 }
 
