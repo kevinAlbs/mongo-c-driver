@@ -250,28 +250,10 @@ _mongoc_async_cmd_phase_setup (mongoc_async_cmd_t *acmd)
 mongoc_async_cmd_result_t
 _mongoc_async_cmd_phase_send (mongoc_async_cmd_t *acmd)
 {
-   ssize_t bytes;
-
-   bytes = mongoc_stream_writev (acmd->stream, acmd->iovec, acmd->niovec, 0);
-
-   if (bytes < 0) {
-      bson_set_error (&acmd->error,
-                      MONGOC_ERROR_STREAM,
-                      MONGOC_ERROR_STREAM_SOCKET,
-                      "Failed to write rpc bytes.");
+   bool ret = _mongoc_stream_writev_full (
+      acmd->stream, acmd->iovec, acmd->niovec, 0, &acmd->error);
+   if (!ret) {
       return MONGOC_ASYNC_CMD_ERROR;
-   }
-
-   while (bytes) {
-      if (acmd->iovec->iov_len < (size_t) bytes) {
-         bytes -= acmd->iovec->iov_len;
-         acmd->iovec++;
-         acmd->niovec--;
-      } else {
-         acmd->iovec->iov_base = ((char *) acmd->iovec->iov_base) + bytes;
-         acmd->iovec->iov_len -= bytes;
-         bytes = 0;
-      }
    }
 
    acmd->state = MONGOC_ASYNC_CMD_RECV_LEN;

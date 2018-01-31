@@ -7,6 +7,7 @@
 #include "mock_server/mock-server.h"
 #include "mock_server/future-functions.h"
 #include "mongoc-errno-private.h"
+#include "test-libmongoc.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "async-test"
@@ -184,11 +185,101 @@ test_ismaster_impl (bool with_ssl)
    }
 }
 
+static void
+test_large_ismaster_helper (mongoc_async_cmd_result_t result,
+                            const bson_t *bson,
+                            int64_t rtt_msec,
+                            void *data,
+                            bson_error_t *error)
+{
+   /* If we get an error, the only one we permit is that the entire
+    * ismaster was unable to send in one message. */
+   if (error->code != 0) {
+      printf ("Got error\n");
+      ASSERT_ERROR_CONTAINS ((*error),
+                             MONGOC_ERROR_STREAM,
+                             MONGOC_ERROR_STREAM_SOCKET,
+                             "Failure to send all requested bytes");
+   }
+}
+
+static void
+test_large_ismaster_impl (void)
+{
+   mongoc_async_t *async;
+   mongoc_stream_t *sock_stream;
+   mongoc_socket_t *conn_sock;
+   mongoc_async_cmd_setup_t setup = NULL;
+   struct sockaddr_in server_addr = {0};
+   struct result result;
+   int i;
+   int r;
+   int errcode;
+   bson_t q = BSON_INITIALIZER;
+
+
+   /* Inflate the size of the isMaster message with other fields to ~1MB.
+    * mongod should ignore them, but this tests that CDRIVER-2483 is fixed
+    */
+   BSON_ASSERT (bson_append_int32 (&q, "isMaster", 8, 1));
+   for (i = 0; i < (1 << 16); i++) {
+      char buf[11];
+      /* each field is 1 byte for type + 11 bytes for key + 4 bytes for int32.
+       * That is 2^4 bytes per field. Make 2^16 of to total 2^20 bytes
+       * or 1MB */
+      snprintf (buf, 11, "key_%06d", i);
+      BSON_APPEND_INT32 (&q, buf, i);
+   }
+
+   ASSERT_CMPINT (1048595, ==, q.len);
+
+   conn_sock = mongoc_socket_new (AF_INET, SOCK_STREAM, 0);
+   BSON_ASSERT (conn_sock);
+
+   server_addr.sin_family = AF_INET;
+   server_addr.sin_port = htons (test_framework_get_port ());
+   server_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+   r = mongoc_socket_connect (
+      conn_sock, (struct sockaddr *) &server_addr, sizeof (server_addr), 0);
+
+   errcode = mongoc_socket_errno (conn_sock);
+   if (!(r == 0 || MONGOC_ERRNO_IS_AGAIN (errcode))) {
+      fprintf (stderr,
+               "mongoc_socket_connect unexpected return: "
+               "%d (errno: %d)\n",
+               r,
+               errcode);
+      fflush (stderr);
+      abort ();
+   }
+
+   sock_stream = mongoc_stream_socket_new (conn_sock);
+
+   async = mongoc_async_new ();
+   mongoc_async_cmd_new (async,
+                         sock_stream,
+                         setup,
+                         NULL,
+                         "admin",
+                         &q,
+                         &test_large_ismaster_helper,
+                         (void *) &result,
+                         TIMEOUT);
+
+   mongoc_async_run (async);
+}
+
 
 static void
 test_ismaster (void)
 {
    test_ismaster_impl (false);
+}
+
+static void
+test_large_ismaster (void *ctx)
+{
+   test_large_ismaster_impl ();
 }
 
 
@@ -205,6 +296,12 @@ void
 test_async_install (TestSuite *suite)
 {
    TestSuite_AddMockServerTest (suite, "/Async/ismaster", test_ismaster);
+   TestSuite_AddFull (suite,
+                      "/Async/large_ismaster",
+                      test_large_ismaster,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_not_single);
 #if defined(MONGOC_ENABLE_SSL_OPENSSL)
    TestSuite_AddMockServerTest (
       suite, "/Async/ismaster_ssl", test_ismaster_ssl);
