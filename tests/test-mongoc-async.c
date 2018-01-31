@@ -205,7 +205,7 @@ test_large_ismaster_helper (mongoc_async_cmd_result_t result,
 }
 
 static void
-test_large_ismaster_impl (void)
+test_large_ismaster (void* ctx)
 {
    mongoc_async_t *async;
    mongoc_stream_t *sock_stream;
@@ -274,12 +274,6 @@ static void
 test_ismaster (void)
 {
    test_ismaster_impl (false);
-}
-
-static void
-test_large_ismaster (void *ctx)
-{
-   test_large_ismaster_impl ();
 }
 
 

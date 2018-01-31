@@ -289,7 +289,6 @@ _mongoc_async_cmd_phase_send (mongoc_async_cmd_t *acmd)
       used_temp_iovec = true;
    }
 
-   /* go to offset */
    bytes = mongoc_stream_writev (acmd->stream, iovec, niovec, 0);
 
    BSON_ASSERT (bytes > 0);
