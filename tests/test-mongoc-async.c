@@ -192,15 +192,16 @@ test_large_ismaster_helper (mongoc_async_cmd_result_t result,
                             void *data,
                             bson_error_t *error)
 {
-   /* If we get an error, the only one we permit is that the entire
-    * ismaster was unable to send in one message. */
-   if (error->code != 0) {
-      printf ("Got error\n");
-      ASSERT_ERROR_CONTAINS ((*error),
-                             MONGOC_ERROR_STREAM,
-                             MONGOC_ERROR_STREAM_SOCKET,
-                             "Failure to send all requested bytes");
+   bson_iter_t iter;
+
+   if (result != MONGOC_ASYNC_CMD_SUCCESS) {
+      fprintf (stderr, "error: %s\n", error->message);
    }
+   ASSERT_CMPINT (result, ==, MONGOC_ASYNC_CMD_SUCCESS);
+
+   BSON_ASSERT (bson_iter_init_find (&iter, bson, "ismaster"));
+   BSON_ASSERT (BSON_ITER_HOLDS_BOOL (&iter) && bson_iter_bool(&iter));
+
 }
 
 static void
@@ -211,7 +212,6 @@ test_large_ismaster_impl (void)
    mongoc_socket_t *conn_sock;
    mongoc_async_cmd_setup_t setup = NULL;
    struct sockaddr_in server_addr = {0};
-   struct result result;
    int i;
    int r;
    int errcode;
@@ -263,7 +263,7 @@ test_large_ismaster_impl (void)
                          "admin",
                          &q,
                          &test_large_ismaster_helper,
-                         (void *) &result,
+                         NULL,
                          TIMEOUT);
 
    mongoc_async_run (async);

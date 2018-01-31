@@ -144,7 +144,6 @@ _mongoc_async_cmd_init_send (mongoc_async_cmd_t *acmd, const char *dbname)
    acmd->iovec = (mongoc_iovec_t *) acmd->array.data;
    acmd->niovec = acmd->array.len;
    _mongoc_rpc_swab_to_le (&acmd->rpc);
-
    acmd->bytes_written = 0;
 }
 
@@ -252,12 +251,12 @@ _mongoc_async_cmd_phase_setup (mongoc_async_cmd_t *acmd)
 mongoc_async_cmd_result_t
 _mongoc_async_cmd_phase_send (mongoc_async_cmd_t *acmd)
 {
-   int total_bytes = 0;
-   int offset;
-   int bytes;
+   size_t total_bytes = 0;
+   size_t offset;
+   ssize_t bytes;
    int i;
-   bool used_temp_iovec = false;
    /* if a continued write, then iovec will be set to a temporary copy */
+   bool used_temp_iovec = false;
    mongoc_iovec_t *iovec = acmd->iovec;
    size_t niovec = acmd->niovec;
 
