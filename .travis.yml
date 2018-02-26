@@ -16,7 +16,7 @@ before_install:
 services: mongodb
 
 env:
-  - CFLAGS="$CFLAGS -Werror -Wno-cast-align" 
+  - CFLAGS="$CFLAGS -Werror -Wno-cast-align" MONGOC_TEST_SKIP_DNS=ON
 
 addons:
   apt:
