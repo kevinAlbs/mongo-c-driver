@@ -582,8 +582,6 @@ test_topology_scanner_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite,
                                 "/TOPOLOGY/blocking_initiator",
                                 test_topology_scanner_blocking_initiator);
-   if (!test_framework_getenv_bool ("MONGOC_TEST_SKIP_DNS")) {
-      TestSuite_AddMockServerTest (
-         suite, "/TOPOLOGY/dns", test_topology_scanner_dns);
-   }
+   TestSuite_AddMockServerTest (
+      suite, "/TOPOLOGY/dns", test_topology_scanner_dns);
 }
