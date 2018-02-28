@@ -155,7 +155,8 @@ test_stream_tls_error_install (TestSuite *suite);
 extern void
 test_cyrus_install (TestSuite *suite);
 #endif
-
+extern void
+test_happy_eyeballs_install (TestSuite *suite);
 
 typedef struct {
    mongoc_log_level_t level;
@@ -2246,6 +2247,7 @@ main (int argc, char *argv[])
 #ifdef MONGOC_ENABLE_SASL_CYRUS
    test_cyrus_install (&suite);
 #endif
+   test_happy_eyeballs_install (&suite);
 
    ret = TestSuite_Run (&suite);
 
