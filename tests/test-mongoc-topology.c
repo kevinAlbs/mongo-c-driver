@@ -611,7 +611,7 @@ test_cooldown_rs (void)
       mock_server_run (servers[i]);
    }
 
-   uri_str = bson_strdup_printf ("mongodb://localhost:%hu/?replicaSet=rs"
+   uri_str = bson_strdup_printf ("mongodb://127.0.0.1:%hu/?replicaSet=rs"
                                  "&serverSelectionTimeoutMS=100"
                                  "&connectTimeoutMS=100",
                                  mock_server_get_port (servers[0]));
@@ -622,14 +622,14 @@ test_cooldown_rs (void)
    secondary_response = bson_strdup_printf (
       "{'ok': 1, 'ismaster': false, 'minWireVersion': 2, 'maxWireVersion': 5 , "
       "'secondary': true, 'setName': 'rs',"
-      " 'hosts': ['localhost:%hu', 'localhost:%hu']}",
+      " 'hosts': ['127.0.0.1:%hu', '127.0.0.1:%hu']}",
       mock_server_get_port (servers[0]),
       mock_server_get_port (servers[1]));
 
    primary_response =
       bson_strdup_printf ("{'ok': 1, 'ismaster': true, 'minWireVersion': 2, "
                           "'maxWireVersion': 5 , 'setName': 'rs',"
-                          " 'hosts': ['localhost:%hu']}",
+                          " 'hosts': ['127.0.0.1:%hu']}",
                           mock_server_get_port (servers[1]));
 
    /* server 0 is a secondary. */
@@ -783,11 +783,11 @@ _test_select_succeed (bool try_once)
                               " 'setName': 'rs',"
                               "  'minWireVersion': 2,"
                               "  'maxWireVersion': 5,"
-                              " 'hosts': ['localhost:%hu', 'localhost:%hu']}",
+                              " 'hosts': ['127.0.0.1:%hu', '127.0.0.1:%hu']}",
                               mock_server_get_port (primary),
                               mock_server_get_port (secondary));
 
-   uri_str = bson_strdup_printf ("mongodb://localhost:%hu,localhost:%hu/"
+   uri_str = bson_strdup_printf ("mongodb://127.0.0.1:%hu,127.0.0.1:%hu/"
                                  "?replicaSet=rs&connectTimeoutMS=%d",
                                  mock_server_get_port (primary),
                                  mock_server_get_port (secondary),

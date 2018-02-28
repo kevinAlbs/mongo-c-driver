@@ -21,6 +21,7 @@
 #include "mongoc-async-cmd-private.h"
 #include "utlist.h"
 #include "mongoc.h"
+#include "mongoc-socket-private.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "async"
@@ -69,13 +70,33 @@ mongoc_async_run (mongoc_async_t *async)
    }
 
    while (async->ncmds) {
-      /* check if any streams need to be initiated. */
+      int nstreams = 0;
+      /* check if any cmds are ready to be initiated. */
       DL_FOREACH_SAFE (async->cmds, acmd, tmp)
       {
          if (acmd->state == MONGOC_ASYNC_CMD_INITIATE) {
-            if (mongoc_async_cmd_run (acmd)) {
-               BSON_ASSERT (acmd->stream);
+            if (now >= acmd->initiate_delay + acmd->connect_started) {
+               printf ("initiating stream\n");
+               BSON_ASSERT (!acmd->stream);
+               if (mongoc_async_cmd_run (acmd)) {
+                  BSON_ASSERT (acmd->stream);
+                  char *names[] = { [AF_INET6] = "AF_INET6", [AF_INET] = "AF_INET" };
+                  if (acmd->stream->type == 1) {
+                     mongoc_socket_t *sock = mongoc_stream_socket_get_socket (
+                        (mongoc_stream_socket_t *) acmd->stream);
+                     printf ("got stream with domain: %s\n", names[sock->domain]);
+                  }
+                  /* reset the connect_started time this may have been delayed. */
+                  acmd->connect_started = now;
+               }
+            } else {
+               int64_t left =
+                  acmd->initiate_delay - (now - acmd->connect_started);
+               printf ("we got %d usecs left I think\n", left);
             }
+         }
+         if (acmd->stream) {
+            ++nstreams;
          }
       }
 
@@ -85,30 +106,50 @@ mongoc_async_run (mongoc_async_t *async)
       }
 
       /* ncmds grows if we discover a replica & start calling ismaster on it */
-      if (poll_size < async->ncmds) {
+      if (poll_size < nstreams) {
          poller = (mongoc_stream_poll_t *) bson_realloc (
-            poller, sizeof (*poller) * async->ncmds);
+            poller, sizeof (*poller) * nstreams);
 
-         poll_size = async->ncmds;
+         poll_size = nstreams;
       }
 
       i = 0;
       expire_at = INT64_MAX;
       DL_FOREACH (async->cmds, acmd)
       {
-         poller[i].stream = acmd->stream;
-         poller[i].events = acmd->events;
-         poller[i].revents = 0;
-         BSON_ASSERT (acmd->connect_started > 0);
-         expire_at = BSON_MIN (
-            expire_at, acmd->connect_started + acmd->timeout_msec * 1000);
-         i++;
+         if (acmd->state == MONGOC_ASYNC_CMD_INITIATE) {
+            /* timeout the poll sooner if an initiate delay expires soon. */
+            expire_at = BSON_MIN (expire_at, acmd->connect_started + acmd->initiate_delay);
+         } else {
+            BSON_ASSERT (i < nstreams);
+            poller[i].stream = acmd->stream;
+            poller[i].events = acmd->events;
+            poller[i].revents = 0;
+            BSON_ASSERT (acmd->connect_started > 0);
+            expire_at = BSON_MIN (expire_at, acmd->connect_started +
+                                             acmd->timeout_msec * 1000);
+            i++;
+         }
       }
 
       poll_timeout_msec = BSON_MAX (0, (expire_at - now) / 1000);
       BSON_ASSERT (poll_timeout_msec < INT32_MAX);
-      nactive =
-         mongoc_stream_poll (poller, async->ncmds, (int32_t) poll_timeout_msec);
+
+      if (nstreams > 0) {
+         /* we need at least one stream to poll. */
+         printf("polling\n");
+         nactive = mongoc_stream_poll (poller, nstreams,
+                                       (int32_t) poll_timeout_msec);
+         printf("done polling\n");
+      } else {
+         /* TODO: I'm *very* hesitant of this. I don't know enough about the implications of what sleep does to a thread's scheduling vs poll. Should I instead pass the type of stream being used a different way? */
+         printf("there are no streams to poll, sleeping instead\n");
+         struct timespec delay;
+         delay.tv_sec = poll_timeout_msec / 1000;
+         delay.tv_nsec = (poll_timeout_msec % 1000) * 1000 * 1000;
+         nanosleep(&delay, NULL);
+         printf("done sleeping\n");
+      }
 
       if (nactive) {
          i = 0;
@@ -152,7 +193,7 @@ mongoc_async_run (mongoc_async_t *async)
          bool remove_cmd = false;
          mongoc_async_cmd_result_t result;
 
-         if (now > acmd->connect_started + acmd->timeout_msec * 1000) {
+         if (acmd->state != MONGOC_ASYNC_CMD_INITIATE && now > acmd->connect_started + acmd->timeout_msec * 1000) {
             bson_set_error (&acmd->error,
                             MONGOC_ERROR_STREAM,
                             MONGOC_ERROR_STREAM_CONNECT,
@@ -168,6 +209,7 @@ mongoc_async_run (mongoc_async_t *async)
          }
 
          if (remove_cmd) {
+            printf("removing this command\n");
             acmd->cb (acmd, result, NULL, (now - acmd->connect_started) / 1000);
 
             /* Remove acmd from the async->cmds doubly-linked list */
@@ -177,6 +219,8 @@ mongoc_async_run (mongoc_async_t *async)
 
       now = bson_get_monotonic_time ();
    }
+
+   printf("done with async loop\n");
 
    if (poll_size) {
       bson_free (poller);

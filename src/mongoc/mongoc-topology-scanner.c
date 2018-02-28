@@ -69,13 +69,16 @@ _tcp_initiate (mongoc_async_cmd_t *acmd);
 /* cancel any pending async commands for a specific node excluding acmd.
  * If acmd is NULL, cancel all async commands on the node. */
 static void
-_mongoc_topology_scanner_node_cancel_commands_excluding (
+_cancel_commands_excluding (
    mongoc_topology_scanner_node_t *node, mongoc_async_cmd_t *acmd);
 
 /* return the number of pending async commands for a node. */
 static int
-_mongoc_topology_scanner_node_count_acmds (
+_count_acmds (
    mongoc_topology_scanner_node_t *node);
+
+static void
+_prioritize_other_acmds (mongoc_topology_scanner_node_t *node, mongoc_async_cmd_t *acmd);
 
 static void
 _add_ismaster (bson_t *cmd)
@@ -143,7 +146,8 @@ _mongoc_topology_scanner_get_ismaster (mongoc_topology_scanner_t *ts)
 static void
 _begin_ismaster_cmd (mongoc_topology_scanner_node_t *node,
                      mongoc_stream_t *stream,
-                     struct addrinfo *dns_result)
+                     struct addrinfo *dns_result,
+                     int64_t initiate_delay)
 {
    mongoc_topology_scanner_t *ts = node->ts;
    bson_t cmd;
@@ -159,10 +163,14 @@ _begin_ismaster_cmd (mongoc_topology_scanner_node_t *node,
       bson_append_document (&cmd, "$clusterTime", 12, &ts->cluster_time);
    }
 
+   /* if the node should connect with a TCP socket, stream will be null, and
+   * dns_result will be set. The async loop is responsible for calling the
+   * _tcp_initiator to construct TCP sockets. */
    mongoc_async_cmd_new (ts->async,
                          stream,
                          dns_result,
                          _tcp_initiate,
+                         initiate_delay,
                          ts->setup,
                          node->host.host,
                          "admin",
@@ -291,7 +299,7 @@ void
 mongoc_topology_scanner_node_retire (mongoc_topology_scanner_node_t *node)
 {
    /* cancel any pending commands. */
-   _mongoc_topology_scanner_node_cancel_commands_excluding (node, NULL);
+   _cancel_commands_excluding (node, NULL);
 
    node->retired = true;
 }
@@ -409,13 +417,24 @@ mongoc_topology_scanner_ismaster_handler (
    node = (mongoc_topology_scanner_node_t *) data;
    ts = node->ts;
 
-   if (node->retired) {
+   /* TODO: I don't like that this now breaks the expectation that this callback is only called once per command. */
+   if (async_status == MONGOC_ASYNC_CMD_CONNECTED) {
+      printf("yo dawg I heard you connected\n");
+      /* cancel all other commands on this node. */
+      _cancel_commands_excluding (node, acmd);
+      /* cancel the remaining commands. */
+      return;
+   }
+
+   if (node->retired && stream) {
       mongoc_stream_failed (stream);
       return;
    }
 
    now = bson_get_monotonic_time ();
    node->last_used = now;
+
+   /* TODO: also have this callback get called on successful connect. */
 
    /* if no ismaster response, async cmd had an error or timed out. */
    if (!ismaster_response || async_status == MONGOC_ASYNC_CMD_ERROR ||
@@ -425,8 +444,7 @@ mongoc_topology_scanner_ismaster_handler (
          mongoc_stream_failed (stream);
       }
 
-      if (!node->stream &&
-          _mongoc_topology_scanner_node_count_acmds (node) == 1) {
+      if (!node->stream && _count_acmds (node) == 1) {
          /* there are no remaining streams, connecting has failed. */
          node->last_failed = now;
          if (error->code) {
@@ -452,6 +470,7 @@ mongoc_topology_scanner_ismaster_handler (
       } else {
          /* there are still more commands left for this node or it succeeded
           * with another stream. skip the callback. */
+         _prioritize_other_acmds (node, acmd);
          return;
       }
    } else {
@@ -461,9 +480,6 @@ mongoc_topology_scanner_ismaster_handler (
 
       /* set our successful stream. */
       node->stream = stream;
-
-      /* cancel all other commands on this node. */
-      _mongoc_topology_scanner_node_cancel_commands_excluding (node, acmd);
    }
 
    ts->cb (node->id, ismaster_response, rtt_msec, ts->cb_data, error);
@@ -538,6 +554,7 @@ mongoc_topology_scanner_node_setup_tcp (mongoc_topology_scanner_node_t *node,
    char portstr[8];
    mongoc_host_list_t *host;
    int s;
+   int64_t delay = 0;
 
    ENTRY;
 
@@ -569,7 +586,10 @@ mongoc_topology_scanner_node_setup_tcp (mongoc_topology_scanner_node_t *node,
 
    LL_FOREACH2 (node->dns_results, iter, ai_next)
    {
-      _begin_ismaster_cmd (node, NULL, iter);
+      _begin_ismaster_cmd (node, NULL, iter, delay);
+      /* TODO: we should really make sure that an IPv4 result has the 250ms delay. */
+      /* each subsequent DNS result will have an additional 250ms delay. */
+      delay += 250 * 1000;
    }
 
 
@@ -630,7 +650,7 @@ mongoc_topology_scanner_node_connect_unix (mongoc_topology_scanner_node_t *node,
    stream = _mongoc_topology_scanner_node_setup_stream_for_tls (
       node, mongoc_stream_socket_new (sock));
    if (stream) {
-      _begin_ismaster_cmd (node, stream, NULL /* dns result. */);
+      _begin_ismaster_cmd (node, stream, NULL /* dns result. */, 0 /* delay */);
       RETURN (true);
    }
    RETURN (false);
@@ -662,7 +682,7 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node,
 
    /* if there is already a working stream, push it back to be re-scanned. */
    if (node->stream) {
-      _begin_ismaster_cmd (node, node->stream, node->successful_dns_result);
+      _begin_ismaster_cmd (node, node->stream, node->successful_dns_result, 0);
       node->stream = NULL;
       return;
    }
@@ -674,7 +694,7 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node,
          node->ts->uri, &node->host, node->ts->initiator_context, error);
       if (stream) {
          success = true;
-         _begin_ismaster_cmd (node, stream, NULL);
+         _begin_ismaster_cmd (node, stream, NULL, 0);
       }
    } else {
       if (node->host.family == AF_UNIX) {
@@ -985,7 +1005,7 @@ _mongoc_topology_scanner_monitor_heartbeat_failed (
 }
 
 static void
-_mongoc_topology_scanner_node_cancel_commands_excluding (
+_cancel_commands_excluding (
    mongoc_topology_scanner_node_t *node, mongoc_async_cmd_t *acmd)
 {
    mongoc_async_cmd_t *iter;
@@ -999,7 +1019,7 @@ _mongoc_topology_scanner_node_cancel_commands_excluding (
 }
 
 static int
-_mongoc_topology_scanner_node_count_acmds (mongoc_topology_scanner_node_t *node)
+_count_acmds (mongoc_topology_scanner_node_t *node)
 {
    mongoc_async_cmd_t *iter;
    int count = 0;
@@ -1010,4 +1030,16 @@ _mongoc_topology_scanner_node_count_acmds (mongoc_topology_scanner_node_t *node)
       }
    }
    return count;
+}
+
+static void
+_prioritize_other_acmds (mongoc_topology_scanner_node_t *node, mongoc_async_cmd_t* acmd)
+{
+   mongoc_async_cmd_t *iter;
+   DL_FOREACH (node->ts->async->cmds, iter)
+   {
+      if ((mongoc_topology_scanner_node_t *) iter->data == node && acmd->initiate_delay < iter->initiate_delay) {
+         iter->initiate_delay = BSON_MAX(iter->initiate_delay - (250 * 1000), 0);
+      }
+   }
 }

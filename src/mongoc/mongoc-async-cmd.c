@@ -102,6 +102,10 @@ mongoc_async_cmd_run (mongoc_async_cmd_t *acmd)
    int64_t rtt_msec;
    _mongoc_async_cmd_phase_t phase_callback;
 
+   if (acmd->state == MONGOC_ASYNC_CMD_SEND) {
+      acmd->cb (acmd, MONGOC_ASYNC_CMD_CONNECTED, NULL, 0);
+   }
+
    phase_callback = gMongocCMDPhases[acmd->state];
    if (phase_callback) {
       result = phase_callback (acmd);
@@ -169,6 +173,7 @@ mongoc_async_cmd_new (mongoc_async_t *async,
                       mongoc_stream_t *stream,
                       struct addrinfo *dns_result,
                       mongoc_async_cmd_initiate_t initiator,
+                      int64_t initiate_delay,
                       mongoc_async_cmd_setup_t setup,
                       void *setup_ctx,
                       const char *dbname,
@@ -188,6 +193,7 @@ mongoc_async_cmd_new (mongoc_async_t *async,
    acmd->timeout_msec = timeout_msec;
    acmd->stream = stream;
    acmd->initiator = initiator;
+   acmd->initiate_delay = initiate_delay;
    acmd->setup = setup;
    acmd->setup_ctx = setup_ctx;
    acmd->cb = cb;
