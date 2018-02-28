@@ -146,7 +146,7 @@ test_ismaster_impl (bool with_ssl)
                             sock_streams[i],
                             NULL /* dns result, n/a. */,
                             NULL, /* initiator. */
-                            0, /* initiate delay. */
+                            0,    /* initiate delay. */
                             setup,
                             setup_ctx,
                             "admin",
@@ -274,7 +274,7 @@ test_large_ismaster (void *ctx)
                          sock_stream,
                          NULL /* dns result, n/a. */,
                          NULL, /* initiator. */
-                         0, /* initiate delay. */
+                         0,    /* initiate delay. */
 #ifdef MONGOC_ENABLE_SSL
                          test_framework_get_ssl () ? mongoc_async_cmd_tls_setup
                                                    : NULL,

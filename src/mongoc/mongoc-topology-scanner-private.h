@@ -185,7 +185,7 @@ _mongoc_topology_scanner_set_cluster_time (mongoc_topology_scanner_t *ts,
 
 void
 _mongoc_topology_scanner_set_dns_cache_timeout (mongoc_topology_scanner_t *ts,
-                                           int64_t timeout_ms);
+                                                int64_t timeout_ms);
 
 #ifdef MONGOC_ENABLE_SSL
 void
