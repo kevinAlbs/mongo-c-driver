@@ -208,6 +208,8 @@ mongoc_topology_scanner_new (
    ts->appname = NULL;
    ts->handshake_ok_to_send = false;
    ts->connect_timeout_msec = connect_timeout_msec;
+   /* default dns cache timeout is 10 minutes. */
+   ts->dns_cache_timeout_ms = 10 * 60 * 1000;
 
    return ts;
 }
@@ -312,6 +314,7 @@ mongoc_topology_scanner_node_disconnect (mongoc_topology_scanner_node_t *node,
       freeaddrinfo (node->dns_results);
       node->dns_results = NULL;
       node->successful_dns_result = NULL;
+      node->last_dns_cache = 0;
    }
    /* the node may or may not have succeeded in finding a working stream. */
    if (node->stream) {
@@ -677,8 +680,13 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node,
 {
    bool success = false;
    mongoc_stream_t *stream;
+   int64_t now = bson_get_monotonic_time ();
 
    _mongoc_topology_scanner_monitor_heartbeat_started (node->ts, &node->host);
+
+   if (node->dns_results && (now - node->last_dns_cache) > node->ts->dns_cache_timeout_ms) {
+      mongoc_topology_scanner_node_disconnect(node, false);
+   }
 
    /* if there is already a working stream, push it back to be re-scanned. */
    if (node->stream) {
@@ -1002,6 +1010,12 @@ _mongoc_topology_scanner_monitor_heartbeat_failed (
       event.error = error;
       ts->apm_callbacks.server_heartbeat_failed (&event);
    }
+}
+
+void
+_mongoc_topology_scanner_set_dns_cache_timeout (mongoc_topology_scanner_t *ts,
+                                                int64_t timeout_ms) {
+   ts->dns_cache_timeout_ms = timeout_ms;
 }
 
 static void
