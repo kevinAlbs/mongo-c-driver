@@ -48,7 +48,7 @@ typedef struct he_testcase {
 } he_testcase_t;
 
 static uint16_t
-test_happy_eyeballs_testcase_setup (he_testcase_t *testcase)
+_testcase_setup (he_testcase_t *testcase)
 {
    uint16_t port = 0;
    int i;
@@ -108,7 +108,7 @@ test_happy_eyeballs_testcase_setup (he_testcase_t *testcase)
 }
 
 static void
-test_happy_eyeballs_testcase_teardown (he_testcase_t *testcase)
+_testcase_teardown (he_testcase_t *testcase)
 {
    int i;
    for (i = 0; i < 2; i++) {
@@ -120,11 +120,11 @@ test_happy_eyeballs_testcase_teardown (he_testcase_t *testcase)
 }
 
 static void
-_test_happy_eyeballs_callback (uint32_t id,
-                               const bson_t *bson,
-                               int64_t rtt_msec,
-                               void *data,
-                               const bson_error_t *error /* IN */)
+_test_scanner_callback (uint32_t id,
+                        const bson_t *bson,
+                        int64_t rtt_msec,
+                        void *data,
+                        const bson_error_t *error /* IN */)
 {
    he_testcase_t *testcase = (he_testcase_t *) data;
    bool should_succeed =
@@ -182,7 +182,7 @@ _check_stream (mongoc_stream_t *stream, const char *expected, char *message)
 }
 
 static void
-test_happy_eyeballs_testcase (he_testcase_t *testcase)
+_run_testcase (he_testcase_t *testcase)
 {
    /* construct mock servers. */
    mongoc_host_list_t host;
@@ -193,11 +193,11 @@ test_happy_eyeballs_testcase (he_testcase_t *testcase)
    uint64_t start, duration_ms;
 
    start = bson_get_monotonic_time ();
-   port = test_happy_eyeballs_testcase_setup (testcase);
+   port = _testcase_setup (testcase);
 
    /* start scan. */
    ts = mongoc_topology_scanner_new (
-      NULL, NULL, &_test_happy_eyeballs_callback, testcase, TIMEOUT);
+      NULL, NULL, &_test_scanner_callback, testcase, TIMEOUT);
 
    _init_host (&host, port, testcase->client.type);
    mongoc_topology_scanner_add (ts, &host, 1);
@@ -228,7 +228,7 @@ test_happy_eyeballs_testcase (he_testcase_t *testcase)
                   expected->conn_succeeds_to,
                   "checking client's final connection");
    /* tear down state. */
-   test_happy_eyeballs_testcase_teardown (testcase);
+   _testcase_teardown (testcase);
 }
 
 static void
@@ -392,11 +392,11 @@ test_happy_eyeballs ()
    ntests = sizeof (testcases) / sizeof (he_testcase_t);
 
    for (i = 0; i < ntests; i++) {
-      test_happy_eyeballs_testcase (testcases + i);
+      _run_testcase (testcases + i);
    }
 }
 
-/* TODO: audit these test cases, introspect a bit more.
+/* TODO: audit these test cases, think of other ways to inspect state.
  * TODO: add DNS caching tests.
  */
 
