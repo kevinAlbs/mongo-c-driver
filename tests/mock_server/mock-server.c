@@ -1559,8 +1559,6 @@ main_thread (void *data)
       nanosleep (&delay, NULL);
    }
 
-   /* not sure if "lingering" is the right thing to turn off here. */
-   /* now do something destructive. */
    if (server->bind_opts.close_before_connection) {
       mongoc_socket_close (server->sock);
       mongoc_mutex_lock (&server->mutex);

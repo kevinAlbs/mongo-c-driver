@@ -177,8 +177,6 @@ mongoc_async_run (mongoc_async_t *async)
          /* check if an initiated cmd has passed the connection timeout.  */
          if (acmd->state != MONGOC_ASYNC_CMD_INITIATE &&
              now > acmd->connect_started + acmd->timeout_msec * 1000) {
-            mongoc_socket_t *sock =
-               mongoc_stream_socket_get_socket (acmd->stream);
             bson_set_error (&acmd->error,
                             MONGOC_ERROR_STREAM,
                             MONGOC_ERROR_STREAM_CONNECT,
