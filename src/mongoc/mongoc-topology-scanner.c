@@ -44,11 +44,23 @@
 
 /* forward declarations */
 static void
-mongoc_topology_scanner_ismaster_handler (
-   mongoc_async_cmd_t *acmd,
-   mongoc_async_cmd_result_t async_status,
-   const bson_t *ismaster_response,
-   int64_t rtt_msec);
+_async_connected (mongoc_async_cmd_t *acmd);
+
+static void
+_async_success (mongoc_async_cmd_t *acmd,
+                const bson_t *ismaster_response,
+                int64_t rtt_msec);
+
+static void
+_async_error_or_timeout (mongoc_async_cmd_t *acmd,
+                         int64_t rtt_msec,
+                         const char *default_err_msg);
+
+static void
+_async_handler (mongoc_async_cmd_t *acmd,
+                mongoc_async_cmd_result_t async_status,
+                const bson_t *ismaster_response,
+                int64_t rtt_msec);
 
 static void
 _mongoc_topology_scanner_monitor_heartbeat_started (
@@ -179,7 +191,7 @@ _begin_ismaster_cmd (mongoc_topology_scanner_node_t *node,
                          node->host.host,
                          "admin",
                          &cmd,
-                         &mongoc_topology_scanner_ismaster_handler,
+                         &_async_handler,
                          node,
                          ts->connect_timeout_msec);
 
@@ -393,6 +405,96 @@ mongoc_topology_scanner_has_node_for_host (mongoc_topology_scanner_t *ts,
    return false;
 }
 
+static void
+_async_connected (mongoc_async_cmd_t *acmd)
+{
+   mongoc_topology_scanner_node_t *node =
+      (mongoc_topology_scanner_node_t *) acmd->data;
+   /* this cmd connected successfully, cancel other cmds on this node. */
+   _cancel_commands_excluding (node, acmd);
+}
+
+static void
+_async_success (mongoc_async_cmd_t *acmd,
+                const bson_t *ismaster_response,
+                int64_t rtt_msec)
+{
+   void *data = acmd->data;
+   mongoc_topology_scanner_node_t *node =
+      (mongoc_topology_scanner_node_t *) data;
+   mongoc_stream_t *stream = acmd->stream;
+   mongoc_topology_scanner_t *ts = node->ts;
+
+   if (node->retired && stream) {
+      mongoc_stream_failed (stream);
+      return;
+   }
+
+   node->last_used = bson_get_monotonic_time ();
+   node->last_failed = -1;
+
+   _mongoc_topology_scanner_monitor_heartbeat_succeeded (
+      ts, &node->host, ismaster_response);
+
+   /* set our successful stream. */
+   node->stream = stream;
+   ts->cb (node->id, ismaster_response, rtt_msec, ts->cb_data, &acmd->error);
+}
+
+static void
+_async_error_or_timeout (mongoc_async_cmd_t *acmd,
+                         int64_t rtt_msec,
+                         const char *default_err_msg)
+{
+   void *data = acmd->data;
+   mongoc_topology_scanner_node_t *node =
+      (mongoc_topology_scanner_node_t *) data;
+   mongoc_stream_t *stream = acmd->stream;
+   mongoc_topology_scanner_t *ts = node->ts;
+   bson_error_t *error = &acmd->error;
+   int64_t now = bson_get_monotonic_time ();
+   const char *message;
+
+   if (node->retired && stream) {
+      mongoc_stream_failed (stream);
+      return;
+   }
+
+   node->last_used = now;
+
+   /* the stream may have failed on initiation. */
+   if (stream) {
+      mongoc_stream_failed (stream);
+   }
+
+   if (!node->stream && _count_acmds (node) == 1) {
+      /* there are no remaining streams, connecting has failed. */
+      node->last_failed = now;
+      if (error->code) {
+         message = error->message;
+      } else {
+         message = default_err_msg;
+      }
+
+      bson_set_error (&node->last_error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_STREAM_CONNECT,
+                      "%s calling ismaster on \'%s\'",
+                      message,
+                      node->host.host_and_port);
+
+      _mongoc_topology_scanner_monitor_heartbeat_failed (
+         ts, &node->host, &node->last_error);
+
+      /* call the topology scanner callback. cannot connect to this node. */
+      ts->cb (node->id, NULL, rtt_msec, ts->cb_data, error);
+   } else {
+      /* there are still more commands left for this node or it succeeded
+       * with another stream. skip the topology scanner callback. */
+      _prioritize_other_acmds (node, acmd);
+   }
+}
+
 /*
  *-----------------------------------------------------------------------
  *
@@ -403,88 +505,32 @@ mongoc_topology_scanner_has_node_for_host (mongoc_topology_scanner_t *ts,
  */
 
 static void
-mongoc_topology_scanner_ismaster_handler (
-   mongoc_async_cmd_t *acmd,
-   mongoc_async_cmd_result_t async_status,
-   const bson_t *ismaster_response,
-   int64_t rtt_msec)
+_async_handler (mongoc_async_cmd_t *acmd,
+                mongoc_async_cmd_result_t async_status,
+                const bson_t *ismaster_response,
+                int64_t rtt_msec)
 {
-   mongoc_stream_t *stream;
-   mongoc_topology_scanner_node_t *node;
-   mongoc_topology_scanner_t *ts;
-   int64_t now;
-   const char *message;
-   void *data = acmd->data;
-   bson_error_t *error = &acmd->error;
+   BSON_ASSERT (acmd->data);
 
-   BSON_ASSERT (data);
-
-   stream = acmd->stream;
-   node = (mongoc_topology_scanner_node_t *) data;
-   ts = node->ts;
-
-   /* TODO: this callback is now called possibly twice per cmd. meh.*/
-   if (async_status == MONGOC_ASYNC_CMD_CONNECTED) {
-      /* this cmd connected successfully, cancel other cmds on this node. */
-      _cancel_commands_excluding (node, acmd);
+   switch (async_status) {
+   case MONGOC_ASYNC_CMD_CONNECTED:
+      _async_connected (acmd);
+      return;
+   case MONGOC_ASYNC_CMD_SUCCESS:
+      _async_success (acmd, ismaster_response, rtt_msec);
+      return;
+   case MONGOC_ASYNC_CMD_TIMEOUT:
+      _async_error_or_timeout (acmd, rtt_msec, "connection timeout");
+      return;
+   case MONGOC_ASYNC_CMD_ERROR:
+      _async_error_or_timeout (acmd, rtt_msec, "connection error");
+      return;
+   case MONGOC_ASYNC_CMD_IN_PROGRESS:
+   default:
+      fprintf (stderr, "unexpected async status: %d\n", async_status);
+      BSON_ASSERT (false);
       return;
    }
-
-   if (node->retired && stream) {
-      mongoc_stream_failed (stream);
-      return;
-   }
-
-   now = bson_get_monotonic_time ();
-   node->last_used = now;
-
-   /* if no ismaster response, async cmd had an error or timed out. */
-   if (!ismaster_response || async_status == MONGOC_ASYNC_CMD_ERROR ||
-       async_status == MONGOC_ASYNC_CMD_TIMEOUT) {
-      /* the stream may have failed on initiation. */
-      if (stream) {
-         mongoc_stream_failed (stream);
-      }
-
-      if (!node->stream && _count_acmds (node) == 1) {
-         /* there are no remaining streams, connecting has failed. */
-         node->last_failed = now;
-         if (error->code) {
-            message = error->message;
-         } else {
-            if (async_status == MONGOC_ASYNC_CMD_TIMEOUT) {
-               message = "connection timeout";
-            } else {
-               message = "connection error";
-            }
-         }
-
-         bson_set_error (&node->last_error,
-                         MONGOC_ERROR_CLIENT,
-                         MONGOC_ERROR_STREAM_CONNECT,
-                         "%s calling ismaster on \'%s\'",
-                         message,
-                         node->host.host_and_port);
-
-         _mongoc_topology_scanner_monitor_heartbeat_failed (
-            ts, &node->host, &node->last_error);
-
-      } else {
-         /* there are still more commands left for this node or it succeeded
-          * with another stream. skip the callback. */
-         _prioritize_other_acmds (node, acmd);
-         return;
-      }
-   } else {
-      node->last_failed = -1;
-      _mongoc_topology_scanner_monitor_heartbeat_succeeded (
-         ts, &node->host, ismaster_response);
-
-      /* set our successful stream. */
-      node->stream = stream;
-   }
-
-   ts->cb (node->id, ismaster_response, rtt_msec, ts->cb_data, error);
 }
 
 mongoc_stream_t *

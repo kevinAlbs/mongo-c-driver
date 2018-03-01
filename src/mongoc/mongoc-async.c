@@ -22,6 +22,7 @@
 #include "utlist.h"
 #include "mongoc.h"
 #include "mongoc-socket-private.h"
+#include "mongoc-util-private.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "async"
@@ -52,6 +53,7 @@ void
 mongoc_async_run (mongoc_async_t *async)
 {
    mongoc_async_cmd_t *acmd, *tmp;
+   mongoc_async_cmd_t **acmds_polled = NULL;
    mongoc_stream_poll_t *poller = NULL;
    int nstreams, i;
    ssize_t nactive;
@@ -74,7 +76,8 @@ mongoc_async_run (mongoc_async_t *async)
       if (poll_size < async->ncmds) {
          poller = (mongoc_stream_poll_t *) bson_realloc (
             poller, sizeof (*poller) * async->ncmds);
-
+         acmds_polled = (mongoc_async_cmd_t **) bson_realloc (
+            acmds_polled, sizeof (*acmds_polled) * async->ncmds);
          poll_size = async->ncmds;
       }
 
@@ -90,9 +93,6 @@ mongoc_async_run (mongoc_async_t *async)
                /* time to initiate. */
                if (mongoc_async_cmd_run (acmd)) {
                   BSON_ASSERT (acmd->stream);
-                  /* reset the connect started time after connection starts. */
-                  /* TODO: does this break expectations of connectTimeoutMS? */
-                  acmd->connect_started = now;
                } else {
                   /* this command was removed. */
                   continue;
@@ -105,7 +105,7 @@ mongoc_async_run (mongoc_async_t *async)
          }
 
          if (acmd->stream) {
-            poller[nstreams].acmd = acmd;
+            acmds_polled[nstreams] = acmd;
             poller[nstreams].stream = acmd->stream;
             poller[nstreams].events = acmd->events;
             poller[nstreams].revents = 0;
@@ -128,16 +128,14 @@ mongoc_async_run (mongoc_async_t *async)
          nactive =
             mongoc_stream_poll (poller, nstreams, (int32_t) poll_timeout_msec);
       } else {
-         /* TODO: I'm hesitant of this. Currently this won't get hit though. */
-         struct timespec delay;
-         delay.tv_sec = poll_timeout_msec / 1000;
-         delay.tv_nsec = (poll_timeout_msec % 1000) * 1000 * 1000;
-         nanosleep (&delay, NULL);
+         /* currently this does not get hit. we always have at least one command
+          * initialized with a stream. */
+         _mongoc_usleep (poll_timeout_msec * 1000 * 1000);
       }
 
       if (nactive) {
          for (i = 0; i < nstreams; i++) {
-            mongoc_async_cmd_t *iter = poller[i].acmd;
+            mongoc_async_cmd_t *iter = acmds_polled[i];
             if (poller[i].revents & (POLLERR | POLLHUP)) {
                int hup = poller[i].revents & POLLHUP;
                if (iter->state == MONGOC_ASYNC_CMD_SEND) {

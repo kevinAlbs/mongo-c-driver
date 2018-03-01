@@ -243,6 +243,8 @@ _mongoc_async_cmd_phase_initiate (mongoc_async_cmd_t *acmd)
    if (!acmd->stream) {
       return MONGOC_ASYNC_CMD_ERROR;
    }
+   /* reset the connect started time after connection starts. */
+   acmd->connect_started = bson_get_monotonic_time ();
    if (acmd->setup) {
       acmd->state = MONGOC_ASYNC_CMD_SETUP;
    } else {

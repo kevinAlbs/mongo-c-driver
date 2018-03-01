@@ -30,10 +30,8 @@ BSON_BEGIN_DECLS
 
 
 typedef struct _mongoc_stream_t mongoc_stream_t;
-struct _mongoc_async_cmd;
 
 typedef struct _mongoc_stream_poll_t {
-   struct _mongoc_async_cmd *acmd;
    mongoc_stream_t *stream;
    int events;
    int revents;
