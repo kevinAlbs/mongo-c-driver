@@ -202,5 +202,6 @@ mongoc_async_run (mongoc_async_t *async)
 
    if (poll_size) {
       bson_free (poller);
+      bson_free (acmds_polled);
    }
 }
