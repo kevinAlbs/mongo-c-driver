@@ -92,7 +92,7 @@ mongoc_async_run (mongoc_async_t *async)
                   BSON_ASSERT (acmd->stream);
                   /* reset the connect started time after connection starts. */
                   /* TODO: does this break expectations of connectTimeoutMS? */
-                  acmd->connect_started = bson_get_monotonic_time ();
+                  acmd->connect_started = now;
                } else {
                   /* this command was removed. */
                   continue;

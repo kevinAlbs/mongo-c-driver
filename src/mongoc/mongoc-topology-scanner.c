@@ -423,8 +423,7 @@ mongoc_topology_scanner_ismaster_handler (
    node = (mongoc_topology_scanner_node_t *) data;
    ts = node->ts;
 
-   /* TODO: I don't like that this now breaks the expectation that this callback
-    * is only called once per command. */
+   /* TODO: this callback is now called possibly twice per cmd. meh.*/
    if (async_status == MONGOC_ASYNC_CMD_CONNECTED) {
       /* this cmd connected successfully, cancel other cmds on this node. */
       _cancel_commands_excluding (node, acmd);
@@ -685,6 +684,7 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node,
 
    _mongoc_topology_scanner_monitor_heartbeat_started (node->ts, &node->host);
 
+   /* if cached dns results are expired, flush. */
    if (node->dns_results &&
        (now - node->last_dns_cache) > node->ts->dns_cache_timeout_ms) {
       mongoc_topology_scanner_node_disconnect (node, false);

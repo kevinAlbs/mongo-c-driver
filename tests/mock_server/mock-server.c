@@ -1580,7 +1580,6 @@ main_thread (void *data)
       client_sock = mongoc_socket_accept_ex (
          server->sock, bson_get_monotonic_time () + 100 * 1000, &port);
 
-
       if (_mock_server_stopping (server)) {
          break;
       }
