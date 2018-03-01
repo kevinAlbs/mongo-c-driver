@@ -121,16 +121,9 @@ mongoc_async_cmd_run (mongoc_async_cmd_t *acmd)
    rtt_msec = (bson_get_monotonic_time () - acmd->cmd_started) / 1000;
 
    if (result == MONGOC_ASYNC_CMD_SUCCESS) {
-      char * names[] = { [AF_INET] = "AF_INET", [AF_INET6] = "AF_INET6"};
-      printf("success on stream for %s\n", names[acmd->dns_result->ai_family]);
       acmd->cb (acmd, result, &acmd->reply, rtt_msec);
    } else {
       /* we're in ERROR, TIMEOUT, or CANCELED */
-      char * names[] = { [AF_INET] = "AF_INET", [AF_INET6] = "AF_INET6"};
-      printf("error on stream for %s\n", names[acmd->dns_result->ai_family]);
-      if (acmd->dns_result->ai_family) {
-         printf("not making sense\n");
-      }
       acmd->cb (acmd, result, NULL, rtt_msec);
    }
 
@@ -194,10 +187,6 @@ mongoc_async_cmd_new (mongoc_async_t *async,
 
    BSON_ASSERT (cmd);
    BSON_ASSERT (dbname);
-   if (stream) {
-      char * names[] = { [AF_INET] = "AF_INET", [AF_INET6] = "AF_INET6"};
-      printf("stream direct => %s/%s\n", names[dns_result->ai_family]);
-   }
 
    acmd = (mongoc_async_cmd_t *) bson_malloc0 (sizeof (*acmd));
    acmd->async = async;

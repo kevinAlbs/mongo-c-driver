@@ -89,15 +89,10 @@ mongoc_async_run (mongoc_async_t *async)
             if (now >= acmd->initiate_delay_ms * 1000 + acmd->connect_started) {
                /* time to initiate. */
                if (mongoc_async_cmd_run (acmd)) {
-                  mongoc_socket_t *sock = mongoc_stream_socket_get_socket (acmd->stream);
-                  char * names[] = { [AF_INET] = "AF_INET", [AF_INET6] = "AF_INET6"};
-                  printf("initiated %s/%s\n", names[sock->domain], names[acmd->dns_result->ai_family]);
                   BSON_ASSERT (acmd->stream);
                   /* reset the connect started time after connection starts. */
-                  /* TODO: does this break expectations? */
                   acmd->connect_started = bson_get_monotonic_time ();
                } else {
-                  printf("failed to initiate\n");
                   /* this command was removed. */
                   continue;
                }
@@ -128,7 +123,6 @@ mongoc_async_run (mongoc_async_t *async)
       BSON_ASSERT (poll_timeout_msec < INT32_MAX);
 
       if (nstreams > 0) {
-         printf("polling with %d streams\n", nstreams);
          /* we need at least one stream to poll. */
          nactive =
             mongoc_stream_poll (poller, nstreams, (int32_t) poll_timeout_msec);
@@ -165,8 +159,6 @@ mongoc_async_run (mongoc_async_t *async)
 
             if ((poller[i].revents & poller[i].events) ||
                 iter->state == MONGOC_ASYNC_CMD_ERROR_STATE) {
-               char * names[] = { [AF_INET] = "AF_INET", [AF_INET6] = "AF_INET6"};
-               printf("running for stream %s\n", names[iter->dns_result->ai_family]);
                mongoc_async_cmd_run (iter);
                nactive--;
             }
@@ -186,8 +178,6 @@ mongoc_async_run (mongoc_async_t *async)
          if (acmd->state != MONGOC_ASYNC_CMD_INITIATE &&
              now > acmd->connect_started + acmd->timeout_msec * 1000) {
             mongoc_socket_t *sock = mongoc_stream_socket_get_socket (acmd->stream);
-            char * names[] = { [AF_INET] = "AF_INET", [AF_INET6] = "AF_INET6"};
-            printf("timed out on stream for %s\n", names[sock->domain]);
             bson_set_error (&acmd->error,
                             MONGOC_ERROR_STREAM,
                             MONGOC_ERROR_STREAM_CONNECT,
@@ -198,8 +188,6 @@ mongoc_async_run (mongoc_async_t *async)
             remove_cmd = true;
             result = MONGOC_ASYNC_CMD_TIMEOUT;
          } else if (acmd->state == MONGOC_ASYNC_CMD_CANCELED_STATE) {
-            char * names[] = { [AF_INET] = "AF_INET", [AF_INET6] = "AF_INET6"};
-            printf("cancelled on stream for %s\n", names[acmd->dns_result->ai_family]);
             remove_cmd = true;
             result = MONGOC_ASYNC_CMD_ERROR;
          }
