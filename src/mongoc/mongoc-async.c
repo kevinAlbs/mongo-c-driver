@@ -91,6 +91,7 @@ mongoc_async_run (mongoc_async_t *async)
                if (mongoc_async_cmd_run (acmd)) {
                   BSON_ASSERT (acmd->stream);
                   /* reset the connect started time after connection starts. */
+                  /* TODO: does this break expectations of connectTimeoutMS? */
                   acmd->connect_started = bson_get_monotonic_time ();
                } else {
                   /* this command was removed. */
@@ -127,8 +128,7 @@ mongoc_async_run (mongoc_async_t *async)
          nactive =
             mongoc_stream_poll (poller, nstreams, (int32_t) poll_timeout_msec);
       } else {
-         /* TODO: I'm hesitant of this. */
-         printf("sleeping for %dms\n", poll_timeout_msec);
+         /* TODO: I'm hesitant of this. Currently this won't get hit though. */
          struct timespec delay;
          delay.tv_sec = poll_timeout_msec / 1000;
          delay.tv_nsec = (poll_timeout_msec % 1000) * 1000 * 1000;
