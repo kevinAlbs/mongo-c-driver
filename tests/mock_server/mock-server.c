@@ -358,7 +358,7 @@ mock_server_run (mock_server_t *server)
    }
 
    if (-1 == mongoc_socket_bind (
-      ssock, (struct sockaddr *) bind_addr, bind_addr_len)) {
+                ssock, (struct sockaddr *) bind_addr, bind_addr_len)) {
       perror ("Failed to bind socket");
       return 0;
    }
@@ -381,7 +381,7 @@ mock_server_run (mock_server_t *server)
    server->uri = mongoc_uri_new (server->uri_str);
 
    mongoc_thread_create (&server->main_thread, main_thread, (void *) server);
-   while (!server->running) {
+   while (!server->running && !server->stopped) {
       mongoc_cond_wait (&server->cond, &server->mutex);
    }
 
@@ -1556,17 +1556,19 @@ main_thread (void *data)
       struct timespec delay = {0};
       delay.tv_sec = delay_ms / 1000;
       delay.tv_nsec = (delay_ms % 1000) * 1000 * 1000;
-      nanosleep(&delay, NULL);
+      nanosleep (&delay, NULL);
    }
 
    /* not sure if "lingering" is the right thing to turn off here. */
    /* now do something destructive. */
    if (server->bind_opts.close_before_connection) {
       mongoc_socket_close (server->sock);
+      mongoc_mutex_lock (&server->mutex);
+      server->running = false;
+      server->stopped = true;
+      mongoc_mutex_unlock (&server->mutex);
       return NULL;
    }
-
-   struct timespec timeout = {.tv_sec = 1, .tv_nsec = 0};
 
    if (-1 == mongoc_socket_listen (server->sock, 0)) {
       perror ("Failed to put socket into listen mode");
