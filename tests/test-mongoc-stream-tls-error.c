@@ -252,7 +252,7 @@ handshake_stall_client (void *ptr)
    }
    mongoc_mutex_unlock (&data->cond_mutex);
 
-   uri_str = bson_strdup_printf ("mongodb://127.0.0.1:%u/"
+   uri_str = bson_strdup_printf ("mongodb://localhost:%u/"
                                  "?ssl=true&serverselectiontimeoutms=200&"
                                  "connecttimeoutms=%" PRId64,
                                  data->server_port,
