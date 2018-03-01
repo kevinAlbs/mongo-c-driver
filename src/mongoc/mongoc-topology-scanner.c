@@ -589,8 +589,6 @@ mongoc_topology_scanner_node_setup_tcp (mongoc_topology_scanner_node_t *node,
    LL_FOREACH2 (node->dns_results, iter, ai_next)
    {
       _begin_ismaster_cmd (node, NULL, iter, delay);
-      /* TODO: we should really make sure that an IPv4 result has the 250ms
-       * delay. */
       /* each subsequent DNS result will have an additional 250ms delay. */
       delay += HAPPY_EYEBALLS_DELAY_MS;
    }
