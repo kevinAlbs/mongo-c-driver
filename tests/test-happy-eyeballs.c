@@ -15,7 +15,7 @@ typedef struct he_testcase_server {
    /* { "ipv4", "ipv6", NULL } */
    char *type;
    /* how long before the mock server calls `listen` on the server socket.
-    * This delays the client from establishing a connection. */
+    * this delays the client from establishing a connection. */
    int listen_delay_ms;
    /* if true, this closes the server socket before the client establishes
     * connection. */
@@ -29,7 +29,7 @@ typedef struct he_testcase_client {
 } he_testcase_client_t;
 
 typedef struct he_testcase_expected {
-   /* { "ipv4", "ipv6", "neither" }. Which connection succeeds (if any). */
+   /* { "ipv4", "ipv6", "neither" }. which connection succeeds (if any). */
    char *conn_succeeds_to;
    /* how many async commands should be created at the start. */
    int initial_acmds;
@@ -64,7 +64,6 @@ _test_scanner_callback (uint32_t id,
    if (should_succeed) {
       ASSERT_OR_PRINT (!error->code, (*error));
    } else {
-      ASSERT (error->code);
       ASSERT_ERROR_CONTAINS ((*error),
                              MONGOC_ERROR_STREAM,
                              MONGOC_ERROR_STREAM_CONNECT,
@@ -211,7 +210,6 @@ _testcase_run (he_testcase_t *testcase)
    mongoc_topology_scanner_scan (ts, 1 /* any server id is ok. */);
    /* how many commands should we have initially? */
    ASSERT_CMPINT ((int) (ts->async->ncmds), ==, expected->initial_acmds);
-   /* TODO: check stream types of async commands. */
 
    mongoc_topology_scanner_work (ts);
 
@@ -418,6 +416,9 @@ test_happy_eyeballs_dns_cache ()
    };
    _testcase_setup (&testcase);
    _testcase_run (&testcase);
+   /* disconnect the node so we perform another DNS lookup. */
+   mongoc_topology_scanner_node_disconnect (testcase.state.ts->nodes, false);
+
    /* after running once, the topology scanner should have cached the DNS
     * result for IPv4. It should complete immediately. */
    testcase.expected.initial_acmds = 1;
@@ -442,9 +443,13 @@ test_happy_eyeballs_dns_cache_timeout ()
    };
    _testcase_setup (&testcase);
    _testcase_run (&testcase);
+   /* disconnect the node so we perform another DNS lookup. */
+   mongoc_topology_scanner_node_disconnect (testcase.state.ts->nodes, false);
+
    /* after running once, the topology scanner should have cached the DNS
     * result for IPv4. Wait for 100ms for cache to expire. */
    _mongoc_usleep (110 * 1000);
+
    /* since the cache is expired, we try connecting to both again. There's no
     * longer a delay applied to the IPv6 connection so it succeeds. */
    testcase.expected.conn_succeeds_to = "ipv6";

@@ -130,7 +130,7 @@ mongoc_async_run (mongoc_async_t *async)
       } else {
          /* currently this does not get hit. we always have at least one command
           * initialized with a stream. */
-         _mongoc_usleep (poll_timeout_msec * 1000 * 1000);
+         _mongoc_usleep (poll_timeout_msec * 1000);
       }
 
       if (nactive) {
@@ -200,8 +200,6 @@ mongoc_async_run (mongoc_async_t *async)
       now = bson_get_monotonic_time ();
    }
 
-   if (poll_size) {
-      bson_free (poller);
-      bson_free (acmds_polled);
-   }
+   bson_free (poller);
+   bson_free (acmds_polled);
 }

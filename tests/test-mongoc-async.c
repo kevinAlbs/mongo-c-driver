@@ -1,4 +1,5 @@
 #include <mongoc.h>
+#include <mongoc-client-private.h>
 
 #include "mongoc-util-private.h"
 #include "mongoc-async-private.h"
@@ -295,6 +296,67 @@ test_large_ismaster (void *ctx)
 }
 #endif
 
+typedef struct _stream_with_result_t {
+   mongoc_stream_t *stream;
+   bool finished;
+} stream_with_result_t;
+
+static void
+test_ismaster_delay_callback (mongoc_async_cmd_t *acmd,
+                              mongoc_async_cmd_result_t result,
+                              const bson_t *bson,
+                              int64_t rtt_msec)
+{
+   ((stream_with_result_t *) acmd->data)->finished = true;
+}
+
+static mongoc_stream_t *
+test_ismaster_delay_initializer (mongoc_async_cmd_t *acmd)
+{
+   return ((stream_with_result_t *) acmd->data)->stream;
+}
+
+static void
+test_ismaster_delay ()
+{
+   /* test that a delayed cmd works. */
+   mock_server_t *server = mock_server_with_autoismaster (WIRE_VERSION_MAX);
+   mock_server_run (server);
+   mongoc_async_t *async = mongoc_async_new ();
+   bson_t ismaster_cmd = BSON_INITIALIZER;
+   stream_with_result_t stream_with_result = {0};
+   int64_t start = bson_get_monotonic_time ();
+
+   stream_with_result.stream =
+      get_localhost_stream (mock_server_get_port (server));
+   stream_with_result.finished = false;
+
+   BSON_ASSERT (bson_append_int32 (&ismaster_cmd, "isMaster", 8, 1));
+   mongoc_async_cmd_new (async,
+                         NULL, /* stream, initialized after delay. */
+                         NULL, /* dns result. */
+                         test_ismaster_delay_initializer,
+                         100,  /* delay 100ms. */
+                         NULL, /* setup function. */
+                         NULL, /* setup ctx. */
+                         "admin",
+                         &ismaster_cmd,
+                         &test_ismaster_delay_callback,
+                         &stream_with_result,
+                         TIMEOUT);
+
+
+   mongoc_async_run (async);
+
+   /* it should have taken at least 100ms to finish. */
+   ASSERT_CMPINT64 (
+      bson_get_monotonic_time () - start, >, (int64_t) (100 * 1000));
+   BSON_ASSERT (stream_with_result.finished);
+
+   mongoc_stream_destroy (stream_with_result.stream);
+   mongoc_async_destroy (async);
+   mock_server_destroy (server);
+}
 
 void
 test_async_install (TestSuite *suite)
@@ -312,4 +374,5 @@ test_async_install (TestSuite *suite)
                       NULL /* ctx */,
                       test_framework_skip_if_not_single);
 #endif
+   TestSuite_AddMockServerTest (suite, "/Async/delay", test_ismaster_delay);
 }

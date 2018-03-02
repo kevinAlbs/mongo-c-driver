@@ -93,8 +93,8 @@ _count_acmds (mongoc_topology_scanner_node_t *node);
 
 /* if acmd fails, schedule the sibling commands sooner. */
 static void
-_prioritize_other_acmds (mongoc_topology_scanner_node_t *node,
-                         mongoc_async_cmd_t *acmd);
+_jumpstart_other_acmds (mongoc_topology_scanner_node_t *node,
+                        mongoc_async_cmd_t *acmd);
 
 static void
 _add_ismaster (bson_t *cmd)
@@ -224,6 +224,7 @@ mongoc_topology_scanner_new (
    ts->appname = NULL;
    ts->handshake_ok_to_send = false;
    ts->connect_timeout_msec = connect_timeout_msec;
+   /* may be overridden for testing. */
    ts->dns_cache_timeout_ms = DNS_CACHE_TIMEOUT_MS;
 
    return ts;
@@ -325,12 +326,6 @@ void
 mongoc_topology_scanner_node_disconnect (mongoc_topology_scanner_node_t *node,
                                          bool failed)
 {
-   if (node->dns_results) {
-      freeaddrinfo (node->dns_results);
-      node->dns_results = NULL;
-      node->successful_dns_result = NULL;
-      node->last_dns_cache = 0;
-   }
    /* the node may or may not have succeeded in finding a working stream. */
    if (node->stream) {
       if (failed) {
@@ -349,6 +344,12 @@ mongoc_topology_scanner_node_destroy (mongoc_topology_scanner_node_t *node,
 {
    DL_DELETE (node->ts->nodes, node);
    mongoc_topology_scanner_node_disconnect (node, failed);
+   if (node->dns_results) {
+      freeaddrinfo (node->dns_results);
+      node->dns_results = NULL;
+      node->successful_dns_result = NULL;
+      node->last_dns_cache = 0;
+   }
    bson_free (node);
 }
 
@@ -412,6 +413,7 @@ _async_connected (mongoc_async_cmd_t *acmd)
       (mongoc_topology_scanner_node_t *) acmd->data;
    /* this cmd connected successfully, cancel other cmds on this node. */
    _cancel_commands_excluding (node, acmd);
+   node->successful_dns_result = acmd->dns_result;
 }
 
 static void
@@ -437,6 +439,7 @@ _async_success (mongoc_async_cmd_t *acmd,
       ts, &node->host, ismaster_response);
 
    /* set our successful stream. */
+   BSON_ASSERT (!node->stream);
    node->stream = stream;
    ts->cb (node->id, ismaster_response, rtt_msec, ts->cb_data, &acmd->error);
 }
@@ -491,7 +494,7 @@ _async_error_or_timeout (mongoc_async_cmd_t *acmd,
    } else {
       /* there are still more commands left for this node or it succeeded
        * with another stream. skip the topology scanner callback. */
-      _prioritize_other_acmds (node, acmd);
+      _jumpstart_other_acmds (node, acmd);
    }
 }
 
@@ -603,10 +606,19 @@ mongoc_topology_scanner_node_setup_tcp (mongoc_topology_scanner_node_t *node,
    mongoc_host_list_t *host;
    int s;
    int64_t delay = 0;
+   int64_t now = bson_get_monotonic_time ();
 
    ENTRY;
 
    host = &node->host;
+
+   /* if cached dns results are expired, flush. */
+   if (node->dns_results &&
+       (now - node->last_dns_cache) > node->ts->dns_cache_timeout_ms * 1000) {
+      freeaddrinfo (node->dns_results);
+      node->dns_results = NULL;
+      node->successful_dns_result = NULL;
+   }
 
    if (!node->dns_results) {
       bson_snprintf (portstr, sizeof portstr, "%hu", host->port);
@@ -630,16 +642,19 @@ mongoc_topology_scanner_node_setup_tcp (mongoc_topology_scanner_node_t *node,
       }
 
       mongoc_counter_dns_success_inc ();
-      node->last_dns_cache = bson_get_monotonic_time ();
+      node->last_dns_cache = now;
    }
 
-   LL_FOREACH2 (node->dns_results, iter, ai_next)
-   {
-      _begin_ismaster_cmd (node, NULL, iter, delay);
-      /* each subsequent DNS result will have an additional 250ms delay. */
-      delay += HAPPY_EYEBALLS_DELAY_MS;
+   if (node->successful_dns_result) {
+      _begin_ismaster_cmd (node, NULL, node->successful_dns_result, 0);
+   } else {
+      LL_FOREACH2 (node->dns_results, iter, ai_next)
+      {
+         _begin_ismaster_cmd (node, NULL, iter, delay);
+         /* each subsequent DNS result will have an additional 250ms delay. */
+         delay += HAPPY_EYEBALLS_DELAY_MS;
+      }
    }
-
 
    RETURN (true);
 }
@@ -725,19 +740,12 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node,
 {
    bool success = false;
    mongoc_stream_t *stream;
-   int64_t now = bson_get_monotonic_time ();
 
    _mongoc_topology_scanner_monitor_heartbeat_started (node->ts, &node->host);
 
-   /* if cached dns results are expired, flush. */
-   if (node->dns_results &&
-       (now - node->last_dns_cache) > node->ts->dns_cache_timeout_ms * 1000) {
-      mongoc_topology_scanner_node_disconnect (node, false);
-   }
-
    /* if there is already a working stream, push it back to be re-scanned. */
    if (node->stream) {
-      _begin_ismaster_cmd (node, node->stream, node->successful_dns_result, 0);
+      _begin_ismaster_cmd (node, node->stream, NULL, 0);
       node->stream = NULL;
       return;
    }
@@ -1059,6 +1067,7 @@ _mongoc_topology_scanner_monitor_heartbeat_failed (
    }
 }
 
+/* this is for testing the dns cache timeout. */
 void
 _mongoc_topology_scanner_set_dns_cache_timeout (mongoc_topology_scanner_t *ts,
                                                 int64_t timeout_ms)
@@ -1095,14 +1104,14 @@ _count_acmds (mongoc_topology_scanner_node_t *node)
 }
 
 static void
-_prioritize_other_acmds (mongoc_topology_scanner_node_t *node,
-                         mongoc_async_cmd_t *acmd)
+_jumpstart_other_acmds (mongoc_topology_scanner_node_t *node,
+                        mongoc_async_cmd_t *acmd)
 {
    mongoc_async_cmd_t *iter;
    DL_FOREACH (node->ts->async->cmds, iter)
    {
       if ((mongoc_topology_scanner_node_t *) iter->data == node &&
-          acmd->initiate_delay_ms < iter->initiate_delay_ms) {
+          iter != acmd && acmd->initiate_delay_ms < iter->initiate_delay_ms) {
          iter->initiate_delay_ms =
             BSON_MAX (iter->initiate_delay_ms - HAPPY_EYEBALLS_DELAY_MS, 0);
       }
