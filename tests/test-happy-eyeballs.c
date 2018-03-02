@@ -1,6 +1,7 @@
 #include <mongoc.h>
 #include <mongoc-socket-private.h>
 #include <mongoc-host-list-private.h>
+#include <mongoc-util-private.h>
 
 #include "mongoc-client-private.h"
 
@@ -24,6 +25,7 @@ typedef struct he_testcase_server {
 typedef struct he_testcase_client {
    /* { "ipv4", "ipv6", "both" } */
    char *type;
+   int64_t dns_cache_timeout_ms;
 } he_testcase_client_t;
 
 typedef struct he_testcase_expected {
@@ -38,6 +40,8 @@ typedef struct he_testcase_expected {
 
 typedef struct he_testcase_state {
    mock_server_t *mock_servers[2];
+   mongoc_host_list_t host;
+   mongoc_topology_scanner_t *ts;
 } he_testcase_state_t;
 
 typedef struct he_testcase {
@@ -47,7 +51,48 @@ typedef struct he_testcase {
    he_testcase_state_t state;
 } he_testcase_t;
 
-static uint16_t
+static void
+_test_scanner_callback (uint32_t id,
+                        const bson_t *bson,
+                        int64_t rtt_msec,
+                        void *data,
+                        const bson_error_t *error /* IN */)
+{
+   he_testcase_t *testcase = (he_testcase_t *) data;
+   bool should_succeed =
+      strcmp (testcase->expected.conn_succeeds_to, "neither");
+   if (should_succeed) {
+      ASSERT_OR_PRINT (!error->code, (*error));
+   } else {
+      ASSERT (error->code);
+      ASSERT_ERROR_CONTAINS ((*error),
+                             MONGOC_ERROR_STREAM,
+                             MONGOC_ERROR_STREAM_CONNECT,
+                             "connection refused");
+   }
+}
+
+static void
+_init_host (mongoc_host_list_t *host, uint16_t port, const char *type)
+{
+   char *host_str, *host_and_port;
+
+   if (strcmp (type, "ipv4") == 0) {
+      host_str = "127.0.0.1";
+   } else if (strcmp (type, "ipv6") == 0) {
+      host_str = "[::1]";
+   } else {
+      host_str = "localhost";
+   }
+
+   host_and_port = bson_strdup_printf ("%s:%d", host_str, port);
+   _mongoc_host_list_from_string (host, host_and_port);
+   /* we should only have one host. */
+   BSON_ASSERT (!host->next);
+   bson_free (host_and_port);
+}
+
+static void
 _testcase_setup (he_testcase_t *testcase)
 {
    uint16_t port = 0;
@@ -104,7 +149,17 @@ _testcase_setup (he_testcase_t *testcase)
          testcase->state.mock_servers[i] = mock_server;
       }
    }
-   return port;
+
+   _init_host (&testcase->state.host, port, testcase->client.type);
+
+   /* start scan. */
+   testcase->state.ts = mongoc_topology_scanner_new (
+      NULL, NULL, &_test_scanner_callback, testcase, TIMEOUT);
+
+   if (testcase->client.dns_cache_timeout_ms > 0) {
+      _mongoc_topology_scanner_set_dns_cache_timeout (
+         testcase->state.ts, testcase->client.dns_cache_timeout_ms);
+   }
 }
 
 static void
@@ -117,47 +172,7 @@ _testcase_teardown (he_testcase_t *testcase)
          testcase->state.mock_servers[i] = 0;
       }
    }
-}
-
-static void
-_test_scanner_callback (uint32_t id,
-                        const bson_t *bson,
-                        int64_t rtt_msec,
-                        void *data,
-                        const bson_error_t *error /* IN */)
-{
-   he_testcase_t *testcase = (he_testcase_t *) data;
-   bool should_succeed =
-      strcmp (testcase->expected.conn_succeeds_to, "neither");
-   if (should_succeed) {
-      ASSERT_OR_PRINT (!error->code, (*error));
-   } else {
-      ASSERT (error->code);
-      ASSERT_ERROR_CONTAINS ((*error),
-                             MONGOC_ERROR_STREAM,
-                             MONGOC_ERROR_STREAM_CONNECT,
-                             "connection refused");
-   }
-}
-
-static void
-_init_host (mongoc_host_list_t *host, uint16_t port, const char *type)
-{
-   char *host_str, *host_and_port;
-
-   if (strcmp (type, "ipv4") == 0) {
-      host_str = "127.0.0.1";
-   } else if (strcmp (type, "ipv6") == 0) {
-      host_str = "[::1]";
-   } else {
-      host_str = "localhost";
-   }
-
-   host_and_port = bson_strdup_printf ("%s:%d", host_str, port);
-   _mongoc_host_list_from_string (host, host_and_port);
-   /* we should only have one host. */
-   BSON_ASSERT (!host->next);
-   bson_free (host_and_port);
+   mongoc_topology_scanner_destroy (testcase->state.ts);
 }
 
 static void
@@ -182,25 +197,17 @@ _check_stream (mongoc_stream_t *stream, const char *expected, char *message)
 }
 
 static void
-_run_testcase (he_testcase_t *testcase)
+_testcase_run (he_testcase_t *testcase)
 {
    /* construct mock servers. */
-   mongoc_host_list_t host;
-   mongoc_topology_scanner_t *ts;
-   uint16_t port;
+   mongoc_topology_scanner_t *ts = testcase->state.ts;
    mongoc_topology_scanner_node_t *node;
    he_testcase_expected_t *expected = &testcase->expected;
    uint64_t start, duration_ms;
 
    start = bson_get_monotonic_time ();
-   port = _testcase_setup (testcase);
 
-   /* start scan. */
-   ts = mongoc_topology_scanner_new (
-      NULL, NULL, &_test_scanner_callback, testcase, TIMEOUT);
-
-   _init_host (&host, port, testcase->client.type);
-   mongoc_topology_scanner_add (ts, &host, 1);
+   mongoc_topology_scanner_add (ts, &testcase->state.host, 1);
    mongoc_topology_scanner_scan (ts, 1 /* any server id is ok. */);
    /* how many commands should we have initially? */
    ASSERT_CMPINT ((int) (ts->async->ncmds), ==, expected->initial_acmds);
@@ -227,8 +234,6 @@ _run_testcase (he_testcase_t *testcase)
    _check_stream (node->stream,
                   expected->conn_succeeds_to,
                   "checking client's final connection");
-   /* tear down state. */
-   _testcase_teardown (testcase);
 }
 
 static void
@@ -392,17 +397,75 @@ test_happy_eyeballs ()
    ntests = sizeof (testcases) / sizeof (he_testcase_t);
 
    for (i = 0; i < ntests; i++) {
-      _run_testcase (testcases + i);
+      _testcase_setup (testcases + i);
+      _testcase_run (testcases + i);
+      _testcase_teardown (testcases + i);
    }
 }
 
+static void
+test_happy_eyeballs_dns_cache ()
+{
+   const int he = 250;
+   const int e = 100;
+   he_testcase_t testcase = {
+      /* client. */
+      {"both"},
+      /* server sockets. */
+      {{"ipv4", 0, false}, {"ipv6", he + e, false}},
+      /* expected. IPv4 succeeds after delay. */
+      {"ipv4", 2, he, he + e},
+   };
+   _testcase_setup (&testcase);
+   _testcase_run (&testcase);
+   /* after running once, the topology scanner should have cached the DNS
+    * result for IPv4. It should complete immediately. */
+   testcase.expected.initial_acmds = 1;
+   testcase.expected.complete_after_ms = 0;
+   testcase.expected.complete_before_ms = e;
+   _testcase_run (&testcase);
+   _testcase_teardown (&testcase);
+}
+
+static void
+test_happy_eyeballs_dns_cache_timeout ()
+{
+   const int he = 250;
+   const int e = 100;
+   he_testcase_t testcase = {
+      /* client. */
+      {"both", 100},
+      /* server sockets. */
+      {{"ipv4", 0, false}, {"ipv6", he + e, false}},
+      /* expected. IPv4 succeeds after delay. */
+      {"ipv4", 2, he, he + e},
+   };
+   _testcase_setup (&testcase);
+   _testcase_run (&testcase);
+   /* after running once, the topology scanner should have cached the DNS
+    * result for IPv4. Wait for 100ms for cache to expire. */
+   _mongoc_usleep (110 * 1000);
+   /* since the cache is expired, we try connecting to both again. There's no
+    * longer a delay applied to the IPv6 connection so it succeeds. */
+   testcase.expected.conn_succeeds_to = "ipv6";
+   testcase.expected.complete_after_ms = 0;
+   testcase.expected.complete_before_ms = e;
+   _testcase_run (&testcase);
+   _testcase_teardown (&testcase);
+}
+
 /* TODO: audit these test cases, think of other ways to inspect state.
- * TODO: add DNS caching tests.
  */
 
 void
 test_happy_eyeballs_install (TestSuite *suite)
 {
    TestSuite_AddMockServerTest (
-      suite, "/TOPOLOGY/happy_eyeballs", test_happy_eyeballs);
+      suite, "/TOPOLOGY/happy_eyeballs/", test_happy_eyeballs);
+   TestSuite_AddMockServerTest (suite,
+                                "/TOPOLOGY/happy_eyeballs/dns_cache/",
+                                test_happy_eyeballs_dns_cache);
+   TestSuite_AddMockServerTest (suite,
+                                "/TOPOLOGY/happy_eyeballs/dns_cache/timeout",
+                                test_happy_eyeballs_dns_cache_timeout);
 }

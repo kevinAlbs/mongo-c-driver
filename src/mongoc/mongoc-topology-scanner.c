@@ -630,6 +630,7 @@ mongoc_topology_scanner_node_setup_tcp (mongoc_topology_scanner_node_t *node,
       }
 
       mongoc_counter_dns_success_inc ();
+      node->last_dns_cache = bson_get_monotonic_time ();
    }
 
    LL_FOREACH2 (node->dns_results, iter, ai_next)
@@ -730,7 +731,7 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node,
 
    /* if cached dns results are expired, flush. */
    if (node->dns_results &&
-       (now - node->last_dns_cache) > node->ts->dns_cache_timeout_ms) {
+       (now - node->last_dns_cache) > node->ts->dns_cache_timeout_ms * 1000) {
       mongoc_topology_scanner_node_disconnect (node, false);
    }
 
