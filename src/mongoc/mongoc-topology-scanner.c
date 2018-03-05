@@ -346,9 +346,6 @@ mongoc_topology_scanner_node_destroy (mongoc_topology_scanner_node_t *node,
    mongoc_topology_scanner_node_disconnect (node, failed);
    if (node->dns_results) {
       freeaddrinfo (node->dns_results);
-      node->dns_results = NULL;
-      node->successful_dns_result = NULL;
-      node->last_dns_cache = 0;
    }
    bson_free (node);
 }
