@@ -7,6 +7,7 @@
 
 #include "TestSuite.h"
 #include "mock_server/mock-server.h"
+#include "test-libmongoc.h"
 
 #define TIMEOUT 20000 /* milliseconds */
 
@@ -16,7 +17,6 @@ typedef struct he_testcase_server {
    char *type;
    /* how long before the mock server calls `listen` on the server socket.
     * this delays the client from establishing a connection. */
-   /* TODO: is this only for ipv6? */
    int listen_delay_ms;
    /* if true, this closes the server socket before the client establishes
     * connection. */
@@ -35,8 +35,8 @@ typedef struct he_testcase_expected {
    /* how many async commands should be created at the start. */
    int initial_acmds;
    /* bounds for the server selection to finish. */
-   int complete_after_ms; /* TODO: rename to complete_duration_min */
-   int complete_before_ms;
+   int duration_min_ms;
+   int duration_max_ms;
 } he_testcase_expected_t;
 
 typedef struct he_testcase_state {
@@ -60,8 +60,7 @@ _test_scanner_callback (uint32_t id,
                         const bson_error_t *error /* IN */)
 {
    he_testcase_t *testcase = (he_testcase_t *) data;
-   bool should_succeed =
-      strcmp (testcase->expected.conn_succeeds_to, "neither");
+   int should_succeed = strcmp (testcase->expected.conn_succeeds_to, "neither");
    if (should_succeed) {
       ASSERT_OR_PRINT (!error->code, (*error));
    } else {
@@ -76,17 +75,27 @@ static void
 _init_host (mongoc_host_list_t *host, uint16_t port, const char *type)
 {
    char *host_str, *host_and_port;
+   bool free_host_str = false;
 
    if (strcmp (type, "ipv4") == 0) {
       host_str = "127.0.0.1";
    } else if (strcmp (type, "ipv6") == 0) {
       host_str = "[::1]";
    } else {
-      host_str = "localhost"; /* TODO: change to env var */
+      host_str = test_framework_getenv ("MONGOC_TEST_IPV4_AND_IPV6_HOST");
+      if (host_str) {
+         free_host_str = true;
+      } else {
+         /* default to localhost. */
+         host_str = "localhost";
+      }
    }
 
    host_and_port = bson_strdup_printf ("%s:%hu", host_str, port);
    _mongoc_host_list_from_string (host, host_and_port);
+   if (free_host_str) {
+      bson_free (host_str);
+   }
    /* we should only have one host. */
    BSON_ASSERT (!host->next);
    bson_free (host_and_port);
@@ -95,6 +104,9 @@ _init_host (mongoc_host_list_t *host, uint16_t port, const char *type)
 static void
 _testcase_setup (he_testcase_t *testcase)
 {
+   /* port is initially zero. the first mock server uses any available port.
+    * if there is a second mock server needed by the testcase, it will bind
+    * to the same port (on a different family). */
    uint16_t port = 0;
    int i;
 
@@ -102,7 +114,6 @@ _testcase_setup (he_testcase_t *testcase)
       he_testcase_server_t *server = testcase->servers + i;
       mock_server_t *mock_server = NULL;
       mock_server_bind_opts_t opts = {0};
-
 
       opts.listen_delay_ms = server->listen_delay_ms;
       opts.close_before_connection = server->close_before_connection;
@@ -115,7 +126,6 @@ _testcase_setup (he_testcase_t *testcase)
          struct sockaddr_in ipv4_addr = {0};
 
          ipv4_addr.sin_family = AF_INET;
-         /* TODO: explain how port saving works. */
          ipv4_addr.sin_port = htons (port);
          inet_pton (AF_INET, "127.0.0.1", &ipv4_addr.sin_addr);
          opts.bind_addr = &ipv4_addr;
@@ -184,14 +194,11 @@ _check_stream (mongoc_stream_t *stream, const char *expected, char *message)
       actual = (sock->domain == AF_INET) ? "ipv4" : "ipv6";
    }
 
-   if (strcmp (expected, actual) != 0) {
-      fprintf (stderr,
-               "%s: expected %s stream but got %s stream\n",
-               message,
-               expected,
-               actual);
-      ASSERT (false);
-   }
+   ASSERT_WITH_MSG (strcmp (expected, actual) == 0,
+                    "%s: expected %s stream but got %s stream\n",
+                    message,
+                    expected,
+                    actual);
 }
 
 static void
@@ -205,7 +212,8 @@ _testcase_run (he_testcase_t *testcase)
 
    start = bson_get_monotonic_time ();
 
-   mongoc_topology_scanner_add (ts, &testcase->state.host, 1 /* any server id is ok. */);
+   mongoc_topology_scanner_add (
+      ts, &testcase->state.host, 1 /* any server id is ok. */);
    mongoc_topology_scanner_scan (ts, 1);
    /* how many commands should we have initially? */
    ASSERT_CMPINT ((int) (ts->async->ncmds), ==, expected->initial_acmds);
@@ -213,21 +221,9 @@ _testcase_run (he_testcase_t *testcase)
    mongoc_topology_scanner_work (ts);
 
    duration_ms = (bson_get_monotonic_time () - start) / (1000);
-   if (duration_ms > expected->complete_before_ms) {
-      /* TODO: ASSERT_WITH_MSG */
-      /* TODO: check for duration macros (ASSERT_CMPTIME), maybe add one. Or use MONGOC_ERROR */
-      fprintf (stderr,
-               "test completed in %dms but should have completed before %dms\n",
-               (int) duration_ms,
-               expected->complete_before_ms);
-      ASSERT (false);
-   } else if (duration_ms < expected->complete_after_ms) {
-      fprintf (stderr,
-               "test completed in %dms but should have completed after %dms\n",
-               (int) duration_ms,
-               expected->complete_after_ms);
-      ASSERT (false);
-   }
+   ASSERT_WITHIN_TIME_INTERVAL ((int) duration_ms,
+                                (int) expected->duration_min_ms,
+                                (int) expected->duration_max_ms);
 
    node = mongoc_topology_scanner_get_node (ts, 1);
    _check_stream (node->stream,
@@ -235,7 +231,33 @@ _testcase_run (he_testcase_t *testcase)
                   "checking client's final connection");
 }
 
-// #define CLIENT (client) { #client }
+#define CLIENT(client) \
+   {                   \
+      #client          \
+   }
+
+#define CLIENT_WITH_DNS_CACHE_TIMEOUT(type, timeout) \
+   {                                                 \
+      #type, timeout                                 \
+   }
+#define HANGUP true
+#define LISTEN false
+#define SERVER(type, delay, hangup) \
+   {                                \
+      #type, delay, hangup          \
+   }
+#define SERVERS(...) \
+   {                 \
+      __VA_ARGS__    \
+   }
+#define DELAY_MS(val) val
+#define DURATION_MS(min, max) (min), (max)
+#define EXPECT(type, num_acmds, duration) \
+   {                                      \
+      #type, num_acmds, duration          \
+   }
+#define NCMDS(n) (n)
+
 static void
 test_happy_eyeballs ()
 {
@@ -245,169 +267,126 @@ test_happy_eyeballs ()
    const int e = 100; /* epsilon. wiggle room for time constraints. */
    int i, ntests;
 
-   /* TODO: define SUCCEED=false, HANGUP=true */
    he_testcase_t testcases[] = {
       /* client ipv4. */
       {
-         /* client */
-         {"ipv4"},
-         /* server sockets. */
-         {{"ipv4", 0, false}}, /* TODO: confirm rest of struct is zeroed out always */
-         /* expected. */
-         {"ipv4", 1, 0, e},
+         CLIENT (ipv4),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN)),
+         EXPECT (ipv4, NCMDS (1), DURATION_MS (0, e)),
       },
       {
-         /* client. */
-         {"ipv4"},
-         /* server sockets. */
-         {{"ipv6", 0, false}},
-         /* expected. */
-         {"neither", 1, 0, e},
+         CLIENT (ipv4),
+         SERVERS (SERVER (ipv6, DELAY_MS (0), LISTEN)),
+         EXPECT (neither, NCMDS (1), DURATION_MS (0, e)),
       },
+      {CLIENT (ipv4),
+       SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
+                SERVER (ipv6, DELAY_MS (0), HANGUP)),
+       EXPECT (ipv4, NCMDS (1), DURATION_MS (0, e))},
       {
-         /* client. */
-         {"ipv4"},
-         /* server sockets. */
-         {{"ipv4", 0, false}, {"ipv6", 0, false}},
-         /* expected. */
-         {"ipv4", 1, 0, e},
-      },
-      {
-         /* client. */
-         {"ipv4"},
-         /* server sockets. */
-         {{"ipv4", 0, true}, {"ipv6", 0, false}},
-         /* expected. */
-         {"neither", 1, 0, e},
+         CLIENT (ipv4),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), HANGUP),
+                  SERVER (ipv6, DELAY_MS (0), HANGUP)),
+         EXPECT (neither, NCMDS (1), DURATION_MS (0, e)),
       },
       /* client ipv6. */
       {
-         /* client. */
-         {"ipv6"},
-         /* server sockets. */
-         {{"ipv4", 0, false}},
-         /* expected. */
-         {"neither", 1, 0, e},
+         CLIENT (ipv6),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN)),
+         EXPECT (neither, NCMDS (1), DURATION_MS (0, e)),
       },
       {
-         /* client. */
-         {"ipv6"},
-         /* server sockets. */
-         {{"ipv6", 0, false}},
-         /* expected. */
-         {"ipv6", 1, 0, e},
+         CLIENT (ipv6),
+         SERVERS (SERVER (ipv6, DELAY_MS (0), LISTEN)),
+         EXPECT (ipv6, NCMDS (1), DURATION_MS (0, e)),
       },
       {
-         /* client. */
-         {"ipv6"},
-         /* server sockets. */
-         {{"ipv4", 0, false}, {"ipv6", 0, false}},
-         /* expected. */
-         {"ipv6", 1, 0, e},
+         CLIENT (ipv6),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
+                  SERVER (ipv6, DELAY_MS (0), LISTEN)),
+         EXPECT (ipv6, NCMDS (1), DURATION_MS (0, e)),
       },
       {
-         /* client. */
-         {"ipv6"},
-         /* server sockets. */
-         {{"ipv4", 0, false}, {"ipv6", 0, true}},
-         /* expected. */
-         {"neither", 1, 0, e},
+         CLIENT (ipv6),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
+                  SERVER (ipv6, DELAY_MS (0), HANGUP)),
+         EXPECT (neither, NCMDS (1), DURATION_MS (0, e)),
       },
       /* client both ipv4 and ipv6. */
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 0, false}},
-         /* expected. no delay, ipv6 fails immediately and ipv4 succeeds. */
-         {"ipv4", 2, 0, e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN)),
+         /* no delay, ipv6 fails immediately and ipv4 succeeds. */
+         EXPECT (ipv4, NCMDS (2), DURATION_MS (0, e)),
       },
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv6", 0, false}},
-         /* expected. no delay, ipv6 succeeds immediately. */
-         {"ipv6", 2, 0, e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv6, DELAY_MS (0), LISTEN)),
+         /* no delay, ipv6 succeeds immediately. */
+         EXPECT (ipv6, NCMDS (2), DURATION_MS (0, e)),
       },
       /* when both client is connecting to both ipv4 and ipv6 and server is
        * listening on both ipv4 and ipv6, test delaying the connections at
        * various times. */
       /* ipv6 {succeeds, fails} before ipv4 starts and {succeeds, fails} */
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 0, false}, {"ipv6", 0, false}},
-         /* expected. no delay, ipv6 succeeds immediately. */
-         {"ipv6", 2, 0, e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
+                  SERVER (ipv6, DELAY_MS (0), LISTEN)),
+         /* no delay, ipv6 succeeds immediately. */
+         EXPECT (ipv6, NCMDS (2), DURATION_MS (0, e)),
       },
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 0, false}, {"ipv6", 0, true}},
-         /* expected. no delay, ipv6 fails immediately and ipv4 succeeds. */
-         {"ipv4", 2, 0, e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
+                  SERVER (ipv6, DELAY_MS (0), HANGUP)),
+         /* no delay, ipv6 fails immediately and ipv4 succeeds. */
+         EXPECT (ipv4, NCMDS (2), DURATION_MS (0, e)),
       },
-      {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 0, true}, {"ipv6", 0, true}},
-         /* expected. */
-         {"neither", 2, 0, e},
-      },
+      {CLIENT (both),
+       SERVERS (SERVER (ipv4, DELAY_MS (0), HANGUP),
+                SERVER (ipv6, DELAY_MS (0), HANGUP)),
+       EXPECT (neither, NCMDS (2), DURATION_MS (0, e))},
       /* ipv6 {succeeds, fails} after ipv4 starts but before ipv4 {succeeds,
          fails} */
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 2 * he, false}, {"ipv6", he, false}},
-         /* expected. */
-         {"ipv6", 2, he, he + e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv4, DELAY_MS (2 * he), LISTEN),
+                  SERVER (ipv6, he, LISTEN)),
+         EXPECT (ipv6, NCMDS (2), DURATION_MS (he, he + e)),
       },
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 2 * he, false}, {"ipv6", he, true}},
-         /* expected. */
-         {"ipv4", 2, 2 * he, 2 * he + e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv4, DELAY_MS (2 * he), LISTEN),
+                  SERVER (ipv6, DELAY_MS (he), HANGUP)),
+         EXPECT (ipv4, NCMDS (2), DURATION_MS (2 * he, 2 * he + e)),
       },
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 2 * he, true}, {"ipv6", he, true}},
-         /* expected. */
-         {"neither", 2, 2 * he, 2 * he + e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv4, DELAY_MS (2 * he), HANGUP),
+                  SERVER (ipv6, DELAY_MS (he), HANGUP)),
+         EXPECT (neither, NCMDS (2), DURATION_MS (2 * he, 2 * he + e)),
       },
       /* ipv4 {succeeds,fails} after ipv6 {succeeds, fails}. */
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 0, false}, {"ipv6", he + e, false}},
-         /* expected. ipv6 is delayed too long, ipv4 succeeds. */
-         {"ipv4", 2, he, he + e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
+                  SERVER (ipv6, DELAY_MS (he + e), LISTEN)),
+         /* ipv6 is delayed too long, ipv4 succeeds. */
+         EXPECT (ipv4, NCMDS (2), DURATION_MS (he, he + e)),
       },
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 0, true}, {"ipv6", he + e, false}},
-         /* expected. ipv6 is delayed, but ipv4 fails. */
-         {"ipv6", 2, he + e, he + 2 * e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), HANGUP),
+                  SERVER (ipv6, DELAY_MS (he + e), LISTEN)),
+         /* ipv6 is delayed, but ipv4 fails. */
+         EXPECT (ipv6, NCMDS (2), DURATION_MS (he + e, he + 2 * e)),
       },
       {
-         /* client. */
-         {"both"},
-         /* server sockets. */
-         {{"ipv4", 0, true}, {"ipv6", he + e, true}},
-         /* expected. both fail. */
-         {"neither", 2, he + e, he + 2 * e},
+         CLIENT (both),
+         SERVERS (SERVER (ipv4, DELAY_MS (0), HANGUP),
+                  SERVER (ipv6, DELAY_MS (he + e), HANGUP)),
+         EXPECT (neither, NCMDS (2), DURATION_MS (he + e, he + 2 * e)),
       },
    };
 
@@ -426,12 +405,10 @@ test_happy_eyeballs_dns_cache ()
    const int he = 250;
    const int e = 100;
    he_testcase_t testcase = {
-      /* client. */
-      {"both"},
-      /* server sockets. */
-      {{"ipv4", 0, false}, {"ipv6", he + e, false}},
-      /* expected. IPv4 succeeds after delay. */
-      {"ipv4", 2, he, he + e},
+      CLIENT (both),
+      SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
+               SERVER (ipv6, DELAY_MS (he + e), false)),
+      EXPECT (ipv4, NCMDS (2), DURATION_MS (he, he + e)),
    };
    _testcase_setup (&testcase);
    _testcase_run (&testcase);
@@ -441,8 +418,8 @@ test_happy_eyeballs_dns_cache ()
    /* after running once, the topology scanner should have cached the DNS
     * result for IPv4. It should complete immediately. */
    testcase.expected.initial_acmds = 1;
-   testcase.expected.complete_after_ms = 0;
-   testcase.expected.complete_before_ms = e;
+   testcase.expected.duration_min_ms = 0;
+   testcase.expected.duration_max_ms = e;
    _testcase_run (&testcase);
    _testcase_teardown (&testcase);
 }
@@ -453,12 +430,10 @@ test_happy_eyeballs_dns_cache_timeout ()
    const int he = 250;
    const int e = 100;
    he_testcase_t testcase = {
-      /* client. */
-      {"both", 100 /* dns cache timeout */},
-      /* server sockets. */
-      {{"ipv4", 0, false}, {"ipv6", he + e, false}},
-      /* expected. IPv4 succeeds after delay. */
-      {"ipv4", 2, he, he + e},
+      CLIENT_WITH_DNS_CACHE_TIMEOUT (both, 100),
+      SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
+               SERVER (ipv6, DELAY_MS (he + e), false)),
+      EXPECT (ipv4, NCMDS (2), DURATION_MS (he, he + e)),
    };
    _testcase_setup (&testcase);
    _testcase_run (&testcase);
@@ -473,14 +448,11 @@ test_happy_eyeballs_dns_cache_timeout ()
     * longer a delay applied to the IPv6 connection so it succeeds. */
    testcase.expected.initial_acmds = 2;
    testcase.expected.conn_succeeds_to = "ipv6";
-   testcase.expected.complete_after_ms = 0;
-   testcase.expected.complete_before_ms = e;
+   testcase.expected.duration_min_ms = 0;
+   testcase.expected.duration_max_ms = e;
    _testcase_run (&testcase);
    _testcase_teardown (&testcase);
 }
-
-/* TODO: audit these test cases, think of other ways to inspect state.
- */
 
 void
 test_happy_eyeballs_install (TestSuite *suite)

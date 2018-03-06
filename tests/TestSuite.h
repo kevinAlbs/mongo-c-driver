@@ -371,6 +371,14 @@ test_error (const char *format, ...) BSON_GNUC_PRINTF (1, 2);
       }                                          \
    } while (0)
 
+/* don't check durations when testing with valgrind */
+#define ASSERT_WITHIN_TIME_INTERVAL(actual, minduration, maxduration) \
+   do {                                                               \
+      if (!test_suite_valgrind ()) {                                  \
+         ASSERT_CMPINT (actual, >=, minduration);                     \
+         ASSERT_CMPINT (actual, <, maxduration);                      \
+      }                                                               \
+   } while (0)
 
 #ifdef _WIN32
 #define gettestpid _getpid
@@ -448,6 +456,21 @@ test_error (const char *format, ...) BSON_GNUC_PRINTF (1, 2);
             abort ();                                                  \
          }                                                             \
       }                                                                \
+   } while (0)
+
+#define ASSERT_WITH_MSG(_statement, ...)              \
+   do {                                               \
+      if (!(_statement)) {                            \
+         fprintf (stderr,                             \
+                  "FAIL:%s:%d  %s()\n  %s\n\n",       \
+                  __FILE__,                           \
+                  __LINE__,                           \
+                  BSON_FUNC,                          \
+                  #_statement);                       \
+         fprintf (stderr, __VA_ARGS__);               \
+         fflush (stderr);                             \
+         abort ();                                    \
+      }                                               \
    } while (0)
 
 #define MAX_TEST_NAME_LENGTH 500
