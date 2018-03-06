@@ -409,7 +409,7 @@ static mock_server_t *
 _mock_server_listening_on (char *server_bind_to)
 {
    mock_server_t *mock_server;
-   mock_server_bind_opts_t opts;
+   mock_server_bind_opts_t opts = {0};
    struct sockaddr_in ipv4_addr = {0};
    struct sockaddr_in6 ipv6_addr = {0};
 

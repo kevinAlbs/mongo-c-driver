@@ -407,7 +407,7 @@ test_happy_eyeballs_dns_cache ()
    he_testcase_t testcase = {
       CLIENT (both),
       SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
-               SERVER (ipv6, DELAY_MS (he + e), false)),
+               SERVER (ipv6, DELAY_MS (he + e), LISTEN)),
       EXPECT (ipv4, NCMDS (2), DURATION_MS (he, he + e)),
    };
    _testcase_setup (&testcase);
@@ -432,7 +432,7 @@ test_happy_eyeballs_dns_cache_timeout ()
    he_testcase_t testcase = {
       CLIENT_WITH_DNS_CACHE_TIMEOUT (both, 100),
       SERVERS (SERVER (ipv4, DELAY_MS (0), LISTEN),
-               SERVER (ipv6, DELAY_MS (he + e), false)),
+               SERVER (ipv6, DELAY_MS (he + e), LISTEN)),
       EXPECT (ipv4, NCMDS (2), DURATION_MS (he, he + e)),
    };
    _testcase_setup (&testcase);
