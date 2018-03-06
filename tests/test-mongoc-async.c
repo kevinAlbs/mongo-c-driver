@@ -321,11 +321,12 @@ test_ismaster_delay ()
 {
    /* test that a delayed cmd works. */
    mock_server_t *server = mock_server_with_autoismaster (WIRE_VERSION_MAX);
-   mock_server_run (server);
    mongoc_async_t *async = mongoc_async_new ();
    bson_t ismaster_cmd = BSON_INITIALIZER;
    stream_with_result_t stream_with_result = {0};
    int64_t start = bson_get_monotonic_time ();
+
+   mock_server_run (server);
 
    stream_with_result.stream =
       get_localhost_stream (mock_server_get_port (server));
