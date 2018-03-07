@@ -1544,19 +1544,20 @@ main_thread (void *data)
    worker_closure_t *closure;
    mongoc_thread_t thread;
    mongoc_array_t worker_threads;
+   bool delayed_listen = server->bind_opts.listen_delay_ms > 0;
    size_t i;
 
-   mongoc_mutex_lock (&server->mutex);
-   server->running = true;
-   mongoc_cond_signal (&server->cond);
-   mongoc_mutex_unlock (&server->mutex);
+   if (delayed_listen || server->bind_opts.close_before_connection) {
+      /* if the test wants clients to start connecting before listen is called
+       * signal that the server is running now. */
+      mongoc_mutex_lock (&server->mutex);
+      server->running = true;
+      mongoc_cond_signal (&server->cond);
+      mongoc_mutex_unlock (&server->mutex);
+   }
 
-   if (server->bind_opts.listen_delay_ms) {
-      int delay_ms = server->bind_opts.listen_delay_ms;
-      struct timespec delay = {0};
-      delay.tv_sec = delay_ms / 1000;
-      delay.tv_nsec = (delay_ms % 1000) * 1000 * 1000;
-      nanosleep (&delay, NULL);
+   if (delayed_listen) {
+      _mongoc_usleep (server->bind_opts.listen_delay_ms * 1000);
    }
 
    if (server->bind_opts.close_before_connection) {
@@ -1573,6 +1574,12 @@ main_thread (void *data)
       return 0;
    }
 
+   if (!delayed_listen) {
+      mongoc_mutex_lock (&server->mutex);
+      server->running = true;
+      mongoc_cond_signal (&server->cond);
+      mongoc_mutex_unlock (&server->mutex);
+   }
 
    for (;;) {
       client_sock = mongoc_socket_accept_ex (
