@@ -104,6 +104,8 @@ mongoc_async_cmd_run (mongoc_async_cmd_t *acmd)
 
    /* if we have successfully connected to the node, call the callback. */
    if (acmd->state == MONGOC_ASYNC_CMD_SEND) {
+	   char* names[] = { [AF_INET] = "AF_INET",[AF_INET6] = "AF_INET6" };
+	   printf("we have succeeded connextion to %s\n", names[acmd->dns_result->ai_family]);
       acmd->cb (acmd, MONGOC_ASYNC_CMD_CONNECTED, NULL, 0);
    }
 

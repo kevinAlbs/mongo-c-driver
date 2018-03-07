@@ -537,8 +537,8 @@ test_topology_scanner_dns ()
                              {"both", "127.0.0.1", true, 1, "ipv4"},
                              {"both", "[::1]", true, 1, "ipv6"}};
    /* these tests require a hostname mapping to both IPv4 and IPv6 local.
- * this can be localhost normally, but some configurations may have localhost
- * only mapping to 127.0.0.1, not ::1. */
+    * this can be localhost normally, but some configurations may have localhost
+    * only mapping to 127.0.0.1, not ::1. */
    dns_testcase_t tests_with_ipv4_and_ipv6_uri[] = {
       {"ipv4", "<placeholder>", true, 2, "ipv4"},
       {"ipv6", "<placeholder>", true, 2, "ipv6"},

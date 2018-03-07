@@ -301,12 +301,18 @@ mongoc_socket_poll (mongoc_socket_poll_t *sds, /* IN */
       FD_SET (sds[i].socket->sd, &error_fds);
    }
 
-   timeout_tv.tv_sec = timeout / 1000;
-   timeout_tv.tv_usec = (timeout % 1000) * 1000;
+   timeout_tv.tv_sec = 0; // timeout / 1000;
+   timeout_tv.tv_usec = 0; // (timeout % 1000) * 1000;
 
    /* not WSAPoll: daniel.haxx.se/blog/2012/10/10/wsapoll-is-broken */
+   int64_t start = bson_get_monotonic_time();
    ret = select (0 /*unused*/, &read_fds, &write_fds, &error_fds, &timeout_tv);
+   int64_t end = bson_get_monotonic_time();
+   if ((end - start) > 1000) {
+	   printf("select took %dms\n", (end - start) / 1000);
+   }
    if (ret == SOCKET_ERROR) {
+	   printf("got socket error\n");
       errno = WSAGetLastError ();
       return -1;
    }
@@ -318,6 +324,7 @@ mongoc_socket_poll (mongoc_socket_poll_t *sds, /* IN */
          sds[i].revents = POLLOUT;
       } else if (FD_ISSET (sds[i].socket->sd, &error_fds)) {
          sds[i].revents = POLLHUP;
+		 printf("finally socket hung up\n");
       } else {
          sds[i].revents = 0;
       }
