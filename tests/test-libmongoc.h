@@ -148,6 +148,8 @@ test_framework_skip_if_single (void);
 int
 test_framework_skip_if_windows (void);
 int
+test_framework_skip_if_not_apple (void);
+int
 test_framework_skip_if_no_uds (void); /* skip if no Unix domain socket */
 int
 test_framework_skip_if_not_mongos (void);
