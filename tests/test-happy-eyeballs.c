@@ -55,6 +55,103 @@ typedef struct he_testcase {
    he_testcase_state_t state;
 } he_testcase_t;
 
+typedef ssize_t (*poll_fn_t) (mongoc_stream_poll_t *streams,
+                              size_t nstreams,
+                              int32_t timeout);
+
+static poll_fn_t gOriginalPoll;
+static he_testcase_t *gCurrentTestCase;
+
+/* if the server testcase specifies a delay or hangup, overwrite the poll
+ * response. */
+static int
+_override_poll_response (he_testcase_server_t *server,
+                         mongoc_stream_poll_t *poller)
+{
+   if (server->listen_delay_ms) {
+      int64_t now = bson_get_monotonic_time ();
+      if (gCurrentTestCase->state.start + server->listen_delay_ms * 1000 >
+          now) {
+         /* should still "sleep". */
+         int delta = 0;
+         if (poller->revents) {
+            delta = -1;
+         }
+         poller->revents = 0;
+         return delta;
+      }
+   }
+   if (server->close_before_connection) {
+      poller->revents = POLLHUP;
+   }
+   return 0;
+}
+
+/* get the server testcase that this client stream is connected to (if one
+ * exists). */
+static he_testcase_server_t *
+_server_for_client (mongoc_stream_t *stream)
+{
+   int i;
+   mongoc_socket_t *sock;
+   char *stream_type = "ipv4";
+
+   BSON_ASSERT (stream->type == MONGOC_STREAM_SOCKET);
+   sock = mongoc_stream_socket_get_socket ((mongoc_stream_socket_t *) stream);
+   if (sock->domain == AF_INET6) {
+      stream_type = "ipv6";
+   }
+
+   for (i = 0; i < 2; i++) {
+      const char *server_type = gCurrentTestCase->servers[i].type;
+      if (!server_type) {
+         break;
+      }
+      if (strcmp (server_type, stream_type) == 0) {
+         return gCurrentTestCase->servers + i;
+      }
+   }
+   return NULL;
+}
+
+static ssize_t
+_mock_poll (mongoc_stream_poll_t *streams, size_t nstreams, int32_t timeout)
+{
+   int i;
+   ssize_t starting_nactive;
+   /* call the real poll first. */
+   ssize_t nactive = gOriginalPoll (streams, nstreams, timeout);
+   starting_nactive = nactive;
+
+   /* check if any of the poll responses need to be overwritten. */
+   for (i = 0; i < nstreams; i++) {
+      mongoc_stream_t *stream =
+         mongoc_stream_get_root_stream ((streams + i)->stream);
+      he_testcase_server_t *server = _server_for_client (stream);
+
+      if (server) {
+         nactive += _override_poll_response (server, streams + i);
+      }
+   }
+   if (starting_nactive > 0 && nactive == 0) {
+      /* if there were active poll responses which were all silenced,
+       * sleep for a little while since subsequent calls to poll may not
+       * have much delay. */
+      _mongoc_usleep (5 * 1000);
+   }
+   return nactive;
+}
+
+static mongoc_stream_t *
+_mock_initiator (mongoc_async_cmd_t *acmd)
+{
+   mongoc_stream_t *stream = _mongoc_topology_scanner_tcp_initiate (acmd);
+   /* override poll */
+   gOriginalPoll = stream->poll;
+   stream->poll = _mock_poll;
+   return stream;
+}
+
 static void
 _test_scanner_callback (uint32_t id,
                         const bson_t *bson,
@@ -102,81 +199,6 @@ _init_host (mongoc_host_list_t *host, uint16_t port, const char *type)
    /* we should only have one host. */
    BSON_ASSERT (!host->next);
    bson_free (host_and_port);
-}
-
-typedef ssize_t (*poll_fn_t) (mongoc_stream_poll_t *streams,
-                              size_t nstreams,
-                              int32_t timeout);
-
-static poll_fn_t original_poll;
-static he_testcase_t *current_testcase;
-
-static int
-override_poll_response (he_testcase_server_t *server,
-                        mongoc_stream_poll_t *poller)
-{
-   if (server->listen_delay_ms) {
-      int64_t now = bson_get_monotonic_time ();
-      if (current_testcase->state.start + server->listen_delay_ms * 1000 >
-          now) {
-         /* should still "sleep" */
-         int delta = 0;
-         if (poller->revents) {
-            delta = -1;
-         }
-         poller->revents = 0;
-         return delta;
-      }
-   }
-   if (server->close_before_connection) {
-      poller->revents = POLLHUP;
-   }
-   return 0;
-}
-
-ssize_t
-mock_poll (mongoc_stream_poll_t *streams, size_t nstreams, int32_t timeout)
-{
-   /* call the real poll */
-   int i, j;
-   /* override any responses if we need to */
-   ssize_t nactive = original_poll (streams, nstreams, timeout);
-   /* find the server associated with each stream. */
-   for (i = 0; i < nstreams; i++) {
-      mongoc_socket_t *sock;
-      mongoc_stream_t *stream =
-         mongoc_stream_get_root_stream ((streams + i)->stream);
-      char *stream_type = "ipv4";
-
-      BSON_ASSERT (stream->type == MONGOC_STREAM_SOCKET);
-      sock =
-         mongoc_stream_socket_get_socket ((mongoc_stream_socket_t *) stream);
-      if (sock->domain == AF_INET6) {
-         stream_type = "ipv6";
-      }
-
-      for (j = 0; j < 2; j++) {
-         if (!current_testcase->servers[j].type) {
-            break;
-         }
-         if (strcmp (current_testcase->servers[j].type, stream_type) == 0) {
-            nactive += override_poll_response (current_testcase->servers + j,
-                                               streams + i);
-            break;
-         }
-      }
-   }
-   return nactive;
-}
-
-static mongoc_stream_t *
-mock_initiator (mongoc_async_cmd_t *acmd)
-{
-   mongoc_stream_t *stream = _mongoc_topology_scanner_tcp_initiate (acmd);
-   /* override poll */
-   original_poll = stream->poll;
-   stream->poll = mock_poll;
-   return stream;
 }
 
 static void
@@ -286,7 +308,7 @@ _testcase_run (he_testcase_t *testcase)
    uint64_t duration_ms;
    mongoc_async_cmd_t *iter;
 
-   current_testcase = testcase;
+   gCurrentTestCase = testcase;
    testcase->state.start = bson_get_monotonic_time ();
 
    mongoc_topology_scanner_add (
@@ -297,15 +319,22 @@ _testcase_run (he_testcase_t *testcase)
 
    DL_FOREACH (ts->async->cmds, iter)
    {
-      iter->initiator = mock_initiator;
+      iter->initiator = _mock_initiator;
    }
 
    mongoc_topology_scanner_work (ts);
 
    duration_ms = (bson_get_monotonic_time () - testcase->state.start) / (1000);
+
+#ifndef _WIN32
+   /* Note: do not check time on Windows. Windows waits 1 second before refusing
+ * connection to unused ports:
+ * https://support.microsoft.com/en-us/help/175523/info-winsock-tcp-connection-performance-to-unused-ports
+ */
    ASSERT_WITHIN_TIME_INTERVAL ((int) duration_ms,
                                 (int) expected->duration_min_ms,
                                 (int) expected->duration_max_ms);
+#endif
 
    node = mongoc_topology_scanner_get_node (ts, 1);
    _check_stream (node->stream,
@@ -345,12 +374,58 @@ _testcase_run (he_testcase_t *testcase)
 #define NCMDS(n) (n)
 
 static void
-test_happy_eyeballs (void)
+_run_testcase (void *ctx)
 {
-   const int e = 100; /* epsilon. wiggle room for time constraints. */
+   he_testcase_t *testcase = (he_testcase_t *) ctx;
+   _testcase_setup (testcase);
+   _testcase_run (testcase);
+   _testcase_teardown (testcase);
+}
+
+static void
+test_happy_eyeballs_dns_cache (void)
+{
+   const int e = 100;
+   he_testcase_t testcase = {
+      CLIENT_WITH_DNS_CACHE_TIMEOUT (both, 300),
+      SERVERS (SERVER (ipv4, LISTEN), SERVER (ipv6, LISTEN)),
+      EXPECT (ipv6, NCMDS (2), DURATION_MS (0, e)),
+   };
+   _testcase_setup (&testcase);
+   _testcase_run (&testcase);
+   /* disconnect the node so we perform another DNS lookup. */
+   mongoc_topology_scanner_node_disconnect (testcase.state.ts->nodes, false);
+
+   /* after running once, the topology scanner should have cached the DNS
+    * result for IPv6. It should complete immediately. */
+   testcase.expected.initial_acmds = 1;
+   _testcase_run (&testcase);
+
+   /* disconnect the node so we perform another DNS lookup. */
+   mongoc_topology_scanner_node_disconnect (testcase.state.ts->nodes, false);
+
+   /* wait for DNS cache to expire. */
+   _mongoc_usleep (310 * 1000);
+
+   /* after running once, the topology scanner should have cached the DNS
+    * result for IPv6. It should complete immediately. */
+   testcase.expected.initial_acmds = 2;
+   _testcase_run (&testcase);
+
+   _testcase_teardown (&testcase);
+}
+
+void
+test_happy_eyeballs_install (TestSuite *suite)
+{
+   const int e = 200; /* epsilon. wiggle room for time constraints. */
+   const int he =
+      250; /* delay before starting second connection if first does not
+              complete. */
    int i, ntests;
 
-   he_testcase_t testcases[] = {
+   /* TODO: add a detailed explanation */
+   static he_testcase_t he_testcases[] = {
       /* client ipv4. */
       {
          CLIENT (ipv4),
@@ -416,26 +491,6 @@ test_happy_eyeballs (void)
          /* no delay, ipv6 fails immediately and ipv4 succeeds. */
          EXPECT (ipv4, NCMDS (2), DURATION_MS (0, e)),
       },
-   };
-
-   ntests = sizeof (testcases) / sizeof (he_testcase_t);
-
-   for (i = 0; i < ntests; i++) {
-      _testcase_setup (testcases + i);
-      _testcase_run (testcases + i);
-      _testcase_teardown (testcases + i);
-   }
-}
-
-static void
-test_happy_eyeballs_with_delays (void)
-{
-   const int he =
-      250; /* delay before starting second connection if first does not
-              complete. */
-   const int e = 100; /* epsilon. wiggle room for time constraints. */
-   int i, ntests;
-   he_testcase_t testcases[] = {
       /* when both client is connecting to both ipv4 and ipv6 and server is
        * listening on both ipv4 and ipv6, test delaying the connections at
        * various times. */
@@ -486,61 +541,16 @@ test_happy_eyeballs_with_delays (void)
          EXPECT (neither, NCMDS (2), DURATION_MS (he + e, he + 2 * e)),
       },
    };
-
-   ntests = sizeof (testcases) / sizeof (he_testcase_t);
-
+   ntests = sizeof (he_testcases) / sizeof (he_testcases[0]);
    for (i = 0; i < ntests; i++) {
-      _testcase_setup (testcases + i);
-      _testcase_run (testcases + i);
-      _testcase_teardown (testcases + i);
+      char *name = bson_strdup_printf ("/TOPOLOGY/happy_eyeballs/%d", i);
+      TestSuite_AddFull (suite,
+                         name,
+                         _run_testcase,
+                         NULL,
+                         he_testcases + i,
+                         test_framework_skip_if_no_dual_ip_hostname);
    }
-}
-
-static void
-test_happy_eyeballs_dns_cache (void)
-{
-   const int e = 100;
-   he_testcase_t testcase = {
-      CLIENT_WITH_DNS_CACHE_TIMEOUT (both, 300),
-      SERVERS (SERVER (ipv4, LISTEN), SERVER (ipv6, LISTEN)),
-      EXPECT (ipv6, NCMDS (2), DURATION_MS (0, e)),
-   };
-   _testcase_setup (&testcase);
-   _testcase_run (&testcase);
-   /* disconnect the node so we perform another DNS lookup. */
-   mongoc_topology_scanner_node_disconnect (testcase.state.ts->nodes, false);
-
-   /* after running once, the topology scanner should have cached the DNS
-    * result for IPv6. It should complete immediately. */
-   testcase.expected.initial_acmds = 1;
-   _testcase_run (&testcase);
-
-   /* disconnect the node so we perform another DNS lookup. */
-   mongoc_topology_scanner_node_disconnect (testcase.state.ts->nodes, false);
-
-   /* wait for DNS cache to expire. */
-   _mongoc_usleep (310 * 1000);
-
-   /* after running once, the topology scanner should have cached the DNS
-    * result for IPv6. It should complete immediately. */
-   testcase.expected.initial_acmds = 2;
-   _testcase_run (&testcase);
-
-   _testcase_teardown (&testcase);
-}
-
-void
-test_happy_eyeballs_install (TestSuite *suite)
-{
-   TestSuite_AddMockServerTest (suite,
-                                "/TOPOLOGY/happy_eyeballs/",
-                                test_happy_eyeballs,
-                                test_framework_skip_if_windows,
-                                test_framework_skip_if_no_dual_ip_hostname);
-   TestSuite_AddMockServerTest (suite,
-                                "/TOPOLOGY/happy_eyeballs/with_delays",
-                                test_happy_eyeballs_with_delays,
-                                test_framework_skip_if_no_dual_ip_hostname);
    TestSuite_AddMockServerTest (suite,
                                 "/TOPOLOGY/happy_eyeballs/dns_cache/",
                                 test_happy_eyeballs_dns_cache,

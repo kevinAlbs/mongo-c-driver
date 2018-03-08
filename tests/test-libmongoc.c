@@ -1836,15 +1836,6 @@ test_framework_skip_if_windows (void)
 #endif
 }
 
-int
-test_framework_skip_if_not_apple (void)
-{
-#ifdef __APPLE__
-   return true;
-#else
-   return false;
-#endif
-}
 
 /* skip if no Unix domain socket */
 int
@@ -2182,7 +2173,7 @@ test_framework_skip_if_no_dual_ip_hostname (void)
    hints.ai_flags = 0;
    hints.ai_protocol = 0;
 
-   BSON_ASSERT(getaddrinfo (host, "27017", &hints, &res) != -1);
+   BSON_ASSERT (getaddrinfo (host, "27017", &hints, &res) != -1);
 
    iter = res;
 
@@ -2195,6 +2186,9 @@ test_framework_skip_if_no_dual_ip_hostname (void)
    if (needs_free) {
       bson_free (host);
    }
+
+   ASSERT_CMPINT (res_count, >, 0);
+   ASSERT_CMPINT (res_count, <, 3);
    return res_count == 2;
 }
 

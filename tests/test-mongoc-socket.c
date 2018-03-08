@@ -442,7 +442,7 @@ test_mongoc_socket_poll_refusal (void *ctx)
 
 #ifdef _WIN32
    ASSERT_WITHIN_TIME_INTERVAL (
-      (int) (bson_get_monotonic_time () - start), 1000 * 800, 1200 * 1000);
+      (int) (bson_get_monotonic_time () - start), 1000 * 500, 1500 * 1000);
 #else
    ASSERT_WITHIN_TIME_INTERVAL (
       (int) (bson_get_monotonic_time () - start), 0, 100);
