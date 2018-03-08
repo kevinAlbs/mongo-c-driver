@@ -418,8 +418,10 @@ test_happy_eyeballs_dns_cache (void)
 void
 test_happy_eyeballs_install (TestSuite *suite)
 {
-   static const int e = 200; /* epsilon. wiggle room for time constraints. */
-   static const int he = 250; /* delay before ipv4 if ipv6 does not finish. */
+/* epsilon. wiggle room for time constraints. */
+#define E 200
+   /* delay before ipv4 if ipv6 does not finish. */
+#define HE 250
    int i, ntests;
 
    /* TODO: add a detailed explanation */
@@ -428,66 +430,66 @@ test_happy_eyeballs_install (TestSuite *suite)
       {
          CLIENT (ipv4),
          SERVERS (SERVER (ipv4, LISTEN)),
-         EXPECT (ipv4, NCMDS (1), DURATION_MS (0, e)),
+         EXPECT (ipv4, NCMDS (1), DURATION_MS (0, E)),
       },
       {
          CLIENT (ipv4),
          SERVERS (SERVER (ipv6, LISTEN)),
-         EXPECT (neither, NCMDS (1), DURATION_MS (0, e)),
+         EXPECT (neither, NCMDS (1), DURATION_MS (0, E)),
       },
       {CLIENT (ipv4),
        SERVERS (SERVER (ipv4, LISTEN), SERVER (ipv6, HANGUP)),
-       EXPECT (ipv4, NCMDS (1), DURATION_MS (0, e))},
+       EXPECT (ipv4, NCMDS (1), DURATION_MS (0, E))},
       {
          CLIENT (ipv4),
          SERVERS (SERVER (ipv4, HANGUP), SERVER (ipv6, HANGUP)),
-         EXPECT (neither, NCMDS (1), DURATION_MS (0, e)),
+         EXPECT (neither, NCMDS (1), DURATION_MS (0, E)),
       },
       /* client ipv6. */
       {
          CLIENT (ipv6),
          SERVERS (SERVER (ipv4, LISTEN)),
-         EXPECT (neither, NCMDS (1), DURATION_MS (0, e)),
+         EXPECT (neither, NCMDS (1), DURATION_MS (0, E)),
       },
       {
          CLIENT (ipv6),
          SERVERS (SERVER (ipv6, LISTEN)),
-         EXPECT (ipv6, NCMDS (1), DURATION_MS (0, e)),
+         EXPECT (ipv6, NCMDS (1), DURATION_MS (0, E)),
       },
       {
          CLIENT (ipv6),
          SERVERS (SERVER (ipv4, LISTEN), SERVER (ipv6, LISTEN)),
-         EXPECT (ipv6, NCMDS (1), DURATION_MS (0, e)),
+         EXPECT (ipv6, NCMDS (1), DURATION_MS (0, E)),
       },
       {
          CLIENT (ipv6),
          SERVERS (SERVER (ipv4, LISTEN), SERVER (ipv6, HANGUP)),
-         EXPECT (neither, NCMDS (1), DURATION_MS (0, e)),
+         EXPECT (neither, NCMDS (1), DURATION_MS (0, E)),
       },
       /* client both ipv4 and ipv6. */
       {
          CLIENT (both),
          SERVERS (SERVER (ipv4, LISTEN)),
          /* no delay, ipv6 fails immediately and ipv4 succeeds. */
-         EXPECT (ipv4, NCMDS (2), DURATION_MS (0, e)),
+         EXPECT (ipv4, NCMDS (2), DURATION_MS (0, E)),
       },
       {
          CLIENT (both),
          SERVERS (SERVER (ipv6, LISTEN)),
          /* no delay, ipv6 succeeds immediately. */
-         EXPECT (ipv6, NCMDS (2), DURATION_MS (0, e)),
+         EXPECT (ipv6, NCMDS (2), DURATION_MS (0, E)),
       },
       {
          CLIENT (both),
          SERVERS (SERVER (ipv4, LISTEN), SERVER (ipv6, LISTEN)),
          /* no delay, ipv6 succeeds immediately. */
-         EXPECT (ipv6, NCMDS (2), DURATION_MS (0, e)),
+         EXPECT (ipv6, NCMDS (2), DURATION_MS (0, E)),
       },
       {
          CLIENT (both),
          SERVERS (SERVER (ipv4, LISTEN), SERVER (ipv6, HANGUP)),
          /* no delay, ipv6 fails immediately and ipv4 succeeds. */
-         EXPECT (ipv4, NCMDS (2), DURATION_MS (0, e)),
+         EXPECT (ipv4, NCMDS (2), DURATION_MS (0, E)),
       },
       /* when both client is connecting to both ipv4 and ipv6 and server is
        * listening on both ipv4 and ipv6, test delaying the connections at
@@ -496,47 +498,47 @@ test_happy_eyeballs_install (TestSuite *suite)
 
       {CLIENT (both),
        SERVERS (SERVER (ipv4, HANGUP), SERVER (ipv6, HANGUP)),
-       EXPECT (neither, NCMDS (2), DURATION_MS (0, e))},
+       EXPECT (neither, NCMDS (2), DURATION_MS (0, E))},
       /* ipv6 {succeeds, fails} after ipv4 starts but before ipv4 {succeeds,
          fails} */
       {
          CLIENT (both),
-         SERVERS (DELAYED_SERVER (ipv4, LISTEN, DELAY_MS (2 * he)),
-                  DELAYED_SERVER (ipv6, LISTEN, he)),
-         EXPECT (ipv6, NCMDS (2), DURATION_MS (he, he + e)),
+         SERVERS (DELAYED_SERVER (ipv4, LISTEN, DELAY_MS (2 * HE)),
+                  DELAYED_SERVER (ipv6, LISTEN, HE)),
+         EXPECT (ipv6, NCMDS (2), DURATION_MS (HE, HE + E)),
       },
       {
          CLIENT (both),
-         SERVERS (DELAYED_SERVER (ipv4, LISTEN, DELAY_MS (2 * he)),
-                  DELAYED_SERVER (ipv6, HANGUP, DELAY_MS (he))),
-         EXPECT (ipv4, NCMDS (2), DURATION_MS (2 * he, 2 * he + e)),
+         SERVERS (DELAYED_SERVER (ipv4, LISTEN, DELAY_MS (2 * HE)),
+                  DELAYED_SERVER (ipv6, HANGUP, DELAY_MS (HE))),
+         EXPECT (ipv4, NCMDS (2), DURATION_MS (2 * HE, 2 * HE + E)),
       },
       {
          CLIENT (both),
-         SERVERS (DELAYED_SERVER (ipv4, HANGUP, DELAY_MS (2 * he)),
-                  DELAYED_SERVER (ipv6, HANGUP, DELAY_MS (he))),
-         EXPECT (neither, NCMDS (2), DURATION_MS (2 * he, 2 * he + e)),
+         SERVERS (DELAYED_SERVER (ipv4, HANGUP, DELAY_MS (2 * HE)),
+                  DELAYED_SERVER (ipv6, HANGUP, DELAY_MS (HE))),
+         EXPECT (neither, NCMDS (2), DURATION_MS (2 * HE, 2 * HE + E)),
       },
       /* ipv4 {succeeds,fails} after ipv6 {succeeds, fails}. */
       {
          CLIENT (both),
          SERVERS (SERVER (ipv4, LISTEN),
-                  DELAYED_SERVER (ipv6, LISTEN, DELAY_MS (he + e))),
+                  DELAYED_SERVER (ipv6, LISTEN, DELAY_MS (HE + E))),
          /* ipv6 is delayed too long, ipv4 succeeds. */
-         EXPECT (ipv4, NCMDS (2), DURATION_MS (he, he + e)),
+         EXPECT (ipv4, NCMDS (2), DURATION_MS (HE, HE + E)),
       },
       {
          CLIENT (both),
          SERVERS (SERVER (ipv4, HANGUP),
-                  DELAYED_SERVER (ipv6, LISTEN, DELAY_MS (he + e))),
+                  DELAYED_SERVER (ipv6, LISTEN, DELAY_MS (HE + E))),
          /* ipv6 is delayed, but ipv4 fails. */
-         EXPECT (ipv6, NCMDS (2), DURATION_MS (he + e, he + 2 * e)),
+         EXPECT (ipv6, NCMDS (2), DURATION_MS (HE + E, HE + 2 * E)),
       },
       {
          CLIENT (both),
          SERVERS (SERVER (ipv4, HANGUP),
-                  DELAYED_SERVER (ipv6, HANGUP, DELAY_MS (he + e))),
-         EXPECT (neither, NCMDS (2), DURATION_MS (he + e, he + 2 * e)),
+                  DELAYED_SERVER (ipv6, HANGUP, DELAY_MS (HE + E))),
+         EXPECT (neither, NCMDS (2), DURATION_MS (HE + E, HE + 2 * E)),
       },
    };
    ntests = sizeof (he_testcases) / sizeof (he_testcases[0]);
