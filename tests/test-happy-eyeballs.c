@@ -550,6 +550,7 @@ test_happy_eyeballs_install (TestSuite *suite)
                          NULL,
                          he_testcases + i,
                          test_framework_skip_if_no_dual_ip_hostname);
+      bson_free (name);
    }
    TestSuite_AddMockServerTest (suite,
                                 "/TOPOLOGY/happy_eyeballs/dns_cache/",
