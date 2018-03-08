@@ -418,13 +418,25 @@ test_happy_eyeballs_dns_cache (void)
 void
 test_happy_eyeballs_install (TestSuite *suite)
 {
-/* epsilon. wiggle room for time constraints. */
-#define E 200
-   /* delay before ipv4 if ipv6 does not finish. */
-#define HE 250
+#define E 200 /* epsilon. wiggle room for time constraints. */
+#define HE 250 /* delay before ipv4 if ipv6 does not finish. */
    int i, ntests;
 
-   /* TODO: add a detailed explanation */
+   /*  This tests conformity to RFC-6555 (Happy Eyeballs) when the topology
+    * scanner connects to a single server. The expected behavior is as follows:
+    * - if a hostname has both A and AAAA records, attempt to connect to IPv6
+    *   immediately, and schedule a delayed IPv4 connection attempt 250ms after.
+    * - if IPv6 fails, schedule the IPv4 connection attempt immediately.
+    * - whichever connection attempt succeeds first cancels the other.
+    *
+    * The testcases are specified in terms of the client and server.
+    * Client
+    *    - what address is trying connect (e.g. 127.0.0.1, ::1, localhost)?
+    * Server
+    *    - is the server listening on IPv4, IPv6, or both?
+    *    - will it delay connection to any of these connections?
+    *    - will it hang up on these connections immediately?
+    * */
    static he_testcase_t he_testcases[] = {
       /* client ipv4. */
       {
@@ -541,6 +553,8 @@ test_happy_eyeballs_install (TestSuite *suite)
          EXPECT (neither, NCMDS (2), DURATION_MS (HE + E, HE + 2 * E)),
       },
    };
+#undef HE
+#undef E
    ntests = sizeof (he_testcases) / sizeof (he_testcases[0]);
    for (i = 0; i < ntests; i++) {
       char *name = bson_strdup_printf ("/TOPOLOGY/happy_eyeballs/%d", i);
