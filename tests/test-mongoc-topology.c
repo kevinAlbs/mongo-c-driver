@@ -783,11 +783,11 @@ _test_select_succeed (bool try_once)
                               " 'setName': 'rs',"
                               "  'minWireVersion': 2,"
                               "  'maxWireVersion': 5,"
-                              " 'hosts': ['localhost:%hu', 'localhost:%hu']}",
+                              " 'hosts': ['127.0.0.1:%hu', '127.0.0.1:%hu']}",
                               mock_server_get_port (primary),
                               mock_server_get_port (secondary));
 
-   uri_str = bson_strdup_printf ("mongodb://localhost:%hu,localhost:%hu/"
+   uri_str = bson_strdup_printf ("mongodb://127.0.0.1:%hu,127.0.0.1:%hu/"
                                  "?replicaSet=rs&connectTimeoutMS=%d",
                                  mock_server_get_port (primary),
                                  mock_server_get_port (secondary),

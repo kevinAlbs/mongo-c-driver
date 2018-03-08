@@ -148,6 +148,8 @@ test_framework_skip_if_single (void);
 int
 test_framework_skip_if_windows (void);
 int
+test_framework_skip_if_not_apple (void);
+int
 test_framework_skip_if_no_uds (void); /* skip if no Unix domain socket */
 int
 test_framework_skip_if_not_mongos (void);
@@ -180,5 +182,8 @@ server_version_t
 test_framework_get_server_version (void);
 server_version_t
 test_framework_str_to_version (const char *version_str);
+
+bool
+test_framework_skip_if_no_dual_ip_hostname (void);
 
 #endif
