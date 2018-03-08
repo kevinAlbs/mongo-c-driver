@@ -418,10 +418,8 @@ test_happy_eyeballs_dns_cache (void)
 void
 test_happy_eyeballs_install (TestSuite *suite)
 {
-   const int e = 200; /* epsilon. wiggle room for time constraints. */
-   const int he =
-      250; /* delay before starting second connection if first does not
-              complete. */
+   static const int e = 200; /* epsilon. wiggle room for time constraints. */
+   static const int he = 250; /* delay before ipv4 if ipv6 does not finish. */
    int i, ntests;
 
    /* TODO: add a detailed explanation */
