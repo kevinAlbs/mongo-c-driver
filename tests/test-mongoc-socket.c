@@ -437,7 +437,6 @@ test_mongoc_socket_poll_refusal (void *ctx)
       }
    }
 
-   mongoc_stream_close (ssock);
    mongoc_stream_destroy (ssock);
    bson_free (poller);
 
