@@ -42,7 +42,7 @@ typedef struct he_testcase_expected {
 } he_testcase_expected_t;
 
 typedef struct he_testcase_state {
-   mock_server_t *mock_servers[2];
+   mock_server_t *mock_server;
    mongoc_host_list_t host;
    mongoc_topology_scanner_t *ts;
    int64_t start;
@@ -204,63 +204,53 @@ _init_host (mongoc_host_list_t *host, uint16_t port, const char *type)
 static void
 _testcase_setup (he_testcase_t *testcase)
 {
-   /* port is initially zero. the first mock server uses any available port.
-    * if there is a second mock server needed by the testcase, it will bind
-    * to the same port (on a different family). */
-   uint16_t port = 0;
-   int i;
+   mock_server_t *mock_server = NULL;
+   mock_server_bind_opts_t opts = {0};
+   struct sockaddr_in ipv4_addr = {0};
+   struct sockaddr_in6 ipv6_addr = {0};
+   char* server_type = "both";
 
-   for (i = 0; i < 2; i++) {
-      he_testcase_server_t *server = testcase->servers + i;
-      mock_server_t *mock_server = NULL;
-      mock_server_bind_opts_t opts = {0};
-
-      if (!server->type) {
-         continue;
-      }
-
-      if (strcmp (server->type, "ipv4") == 0) {
-         struct sockaddr_in ipv4_addr = {0};
-
-         ipv4_addr.sin_family = AF_INET;
-         ipv4_addr.sin_port = htons (port);
-         inet_pton (AF_INET, "127.0.0.1", &ipv4_addr.sin_addr);
-         opts.bind_addr = &ipv4_addr;
-         opts.bind_addr_len = sizeof (ipv4_addr);
-         opts.family = AF_INET;
-         opts.ipv6_only = false;
-
-         mock_server = mock_server_with_autoismaster (WIRE_VERSION_MAX);
-         mock_server_set_bind_opts (mock_server, &opts);
-         mock_server_run (mock_server);
-         port = mock_server_get_port (mock_server);
-         testcase->state.mock_servers[i] = mock_server;
-      }
-
-      if (strcmp (server->type, "ipv6") == 0) {
-         struct sockaddr_in6 ipv6_addr = {0};
-
-         ipv6_addr.sin6_family = AF_INET6;
-         /* use the same port of the ipv4 server (if one was started). */
-         ipv6_addr.sin6_port = htons (port);
-         inet_pton (AF_INET6, "::1", &ipv6_addr.sin6_addr);
-         opts.bind_addr = (struct sockaddr_in *) &ipv6_addr;
-         opts.bind_addr_len = sizeof (ipv6_addr);
-         opts.family = AF_INET6;
-         opts.ipv6_only = true;
-
-         mock_server = mock_server_with_autoismaster (WIRE_VERSION_MAX);
-         mock_server_set_bind_opts (mock_server, &opts);
-         mock_server_run (mock_server);
-         port = mock_server_get_port (mock_server);
-         testcase->state.mock_servers[i] = mock_server;
-      }
+   /* if there is only one server, use that type. */
+   if (testcase->servers[0].type && !testcase->servers[1].type) {
+      server_type = testcase->servers[0].type;
    }
 
-   _init_host (&testcase->state.host, port, testcase->client.type);
+   if (strcmp ("both", server_type) == 0) {
+      opts.bind_addr_len = sizeof (ipv6_addr);
+      opts.family = AF_INET6;
+      opts.ipv6_only = 0;
+      ipv6_addr.sin6_family = AF_INET6;
+      ipv6_addr.sin6_port = htons (0);
+      ipv6_addr.sin6_addr = in6addr_any;
+      opts.bind_addr = (struct sockaddr_in *) &ipv6_addr;
+   } else if (strcmp ("ipv4", server_type) == 0) {
+      opts.bind_addr_len = sizeof (ipv4_addr);
+      opts.family = AF_INET;
+      opts.ipv6_only = 0;
+      ipv4_addr.sin_family = AF_INET;
+      ipv4_addr.sin_port = htons (0);
+      inet_pton (AF_INET, "127.0.0.1", &ipv4_addr.sin_addr);
+      opts.bind_addr = &ipv4_addr;
+   } else if (strcmp ("ipv6", server_type) == 0) {
+      opts.bind_addr_len = sizeof (ipv6_addr);
+      opts.family = AF_INET6;
+      opts.ipv6_only = 1;
+      ipv6_addr.sin6_family = AF_INET6;
+      ipv6_addr.sin6_port = htons (0);
+      inet_pton (AF_INET6, "::1", &ipv6_addr.sin6_addr);
+      opts.bind_addr = (struct sockaddr_in *) &ipv6_addr;
+   }
+
+   mock_server = mock_server_with_autoismaster (WIRE_VERSION_MAX);
+   mock_server_set_bind_opts (mock_server, &opts);
+   mock_server_run (mock_server);
+
+   _init_host (&testcase->state.host, mock_server_get_port (mock_server), testcase->client.type);
 
    testcase->state.ts = mongoc_topology_scanner_new (
       NULL, NULL, &_test_scanner_callback, testcase, TIMEOUT);
+
+   testcase->state.mock_server = mock_server;
 
    if (testcase->client.dns_cache_timeout_ms > 0) {
       _mongoc_topology_scanner_set_dns_cache_timeout (
@@ -271,12 +261,7 @@ _testcase_setup (he_testcase_t *testcase)
 static void
 _testcase_teardown (he_testcase_t *testcase)
 {
-   int i;
-   for (i = 0; i < 2; i++) {
-      if (testcase->state.mock_servers[i]) {
-         mock_server_destroy (testcase->state.mock_servers[i]);
-      }
-   }
+   mock_server_destroy (testcase->state.mock_server);
    mongoc_topology_scanner_destroy (testcase->state.ts);
 }
 
