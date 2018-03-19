@@ -421,8 +421,10 @@ _async_success (mongoc_async_cmd_t *acmd,
    mongoc_stream_t *stream = acmd->stream;
    mongoc_topology_scanner_t *ts = node->ts;
 
-   if (node->retired && stream) {
-      mongoc_stream_failed (stream);
+   if (node->retired) {
+      if (stream) {
+         mongoc_stream_failed (stream);
+      }
       return;
    }
 
@@ -435,6 +437,7 @@ _async_success (mongoc_async_cmd_t *acmd,
    /* set our successful stream. */
    BSON_ASSERT (!node->stream);
    node->stream = stream;
+   BSON_ASSERT (!node->retired);
    ts->cb (node->id, ismaster_response, rtt_msec, ts->cb_data, &acmd->error);
 }
 
@@ -452,17 +455,16 @@ _async_error_or_timeout (mongoc_async_cmd_t *acmd,
    int64_t now = bson_get_monotonic_time ();
    const char *message;
 
-   if (node->retired && stream) {
-      mongoc_stream_failed (stream);
-      return;
-   }
-
-   node->last_used = now;
-
    /* the stream may have failed on initiation. */
    if (stream) {
       mongoc_stream_failed (stream);
    }
+
+   if (node->retired) {
+      return;
+   }
+
+   node->last_used = now;
 
    if (!node->stream && _count_acmds (node) == 1) {
       /* there are no remaining streams, connecting has failed. */
@@ -484,6 +486,7 @@ _async_error_or_timeout (mongoc_async_cmd_t *acmd,
          ts, &node->host, &node->last_error);
 
       /* call the topology scanner callback. cannot connect to this node. */
+      BSON_ASSERT (!node->retired);
       ts->cb (node->id, NULL, rtt_msec, ts->cb_data, error);
    } else {
       /* there are still more commands left for this node or it succeeded
