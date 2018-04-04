@@ -225,7 +225,8 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
 
    bson_init (&cursor->filter);
    bson_init (&cursor->opts);
-   bson_init (&cursor->reply);
+   bson_init (&cursor->error_doc);
+   bson_init (&cursor->deprecated_reply);
 
    if (filter) {
       if (!bson_validate_with_error (
@@ -584,7 +585,8 @@ _mongoc_cursor_destroy (mongoc_cursor_t *cursor)
 
    bson_destroy (&cursor->filter);
    bson_destroy (&cursor->opts);
-   bson_destroy (&cursor->reply);
+   bson_destroy (&cursor->deprecated_reply);
+   bson_destroy (&cursor->error_doc);
    bson_free (cursor);
 
    mongoc_counter_cursors_active_dec ();
@@ -660,11 +662,13 @@ _mongoc_cursor_initial_query (mongoc_cursor_t *cursor)
 
    if (!cursor->is_find) {
       /* cursor created with deprecated mongoc_client_command() */
-      bson_destroy (&cursor->reply);
+      bson_destroy (&cursor->deprecated_reply);
 
-      if (_mongoc_cursor_run_command (
-             cursor, &cursor->filter, &cursor->opts, &cursor->reply)) {
-         b = &cursor->reply;
+      if (_mongoc_cursor_run_command (cursor,
+                                      &cursor->filter,
+                                      &cursor->opts,
+                                      &cursor->deprecated_reply)) {
+         b = &cursor->deprecated_reply;
       }
 
       cursor->sent = true;
@@ -1040,6 +1044,11 @@ _mongoc_cursor_run_command (mongoc_cursor_t *cursor,
    ret = mongoc_cluster_run_command_monitored (
       cluster, &parts.assembled, reply, &cursor->error);
 
+   if (cursor->error.domain) {
+      bson_destroy (&cursor->error_doc);
+      bson_copy_to (reply, &cursor->error_doc);
+   }
+
    /* Read and Write Concern Spec: "Drivers SHOULD parse server replies for a
     * "writeConcernError" field and report the error only in command-specific
     * helper methods that take a separate write concern parameter or an options
@@ -1262,7 +1271,7 @@ _mongoc_cursor_error_document (mongoc_cursor_t *cursor,
                       cursor->error.message);
 
       if (doc) {
-         *doc = &cursor->reply;
+         *doc = &cursor->error_doc;
       }
 
       RETURN (true);
@@ -1455,7 +1464,8 @@ _mongoc_cursor_clone (const mongoc_cursor_t *cursor)
 
    bson_copy_to (&cursor->filter, &_clone->filter);
    bson_copy_to (&cursor->opts, &_clone->opts);
-   bson_copy_to (&cursor->reply, &_clone->reply);
+   bson_init (&_clone->deprecated_reply);
+   bson_init (&_clone->error_doc);
 
    bson_strncpy (_clone->ns, cursor->ns, sizeof _clone->ns);
 

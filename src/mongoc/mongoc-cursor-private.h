@@ -127,7 +127,6 @@ struct _mongoc_cursor_t {
 
    bson_t filter;
    bson_t opts;
-   bson_t reply;
 
    mongoc_read_concern_t *read_concern;
    mongoc_read_prefs_t *read_prefs;
@@ -141,6 +140,11 @@ struct _mongoc_cursor_t {
    uint32_t dblen;
 
    bson_error_t error;
+   bson_t error_doc; /* always initialized, and set with server errors. */
+
+   /* only used by deprecated mongoc_client_command to store the cursor reply.
+    * Cursors which batch/stream weirdly used this only for store error docs. */
+   bson_t deprecated_reply;
 
    const bson_t *current;
 
