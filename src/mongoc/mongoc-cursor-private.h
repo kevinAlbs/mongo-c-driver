@@ -104,6 +104,12 @@ struct _mongoc_cursor_interface_t {
 #define MONGOC_CURSOR_TAILABLE "tailable"
 #define MONGOC_CURSOR_TAILABLE_LEN 8
 
+typedef struct _mongoc_cursor_legacy_response {
+   mongoc_rpc_t rpc;
+   mongoc_buffer_t buffer;
+   bson_reader_t *reader;
+} mongoc_cursor_legacy_response;
+
 struct _mongoc_cursor_t {
    mongoc_client_t *client;
 
@@ -136,11 +142,9 @@ struct _mongoc_cursor_t {
 
    bson_error_t error;
 
-   /* for OP_QUERY and OP_GETMORE replies*/
-   mongoc_rpc_t rpc;
-   mongoc_buffer_t buffer;
-   bson_reader_t *reader;
    const bson_t *current;
+
+   mongoc_cursor_legacy_response legacy_response;
 
    mongoc_cursor_interface_t iface;
    void *iface_data;
