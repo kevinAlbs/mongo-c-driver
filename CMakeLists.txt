@@ -553,6 +553,7 @@ set (SOURCES ${SOURCES}
    ${SOURCE_DIR}/src/mongoc/mongoc-counters.c
    ${SOURCE_DIR}/src/mongoc/mongoc-cursor-array.c
    ${SOURCE_DIR}/src/mongoc/mongoc-cursor.c
+   ${SOURCE_DIR}/src/mongoc/mongoc-cursor-legacy.c
    ${SOURCE_DIR}/src/mongoc/mongoc-cursor-array.c
    ${SOURCE_DIR}/src/mongoc/mongoc-cursor-cursorid.c
    ${SOURCE_DIR}/src/mongoc/mongoc-database.c
