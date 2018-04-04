@@ -189,8 +189,6 @@ _mongoc_cursor_clone (const mongoc_cursor_t *cursor);
 void
 _mongoc_cursor_destroy (mongoc_cursor_t *cursor);
 bool
-_mongoc_read_from_buffer (mongoc_cursor_t *cursor, const bson_t **bson);
-bool
 _use_find_command (const mongoc_cursor_t *cursor,
                    const mongoc_server_stream_t *server_stream);
 bool
@@ -212,8 +210,6 @@ _mongoc_cursor_run_command (mongoc_cursor_t *cursor,
                             bson_t *reply);
 bool
 _mongoc_cursor_more (mongoc_cursor_t *cursor);
-bool
-_mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson);
 bool
 _mongoc_cursor_error_document (mongoc_cursor_t *cursor,
                                bson_error_t *error,
