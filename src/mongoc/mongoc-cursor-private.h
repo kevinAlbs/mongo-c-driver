@@ -216,6 +216,42 @@ bool
 _mongoc_cursor_set_opt_int64 (mongoc_cursor_t *cursor,
                               const char *option,
                               int64_t value);
+void
+_mongoc_cursor_monitor_failed (mongoc_cursor_t *cursor,
+                               int64_t duration,
+                               mongoc_server_stream_t *stream,
+                               const char *cmd_name);
+bool
+_mongoc_cursor_monitor_command (mongoc_cursor_t *cursor,
+                                mongoc_server_stream_t *server_stream,
+                                const bson_t *cmd,
+                                const char *cmd_name);
+bool
+_mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor, bson_t *command);
+const bson_t *
+_mongoc_cursor_initial_query (mongoc_cursor_t *cursor);
+const bson_t *
+_mongoc_cursor_get_more (mongoc_cursor_t *cursor);
+bool
+_mongoc_cursor_flags (mongoc_cursor_t *cursor,
+                      mongoc_server_stream_t *stream,
+                      mongoc_query_flags_t *flags /* OUT */);
+void
+_mongoc_cursor_monitor_succeeded (mongoc_cursor_t *cursor,
+                                  int64_t duration,
+                                  bool first_batch,
+                                  mongoc_server_stream_t *stream,
+                                  const char *cmd_name);
+/* legacy functions. */
+bool
+_mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson);
+
+bool
+_mongoc_read_from_buffer (mongoc_cursor_t *cursor, const bson_t **bson);
+
+const bson_t *
+_mongoc_cursor_op_query (mongoc_cursor_t *cursor,
+                         mongoc_server_stream_t *server_stream);
 
 BSON_END_DECLS
 
