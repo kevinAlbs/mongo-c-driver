@@ -433,7 +433,7 @@ test_kill_cursor_live (void)
                                 NULL,
                                 NULL);
 
-   cursor->rpc.reply.cursor_id = ctx.cursor_id;
+   cursor->legacy_response.rpc.reply.cursor_id = ctx.cursor_id;
    cursor->sent = true;
    cursor->end_of_event = true; /* meaning, "finished reading first batch" */
    r = mongoc_cursor_next (cursor, &doc);

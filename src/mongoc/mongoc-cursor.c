@@ -37,7 +37,7 @@
 
 static const bson_t *
 _mongoc_cursor_find_command (mongoc_cursor_t *cursor,
-                            mongoc_server_stream_t *server_stream);
+                             mongoc_server_stream_t *server_stream);
 
 static bool
 _translate_query_opt (const char *query_field,
@@ -328,7 +328,7 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
       }
    }
 
-   _mongoc_buffer_init (&cursor->buffer, NULL, 0, NULL, NULL);
+   _mongoc_buffer_init (&cursor->legacy_response.buffer, NULL, 0, NULL, NULL);
    (void) _mongoc_read_prefs_validate (read_prefs, &cursor->error);
 
 finish:
@@ -556,28 +556,28 @@ _mongoc_cursor_destroy (mongoc_cursor_t *cursor)
          mongoc_cluster_disconnect_node (
             &cursor->client->cluster, cursor->server_id, false, NULL);
       }
-   } else if (cursor->rpc.reply.cursor_id) {
+   } else if (cursor->legacy_response.rpc.reply.cursor_id) {
       bson_strncpy (db, cursor->ns, cursor->dblen + 1);
 
       _mongoc_client_kill_cursor (cursor->client,
                                   cursor->server_id,
-                                  cursor->rpc.reply.cursor_id,
+                                  cursor->legacy_response.rpc.reply.cursor_id,
                                   cursor->operation_id,
                                   db,
                                   cursor->ns + cursor->dblen + 1,
                                   cursor->client_session);
    }
 
-   if (cursor->reader) {
-      bson_reader_destroy (cursor->reader);
-      cursor->reader = NULL;
+   if (cursor->legacy_response.reader) {
+      bson_reader_destroy (cursor->legacy_response.reader);
+      cursor->legacy_response.reader = NULL;
    }
 
    if (cursor->client_session && !cursor->explicit_session) {
       mongoc_client_session_destroy (cursor->client_session);
    }
 
-   _mongoc_buffer_destroy (&cursor->buffer);
+   _mongoc_buffer_destroy (&cursor->legacy_response.buffer);
    mongoc_read_prefs_destroy (cursor->read_prefs);
    mongoc_read_concern_destroy (cursor->read_concern);
    mongoc_write_concern_destroy (cursor->write_concern);
@@ -746,12 +746,12 @@ _mongoc_cursor_append_docs_array (mongoc_cursor_t *cursor, bson_t *docs)
    size_t keylen;
    const bson_t *doc;
 
-   while ((doc = bson_reader_read (cursor->reader, &eof))) {
+   while ((doc = bson_reader_read (cursor->legacy_response.reader, &eof))) {
       keylen = bson_uint32_to_string (i, &key, str, sizeof str);
       bson_append_document (docs, key, (int) keylen, doc);
    }
 
-   bson_reader_reset (cursor->reader);
+   bson_reader_reset (cursor->legacy_response.reader);
 }
 
 
@@ -1187,7 +1187,7 @@ _mongoc_cursor_get_more (mongoc_cursor_t *cursor)
       GOTO (failure);
    }
 
-   if (!cursor->in_exhaust && !cursor->rpc.reply.cursor_id) {
+   if (!cursor->in_exhaust && !cursor->legacy_response.rpc.reply.cursor_id) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_CURSOR,
                       MONGOC_ERROR_CURSOR_INVALID_CURSOR,
@@ -1201,7 +1201,7 @@ _mongoc_cursor_get_more (mongoc_cursor_t *cursor)
 
    mongoc_server_stream_cleanup (server_stream);
 
-   if (cursor->reader) {
+   if (cursor->legacy_response.reader) {
       _mongoc_read_from_buffer (cursor, &b);
    }
 
@@ -1459,7 +1459,7 @@ _mongoc_cursor_clone (const mongoc_cursor_t *cursor)
 
    bson_strncpy (_clone->ns, cursor->ns, sizeof _clone->ns);
 
-   _mongoc_buffer_init (&_clone->buffer, NULL, 0, NULL, NULL);
+   _mongoc_buffer_init (&_clone->legacy_response.buffer, NULL, 0, NULL, NULL);
 
    mongoc_counter_cursors_active_inc ();
 
@@ -1593,7 +1593,7 @@ mongoc_cursor_get_id (const mongoc_cursor_t *cursor)
 {
    BSON_ASSERT (cursor);
 
-   return cursor->rpc.reply.cursor_id;
+   return cursor->legacy_response.rpc.reply.cursor_id;
 }
 
 void

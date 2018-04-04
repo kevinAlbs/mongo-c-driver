@@ -118,9 +118,9 @@ _mongoc_read_from_buffer (mongoc_cursor_t *cursor, const bson_t **bson)
 {
    bool eof = false;
 
-   BSON_ASSERT (cursor->reader);
+   BSON_ASSERT (cursor->legacy_response.reader);
 
-   *bson = bson_reader_read (cursor->reader, &eof);
+   *bson = bson_reader_read (cursor->legacy_response.reader, &eof);
    cursor->end_of_event = eof ? 1 : 0;
 
    return *bson ? true : false;
@@ -159,7 +159,7 @@ _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
     * Try to read the next document from the reader if it exists, we might
     * get NULL back and EOF, in which case we need to submit a getmore.
     */
-   if (cursor->reader) {
+   if (cursor->legacy_response.reader) {
       _mongoc_read_from_buffer (cursor, &b);
       if (b) {
          GOTO (complete);
@@ -172,15 +172,16 @@ _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
    if (!cursor->sent) {
       b = _mongoc_cursor_initial_query (cursor);
    } else if (BSON_UNLIKELY (cursor->end_of_event) &&
-              cursor->rpc.reply.cursor_id) {
+              cursor->legacy_response.rpc.reply.cursor_id) {
       b = _mongoc_cursor_get_more (cursor);
    }
 
 complete:
    tailable = _mongoc_cursor_get_opt_bool (cursor, "tailable");
-   cursor->done = (cursor->end_of_event &&
-                   ((cursor->in_exhaust && !cursor->rpc.reply.cursor_id) ||
-                    (!b && !tailable)));
+   cursor->done =
+      (cursor->end_of_event &&
+       ((cursor->in_exhaust && !cursor->legacy_response.rpc.reply.cursor_id) ||
+        (!b && !tailable)));
 
    if (bson) {
       *bson = b;
@@ -209,11 +210,11 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
    }
 
    if (cursor->in_exhaust) {
-      request_id = (uint32_t) cursor->rpc.header.request_id;
+      request_id = (uint32_t) cursor->legacy_response.rpc.header.request_id;
    } else {
       request_id = ++cluster->request_id;
 
-      rpc.get_more.cursor_id = cursor->rpc.reply.cursor_id;
+      rpc.get_more.cursor_id = cursor->legacy_response.rpc.reply.cursor_id;
       rpc.header.msg_len = 0;
       rpc.header.request_id = request_id;
       rpc.header.response_to = 0;
@@ -232,54 +233,55 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
       }
 
       if (!mongoc_cluster_legacy_rpc_sendv_to_server (
-         cluster, &rpc, server_stream, &cursor->error)) {
+             cluster, &rpc, server_stream, &cursor->error)) {
          GOTO (fail);
       }
    }
 
-   _mongoc_buffer_clear (&cursor->buffer, false);
+   _mongoc_buffer_clear (&cursor->legacy_response.buffer, false);
 
    if (!_mongoc_client_recv (cursor->client,
-                             &cursor->rpc,
-                             &cursor->buffer,
+                             &cursor->legacy_response.rpc,
+                             &cursor->legacy_response.buffer,
                              server_stream,
                              &cursor->error)) {
       GOTO (fail);
    }
 
-   if (cursor->rpc.header.opcode != MONGOC_OPCODE_REPLY) {
+   if (cursor->legacy_response.rpc.header.opcode != MONGOC_OPCODE_REPLY) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_PROTOCOL,
                       MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
                       "Invalid opcode. Expected %d, got %d.",
                       MONGOC_OPCODE_REPLY,
-                      cursor->rpc.header.opcode);
+                      cursor->legacy_response.rpc.header.opcode);
       GOTO (fail);
    }
 
-   if (cursor->rpc.header.response_to != request_id) {
+   if (cursor->legacy_response.rpc.header.response_to != request_id) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_PROTOCOL,
                       MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
                       "Invalid response_to for getmore. Expected %d, got %d.",
                       request_id,
-                      cursor->rpc.header.response_to);
+                      cursor->legacy_response.rpc.header.response_to);
       GOTO (fail);
    }
 
-   if (!_mongoc_rpc_check_ok (&cursor->rpc,
+   if (!_mongoc_rpc_check_ok (&cursor->legacy_response.rpc,
                               cursor->client->error_api_version,
                               &cursor->error,
                               &cursor->reply)) {
       GOTO (fail);
    }
 
-   if (cursor->reader) {
-      bson_reader_destroy (cursor->reader);
+   if (cursor->legacy_response.reader) {
+      bson_reader_destroy (cursor->legacy_response.reader);
    }
 
-   cursor->reader = bson_reader_new_from_data (
-      cursor->rpc.reply.documents, (size_t) cursor->rpc.reply.documents_len);
+   cursor->legacy_response.reader = bson_reader_new_from_data (
+      cursor->legacy_response.rpc.reply.documents,
+      (size_t) cursor->legacy_response.rpc.reply.documents_len);
 
    _mongoc_cursor_monitor_succeeded (cursor,
                                      bson_get_monotonic_time () - started,
@@ -416,7 +418,7 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
          OPT_CHECK_INT ();
          *skip = (int32_t) bson_iter_as_int64 (&iter);
       }
-         /* the rest of the options, alphabetically */
+      /* the rest of the options, alphabetically */
       else if (!strcmp (key, MONGOC_CURSOR_ALLOW_PARTIAL_RESULTS)) {
          OPT_FLAG (MONGOC_QUERY_PARTIAL);
       } else if (!strcmp (key, MONGOC_CURSOR_AWAIT_DATA)) {
@@ -451,7 +453,7 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
          OPT_SUBDOCUMENT (min, min);
       } else if (!strcmp (key, MONGOC_CURSOR_READ_CONCERN)) {
          OPT_ERR ("Set readConcern on client, database, or collection,"
-                     " not in a query.");
+                  " not in a query.");
       } else if (!strcmp (key, MONGOC_CURSOR_RETURN_KEY)) {
          OPT_CHECK (BOOL);
          PUSH_DOLLAR_QUERY ();
@@ -471,11 +473,11 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
                          "The selected server does not support collation");
          return NULL;
       }
-         /* singleBatch limit and batchSize are handled in _mongoc_n_return,
-          * exhaust noCursorTimeout oplogReplay tailable in _mongoc_cursor_flags
-          * maxAwaitTimeMS is handled in _mongoc_cursor_prepare_getmore_command
-          * sessionId is used to retrieve the mongoc_client_session_t
-          */
+      /* singleBatch limit and batchSize are handled in _mongoc_n_return,
+       * exhaust noCursorTimeout oplogReplay tailable in _mongoc_cursor_flags
+       * maxAwaitTimeMS is handled in _mongoc_cursor_prepare_getmore_command
+       * sessionId is used to retrieve the mongoc_client_session_t
+       */
       else if (strcmp (key, MONGOC_CURSOR_SINGLE_BATCH) &&
                strcmp (key, MONGOC_CURSOR_LIMIT) &&
                strcmp (key, MONGOC_CURSOR_BATCH_SIZE) &&
@@ -578,53 +580,54 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
    }
 
    if (!mongoc_cluster_legacy_rpc_sendv_to_server (
-      &cursor->client->cluster, &rpc, server_stream, &cursor->error)) {
+          &cursor->client->cluster, &rpc, server_stream, &cursor->error)) {
       GOTO (done);
    }
 
-   _mongoc_buffer_clear (&cursor->buffer, false);
+   _mongoc_buffer_clear (&cursor->legacy_response.buffer, false);
 
    if (!_mongoc_client_recv (cursor->client,
-                             &cursor->rpc,
-                             &cursor->buffer,
+                             &cursor->legacy_response.rpc,
+                             &cursor->legacy_response.buffer,
                              server_stream,
                              &cursor->error)) {
       GOTO (done);
    }
 
-   if (cursor->rpc.header.opcode != MONGOC_OPCODE_REPLY) {
+   if (cursor->legacy_response.rpc.header.opcode != MONGOC_OPCODE_REPLY) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_PROTOCOL,
                       MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
                       "Invalid opcode. Expected %d, got %d.",
                       MONGOC_OPCODE_REPLY,
-                      cursor->rpc.header.opcode);
+                      cursor->legacy_response.rpc.header.opcode);
       GOTO (done);
    }
 
-   if (cursor->rpc.header.response_to != request_id) {
+   if (cursor->legacy_response.rpc.header.response_to != request_id) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_PROTOCOL,
                       MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
                       "Invalid response_to for query. Expected %d, got %d.",
                       request_id,
-                      cursor->rpc.header.response_to);
+                      cursor->legacy_response.rpc.header.response_to);
       GOTO (done);
    }
 
-   if (!_mongoc_rpc_check_ok (&cursor->rpc,
+   if (!_mongoc_rpc_check_ok (&cursor->legacy_response.rpc,
                               cursor->client->error_api_version,
                               &cursor->error,
                               &cursor->reply)) {
       GOTO (done);
    }
 
-   if (cursor->reader) {
-      bson_reader_destroy (cursor->reader);
+   if (cursor->legacy_response.reader) {
+      bson_reader_destroy (cursor->legacy_response.reader);
    }
 
-   cursor->reader = bson_reader_new_from_data (
-      cursor->rpc.reply.documents, (size_t) cursor->rpc.reply.documents_len);
+   cursor->legacy_response.reader = bson_reader_new_from_data (
+      cursor->legacy_response.rpc.reply.documents,
+      (size_t) cursor->legacy_response.rpc.reply.documents_len);
 
    if (_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST)) {
       cursor->in_exhaust = true;
