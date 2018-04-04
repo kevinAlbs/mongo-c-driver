@@ -108,16 +108,16 @@ struct _mongoc_cursor_t {
    mongoc_client_t *client;
 
    uint32_t server_id;
-   bool server_id_set;
    bool slave_ok;
 
+   /* TODO: remove */
    unsigned is_find : 1;
    unsigned sent : 1;
    unsigned done : 1;
    unsigned end_of_event : 1;
-   unsigned has_fields : 1;
-   unsigned in_exhaust : 1;
-   unsigned explicit_session : 1;
+
+   bool in_exhaust : 1;
+   bool explicit_session : 1;
 
    bson_t filter;
    bson_t opts;

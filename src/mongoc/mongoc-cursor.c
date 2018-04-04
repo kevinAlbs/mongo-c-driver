@@ -281,7 +281,7 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
             GOTO (finish);
          }
 
-         cursor->explicit_session = 1;
+         cursor->explicit_session = true;
       }
 
       /* true if there's a valid serverId or no serverId, false on err */
@@ -1020,7 +1020,7 @@ _mongoc_cursor_flags (mongoc_cursor_t *cursor,
 
    if (cursor->slave_ok) {
       *flags |= MONGOC_QUERY_SLAVE_OK;
-   } else if (cursor->server_id_set &&
+   } else if (cursor->server_id &&
               (stream->topology_type == MONGOC_TOPOLOGY_RS_WITH_PRIMARY ||
                stream->topology_type == MONGOC_TOPOLOGY_RS_NO_PRIMARY) &&
               stream->sd->type != MONGOC_SERVER_RS_PRIMARY) {
@@ -1379,7 +1379,7 @@ _mongoc_cursor_run_command (mongoc_cursor_t *cursor,
       BSON_ASSERT (!cursor->client_session);
       BSON_ASSERT (!cursor->explicit_session);
       cursor->client_session = parts.assembled.session;
-      cursor->explicit_session = 1;
+      cursor->explicit_session = true;
    } else if (cursor->client_session) {
       /* a getMore with implicit or explicit session already acquired */
       mongoc_cmd_parts_set_session (&parts, cursor->client_session);
@@ -2077,7 +2077,6 @@ _mongoc_cursor_clone (const mongoc_cursor_t *cursor)
    _clone->is_find = cursor->is_find;
    _clone->nslen = cursor->nslen;
    _clone->dblen = cursor->dblen;
-   _clone->has_fields = cursor->has_fields;
    _clone->explicit_session = cursor->explicit_session;
 
    if (cursor->read_prefs) {
@@ -2219,7 +2218,6 @@ mongoc_cursor_set_hint (mongoc_cursor_t *cursor, uint32_t server_id)
    }
 
    cursor->server_id = server_id;
-   cursor->server_id_set = true;
 
    return true;
 }

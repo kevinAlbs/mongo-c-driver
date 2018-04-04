@@ -166,7 +166,7 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
 
    if (cs) {
       stream->cursor->client_session = cs;
-      stream->cursor->explicit_session = 1;
+      stream->cursor->explicit_session = true;
    }
 
    /* maxTimeMS is only appended to getMores if these are set in cursor opts */
