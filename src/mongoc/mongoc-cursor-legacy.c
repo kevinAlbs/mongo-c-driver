@@ -181,8 +181,7 @@ complete:
    tailable = _mongoc_cursor_get_opt_bool (cursor, "tailable");
    cursor->done =
       (cursor->end_of_event &&
-       ((cursor->in_exhaust && !cursor->cursor_id) ||
-        (!b && !tailable)));
+       ((cursor->in_exhaust && !cursor->cursor_id) || (!b && !tailable)));
 
    if (bson) {
       *bson = b;
@@ -275,7 +274,7 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
    if (!_mongoc_rpc_check_ok (&cursor->legacy_response.rpc,
                               cursor->client->error_api_version,
                               &cursor->error,
-                              &cursor->reply)) {
+                              &cursor->error_doc)) {
       GOTO (fail);
    }
 
@@ -623,7 +622,7 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
    if (!_mongoc_rpc_check_ok (&cursor->legacy_response.rpc,
                               cursor->client->error_api_version,
                               &cursor->error,
-                              &cursor->reply)) {
+                              &cursor->error_doc)) {
       GOTO (done);
    }
 
