@@ -556,12 +556,12 @@ _mongoc_cursor_destroy (mongoc_cursor_t *cursor)
          mongoc_cluster_disconnect_node (
             &cursor->client->cluster, cursor->server_id, false, NULL);
       }
-   } else if (cursor->legacy_response.rpc.reply.cursor_id) {
+   } else if (cursor->cursor_id) {
       bson_strncpy (db, cursor->ns, cursor->dblen + 1);
 
       _mongoc_client_kill_cursor (cursor->client,
                                   cursor->server_id,
-                                  cursor->legacy_response.rpc.reply.cursor_id,
+                                  cursor->cursor_id,
                                   cursor->operation_id,
                                   db,
                                   cursor->ns + cursor->dblen + 1,
@@ -1187,7 +1187,7 @@ _mongoc_cursor_get_more (mongoc_cursor_t *cursor)
       GOTO (failure);
    }
 
-   if (!cursor->in_exhaust && !cursor->legacy_response.rpc.reply.cursor_id) {
+   if (!cursor->in_exhaust && !cursor->cursor_id) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_CURSOR,
                       MONGOC_ERROR_CURSOR_INVALID_CURSOR,
@@ -1286,7 +1286,7 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
    BSON_ASSERT (cursor);
    BSON_ASSERT (bson);
 
-   TRACE ("cursor_id(%" PRId64 ")", cursor->rpc.reply.cursor_id);
+   TRACE ("cursor_id(%" PRId64 ")", cursor->cursor_id);
 
    if (bson) {
       *bson = NULL;
@@ -1593,7 +1593,7 @@ mongoc_cursor_get_id (const mongoc_cursor_t *cursor)
 {
    BSON_ASSERT (cursor);
 
-   return cursor->legacy_response.rpc.reply.cursor_id;
+   return cursor->cursor_id;
 }
 
 void
