@@ -150,6 +150,7 @@ struct _mongoc_cursor_t {
    void *iface_data;
 
    int64_t operation_id;
+   int64_t cursor_id;
 };
 
 

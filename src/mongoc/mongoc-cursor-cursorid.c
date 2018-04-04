@@ -85,8 +85,7 @@ _mongoc_cursor_cursorid_start_batch (mongoc_cursor_t *cursor)
        BSON_ITER_HOLDS_DOCUMENT (&iter) && bson_iter_recurse (&iter, &child)) {
       while (bson_iter_next (&child)) {
          if (BSON_ITER_IS_KEY (&child, "id")) {
-            cursor->legacy_response.rpc.reply.cursor_id =
-               bson_iter_as_int64 (&child);
+            cursor->cursor_id = bson_iter_as_int64 (&child);
          } else if (BSON_ITER_IS_KEY (&child, "ns")) {
             ns = bson_iter_utf8 (&child, &nslen);
             _mongoc_set_cursor_ns (cursor, ns, nslen);
@@ -104,7 +103,7 @@ _mongoc_cursor_cursorid_start_batch (mongoc_cursor_t *cursor)
     * cursor for use with getMore operations, the session MUST be returned to
     * the pool immediately following a getMore operation that indicates that the
     * cursor has been exhausted." */
-   if (cursor->legacy_response.rpc.reply.cursor_id == 0 &&
+   if (cursor->cursor_id == 0 &&
        cursor->client_session && !cursor->explicit_session) {
       mongoc_client_session_destroy (cursor->client_session);
       cursor->client_session = NULL;

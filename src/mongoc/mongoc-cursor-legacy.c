@@ -32,6 +32,8 @@
 #include "mongoc-util-private.h"
 #include "mongoc-write-concern-private.h"
 #include "mongoc-read-prefs-private.h"
+#include "mongoc-rpc-private.h"
+
 
 static bool
 _mongoc_cursor_monitor_legacy_get_more (mongoc_cursor_t *cursor,
@@ -171,8 +173,7 @@ _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
     */
    if (!cursor->sent) {
       b = _mongoc_cursor_initial_query (cursor);
-   } else if (BSON_UNLIKELY (cursor->end_of_event) &&
-              cursor->legacy_response.rpc.reply.cursor_id) {
+   } else if (BSON_UNLIKELY (cursor->end_of_event) && cursor->cursor_id) {
       b = _mongoc_cursor_get_more (cursor);
    }
 
@@ -180,7 +181,7 @@ complete:
    tailable = _mongoc_cursor_get_opt_bool (cursor, "tailable");
    cursor->done =
       (cursor->end_of_event &&
-       ((cursor->in_exhaust && !cursor->legacy_response.rpc.reply.cursor_id) ||
+       ((cursor->in_exhaust && !cursor->cursor_id) ||
         (!b && !tailable)));
 
    if (bson) {
@@ -214,7 +215,7 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
    } else {
       request_id = ++cluster->request_id;
 
-      rpc.get_more.cursor_id = cursor->legacy_response.rpc.reply.cursor_id;
+      rpc.get_more.cursor_id = cursor->cursor_id;
       rpc.header.msg_len = 0;
       rpc.header.request_id = request_id;
       rpc.header.response_to = 0;
@@ -239,6 +240,9 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
    }
 
    _mongoc_buffer_clear (&cursor->legacy_response.buffer, false);
+
+   /* reset the last known cursor id. */
+   cursor->cursor_id = 0;
 
    if (!_mongoc_client_recv (cursor->client,
                              &cursor->legacy_response.rpc,
@@ -278,6 +282,8 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
    if (cursor->legacy_response.reader) {
       bson_reader_destroy (cursor->legacy_response.reader);
    }
+
+   cursor->cursor_id = cursor->legacy_response.rpc.reply.cursor_id;
 
    cursor->legacy_response.reader = bson_reader_new_from_data (
       cursor->legacy_response.rpc.reply.documents,
@@ -624,6 +630,8 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
    if (cursor->legacy_response.reader) {
       bson_reader_destroy (cursor->legacy_response.reader);
    }
+
+   cursor->cursor_id = cursor->legacy_response.rpc.reply.cursor_id;
 
    cursor->legacy_response.reader = bson_reader_new_from_data (
       cursor->legacy_response.rpc.reply.documents,
