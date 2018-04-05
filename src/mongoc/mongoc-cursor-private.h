@@ -33,7 +33,6 @@ BSON_BEGIN_DECLS
 
 typedef struct _mongoc_cursor_interface_t mongoc_cursor_interface_t;
 
-
 struct _mongoc_cursor_interface_t {
    mongoc_cursor_t *(*clone) (const mongoc_cursor_t *cursor);
    void (*destroy) (mongoc_cursor_t *cursor);
@@ -104,6 +103,8 @@ struct _mongoc_cursor_interface_t {
 #define MONGOC_CURSOR_TAILABLE "tailable"
 #define MONGOC_CURSOR_TAILABLE_LEN 8
 
+typedef enum { UNPRIMED, IN_BATCH, END_OF_BATCH, DONE } mongoc_cursor_state_t;
+
 typedef struct _mongoc_cursor_legacy_response {
    mongoc_rpc_t rpc;
    mongoc_buffer_t buffer;
@@ -118,9 +119,7 @@ struct _mongoc_cursor_t {
 
    /* TODO: remove */
    unsigned is_find : 1;
-   unsigned sent : 1;
-   unsigned done : 1;
-   unsigned end_of_event : 1;
+   mongoc_cursor_state_t state;
 
    bool in_exhaust : 1;
    bool explicit_session : 1;

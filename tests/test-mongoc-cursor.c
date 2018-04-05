@@ -434,8 +434,7 @@ test_kill_cursor_live (void)
                                 NULL);
 
    cursor->cursor_id = ctx.cursor_id;
-   cursor->sent = true;
-   cursor->end_of_event = true; /* meaning, "finished reading first batch" */
+   cursor->state = END_OF_BATCH; /* meaning, "finished reading first batch" */
    r = mongoc_cursor_next (cursor, &doc);
    ASSERT (!r);
    ASSERT (mongoc_cursor_error (cursor, &error));

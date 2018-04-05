@@ -193,9 +193,7 @@ _first_dollar_field (const bson_t *bson)
 
 #define MARK_FAILED(c)          \
    do {                         \
-      (c)->done = true;         \
-      (c)->end_of_event = true; \
-      (c)->sent = true;         \
+      (c)->state = DONE;         \
    } while (0)
 
 
@@ -552,7 +550,7 @@ _mongoc_cursor_destroy (mongoc_cursor_t *cursor)
 
    if (cursor->in_exhaust) {
       cursor->client->in_exhaust = false;
-      if (!cursor->done) {
+      if (cursor->state != DONE) {
          /* The only way to stop an exhaust cursor is to kill the connection */
          mongoc_cluster_disconnect_node (
             &cursor->client->cluster, cursor->server_id, false, NULL);
@@ -671,7 +669,7 @@ _mongoc_cursor_initial_query (mongoc_cursor_t *cursor)
          b = &cursor->deprecated_reply;
       }
 
-      cursor->sent = true;
+      cursor->state = IN_BATCH;
    } else if (_use_find_command (cursor, server_stream)) {
       b = _mongoc_cursor_find_command (cursor, server_stream);
    } else {
@@ -695,7 +693,7 @@ done:
    mongoc_server_stream_cleanup (server_stream);
 
    if (!b) {
-      cursor->done = true;
+      cursor->state = DONE;
    }
 
    RETURN (b);
@@ -1217,7 +1215,7 @@ _mongoc_cursor_get_more (mongoc_cursor_t *cursor)
    RETURN (b);
 
 failure:
-   cursor->done = true;
+   cursor->state = DONE;
 
    mongoc_server_stream_cleanup (server_stream);
 
@@ -1305,7 +1303,7 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
       return false;
    }
 
-   if (cursor->done) {
+   if (cursor->state == DONE) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_CURSOR,
                       MONGOC_ERROR_CURSOR_INVALID_CURSOR,
@@ -1365,7 +1363,7 @@ _mongoc_cursor_more (mongoc_cursor_t *cursor)
       return false;
    }
 
-   return !(cursor->sent && cursor->done && cursor->end_of_event);
+   return cursor->state != DONE;
 }
 
 
@@ -1500,7 +1498,14 @@ mongoc_cursor_is_alive (const mongoc_cursor_t *cursor) /* IN */
 {
    BSON_ASSERT (cursor);
 
-   return !cursor->done;
+
+   /* I think this function was incorrect before. done is true when there will
+    * be no additional getMore attempts *and* there are no more documents.
+    * Before: `return !cursor->done`
+    * Should have been `return !cursor->sent || cursor->rpc.reply.cursor_id`
+    */
+   return cursor->state != DONE;
+   /* Should be: return cursor->state == UNPRIMED || cursor->cursor_id; */
 }
 
 
@@ -1536,7 +1541,7 @@ mongoc_cursor_set_limit (mongoc_cursor_t *cursor, int64_t limit)
 {
    BSON_ASSERT (cursor);
 
-   if (!cursor->sent) {
+   if (cursor->state == UNPRIMED) {
       if (limit < 0) {
          return _mongoc_cursor_set_opt_int64 (
                    cursor, MONGOC_CURSOR_LIMIT, -limit) &&
@@ -1612,7 +1617,7 @@ mongoc_cursor_set_max_await_time_ms (mongoc_cursor_t *cursor,
 {
    BSON_ASSERT (cursor);
 
-   if (!cursor->sent) {
+   if (cursor->state == UNPRIMED) {
       _mongoc_cursor_set_opt_int64 (
          cursor, MONGOC_CURSOR_MAX_AWAIT_TIME_MS, (int64_t) max_await_time_ms);
    }
