@@ -123,7 +123,7 @@ _mongoc_read_from_buffer (mongoc_cursor_t *cursor, const bson_t **bson)
    BSON_ASSERT (cursor->legacy_response.reader);
 
    *bson = bson_reader_read (cursor->legacy_response.reader, &eof);
-   cursor->end_of_event = eof ? 1 : 0;
+   cursor->state = eof ? END_OF_BATCH : IN_BATCH;
 
    return *bson ? true : false;
 }
@@ -152,8 +152,7 @@ _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
    limit = cursor->is_find ? mongoc_cursor_get_limit (cursor) : 1;
 
    if (limit && cursor->count >= llabs (limit)) {
-      cursor->done = true;
-      cursor->end_of_event = true;
+      cursor->state = DONE;
       RETURN (false);
    }
 
@@ -171,17 +170,22 @@ _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
    /*
     * Check to see if we need to send a GET_MORE for more results.
     */
-   if (!cursor->sent) {
+   if (cursor->state == UNPRIMED) {
       b = _mongoc_cursor_initial_query (cursor);
-   } else if (BSON_UNLIKELY (cursor->end_of_event) && cursor->cursor_id) {
+   } else if (BSON_UNLIKELY (cursor->state == END_OF_BATCH) && cursor->cursor_id) {
       b = _mongoc_cursor_get_more (cursor);
    }
 
 complete:
    tailable = _mongoc_cursor_get_opt_bool (cursor, "tailable");
-   cursor->done =
-      (cursor->end_of_event &&
-       ((cursor->in_exhaust && !cursor->cursor_id) || (!b && !tailable)));
+   if (cursor->state == END_OF_BATCH && !tailable) {
+      if (cursor->in_exhaust && !cursor->cursor_id) {
+         /* the exhaust cursor has received all of the documents. */
+         cursor->state = DONE;
+      } else if (!b) {
+         cursor->state = DONE;
+      }
+   }
 
    if (bson) {
       *bson = b;
@@ -545,7 +549,6 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
 
    started = bson_get_monotonic_time ();
 
-   cursor->sent = true;
    cursor->operation_id = ++cursor->client->cluster.operation_id;
 
    request_id = ++cursor->client->cluster.request_id;
@@ -647,8 +650,7 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
                                      server_stream,
                                      "find");
 
-   cursor->done = false;
-   cursor->end_of_event = false;
+   cursor->state = IN_BATCH;
    succeeded = true;
 
    _mongoc_read_from_buffer (cursor, &ret);
@@ -664,7 +666,7 @@ done:
    bson_destroy (&fields);
 
    if (!ret) {
-      cursor->done = true;
+      cursor->state = DONE;
    }
 
    RETURN (ret);

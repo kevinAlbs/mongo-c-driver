@@ -167,9 +167,9 @@ _mongoc_cursor_cursorid_read_from_batch (mongoc_cursor_t *cursor,
       BSON_ASSERT (bson_init_static (&cid->current_doc, data, data_len));
       *bson = &cid->current_doc;
 
-      cursor->end_of_event = false;
+      cursor->state = IN_BATCH;
    } else {
-      cursor->end_of_event = true;
+      cursor->state = END_OF_BATCH;
    }
 }
 
@@ -183,7 +183,7 @@ _mongoc_cursor_cursorid_prime (mongoc_cursor_t *cursor)
       return false;
    }
 
-   cursor->sent = true;
+   cursor->state = IN_BATCH;
    cursor->operation_id = ++cursor->client->cluster.operation_id;
 
    /* `find` does not have a cursor field */
@@ -312,7 +312,7 @@ _mongoc_cursor_cursorid_next (mongoc_cursor_t *cursor, const bson_t **bson)
    cid = (mongoc_cursor_cursorid_t *) cursor->iface_data;
    BSON_ASSERT (cid);
 
-   if (!cursor->sent) {
+   if (cursor->state == UNPRIMED) {
       if (!_mongoc_cursor_cursorid_prime (cursor)) {
          GOTO (done);
       }
@@ -354,7 +354,7 @@ again:
 
 done:
    if (!*bson && mongoc_cursor_get_id (cursor) == 0) {
-      cursor->done = 1;
+      cursor->state = DONE;
    }
 
    RETURN (*bson != NULL);
@@ -407,7 +407,7 @@ _mongoc_cursor_cursorid_init_with_reply (mongoc_cursor_t *cursor,
 {
    mongoc_cursor_cursorid_t *cid;
 
-   cursor->sent = true;
+   cursor->state = IN_BATCH;
    cursor->server_id = server_id;
 
    cid = (mongoc_cursor_cursorid_t *) cursor->iface_data;
