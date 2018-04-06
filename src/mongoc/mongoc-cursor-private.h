@@ -163,6 +163,15 @@ void
 _mongoc_set_cursor_ns (mongoc_cursor_t *cursor, const char *ns, uint32_t nslen);
 bool
 _mongoc_cursor_get_opt_bool (const mongoc_cursor_t *cursor, const char *option);
+void
+_mongoc_cursor_flags_to_opts (mongoc_query_flags_t qflags,
+                              bson_t *opts,
+                              bool *slave_ok);
+bool
+_mongoc_cursor_translate_dollar_query_opts (const bson_t *query,
+                                            bson_t *opts,
+                                            bson_t *filter,
+                                            bson_error_t *error);
 mongoc_cursor_t *
 _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const char *db_and_collection,
@@ -171,18 +180,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const bson_t *opts,
                               const mongoc_read_prefs_t *read_prefs,
                               const mongoc_read_concern_t *read_concern);
-mongoc_cursor_t *
-_mongoc_cursor_new (mongoc_client_t *client,
-                    const char *db_and_collection,
-                    mongoc_query_flags_t flags,
-                    uint32_t skip,
-                    int32_t limit,
-                    uint32_t batch_size,
-                    bool is_command,
-                    const bson_t *query,
-                    const bson_t *fields,
-                    const mongoc_read_prefs_t *read_prefs,
-                    const mongoc_read_concern_t *read_concern);
 mongoc_cursor_t *
 _mongoc_cursor_clone (const mongoc_cursor_t *cursor);
 void

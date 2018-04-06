@@ -42,26 +42,6 @@
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "collection"
 
-
-static mongoc_cursor_t *
-_mongoc_collection_cursor_new (mongoc_collection_t *collection,
-                               mongoc_query_flags_t flags,
-                               const mongoc_read_prefs_t *prefs,
-                               bool is_command)
-{
-   return _mongoc_cursor_new (collection->client,
-                              collection->ns,
-                              flags,
-                              0,           /* skip */
-                              0,           /* limit */
-                              0,           /* batch_size */
-                              !is_command, /* is_find */
-                              NULL,        /* query */
-                              NULL,        /* fields */
-                              prefs,       /* read prefs */
-                              NULL);       /* read concern */
-}
-
 static void
 _mongoc_collection_write_command_execute (
    mongoc_write_command_t *command,
@@ -333,6 +313,8 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
    bson_iter_t iter;
    bson_t command;
    bson_t child;
+   bson_t cursor_opts;
+   bool slave_ok;
 
    ENTRY;
 
@@ -341,7 +323,16 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
 
    bson_init (&command);
 
-   cursor = _mongoc_collection_cursor_new (collection, flags, read_prefs, true);
+   bson_init (&cursor_opts);
+   _mongoc_cursor_flags_to_opts (flags, &cursor_opts, &slave_ok);
+   cursor = _mongoc_cursor_new_with_opts (collection->client,
+                                          collection->ns,
+                                          false,
+                                          NULL /* filter */,
+                                          &cursor_opts,
+                                          read_prefs,
+                                          NULL /* read concern */);
+   bson_destroy (&cursor_opts);
 
    if (!_mongoc_get_server_id_from_opts (opts,
                                          MONGOC_ERROR_COMMAND,
@@ -522,6 +513,12 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
                         const bson_t *fields,                  /* IN */
                         const mongoc_read_prefs_t *read_prefs) /* IN */
 {
+   bool has_unwrapped;
+   bson_t unwrapped;
+   bson_error_t error;
+   bson_t opts;
+   bool slave_ok;
+   mongoc_cursor_t *cursor;
    BSON_ASSERT (collection);
    BSON_ASSERT (query);
 
@@ -531,17 +528,43 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
       read_prefs = collection->read_prefs;
    }
 
-   return _mongoc_cursor_new (collection->client,
-                              collection->ns,
-                              flags,
-                              skip,
-                              limit,
-                              batch_size,
-                              true /* is_find */,
-                              query,
-                              fields,
-                              COALESCE (read_prefs, collection->read_prefs),
-                              collection->read_concern);
+   bson_init (&opts);
+   _mongoc_cursor_flags_to_opts (flags, &opts, &slave_ok);
+   has_unwrapped = _mongoc_cursor_translate_dollar_query_opts (
+      query, &opts, &unwrapped, &error);
+   if (!bson_empty0 (fields)) {
+      bson_append_document (
+         &opts, MONGOC_CURSOR_PROJECTION, MONGOC_CURSOR_PROJECTION_LEN, fields);
+   }
+   cursor = _mongoc_cursor_new_with_opts (collection->client,
+                                          collection->ns,
+                                          true,
+                                          has_unwrapped ? &unwrapped : query,
+                                          &opts,
+                                          read_prefs,
+                                          collection->read_concern);
+   if (skip) {
+      _mongoc_cursor_set_opt_int64 (cursor, MONGOC_CURSOR_SKIP, skip);
+   }
+   if (limit) {
+      /* limit must be casted to int32_t. Although the argument is a uint32_t,
+       * callers can specify a negative limit by casting to a signed int32_t
+       * value to uint32_t. E.g. to set a limit of -4, the caller passes
+       * UINT32_MAX - 3 */
+      (void) mongoc_cursor_set_limit (cursor, (int32_t) limit);
+   }
+   if (batch_size) {
+      mongoc_cursor_set_batch_size (cursor, batch_size);
+   }
+   bson_destroy (&unwrapped);
+   bson_destroy (&opts);
+
+   if (error.domain) {
+      memcpy (&cursor->error, &error, sizeof (error));
+      cursor->state = DONE;
+   }
+
+   return cursor;
 }
 
 
@@ -1375,16 +1398,18 @@ mongoc_collection_find_indexes_with_opts (mongoc_collection_t *collection,
       /* intentionally empty */
    } else if (mongoc_cursor_error (cursor, &error) &&
               error.code == MONGOC_ERROR_COLLECTION_DOES_NOT_EXIST) {
-
       bson_t empty_arr = BSON_INITIALIZER;
       /* collection does not exist. in accordance with the spec we return
-       * an empty array. Also we need to clear out the error. */
-      error.code = 0;
-      error.domain = 0;
+       * an empty array. */
       mongoc_cursor_destroy (cursor);
-      cursor = _mongoc_collection_cursor_new (
-         collection, MONGOC_QUERY_SLAVE_OK, NULL /* read prefs */, true);
-
+      cursor = _mongoc_cursor_new_with_opts (collection->client,
+                                             collection->ns,
+                                             true /* is_find */,
+                                             NULL /* filter */,
+                                             NULL /* opts */,
+                                             NULL /* read_prefs */,
+                                             NULL /* read_concern */
+                                             );
       _mongoc_cursor_array_init (cursor, NULL, NULL);
       _mongoc_cursor_array_set_bson (cursor, &empty_arr);
       bson_destroy (&empty_arr);

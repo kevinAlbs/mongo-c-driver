@@ -191,9 +191,9 @@ _first_dollar_field (const bson_t *bson)
 }
 
 
-#define MARK_FAILED(c)          \
-   do {                         \
-      (c)->state = DONE;         \
+#define MARK_FAILED(c)   \
+   do {                  \
+      (c)->state = DONE; \
    } while (0)
 
 
@@ -336,140 +336,88 @@ finish:
    RETURN (cursor);
 }
 
-
-mongoc_cursor_t *
-_mongoc_cursor_new (mongoc_client_t *client,
-                    const char *db_and_collection,
-                    mongoc_query_flags_t qflags,
-                    uint32_t skip,
-                    int32_t limit,
-                    uint32_t batch_size,
-                    bool is_find,
-                    const bson_t *query,
-                    const bson_t *fields,
-                    const mongoc_read_prefs_t *read_prefs,
-                    const mongoc_read_concern_t *read_concern)
+static bool
+_translate_query_opt (const char *query_field, const char **cmd_field, int *len)
 {
-   bson_t filter;
-   bool has_filter = false;
-   bson_t opts = BSON_INITIALIZER;
-   bool slave_ok = false;
-   const char *key;
-   bson_iter_t iter;
-   const char *opt_key;
-   int len;
-   uint32_t data_len;
-   const uint8_t *data;
-   mongoc_cursor_t *cursor;
-   bson_error_t error = {0};
+   if (query_field[0] != '$') {
+      *cmd_field = query_field;
+      *len = -1;
+      return true;
+   }
 
+   /* strip the leading '$' */
+   query_field++;
+
+   if (!strcmp (MONGOC_CURSOR_ORDERBY, query_field)) {
+      *cmd_field = MONGOC_CURSOR_SORT;
+      *len = MONGOC_CURSOR_SORT_LEN;
+   } else if (!strcmp (MONGOC_CURSOR_SHOW_DISK_LOC,
+                       query_field)) { /* <= MongoDb 3.0 */
+      *cmd_field = MONGOC_CURSOR_SHOW_RECORD_ID;
+      *len = MONGOC_CURSOR_SHOW_RECORD_ID_LEN;
+   } else if (!strcmp (MONGOC_CURSOR_HINT, query_field)) {
+      *cmd_field = MONGOC_CURSOR_HINT;
+      *len = MONGOC_CURSOR_HINT_LEN;
+   } else if (!strcmp (MONGOC_CURSOR_COMMENT, query_field)) {
+      *cmd_field = MONGOC_CURSOR_COMMENT;
+      *len = MONGOC_CURSOR_COMMENT_LEN;
+   } else if (!strcmp (MONGOC_CURSOR_MAX_SCAN, query_field)) {
+      *cmd_field = MONGOC_CURSOR_MAX_SCAN;
+      *len = MONGOC_CURSOR_MAX_SCAN_LEN;
+   } else if (!strcmp (MONGOC_CURSOR_MAX_TIME_MS, query_field)) {
+      *cmd_field = MONGOC_CURSOR_MAX_TIME_MS;
+      *len = MONGOC_CURSOR_MAX_TIME_MS_LEN;
+   } else if (!strcmp (MONGOC_CURSOR_MAX, query_field)) {
+      *cmd_field = MONGOC_CURSOR_MAX;
+      *len = MONGOC_CURSOR_MAX_LEN;
+   } else if (!strcmp (MONGOC_CURSOR_MIN, query_field)) {
+      *cmd_field = MONGOC_CURSOR_MIN;
+      *len = MONGOC_CURSOR_MIN_LEN;
+   } else if (!strcmp (MONGOC_CURSOR_RETURN_KEY, query_field)) {
+      *cmd_field = MONGOC_CURSOR_RETURN_KEY;
+      *len = MONGOC_CURSOR_RETURN_KEY_LEN;
+   } else if (!strcmp (MONGOC_CURSOR_SNAPSHOT, query_field)) {
+      *cmd_field = MONGOC_CURSOR_SNAPSHOT;
+      *len = MONGOC_CURSOR_SNAPSHOT_LEN;
+   } else {
+      /* not a special command field, must be a query operator like $or */
+      return false;
+   }
+
+   return true;
+}
+
+
+/* set up a new opt bson from older ways of specifying options.
+ * slave_ok may be NULL.
+ * error may be NULL.
+ */
+void
+_mongoc_cursor_flags_to_opts (mongoc_query_flags_t qflags,
+                              bson_t *opts, /* IN/OUT */
+                              bool *slave_ok /* OUT */)
+{
    ENTRY;
+   BSON_ASSERT (opts);
 
-   BSON_ASSERT (client);
-
-   if (query) {
-      if (bson_has_field (query, "$query")) {
-         /* like "{$query: {a: 1}, $orderby: {b: 1}, $otherModifier: true}" */
-         if (!bson_iter_init (&iter, query)) {
-            bson_set_error (&error,
-                            MONGOC_ERROR_BSON,
-                            MONGOC_ERROR_BSON_INVALID,
-                            "Invalid BSON in query document");
-            GOTO (done);
-         }
-         while (bson_iter_next (&iter)) {
-            key = bson_iter_key (&iter);
-
-            if (key[0] != '$') {
-               bson_set_error (&error,
-                               MONGOC_ERROR_CURSOR,
-                               MONGOC_ERROR_CURSOR_INVALID_CURSOR,
-                               "Cannot mix $query with non-dollar field '%s'",
-                               key);
-               GOTO (done);
-            }
-
-            if (!strcmp (key, "$query")) {
-               /* set "filter" to the incoming document's "$query" */
-               bson_iter_document (&iter, &data_len, &data);
-               if (!bson_init_static (&filter, data, (size_t) data_len)) {
-                  bson_set_error (&error,
-                                  MONGOC_ERROR_BSON,
-                                  MONGOC_ERROR_BSON_INVALID,
-                                  "Invalid BSON in $query subdocument");
-                  GOTO (done);
-               }
-               has_filter = true;
-            } else if (_translate_query_opt (key, &opt_key, &len)) {
-               /* "$orderby" becomes "sort", etc., "$unknown" -> "unknown" */
-               if (!bson_append_iter (&opts, opt_key, len, &iter)) {
-                  bson_set_error (&error,
-                                  MONGOC_ERROR_BSON,
-                                  MONGOC_ERROR_BSON_INVALID,
-                                  "Error adding \"%s\" to query",
-                                  opt_key);
-               }
-            } else {
-               /* strip leading "$" */
-               if (!bson_append_iter (&opts, key + 1, -1, &iter)) {
-                  bson_set_error (&error,
-                                  MONGOC_ERROR_BSON,
-                                  MONGOC_ERROR_BSON_INVALID,
-                                  "Error adding \"%s\" to query",
-                                  key);
-               }
-            }
-         }
-      }
-   }
-
-   if (!bson_empty0 (fields)) {
-      bson_append_document (
-         &opts, MONGOC_CURSOR_PROJECTION, MONGOC_CURSOR_PROJECTION_LEN, fields);
-   }
-
-   if (skip) {
-      bson_append_int64 (
-         &opts, MONGOC_CURSOR_SKIP, MONGOC_CURSOR_SKIP_LEN, skip);
-   }
-
-   if (limit) {
-      bson_append_int64 (
-         &opts, MONGOC_CURSOR_LIMIT, MONGOC_CURSOR_LIMIT_LEN, llabs (limit));
-
-      if (limit < 0) {
-         bson_append_bool (&opts,
-                           MONGOC_CURSOR_SINGLE_BATCH,
-                           MONGOC_CURSOR_SINGLE_BATCH_LEN,
-                           true);
-      }
-   }
-
-   if (batch_size) {
-      bson_append_int64 (&opts,
-                         MONGOC_CURSOR_BATCH_SIZE,
-                         MONGOC_CURSOR_BATCH_SIZE_LEN,
-                         batch_size);
-   }
-
-   if (qflags & MONGOC_QUERY_SLAVE_OK) {
-      slave_ok = true;
+   if (slave_ok) {
+      *slave_ok = !!(qflags & MONGOC_QUERY_SLAVE_OK);
    }
 
    if (qflags & MONGOC_QUERY_TAILABLE_CURSOR) {
       bson_append_bool (
-         &opts, MONGOC_CURSOR_TAILABLE, MONGOC_CURSOR_TAILABLE_LEN, true);
+         opts, MONGOC_CURSOR_TAILABLE, MONGOC_CURSOR_TAILABLE_LEN, true);
    }
 
    if (qflags & MONGOC_QUERY_OPLOG_REPLAY) {
-      bson_append_bool (&opts,
+      bson_append_bool (opts,
                         MONGOC_CURSOR_OPLOG_REPLAY,
                         MONGOC_CURSOR_OPLOG_REPLAY_LEN,
                         true);
    }
 
    if (qflags & MONGOC_QUERY_NO_CURSOR_TIMEOUT) {
-      bson_append_bool (&opts,
+      bson_append_bool (opts,
                         MONGOC_CURSOR_NO_CURSOR_TIMEOUT,
                         MONGOC_CURSOR_NO_CURSOR_TIMEOUT_LEN,
                         true);
@@ -477,52 +425,110 @@ _mongoc_cursor_new (mongoc_client_t *client,
 
    if (qflags & MONGOC_QUERY_AWAIT_DATA) {
       bson_append_bool (
-         &opts, MONGOC_CURSOR_AWAIT_DATA, MONGOC_CURSOR_AWAIT_DATA_LEN, true);
+         opts, MONGOC_CURSOR_AWAIT_DATA, MONGOC_CURSOR_AWAIT_DATA_LEN, true);
    }
 
    if (qflags & MONGOC_QUERY_EXHAUST) {
       bson_append_bool (
-         &opts, MONGOC_CURSOR_EXHAUST, MONGOC_CURSOR_EXHAUST_LEN, true);
+         opts, MONGOC_CURSOR_EXHAUST, MONGOC_CURSOR_EXHAUST_LEN, true);
    }
 
    if (qflags & MONGOC_QUERY_PARTIAL) {
-      bson_append_bool (&opts,
+      bson_append_bool (opts,
                         MONGOC_CURSOR_ALLOW_PARTIAL_RESULTS,
                         MONGOC_CURSOR_ALLOW_PARTIAL_RESULTS_LEN,
                         true);
    }
-
-done:
-
-   if (error.domain != 0) {
-      cursor = _mongoc_cursor_new_with_opts (
-         client, db_and_collection, is_find, NULL, NULL, NULL, NULL);
-
-      MARK_FAILED (cursor);
-      memcpy (&cursor->error, &error, sizeof (bson_error_t));
-   } else {
-      cursor = _mongoc_cursor_new_with_opts (client,
-                                             db_and_collection,
-                                             is_find,
-                                             has_filter ? &filter : query,
-                                             &opts,
-                                             read_prefs,
-                                             read_concern);
-
-      if (slave_ok) {
-         cursor->slave_ok = true;
-      }
-   }
-
-   if (has_filter) {
-      bson_destroy (&filter);
-   }
-
-   bson_destroy (&opts);
-
-   RETURN (cursor);
 }
 
+/* Checks if the passed query was wrapped in a $query, and if so, parses the
+ * query modifiers:
+ * https://docs.mongodb.com/manual/reference/operator/query-modifier/
+ * and translates them to find command options:
+ * https://docs.mongodb.com/manual/reference/command/find/
+ * opts must be initialized, and may already have options set.
+ * unwrapped must be uninitialized, and will be initialized at return.
+ * Returns true if query was unwrapped. */
+bool
+_mongoc_cursor_translate_dollar_query_opts (const bson_t *query,
+                                            bson_t *opts,
+                                            bson_t *unwrapped,
+                                            bson_error_t *error)
+{
+   bool has_filter = false;
+   const char *key;
+   bson_iter_t iter;
+   const char *opt_key;
+   int len;
+   uint32_t data_len;
+   const uint8_t *data;
+   bson_error_t error_local = {0};
+
+   ENTRY;
+   BSON_ASSERT (query);
+   BSON_ASSERT (opts);
+   /* If the query is explicitly specified wrapped in $query, unwrap it and
+    * translate the options to new options. */
+   if (bson_has_field (query, "$query")) {
+      /* like "{$query: {a: 1}, $orderby: {b: 1}, $otherModifier: true}" */
+      if (!bson_iter_init (&iter, query)) {
+         bson_set_error (&error_local,
+                         MONGOC_ERROR_BSON,
+                         MONGOC_ERROR_BSON_INVALID,
+                         "Invalid BSON in query document");
+         GOTO (done);
+      }
+      while (bson_iter_next (&iter)) {
+         key = bson_iter_key (&iter);
+         if (key[0] != '$') {
+            bson_set_error (&error_local,
+                            MONGOC_ERROR_CURSOR,
+                            MONGOC_ERROR_CURSOR_INVALID_CURSOR,
+                            "Cannot mix $query with non-dollar field '%s'",
+                            key);
+            GOTO (done);
+         }
+         if (!strcmp (key, "$query")) {
+            /* set "filter" to the incoming document's "$query" */
+            bson_iter_document (&iter, &data_len, &data);
+            if (!bson_init_static (unwrapped, data, (size_t) data_len)) {
+               bson_set_error (&error_local,
+                               MONGOC_ERROR_BSON,
+                               MONGOC_ERROR_BSON_INVALID,
+                               "Invalid BSON in $query subdocument");
+               GOTO (done);
+            }
+            has_filter = true;
+         } else if (_translate_query_opt (key, &opt_key, &len)) {
+            /* "$orderby" becomes "sort", etc., "$unknown" -> "unknown" */
+            if (!bson_append_iter (opts, opt_key, len, &iter)) {
+               bson_set_error (&error_local,
+                               MONGOC_ERROR_BSON,
+                               MONGOC_ERROR_BSON_INVALID,
+                               "Error adding \"%s\" to query",
+                               opt_key);
+            }
+         } else {
+            /* strip leading "$" */
+            if (!bson_append_iter (opts, key + 1, -1, &iter)) {
+               bson_set_error (&error_local,
+                               MONGOC_ERROR_BSON,
+                               MONGOC_ERROR_BSON_INVALID,
+                               "Error adding \"%s\" to query",
+                               key);
+            }
+         }
+      }
+   }
+done:
+   if (error) {
+      memcpy (error, &error_local, sizeof (bson_error_t));
+   }
+   if (!has_filter) {
+      bson_init (unwrapped);
+   }
+   RETURN (has_filter);
+}
 
 void
 mongoc_cursor_destroy (mongoc_cursor_t *cursor)
@@ -1065,58 +1071,6 @@ done:
    mongoc_read_prefs_destroy (prefs);
 
    return ret;
-}
-
-
-static bool
-_translate_query_opt (const char *query_field, const char **cmd_field, int *len)
-{
-   if (query_field[0] != '$') {
-      *cmd_field = query_field;
-      *len = -1;
-      return true;
-   }
-
-   /* strip the leading '$' */
-   query_field++;
-
-   if (!strcmp (MONGOC_CURSOR_ORDERBY, query_field)) {
-      *cmd_field = MONGOC_CURSOR_SORT;
-      *len = MONGOC_CURSOR_SORT_LEN;
-   } else if (!strcmp (MONGOC_CURSOR_SHOW_DISK_LOC,
-                       query_field)) { /* <= MongoDb 3.0 */
-      *cmd_field = MONGOC_CURSOR_SHOW_RECORD_ID;
-      *len = MONGOC_CURSOR_SHOW_RECORD_ID_LEN;
-   } else if (!strcmp (MONGOC_CURSOR_HINT, query_field)) {
-      *cmd_field = MONGOC_CURSOR_HINT;
-      *len = MONGOC_CURSOR_HINT_LEN;
-   } else if (!strcmp (MONGOC_CURSOR_COMMENT, query_field)) {
-      *cmd_field = MONGOC_CURSOR_COMMENT;
-      *len = MONGOC_CURSOR_COMMENT_LEN;
-   } else if (!strcmp (MONGOC_CURSOR_MAX_SCAN, query_field)) {
-      *cmd_field = MONGOC_CURSOR_MAX_SCAN;
-      *len = MONGOC_CURSOR_MAX_SCAN_LEN;
-   } else if (!strcmp (MONGOC_CURSOR_MAX_TIME_MS, query_field)) {
-      *cmd_field = MONGOC_CURSOR_MAX_TIME_MS;
-      *len = MONGOC_CURSOR_MAX_TIME_MS_LEN;
-   } else if (!strcmp (MONGOC_CURSOR_MAX, query_field)) {
-      *cmd_field = MONGOC_CURSOR_MAX;
-      *len = MONGOC_CURSOR_MAX_LEN;
-   } else if (!strcmp (MONGOC_CURSOR_MIN, query_field)) {
-      *cmd_field = MONGOC_CURSOR_MIN;
-      *len = MONGOC_CURSOR_MIN_LEN;
-   } else if (!strcmp (MONGOC_CURSOR_RETURN_KEY, query_field)) {
-      *cmd_field = MONGOC_CURSOR_RETURN_KEY;
-      *len = MONGOC_CURSOR_RETURN_KEY_LEN;
-   } else if (!strcmp (MONGOC_CURSOR_SNAPSHOT, query_field)) {
-      *cmd_field = MONGOC_CURSOR_SNAPSHOT;
-      *len = MONGOC_CURSOR_SNAPSHOT_LEN;
-   } else {
-      /* not a special command field, must be a query operator like $or */
-      return false;
-   }
-
-   return true;
 }
 
 
