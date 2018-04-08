@@ -543,6 +543,7 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
                                           &opts,
                                           read_prefs,
                                           collection->read_concern);
+   _mongoc_cursor_init_find_ctx (cursor);
    if (skip) {
       _mongoc_cursor_set_opt_int64 (cursor, MONGOC_CURSOR_SKIP, skip);
    }
@@ -610,7 +611,7 @@ mongoc_collection_find_with_opts (mongoc_collection_t *collection,
       read_prefs = collection->read_prefs;
    }
 
-   return _mongoc_cursor_new_with_opts (
+   mongoc_cursor_t *cursor = _mongoc_cursor_new_with_opts (
       collection->client,
       collection->ns,
       true /* is_find */,
@@ -618,6 +619,8 @@ mongoc_collection_find_with_opts (mongoc_collection_t *collection,
       opts,
       COALESCE (read_prefs, collection->read_prefs),
       collection->read_concern);
+   _mongoc_cursor_init_find_ctx (cursor);
+   return cursor;
 }
 
 
@@ -1404,7 +1407,7 @@ mongoc_collection_find_indexes_with_opts (mongoc_collection_t *collection,
       mongoc_cursor_destroy (cursor);
       cursor = _mongoc_cursor_new_with_opts (collection->client,
                                              collection->ns,
-                                             true /* is_find */,
+                                             false /* is_find */,
                                              NULL /* filter */,
                                              NULL /* opts */,
                                              NULL /* read_prefs */,

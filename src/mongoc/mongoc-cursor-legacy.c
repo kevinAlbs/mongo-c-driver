@@ -98,11 +98,7 @@ _mongoc_cursor_monitor_legacy_query (mongoc_cursor_t *cursor,
    bson_strncpy (db, cursor->ns, cursor->dblen + 1);
 
    /* simulate a MongoDB 3.2+ "find" command */
-   if (!_mongoc_cursor_prepare_find_command (cursor, &doc)) {
-      /* cursor->error is set */
-      bson_destroy (&doc);
-      RETURN (false);
-   }
+   _mongoc_cursor_prepare_find_command (cursor, &doc);
 
    bson_copy_to_excluding_noinit (
       &cursor->opts, &doc, "serverId", "maxAwaitTimeMS", "sessionId", NULL);
@@ -172,7 +168,8 @@ _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
     */
    if (cursor->state == UNPRIMED) {
       b = _mongoc_cursor_initial_query (cursor);
-   } else if (BSON_UNLIKELY (cursor->state == END_OF_BATCH) && cursor->cursor_id) {
+   } else if (BSON_UNLIKELY (cursor->state == END_OF_BATCH) &&
+              cursor->cursor_id) {
       b = _mongoc_cursor_get_more (cursor);
    }
 
@@ -203,11 +200,18 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
    uint32_t request_id;
    mongoc_cluster_t *cluster;
    mongoc_query_flags_t flags;
+   bool owns_stream = false;
+   bool ret = true;
 
    ENTRY;
 
    started = bson_get_monotonic_time ();
    cluster = &cursor->client->cluster;
+
+   if (!server_stream) {
+      server_stream = _mongoc_cursor_fetch_stream (cursor);
+      owns_stream = true;
+   }
 
    if (!_mongoc_cursor_flags (cursor, server_stream, &flags)) {
       GOTO (fail);
@@ -233,12 +237,12 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
       }
 
       if (!_mongoc_cursor_monitor_legacy_get_more (cursor, server_stream)) {
-         GOTO (fail);
+         GOTO (done);
       }
 
       if (!mongoc_cluster_legacy_rpc_sendv_to_server (
              cluster, &rpc, server_stream, &cursor->error)) {
-         GOTO (fail);
+         GOTO (done);
       }
    }
 
@@ -252,7 +256,7 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                              &cursor->legacy_response.buffer,
                              server_stream,
                              &cursor->error)) {
-      GOTO (fail);
+      GOTO (done);
    }
 
    if (cursor->legacy_response.rpc.header.opcode != MONGOC_OPCODE_REPLY) {
@@ -262,7 +266,7 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                       "Invalid opcode. Expected %d, got %d.",
                       MONGOC_OPCODE_REPLY,
                       cursor->legacy_response.rpc.header.opcode);
-      GOTO (fail);
+      GOTO (done);
    }
 
    if (cursor->legacy_response.rpc.header.response_to != request_id) {
@@ -272,14 +276,14 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                       "Invalid response_to for getmore. Expected %d, got %d.",
                       request_id,
                       cursor->legacy_response.rpc.header.response_to);
-      GOTO (fail);
+      GOTO (done);
    }
 
    if (!_mongoc_rpc_check_ok (&cursor->legacy_response.rpc,
                               cursor->client->error_api_version,
                               &cursor->error,
                               &cursor->error_doc)) {
-      GOTO (fail);
+      GOTO (done);
    }
 
    if (cursor->legacy_response.reader) {
@@ -298,12 +302,17 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                                      server_stream,
                                      "getMore");
 
-   RETURN (true);
+   GOTO (done);
 
 fail:
    _mongoc_cursor_monitor_failed (
       cursor, bson_get_monotonic_time () - started, server_stream, "getMore");
-   RETURN (false);
+   ret = false;
+done:
+   if (owns_stream) {
+      mongoc_server_stream_cleanup (server_stream);
+   }
+   RETURN (ret);
 }
 
 #define OPT_CHECK(_type)                                         \
@@ -541,8 +550,14 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
    mongoc_assemble_query_result_t result = ASSEMBLE_QUERY_RESULT_INIT;
    const bson_t *ret = NULL;
    bool succeeded = false;
+   bool owns_stream = false;
 
    ENTRY;
+
+   if (!server_stream) {
+      server_stream = _mongoc_cursor_fetch_stream (cursor);
+      owns_stream = true;
+   }
 
    /* cursors created by mongoc_client_command don't use this function */
    BSON_ASSERT (cursor->is_find);
@@ -653,18 +668,33 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
    cursor->state = IN_BATCH;
    succeeded = true;
 
-   _mongoc_read_from_buffer (cursor, &ret);
+   /* TODO: I'm using owns_stream to distinguish whether or not the caller is
+    * the new cursor.
+    * The real change here should be *not* to return the reply immediately (I
+    * think) */
+   if (!owns_stream) {
+      _mongoc_read_from_buffer (cursor, &ret);
+   }
 
 done:
    if (!succeeded) {
       _mongoc_cursor_monitor_failed (
          cursor, bson_get_monotonic_time () - started, server_stream, "find");
+      /* TODO: maybe set cursor->state to DONE here? */
+   }
+
+   if (owns_stream) {
+      mongoc_server_stream_cleanup (server_stream);
    }
 
    assemble_query_result_cleanup (&result);
    bson_destroy (&query);
    bson_destroy (&fields);
 
+   /* TODO: ditto above */
+   if (owns_stream) {
+      return NULL;
+   }
    if (!ret) {
       cursor->state = DONE;
    }

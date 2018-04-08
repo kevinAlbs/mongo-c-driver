@@ -220,6 +220,7 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
    cursor = (mongoc_cursor_t *) bson_malloc0 (sizeof *cursor);
    cursor->client = client;
    cursor->is_find = is_find ? 1 : 0;
+   cursor->state = UNPRIMED;
 
    bson_init (&cursor->filter);
    bson_init (&cursor->opts);
@@ -541,6 +542,10 @@ mongoc_cursor_destroy (mongoc_cursor_t *cursor)
       cursor->iface.destroy (cursor);
    } else {
       _mongoc_cursor_destroy (cursor);
+   }
+
+   if (cursor->ctx.destroy) {
+      cursor->ctx.destroy(&cursor->ctx);
    }
 
    EXIT;
@@ -1088,7 +1093,7 @@ _mongoc_cursor_collection (const mongoc_cursor_t *cursor,
 }
 
 
-bool
+void
 _mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor, bson_t *command)
 {
    const char *collection;
@@ -1102,8 +1107,6 @@ _mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor, bson_t *command)
                      collection_len);
    bson_append_document (
       command, MONGOC_CURSOR_FILTER, MONGOC_CURSOR_FILTER_LEN, &cursor->filter);
-
-   return true;
 }
 
 
@@ -1119,9 +1122,7 @@ _mongoc_cursor_find_command (mongoc_cursor_t *cursor,
    /* cursors created by mongoc_client_command don't use this function */
    BSON_ASSERT (cursor->is_find);
 
-   if (!_mongoc_cursor_prepare_find_command (cursor, &command)) {
-      RETURN (NULL);
-   }
+   _mongoc_cursor_prepare_find_command (cursor, &command);
 
    _mongoc_cursor_cursorid_init (cursor, &command);
    bson_destroy (&command);
@@ -1276,12 +1277,46 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
       RETURN (false);
    }
 
-   if (cursor->iface.next) {
+   if (cursor->ctx.prime) {
+      printf ("override. \n");
+      if (cursor->state == UNPRIMED) {
+         cursor->ctx.prime (cursor);
+         if (cursor->state == DONE) {
+            ret = false;
+            goto done;
+         }
+      }
+
+      if (cursor->state == IN_BATCH) {
+         cursor->ctx.pop_from_batch (cursor, bson);
+         if (*bson) {
+            ret = true;
+            goto done;
+         }
+
+         if (cursor->state == END_OF_BATCH) {
+            cursor->ctx.get_next_batch (cursor);
+         }
+
+         if (cursor->state == DONE) {
+            ret = false;
+            goto done;
+         }
+
+         cursor->ctx.pop_from_batch (cursor, bson);
+         if (*bson) {
+            ret = true;
+            goto done;
+         }
+      }
+      return false;
+   } else if (cursor->iface.next) {
       ret = cursor->iface.next (cursor, bson);
    } else {
       ret = _mongoc_cursor_next (cursor, bson);
    }
 
+done:
    cursor->current = *bson;
 
    cursor->count++;
@@ -1375,6 +1410,10 @@ mongoc_cursor_clone (const mongoc_cursor_t *cursor)
       ret = cursor->iface.clone (cursor);
    } else {
       ret = _mongoc_cursor_clone (cursor);
+   }
+
+   if (cursor->ctx.clone) {
+      cursor->ctx.clone(&cursor->ctx, &ret->ctx);
    }
 
    RETURN (ret);
@@ -1645,4 +1684,97 @@ mongoc_cursor_new_from_command_reply (mongoc_client_t *client,
    bson_destroy (&opts);
 
    return cursor;
+}
+
+static bool
+_batch_reader_start (mongoc_cursor_t *cursor,
+                     mongoc_cursor_batch_reader_t *reader)
+{
+   bson_iter_t iter;
+   bson_iter_t child;
+   const char *ns;
+   uint32_t nslen;
+   bool in_batch = false;
+
+   if (bson_iter_init_find (&iter, &reader->reply, "cursor") &&
+       BSON_ITER_HOLDS_DOCUMENT (&iter) && bson_iter_recurse (&iter, &child)) {
+      while (bson_iter_next (&child)) {
+         if (BSON_ITER_IS_KEY (&child, "id")) {
+            cursor->cursor_id = bson_iter_as_int64 (&child);
+         } else if (BSON_ITER_IS_KEY (&child, "ns")) {
+            ns = bson_iter_utf8 (&child, &nslen);
+            _mongoc_set_cursor_ns (cursor, ns, nslen);
+         } else if (BSON_ITER_IS_KEY (&child, "firstBatch") ||
+                    BSON_ITER_IS_KEY (&child, "nextBatch")) {
+            if (BSON_ITER_HOLDS_ARRAY (&child) &&
+                bson_iter_recurse (&child, &reader->batch_iter)) {
+               in_batch = true;
+            }
+         }
+      }
+   }
+
+   /* Driver Sessions Spec: "When an implicit session is associated with a
+    * cursor for use with getMore operations, the session MUST be returned to
+    * the pool immediately following a getMore operation that indicates that the
+    * cursor has been exhausted." */
+   if (cursor->cursor_id == 0 && cursor->client_session &&
+       !cursor->explicit_session) {
+      mongoc_client_session_destroy (cursor->client_session);
+      cursor->client_session = NULL;
+   }
+
+   return in_batch;
+}
+
+void
+_mongoc_cursor_batch_reader_read (mongoc_cursor_t *cursor,
+                                  mongoc_cursor_batch_reader_t *reader,
+                                  const bson_t **bson)
+{
+   const uint8_t *data = NULL;
+   uint32_t data_len = 0;
+
+   ENTRY;
+
+   if (bson_iter_next (&reader->batch_iter) &&
+       BSON_ITER_HOLDS_DOCUMENT (&reader->batch_iter)) {
+      bson_iter_document (&reader->batch_iter, &data_len, &data);
+
+      /* bson_iter_next guarantees valid BSON, so this must succeed */
+      BSON_ASSERT (bson_init_static (&reader->current_doc, data, data_len));
+      *bson = &reader->current_doc;
+
+      cursor->state = IN_BATCH;
+   } else {
+      cursor->state = cursor->cursor_id ? END_OF_BATCH : DONE;
+   }
+}
+
+
+void
+_mongoc_cursor_batch_reader_refresh (mongoc_cursor_t *cursor,
+                                     const bson_t *command,
+                                     const bson_t *opts,
+                                     mongoc_cursor_batch_reader_t *reader)
+{
+   ENTRY;
+
+   bson_destroy (&reader->reply);
+
+   /* server replies to find / aggregate with {cursor: {id: N, firstBatch: []}},
+    * to getMore command with {cursor: {id: N, nextBatch: []}}. */
+   if (_mongoc_cursor_run_command (cursor, command, opts, &reader->reply) &&
+       _batch_reader_start (cursor, reader)) {
+      cursor->state = IN_BATCH;
+   } else {
+      if (!cursor->error.domain) {
+         bson_set_error (&cursor->error,
+                         MONGOC_ERROR_PROTOCOL,
+                         MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
+                         "Invalid reply to %s command.",
+                         _mongoc_get_command_name (command));
+         cursor->state = DONE;
+      }
+   }
 }

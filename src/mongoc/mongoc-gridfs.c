@@ -417,6 +417,7 @@ mongoc_gridfs_remove_by_filename (mongoc_gridfs_t *gridfs,
                                           NULL /* read_concern */);
 
    BSON_ASSERT (cursor);
+   _mongoc_cursor_init_find_ctx (cursor);
 
    while (mongoc_cursor_next (cursor, &doc)) {
       if (bson_iter_init_find (&iter, doc, "_id")) {

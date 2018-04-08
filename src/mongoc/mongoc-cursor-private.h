@@ -32,6 +32,16 @@
 BSON_BEGIN_DECLS
 
 typedef struct _mongoc_cursor_interface_t mongoc_cursor_interface_t;
+typedef struct _mongoc_cursor_context_t mongoc_cursor_context_t;
+typedef struct _mongoc_cursor_context_t {
+   void (*clone) (mongoc_cursor_context_t *src, mongoc_cursor_context_t *dst);
+   void (*destroy) (mongoc_cursor_context_t *ctx);
+   void (*prime) (mongoc_cursor_t *cursor);
+   void (*pop_from_batch) (mongoc_cursor_t *cursor, const bson_t **out);
+   void (*get_next_batch) (mongoc_cursor_t *cursor);
+   void (*get_host) (mongoc_cursor_t *cursor, mongoc_host_list_t *host);
+   void *data;
+} mongoc_cursor_context_t;
 
 struct _mongoc_cursor_interface_t {
    mongoc_cursor_t *(*clone) (const mongoc_cursor_t *cursor);
@@ -149,6 +159,8 @@ struct _mongoc_cursor_t {
 
    mongoc_cursor_legacy_response legacy_response;
 
+   mongoc_cursor_context_t ctx;
+
    mongoc_cursor_interface_t iface;
    void *iface_data;
 
@@ -180,6 +192,8 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const bson_t *opts,
                               const mongoc_read_prefs_t *read_prefs,
                               const mongoc_read_concern_t *read_concern);
+void
+_mongoc_cursor_init_find_ctx (mongoc_cursor_t *cursor);
 mongoc_cursor_t *
 _mongoc_cursor_clone (const mongoc_cursor_t *cursor);
 void
@@ -227,7 +241,7 @@ _mongoc_cursor_monitor_command (mongoc_cursor_t *cursor,
                                 mongoc_server_stream_t *server_stream,
                                 const bson_t *cmd,
                                 const char *cmd_name);
-bool
+void
 _mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor, bson_t *command);
 const bson_t *
 _mongoc_cursor_initial_query (mongoc_cursor_t *cursor);
@@ -243,6 +257,25 @@ _mongoc_cursor_monitor_succeeded (mongoc_cursor_t *cursor,
                                   bool first_batch,
                                   mongoc_server_stream_t *stream,
                                   const char *cmd_name);
+/* utilities to read a batch document response from commands like "aggregate"
+ * or "listCollections" */
+typedef struct _mongoc_cursor_batch_reader_t {
+   bson_t reply;           /* the entire command reply */
+   bson_iter_t batch_iter; /* iterates over the batch array */
+   bson_t current_doc;     /* the current doc inside the batch array */
+} mongoc_cursor_batch_reader_t;
+/* start iterating a reply like
+ * {cursor: {id: 1234, ns: "db.collection", firstBatch: [...]}} or
+ * {cursor: {id: 1234, ns: "db.collection", nextBatch: [...]}} */
+void
+_mongoc_cursor_batch_reader_refresh (mongoc_cursor_t *cursor,
+                                     const bson_t *command,
+                                     const bson_t *opts,
+                                     mongoc_cursor_batch_reader_t *reader);
+void
+_mongoc_cursor_batch_reader_read (mongoc_cursor_t *cursor,
+                                  mongoc_cursor_batch_reader_t *reader,
+                                  const bson_t **bson);
 /* legacy functions. */
 bool
 _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson);
