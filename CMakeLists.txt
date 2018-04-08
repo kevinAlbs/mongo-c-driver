@@ -528,6 +528,9 @@ set (SOURCES ${SOURCES}
    ${SOURCE_DIR}/src/mongoc/mongoc-counters.c
    ${SOURCE_DIR}/src/mongoc/mongoc-cursor-array.c
    ${SOURCE_DIR}/src/mongoc/mongoc-cursor.c
+   ${SOURCE_DIR}/src/mongoc/mongoc-cursor-find.c
+   ${SOURCE_DIR}/src/mongoc/mongoc-cursor-find-cmd.c
+   ${SOURCE_DIR}/src/mongoc/mongoc-cursor-find-opquery.c
    ${SOURCE_DIR}/src/mongoc/mongoc-cursor-legacy.c
    ${SOURCE_DIR}/src/mongoc/mongoc-cursor-array.c
    ${SOURCE_DIR}/src/mongoc/mongoc-cursor-cursorid.c
