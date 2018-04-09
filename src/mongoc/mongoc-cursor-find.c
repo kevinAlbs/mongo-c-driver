@@ -78,29 +78,12 @@ _prime (mongoc_cursor_t *cursor)
    cursor->ctx.prime (cursor);
 }
 
-static void
-_pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
-{
-   fprintf (stderr, "_pop_from_batch called on find cursor.\n");
-   BSON_ASSERT (false);
-}
 
-
-static void
-_get_next_batch (mongoc_cursor_t *cursor)
-{
-   fprintf (stderr, "_get_next_batch called on find cursor.\n");
-   BSON_ASSERT (false);
-}
-
-
-void
-_mongoc_cursor_ctx_find_init (mongoc_cursor_t *cursor)
-{
+mongoc_cursor_t *
+_mongoc_cursor_find_new (mongoc_client_t *client, const char* db_and_coll, const bson_t *filter, const bson_t *opts, const mongoc_read_prefs_t *read_prefs, const mongoc_read_concern_t *read_concern) {
+   mongoc_cursor_t *cursor;
+   cursor = _mongoc_cursor_new_with_opts (client, db_and_coll, filter, opts, read_prefs, read_concern);
    cursor->ctx.prime = _prime;
-   cursor->ctx.pop_from_batch = _pop_from_batch;
-   cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.init = _mongoc_cursor_ctx_find_init;
    cursor->ctx.destroy = _destroy;
    cursor->ctx.get_host = _get_host;
 }
