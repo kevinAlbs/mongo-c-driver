@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 MongoDB, Inc.
+ * Copyright 2018-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,233 +13,86 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
-#include "mongoc-cursor.h"
-#include "mongoc-cursor-array-private.h"
+#include "mongoc.h"
 #include "mongoc-cursor-private.h"
 #include "mongoc-client-private.h"
-#include "mongoc-counters-private.h"
-#include "mongoc-error.h"
-#include "mongoc-log.h"
-#include "mongoc-opcode.h"
-#include "mongoc-trace-private.h"
 
-
-#undef MONGOC_LOG_DOMAIN
-#define MONGOC_LOG_DOMAIN "cursor-array"
-
-
-typedef struct {
+typedef struct _data_array_t {
    bson_t array;
-   bool has_array;
-   bool has_synthetic_bson;
    bson_iter_t iter;
    bson_t bson; /* current document */
    const char *field_name;
-} mongoc_cursor_array_t;
+} data_array_t;
 
-
-static void *
-_mongoc_cursor_array_new (const char *field_name)
+static void
+_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
 {
-   mongoc_cursor_array_t *arr;
-
-   ENTRY;
-
-   arr = (mongoc_cursor_array_t *) bson_malloc0 (sizeof *arr);
-   arr->has_array = false;
-   arr->has_synthetic_bson = false;
-   arr->field_name = field_name;
-
-   RETURN (arr);
+   _mongoc_cursor_get_host (cursor, host);
 }
 
 
 static void
-_mongoc_cursor_array_destroy (mongoc_cursor_t *cursor)
+_destroy (mongoc_cursor_context_t *ctx)
 {
-   mongoc_cursor_array_t *arr;
-
-   ENTRY;
-
-   arr = (mongoc_cursor_array_t *) cursor->iface_data;
-
-   if (arr->has_array) {
-      bson_destroy (&arr->array);
-   }
-
-   if (arr->has_synthetic_bson) {
-      bson_destroy (&arr->bson);
-   }
-
-   bson_free (cursor->iface_data);
-   _mongoc_cursor_destroy (cursor);
-
-   EXIT;
+   data_array_t *data = (data_array_t *) ctx->data;
+   bson_destroy (&data->array);
+   bson_free (data);
 }
 
 
-bool
-_mongoc_cursor_array_prime (mongoc_cursor_t *cursor)
+static void
+_prime (mongoc_cursor_t *cursor)
 {
-   mongoc_cursor_array_t *arr;
    bson_iter_t iter;
-
-   ENTRY;
-
-   arr = (mongoc_cursor_array_t *) cursor->iface_data;
-   arr->has_array = true;
-
-   BSON_ASSERT (arr);
+   data_array_t *data = (data_array_t *) cursor->ctx.data;
 
    if (_mongoc_cursor_run_command (
-          cursor, &cursor->filter, &cursor->opts, &arr->array) &&
-       bson_iter_init_find (&iter, &arr->array, arr->field_name) &&
-       BSON_ITER_HOLDS_ARRAY (&iter) && bson_iter_recurse (&iter, &arr->iter)) {
-      return true;
+          cursor, &cursor->filter, &cursor->opts, &data->array) &&
+       bson_iter_init_find (&iter, &data->array, data->field_name) &&
+       BSON_ITER_HOLDS_ARRAY (&iter) &&
+       bson_iter_recurse (&iter, &data->iter)) {
+      cursor->state = IN_BATCH;
+      return;
    }
-
-   return false;
+   cursor->state = DONE;
 }
 
 
-static bool
-_mongoc_cursor_array_next (mongoc_cursor_t *cursor, const bson_t **bson)
+static void
+_pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
 {
-   bool ret = true;
-   mongoc_cursor_array_t *arr;
    uint32_t document_len;
    const uint8_t *document;
-
-   ENTRY;
-
-   arr = (mongoc_cursor_array_t *) cursor->iface_data;
-   *bson = NULL;
-
-   if (!arr->has_array && !arr->has_synthetic_bson) {
-      ret = _mongoc_cursor_array_prime (cursor);
-   }
-
-   if (ret) {
-      ret = bson_iter_next (&arr->iter);
-   }
-
-   if (ret) {
-      bson_iter_document (&arr->iter, &document_len, &document);
-      ret = bson_init_static (&arr->bson, document, document_len);
-      *bson = &arr->bson;
-   }
-
-   RETURN (ret);
-}
-
-
-static mongoc_cursor_t *
-_mongoc_cursor_array_clone (const mongoc_cursor_t *cursor)
-{
-   mongoc_cursor_array_t *arr;
-   mongoc_cursor_t *clone_;
-
-   ENTRY;
-
-   arr = (mongoc_cursor_array_t *) cursor->iface_data;
-
-   clone_ = _mongoc_cursor_clone (cursor);
-   _mongoc_cursor_array_init (clone_, &cursor->filter, arr->field_name);
-
-   RETURN (clone_);
-}
-
-
-static bool
-_mongoc_cursor_array_more (mongoc_cursor_t *cursor)
-{
-   bool ret;
-   mongoc_cursor_array_t *arr;
-   bson_iter_t iter;
-
-   ENTRY;
-
-   arr = (mongoc_cursor_array_t *) cursor->iface_data;
-
-   if (arr->has_array || arr->has_synthetic_bson) {
-      memcpy (&iter, &arr->iter, sizeof iter);
-
-      ret = bson_iter_next (&iter);
+   data_array_t *data = (data_array_t *) cursor->ctx.data;
+   if (bson_iter_next (&data->iter)) {
+      bson_iter_document (&data->iter, &document_len, &document);
+      bson_init_static (&data->bson, document, document_len);
+      *out = &data->bson;
    } else {
-      ret = true;
+      cursor->state = DONE;
    }
-
-   RETURN (ret);
 }
 
 
-static bool
-_mongoc_cursor_array_error_document (mongoc_cursor_t *cursor,
-                                     bson_error_t *error,
-                                     const bson_t **doc)
+static void
+_get_next_batch (mongoc_cursor_t *cursor)
 {
-   mongoc_cursor_array_t *arr;
-
-   ENTRY;
-
-   arr = (mongoc_cursor_array_t *) cursor->iface_data;
-
-   if (arr->has_synthetic_bson) {
-      if (doc) {
-         *doc = NULL;
-      }
-
-      return false;
-   }
-
-   return _mongoc_cursor_error_document (cursor, error, doc);
+   fprintf (stderr, "called _get_next_batch on an array cursor\n");
+   BSON_ASSERT (false);
 }
 
 
-static mongoc_cursor_interface_t gMongocCursorArray = {
-   _mongoc_cursor_array_clone,
-   _mongoc_cursor_array_destroy,
-   _mongoc_cursor_array_more,
-   _mongoc_cursor_array_next,
-   _mongoc_cursor_array_error_document,
-};
-
-
+/* transition a find cursor to use the find command. */
 void
-_mongoc_cursor_array_init (mongoc_cursor_t *cursor,
-                           const bson_t *command,
-                           const char *field_name)
+_mongoc_cursor_ctx_array_init (mongoc_cursor_t *cursor, const char *field_name)
 {
-   ENTRY;
-
-
-   if (command) {
-      bson_destroy (&cursor->filter);
-      bson_copy_to (command, &cursor->filter);
-   }
-
-   cursor->iface_data = _mongoc_cursor_array_new (field_name);
-
-   memcpy (
-      &cursor->iface, &gMongocCursorArray, sizeof (mongoc_cursor_interface_t));
-
-   EXIT;
-}
-
-
-void
-_mongoc_cursor_array_set_bson (mongoc_cursor_t *cursor, const bson_t *bson)
-{
-   mongoc_cursor_array_t *arr;
-
-   ENTRY;
-
-   arr = (mongoc_cursor_array_t *) cursor->iface_data;
-   bson_copy_to (bson, &arr->bson);
-   arr->has_synthetic_bson = true;
-   BSON_ASSERT (bson_iter_init (&arr->iter, &arr->bson));
-
-   EXIT;
+   data_array_t *data = bson_malloc0 (sizeof (*data));
+   data->field_name = field_name;
+   cursor->ctx.prime = _prime;
+   cursor->ctx.pop_from_batch = _pop_from_batch;
+   cursor->ctx.get_next_batch = _get_next_batch;
+   cursor->ctx.destroy = _destroy;
+   cursor->ctx.get_host = _get_host;
+   cursor->ctx.init = _mongoc_cursor_ctx_array_init;
+   cursor->ctx.data = (void *) data;
 }

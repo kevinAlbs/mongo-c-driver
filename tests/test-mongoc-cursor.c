@@ -33,8 +33,8 @@ test_get_host (void)
    client = test_framework_client_new ();
    cursor =
       _mongoc_cursor_new_with_opts (client, "test.test", &q, NULL, NULL, NULL);
-   _mongoc_cursor_ctx_find_init (cursor);
    ASSERT (cursor);
+   _mongoc_cursor_ctx_find_init (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
    r = mongoc_cursor_next (cursor, &doc);
@@ -170,6 +170,7 @@ test_clone_with_concerns (void)
    cursor = _mongoc_cursor_new_with_opts (
       client, "test.test", &q, NULL, NULL, read_concern);
    ASSERT (cursor);
+   _mongoc_cursor_ctx_find_init (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
 
@@ -350,6 +351,8 @@ killcursors_succeeded (const mongoc_apm_command_succeeded_t *event)
    ASSERT_CMPINT64 (ctx->cursor_id, ==, bson_iter_int64 (&array));
 }
 
+extern void
+_mongoc_cursor_ctx_find_opquery_init (mongoc_cursor_t *cursor);
 
 /* test killing a cursor with mongo_cursor_destroy and a real server */
 static void
@@ -405,6 +408,8 @@ test_kill_cursor_live (void)
 
    cursor = _mongoc_cursor_new_with_opts (
       client, collection->ns, b, NULL, NULL, NULL);
+   _mongoc_cursor_ctx_find_init (cursor);
+   _mongoc_cursor_ctx_find_opquery_init (cursor);
 
    cursor->cursor_id = ctx.cursor_id;
    cursor->state = END_OF_BATCH; /* meaning, "finished reading first batch" */

@@ -94,7 +94,6 @@ NOINST_H_FILES = \
 	src/mongoc/mongoc-crypto-common-crypto-private.h \
 	src/mongoc/mongoc-crypto-openssl-private.h \
 	src/mongoc/mongoc-crypto-private.h \
-	src/mongoc/mongoc-cursor-array-private.h \
 	src/mongoc/mongoc-cursor-cursorid-private.h \
 	src/mongoc/mongoc-cursor-private.h \
 	src/mongoc/mongoc-cyrus-private.h \

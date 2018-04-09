@@ -33,7 +33,6 @@
 #endif
 #endif
 
-#include "mongoc-cursor-array-private.h"
 #include "mongoc-client-private.h"
 #include "mongoc-collection-private.h"
 #include "mongoc-counters-private.h"
@@ -1527,6 +1526,7 @@ mongoc_client_command (mongoc_client_t *client,
    /* flags, skip, limit, batch_size, fields are unused */
    cursor = _mongoc_cursor_new_with_opts (
       client, db_name, query, NULL, read_prefs, NULL);
+   _mongoc_cursor_ctx_cmd_deprecated_init (cursor);
 
    return cursor;
 }
@@ -2380,7 +2380,9 @@ mongoc_client_get_database_names_with_opts (mongoc_client_t *client,
    cursor =
       _mongoc_cursor_new_with_opts (client, "admin", NULL, opts, NULL, NULL);
 
-   _mongoc_cursor_array_init (cursor, &cmd, "databases");
+   bson_destroy (&cursor->filter);
+   bson_copy_to (&cmd, &cursor->filter);
+   _mongoc_cursor_ctx_array_init (cursor, "databases");
    bson_destroy (&cmd);
 
    while (mongoc_cursor_next (cursor, &doc)) {
@@ -2426,7 +2428,9 @@ mongoc_client_find_databases_with_opts (mongoc_client_t *client,
    cursor =
       _mongoc_cursor_new_with_opts (client, "admin", NULL, opts, NULL, NULL);
 
-   _mongoc_cursor_array_init (cursor, &cmd, "databases");
+   bson_destroy (&cursor->filter);
+   bson_copy_to (&cmd, &cursor->filter);
+   _mongoc_cursor_ctx_array_init (cursor, "databases");
 
    bson_destroy (&cmd);
 
