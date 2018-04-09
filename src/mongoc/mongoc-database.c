@@ -182,13 +182,8 @@ mongoc_database_command (mongoc_database_t *database,
     */
 
    /* flags, skip, limit, batch_size, fields are unused */
-   cursor = _mongoc_cursor_new_with_opts (database->client,
-                                          ns,
-                                          command,
-                                          NULL /* opts */,
-                                          read_prefs,
-                                          NULL /* read concern */);
-   _mongoc_cursor_ctx_cmd_deprecated_init (cursor);
+   cursor = _mongoc_cursor_cmd_deprecated_new (
+      database->client, ns, command, read_prefs);
    return cursor;
 }
 
@@ -760,12 +755,8 @@ mongoc_database_find_collections_with_opts (mongoc_database_t *database,
 
    /* Enumerate Collections Spec: "run listCollections on the primary node in
     * replicaset mode" */
-   cursor = _mongoc_cursor_new_with_opts (
-      database->client, database->name, NULL, opts, NULL, NULL);
-
-   bson_destroy (&cursor->filter);
-   bson_copy_to (&cmd, &cursor->filter);
-   _mongoc_cursor_ctx_cmd_init (cursor);
+   cursor = _mongoc_cursor_cmd_new (
+      database->client, database->name, &cmd, opts, NULL, NULL);
    cursor->ctx.prime (cursor);
    bson_destroy (&cmd);
 

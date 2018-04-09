@@ -61,6 +61,7 @@
 #include "mongoc-ssl-private.h"
 #include "mongoc-cmd-private.h"
 #include "mongoc-opts-private.h"
+#include "mongoc-cursor-private.h"
 
 #endif
 
@@ -1523,10 +1524,8 @@ mongoc_client_command (mongoc_client_t *client,
       db_name = ns;
    }
 
-   /* flags, skip, limit, batch_size, fields are unused */
-   cursor = _mongoc_cursor_new_with_opts (
-      client, db_name, query, NULL, read_prefs, NULL);
-   _mongoc_cursor_ctx_cmd_deprecated_init (cursor);
+   cursor =
+      _mongoc_cursor_cmd_deprecated_new (client, db_name, query, read_prefs);
 
    return cursor;
 }
@@ -2377,13 +2376,7 @@ mongoc_client_get_database_names_with_opts (mongoc_client_t *client,
    BSON_APPEND_BOOL (&cmd, "nameOnly", true);
 
    /* ignore client read prefs */
-   cursor =
-      _mongoc_cursor_new_with_opts (client, "admin", NULL, opts, NULL, NULL);
-
-   bson_destroy (&cursor->filter);
-   bson_copy_to (&cmd, &cursor->filter);
-   _mongoc_cursor_ctx_array_init (cursor, "databases");
-   bson_destroy (&cmd);
+   cursor = _mongoc_cursor_array_new (client, "admin", &cmd, opts, "databases");
 
    while (mongoc_cursor_next (cursor, &doc)) {
       if (bson_iter_init (&iter, doc) && bson_iter_find (&iter, "name") &&
@@ -2421,19 +2414,9 @@ mongoc_client_find_databases_with_opts (mongoc_client_t *client,
    mongoc_cursor_t *cursor;
 
    BSON_ASSERT (client);
-
    BSON_APPEND_INT32 (&cmd, "listDatabases", 1);
-
-   /* ignore client read prefs */
-   cursor =
-      _mongoc_cursor_new_with_opts (client, "admin", NULL, opts, NULL, NULL);
-
-   bson_destroy (&cursor->filter);
-   bson_copy_to (&cmd, &cursor->filter);
-   _mongoc_cursor_ctx_array_init (cursor, "databases");
-
+   cursor = _mongoc_cursor_array_new (client, "admin", &cmd, opts, "databases");
    bson_destroy (&cmd);
-
    return cursor;
 }
 

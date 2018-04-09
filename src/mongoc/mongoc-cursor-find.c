@@ -26,20 +26,6 @@ extern void
 _mongoc_cursor_ctx_find_opquery_init (mongoc_cursor_t *cursor);
 
 static void
-_destroy (mongoc_cursor_context_t *ctx)
-{
-}
-
-
-static void
-_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
-{
-   /* there is no host yet */
-   memset (host, sizeof (mongoc_host_list_t), 0);
-}
-
-
-static void
 _prime (mongoc_cursor_t *cursor)
 {
    bool use_find_command;
@@ -78,29 +64,18 @@ _prime (mongoc_cursor_t *cursor)
    cursor->ctx.prime (cursor);
 }
 
-static void
-_pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
+
+mongoc_cursor_t *
+_mongoc_cursor_find_new (mongoc_client_t *client,
+                         const char *db_and_coll,
+                         const bson_t *filter,
+                         const bson_t *opts,
+                         const mongoc_read_prefs_t *read_prefs,
+                         const mongoc_read_concern_t *read_concern)
 {
-   fprintf (stderr, "_pop_from_batch called on find cursor.\n");
-   BSON_ASSERT (false);
-}
-
-
-static void
-_get_next_batch (mongoc_cursor_t *cursor)
-{
-   fprintf (stderr, "_get_next_batch called on find cursor.\n");
-   BSON_ASSERT (false);
-}
-
-
-void
-_mongoc_cursor_ctx_find_init (mongoc_cursor_t *cursor)
-{
+   mongoc_cursor_t *cursor;
+   cursor = _mongoc_cursor_new_with_opts (
+      client, db_and_coll, filter, opts, read_prefs, read_concern);
    cursor->ctx.prime = _prime;
-   cursor->ctx.pop_from_batch = _pop_from_batch;
-   cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.init = _mongoc_cursor_ctx_find_init;
-   cursor->ctx.destroy = _destroy;
-   cursor->ctx.get_host = _get_host;
+   return cursor;
 }

@@ -408,15 +408,14 @@ mongoc_gridfs_remove_by_filename (mongoc_gridfs_t *gridfs,
    BSON_APPEND_INT32 (&find_opts_project, "_id", 1);
    bson_append_document_end (&find_opts, &find_opts_project);
 
-   cursor = _mongoc_cursor_new_with_opts (gridfs->client,
-                                          gridfs->files->ns,
-                                          &find_filter,
-                                          &find_opts,
-                                          NULL /* read_prefs */,
-                                          NULL /* read_concern */);
+   cursor = _mongoc_cursor_find_new (gridfs->client,
+                                     gridfs->files->ns,
+                                     &find_filter,
+                                     &find_opts,
+                                     NULL /* read_prefs */,
+                                     NULL /* read_concern */);
 
    BSON_ASSERT (cursor);
-   _mongoc_cursor_ctx_find_init (cursor);
 
    while (mongoc_cursor_next (cursor, &doc)) {
       if (bson_iter_init_find (&iter, doc, "_id")) {

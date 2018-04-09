@@ -193,6 +193,7 @@ _first_dollar_field (const bson_t *bson)
    } while (0)
 
 
+/* TODO: split this up into separate cursor implementation constructors */
 mongoc_cursor_t *
 _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const char *db_and_collection,
@@ -1354,8 +1355,9 @@ mongoc_cursor_clone (const mongoc_cursor_t *cursor)
       ret = _mongoc_cursor_clone (cursor);
    }
 
-   if (cursor->ctx.init) {
-      cursor->ctx.init (ret);
+   memcpy (&ret->ctx, &cursor->ctx, sizeof (cursor->ctx));
+   if (cursor->ctx.clone) {
+      cursor->ctx.clone (&ret->ctx, &cursor->ctx);
    }
 
    RETURN (ret);
@@ -1606,7 +1608,7 @@ mongoc_cursor_new_from_command_reply (mongoc_client_t *client,
 
    BSON_ASSERT (client);
    BSON_ASSERT (reply);
-
+   /* options are passed through by adding them to reply. */
    bson_copy_to_excluding_noinit (reply,
                                   &opts,
                                   "cursor",
@@ -1617,12 +1619,7 @@ mongoc_cursor_new_from_command_reply (mongoc_client_t *client,
                                   NULL);
 
    cursor =
-      _mongoc_cursor_new_with_opts (client, NULL, NULL, &opts, NULL, NULL);
-
-   bson_destroy (&cursor->filter);
-   bson_copy_to (&cmd, &cursor->filter);
-   _mongoc_cursor_ctx_cmd_init_with_reply (
-      cursor, reply /* stolen */, server_id);
+      _mongoc_cursor_cmd_new_from_reply (client, &cmd, &opts, reply, server_id);
    bson_destroy (&cmd);
    bson_destroy (&opts);
 

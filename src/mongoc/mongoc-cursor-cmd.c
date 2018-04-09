@@ -48,14 +48,6 @@ _use_getmore_cmd (mongoc_cursor_t *cursor)
    return ret;
 }
 
-
-static void
-_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
-{
-   _mongoc_cursor_get_host (cursor, host);
-}
-
-
 static void
 _destroy (mongoc_cursor_context_t *ctx)
 {
@@ -139,15 +131,48 @@ _get_next_batch (mongoc_cursor_t *cursor)
 }
 
 
-void
-_mongoc_cursor_ctx_cmd_init_with_reply (mongoc_cursor_t *cursor,
-                                        bson_t *reply,
-                                        uint32_t server_id)
+static void
+_clone (mongoc_cursor_context_t *dst, const mongoc_cursor_context_t *src)
 {
-   data_cmd_t *data;
+   data_cmd_t *data = bson_malloc0 (sizeof (*data));
+   bson_init (&data->reader.reply);
+   dst->data = data;
+}
 
-   _mongoc_cursor_ctx_cmd_init (cursor);
-   data = (data_cmd_t *) cursor->ctx.data;
+
+mongoc_cursor_t *
+_mongoc_cursor_cmd_new (mongoc_client_t *client,
+                        const char *db_and_coll,
+                        const bson_t *cmd,
+                        const bson_t *opts,
+                        const mongoc_read_prefs_t *read_prefs,
+                        const mongoc_read_concern_t *read_concern)
+{
+   mongoc_cursor_t *cursor;
+   data_cmd_t *data = bson_malloc0 (sizeof (*data));
+
+   cursor = _mongoc_cursor_new_with_opts (
+      client, db_and_coll, cmd, opts, read_prefs, read_concern);
+   bson_init (&data->reader.reply);
+   cursor->ctx.prime = _prime;
+   cursor->ctx.pop_from_batch = _pop_from_batch;
+   cursor->ctx.get_next_batch = _get_next_batch;
+   cursor->ctx.destroy = _destroy;
+   cursor->ctx.clone = _clone;
+   cursor->ctx.data = (void *) data;
+   return cursor;
+}
+
+mongoc_cursor_t *
+_mongoc_cursor_cmd_new_from_reply (mongoc_client_t *client,
+                                   const bson_t *cmd,
+                                   const bson_t *opts,
+                                   bson_t *reply,
+                                   uint32_t server_id)
+{
+   mongoc_cursor_t *cursor =
+      _mongoc_cursor_cmd_new (client, NULL, cmd, opts, NULL, NULL);
+   data_cmd_t *data = (data_cmd_t *) cursor->ctx.data;
    cursor->state = IN_BATCH;
    cursor->server_id = server_id;
    data->reading_from = DOC;
@@ -163,20 +188,5 @@ _mongoc_cursor_ctx_cmd_init_with_reply (mongoc_cursor_t *cursor,
                       MONGOC_ERROR_CURSOR_INVALID_CURSOR,
                       "Couldn't parse cursor document");
    }
-}
-
-
-/* transition a find cursor to use the find command. */
-void
-_mongoc_cursor_ctx_cmd_init (mongoc_cursor_t *cursor)
-{
-   data_cmd_t *data = bson_malloc0 (sizeof (*data));
-   bson_init (&data->reader.reply);
-   cursor->ctx.prime = _prime;
-   cursor->ctx.pop_from_batch = _pop_from_batch;
-   cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.destroy = _destroy;
-   cursor->ctx.get_host = _get_host;
-   cursor->ctx.init = _mongoc_cursor_ctx_cmd_init;
-   cursor->ctx.data = (void *) data;
+   return cursor;
 }

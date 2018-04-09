@@ -31,10 +31,8 @@ test_get_host (void)
    hosts = mongoc_uri_get_hosts (uri);
 
    client = test_framework_client_new ();
-   cursor =
-      _mongoc_cursor_new_with_opts (client, "test.test", &q, NULL, NULL, NULL);
+   cursor = _mongoc_cursor_find_new (client, "test.test", &q, NULL, NULL, NULL);
    ASSERT (cursor);
-   _mongoc_cursor_ctx_find_init (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
    r = mongoc_cursor_next (cursor, &doc);
@@ -101,10 +99,8 @@ test_clone (void)
       mongoc_collection_destroy (col);
    }
 
-   cursor =
-      _mongoc_cursor_new_with_opts (client, "test.test", &q, NULL, NULL, NULL);
+   cursor = _mongoc_cursor_find_new (client, "test.test", &q, NULL, NULL, NULL);
    ASSERT (cursor);
-   _mongoc_cursor_ctx_find_init (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
 
@@ -167,10 +163,9 @@ test_clone_with_concerns (void)
    mongoc_read_concern_set_level (read_concern,
                                   MONGOC_READ_CONCERN_LEVEL_LOCAL);
 
-   cursor = _mongoc_cursor_new_with_opts (
+   cursor = _mongoc_cursor_find_new (
       client, "test.test", &q, NULL, NULL, read_concern);
    ASSERT (cursor);
-   _mongoc_cursor_ctx_find_init (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
 
@@ -406,9 +401,8 @@ test_kill_cursor_live (void)
 
    ASSERT_CMPINT (ctx.succeeded_count, ==, 1);
 
-   cursor = _mongoc_cursor_new_with_opts (
-      client, collection->ns, b, NULL, NULL, NULL);
-   _mongoc_cursor_ctx_find_init (cursor);
+   cursor =
+      _mongoc_cursor_find_new (client, collection->ns, b, NULL, NULL, NULL);
    _mongoc_cursor_ctx_find_opquery_init (cursor);
 
    cursor->cursor_id = ctx.cursor_id;
