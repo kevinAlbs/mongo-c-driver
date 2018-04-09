@@ -51,7 +51,6 @@ _mongoc_gridfs_file_list_new (mongoc_gridfs_t *gridfs,
 
    cursor = _mongoc_cursor_new_with_opts (gridfs->client,
                                           gridfs->files->ns,
-                                          true /* is_find */,
                                           use_unwrapped ? &unwrapped : query,
                                           NULL /* opts */,
                                           gridfs->files->read_prefs,

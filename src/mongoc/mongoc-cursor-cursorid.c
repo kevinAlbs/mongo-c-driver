@@ -186,22 +186,16 @@ _mongoc_cursor_cursorid_prime (mongoc_cursor_t *cursor)
    cursor->state = IN_BATCH;
    cursor->operation_id = ++cursor->client->cluster.operation_id;
 
-   /* `find` does not have a cursor field */
-   if (cursor->is_find) {
-      return _mongoc_cursor_cursorid_refresh_from_command (
-         cursor, &cursor->filter, &cursor->opts);
-   } else {
-      /* commands like `aggregate` have a cursor field so we
-       * have to copy over opts without "batchSize" */
-      bson_init (&copied_opts);
-      bson_copy_to_excluding_noinit (
-         &cursor->opts, &copied_opts, "batchSize", NULL);
-      return_value = _mongoc_cursor_cursorid_refresh_from_command (
-         cursor, &cursor->filter, &copied_opts);
+   /* commands like `aggregate` have a cursor field so we
+    * have to copy over opts without "batchSize" */
+   bson_init (&copied_opts);
+   bson_copy_to_excluding_noinit (
+      &cursor->opts, &copied_opts, "batchSize", NULL);
+   return_value = _mongoc_cursor_cursorid_refresh_from_command (
+      cursor, &cursor->filter, &copied_opts);
 
-      bson_destroy (&copied_opts);
-      return return_value;
-   }
+   bson_destroy (&copied_opts);
+   return return_value;
 }
 
 
@@ -230,7 +224,7 @@ _mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
       bson_append_int64 (command,
                          MONGOC_CURSOR_BATCH_SIZE,
                          MONGOC_CURSOR_BATCH_SIZE_LEN,
-                         abs (_mongoc_n_return (false, cursor)));
+                         abs (_mongoc_n_return (cursor)));
    }
 
    /* Find, getMore And killCursors Commands Spec: "In the case of a tailable

@@ -185,7 +185,6 @@ mongoc_database_command (mongoc_database_t *database,
    /* flags, skip, limit, batch_size, fields are unused */
    return _mongoc_cursor_new_with_opts (database->client,
                                         ns,
-                                        false /* is_find */,
                                         command,
                                         NULL /* opts */,
                                         read_prefs,
@@ -760,13 +759,8 @@ mongoc_database_find_collections_with_opts (mongoc_database_t *database,
 
    /* Enumerate Collections Spec: "run listCollections on the primary node in
     * replicaset mode" */
-   cursor = _mongoc_cursor_new_with_opts (database->client,
-                                          database->name,
-                                          false /* is_find */,
-                                          NULL,
-                                          opts,
-                                          NULL,
-                                          NULL);
+   cursor = _mongoc_cursor_new_with_opts (
+      database->client, database->name, NULL, opts, NULL, NULL);
 
    _mongoc_cursor_cursorid_init (cursor, &cmd);
    (void) _mongoc_cursor_cursorid_prime (cursor);

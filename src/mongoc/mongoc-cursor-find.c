@@ -32,12 +32,6 @@ _destroy (mongoc_cursor_context_t *ctx)
 
 
 static void
-_clone (mongoc_cursor_context_t *src, mongoc_cursor_context_t *dst)
-{
-}
-
-
-static void
 _get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
 {
    /* there is no host yet */
@@ -106,7 +100,7 @@ _mongoc_cursor_init_find_ctx (mongoc_cursor_t *cursor)
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.clone = _clone;
+   cursor->ctx.init = _mongoc_cursor_init_find_ctx;
    cursor->ctx.destroy = _destroy;
    cursor->ctx.get_host = _get_host;
 }
