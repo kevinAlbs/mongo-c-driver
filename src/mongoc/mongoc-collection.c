@@ -26,7 +26,6 @@
 #include "mongoc-collection.h"
 #include "mongoc-collection-private.h"
 #include "mongoc-cursor-private.h"
-#include "mongoc-cursor-cursorid-private.h"
 #include "mongoc-cursor-array-private.h"
 #include "mongoc-error.h"
 #include "mongoc-index.h"
@@ -445,7 +444,11 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
          mongoc_collection_get_read_concern (collection));
    }
 
-   _mongoc_cursor_cursorid_init (cursor, &command);
+   /* TODO: don't do this destroy + copy_to in the caller, do it in the
+    * constructor */
+   bson_destroy (&cursor->filter);
+   bson_copy_to (&command, &cursor->filter);
+   _mongoc_cursor_ctx_cmd_init (cursor);
 
 done:
    mongoc_server_stream_cleanup (server_stream); /* null ok */
@@ -541,7 +544,7 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
                                           &opts,
                                           read_prefs,
                                           collection->read_concern);
-   _mongoc_cursor_init_find_ctx (cursor);
+   _mongoc_cursor_ctx_find_init (cursor);
    if (skip) {
       _mongoc_cursor_set_opt_int64 (cursor, MONGOC_CURSOR_SKIP, skip);
    }
@@ -616,7 +619,7 @@ mongoc_collection_find_with_opts (mongoc_collection_t *collection,
       opts,
       COALESCE (read_prefs, collection->read_prefs),
       collection->read_concern);
-   _mongoc_cursor_init_find_ctx (cursor);
+   _mongoc_cursor_ctx_find_init (cursor);
    return cursor;
 }
 
@@ -1385,13 +1388,14 @@ mongoc_collection_find_indexes_with_opts (mongoc_collection_t *collection,
                                           opts,
                                           NULL /* read prefs */,
                                           NULL /* read concern */);
+   bson_destroy (&cursor->filter);
+   bson_copy_to (&cmd, &cursor->filter);
+   _mongoc_cursor_ctx_cmd_init (cursor);
 
-   _mongoc_cursor_cursorid_init (cursor, &cmd);
+   cursor->ctx.prime (cursor);
 
-   if (_mongoc_cursor_cursorid_prime (cursor)) {
-      /* intentionally empty */
-   } else if (mongoc_cursor_error (cursor, &error) &&
-              error.code == MONGOC_ERROR_COLLECTION_DOES_NOT_EXIST) {
+   if (mongoc_cursor_error (cursor, &error) &&
+       error.code == MONGOC_ERROR_COLLECTION_DOES_NOT_EXIST) {
       bson_t empty_arr = BSON_INITIALIZER;
       /* collection does not exist. in accordance with the spec we return
        * an empty array. */

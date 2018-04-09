@@ -33,7 +33,7 @@ test_get_host (void)
    client = test_framework_client_new ();
    cursor =
       _mongoc_cursor_new_with_opts (client, "test.test", &q, NULL, NULL, NULL);
-   _mongoc_cursor_init_find_ctx (cursor);
+   _mongoc_cursor_ctx_find_init (cursor);
    ASSERT (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
@@ -104,7 +104,7 @@ test_clone (void)
    cursor =
       _mongoc_cursor_new_with_opts (client, "test.test", &q, NULL, NULL, NULL);
    ASSERT (cursor);
-   _mongoc_cursor_init_find_ctx (cursor);
+   _mongoc_cursor_ctx_find_init (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
 

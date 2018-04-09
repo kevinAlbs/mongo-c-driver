@@ -20,7 +20,6 @@
 #include "mongoc-collection-private.h"
 #include "mongoc-cursor.h"
 #include "mongoc-cursor-array-private.h"
-#include "mongoc-cursor-cursorid-private.h"
 #include "mongoc-cursor-private.h"
 #include "mongoc-database.h"
 #include "mongoc-database-private.h"
@@ -762,9 +761,10 @@ mongoc_database_find_collections_with_opts (mongoc_database_t *database,
    cursor = _mongoc_cursor_new_with_opts (
       database->client, database->name, NULL, opts, NULL, NULL);
 
-   _mongoc_cursor_cursorid_init (cursor, &cmd);
-   (void) _mongoc_cursor_cursorid_prime (cursor);
-
+   bson_destroy (&cursor->filter);
+   bson_copy_to (&cmd, &cursor->filter);
+   _mongoc_cursor_ctx_cmd_init (cursor);
+   cursor->ctx.prime (cursor);
    bson_destroy (&cmd);
 
    return cursor;

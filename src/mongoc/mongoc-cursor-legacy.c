@@ -27,7 +27,6 @@
 #include "mongoc-error.h"
 #include "mongoc-log.h"
 #include "mongoc-trace-private.h"
-#include "mongoc-cursor-cursorid-private.h"
 #include "mongoc-read-concern-private.h"
 #include "mongoc-util-private.h"
 #include "mongoc-write-concern-private.h"
@@ -551,7 +550,7 @@ _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor)
    mongoc_query_flags_t flags;
    mongoc_assemble_query_result_t result = ASSEMBLE_QUERY_RESULT_INIT;
    bool succeeded = false;
-   mongoc_server_stream_t* server_stream;
+   mongoc_server_stream_t *server_stream;
 
    ENTRY;
 
