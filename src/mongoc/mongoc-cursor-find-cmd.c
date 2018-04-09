@@ -77,13 +77,13 @@ _get_next_batch (mongoc_cursor_t *cursor)
 void
 _mongoc_cursor_ctx_find_cmd_init (mongoc_cursor_t *cursor)
 {
-   data_find_cmd_t *ctx = bson_malloc0 (sizeof (*ctx));
-   bson_init (&ctx->reader.reply);
+   data_find_cmd_t *data = bson_malloc0 (sizeof (*data));
+   bson_init (&data->reader.reply);
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
    cursor->ctx.destroy = _destroy;
    cursor->ctx.get_host = _get_host;
    cursor->ctx.init = _mongoc_cursor_ctx_find_cmd_init;
-   cursor->ctx.data = (void *) ctx;
+   cursor->ctx.data = (void *) data;
 }

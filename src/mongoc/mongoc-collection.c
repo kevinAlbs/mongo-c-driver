@@ -26,7 +26,6 @@
 #include "mongoc-collection.h"
 #include "mongoc-collection-private.h"
 #include "mongoc-cursor-private.h"
-#include "mongoc-cursor-array-private.h"
 #include "mongoc-error.h"
 #include "mongoc-index.h"
 #include "mongoc-log.h"
@@ -664,6 +663,7 @@ mongoc_collection_command (mongoc_collection_t *collection,
                            const mongoc_read_prefs_t *read_prefs)
 {
    char ns[MONGOC_NAMESPACE_MAX];
+   mongoc_cursor_t *cursor;
 
    BSON_ASSERT (collection);
    BSON_ASSERT (query);
@@ -688,8 +688,10 @@ mongoc_collection_command (mongoc_collection_t *collection,
     */
 
    /* flags, skip, limit, batch_size, fields are unused */
-   return _mongoc_cursor_new_with_opts (
+   cursor = _mongoc_cursor_new_with_opts (
       collection->client, ns, query, NULL, read_prefs, NULL);
+   _mongoc_cursor_ctx_cmd_deprecated_init (cursor);
+   return cursor;
 }
 
 
@@ -1396,20 +1398,13 @@ mongoc_collection_find_indexes_with_opts (mongoc_collection_t *collection,
 
    if (mongoc_cursor_error (cursor, &error) &&
        error.code == MONGOC_ERROR_COLLECTION_DOES_NOT_EXIST) {
-      bson_t empty_arr = BSON_INITIALIZER;
-      /* collection does not exist. in accordance with the spec we return
-       * an empty array. */
-      mongoc_cursor_destroy (cursor);
-      cursor = _mongoc_cursor_new_with_opts (collection->client,
-                                             collection->ns,
-                                             NULL /* filter */,
-                                             NULL /* opts */,
-                                             NULL /* read_prefs */,
-                                             NULL /* read_concern */
-                                             );
-      _mongoc_cursor_array_init (cursor, NULL, NULL);
-      _mongoc_cursor_array_set_bson (cursor, &empty_arr);
-      bson_destroy (&empty_arr);
+      /* collection does not exist. in accordance with the spec we do not
+       * return an error:
+       * https://github.com/mongodb/specifications/blob/master/source/enumerate-indexes.rst#enumeration-getting-index-information
+       * so clear it. */
+      memset (&cursor->error, 0, sizeof (bson_error_t));
+      bson_reinit (&cursor->error_doc);
+      cursor->state = IN_BATCH;
    }
 
    bson_destroy (&cmd);

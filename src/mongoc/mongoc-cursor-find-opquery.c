@@ -90,7 +90,7 @@ _get_next_batch (mongoc_cursor_t *cursor)
 
    _mongoc_buffer_clear (&cursor->legacy_response.buffer, false);
    r = _mongoc_cursor_op_getmore (cursor, NULL /* server stream */);
-   if (!r) {
+   if (!r || cursor->error.domain) {
       cursor->state = DONE;
    } else {
       cursor->state = IN_BATCH;

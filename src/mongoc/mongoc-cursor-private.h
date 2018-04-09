@@ -39,6 +39,7 @@ typedef struct _mongoc_cursor_context_t {
    void (*prime) (mongoc_cursor_t *cursor);
    void (*pop_from_batch) (mongoc_cursor_t *cursor, const bson_t **out);
    void (*get_next_batch) (mongoc_cursor_t *cursor);
+   /* TODO: this might not be needed, right? */
    void (*get_host) (mongoc_cursor_t *cursor, mongoc_host_list_t *host);
    void *data;
 } mongoc_cursor_context_t;
@@ -197,6 +198,10 @@ void
 _mongoc_cursor_ctx_find_init (mongoc_cursor_t *cursor);
 void
 _mongoc_cursor_ctx_cmd_init (mongoc_cursor_t *cursor);
+void
+_mongoc_cursor_ctx_cmd_deprecated_init (mongoc_cursor_t *cursor);
+void
+_mongoc_cursor_ctx_array_init (mongoc_cursor_t *cursor, const char *field_name);
 mongoc_cursor_t *
 _mongoc_cursor_clone (const mongoc_cursor_t *cursor);
 void

@@ -31,6 +31,7 @@ typedef struct _data_cmd_t {
    getmore_type_t getmore_type; /* cache after first getmore. */
 } data_cmd_t;
 
+
 static bool
 _use_getmore_cmd (mongoc_cursor_t *cursor)
 {
@@ -143,13 +144,13 @@ _mongoc_cursor_ctx_cmd_init_with_reply (mongoc_cursor_t *cursor,
                                         bson_t *reply,
                                         uint32_t server_id)
 {
-   _mongoc_cursor_ctx_cmd_init (cursor);
-   data_cmd_t *data = (data_cmd_t *) cursor->ctx.data;
+   data_cmd_t *data;
 
+   _mongoc_cursor_ctx_cmd_init (cursor);
+   data = (data_cmd_t *) cursor->ctx.data;
    cursor->state = IN_BATCH;
    cursor->server_id = server_id;
    data->reading_from = DOC;
-
    bson_destroy (&data->reader.reply);
    if (!bson_steal (&data->reader.reply, reply)) {
       bson_destroy (&data->reader.reply);
@@ -169,13 +170,13 @@ _mongoc_cursor_ctx_cmd_init_with_reply (mongoc_cursor_t *cursor,
 void
 _mongoc_cursor_ctx_cmd_init (mongoc_cursor_t *cursor)
 {
-   data_cmd_t *ctx = bson_malloc0 (sizeof (*ctx));
-   bson_init (&ctx->reader.reply);
+   data_cmd_t *data = bson_malloc0 (sizeof (*data));
+   bson_init (&data->reader.reply);
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
    cursor->ctx.destroy = _destroy;
    cursor->ctx.get_host = _get_host;
    cursor->ctx.init = _mongoc_cursor_ctx_cmd_init;
-   cursor->ctx.data = (void *) ctx;
+   cursor->ctx.data = (void *) data;
 }

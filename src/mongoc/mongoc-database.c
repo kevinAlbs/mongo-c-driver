@@ -19,7 +19,6 @@
 #include "mongoc-collection.h"
 #include "mongoc-collection-private.h"
 #include "mongoc-cursor.h"
-#include "mongoc-cursor-array-private.h"
 #include "mongoc-cursor-private.h"
 #include "mongoc-database.h"
 #include "mongoc-database-private.h"
@@ -168,6 +167,7 @@ mongoc_database_command (mongoc_database_t *database,
                          const mongoc_read_prefs_t *read_prefs)
 {
    char ns[MONGOC_NAMESPACE_MAX];
+   mongoc_cursor_t *cursor;
 
    BSON_ASSERT (database);
    BSON_ASSERT (command);
@@ -182,12 +182,14 @@ mongoc_database_command (mongoc_database_t *database,
     */
 
    /* flags, skip, limit, batch_size, fields are unused */
-   return _mongoc_cursor_new_with_opts (database->client,
-                                        ns,
-                                        command,
-                                        NULL /* opts */,
-                                        read_prefs,
-                                        NULL /* read concern */);
+   cursor = _mongoc_cursor_new_with_opts (database->client,
+                                          ns,
+                                          command,
+                                          NULL /* opts */,
+                                          read_prefs,
+                                          NULL /* read concern */);
+   _mongoc_cursor_ctx_cmd_deprecated_init (cursor);
+   return cursor;
 }
 
 
