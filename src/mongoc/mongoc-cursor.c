@@ -22,7 +22,6 @@
 #include "mongoc-error.h"
 #include "mongoc-log.h"
 #include "mongoc-trace-private.h"
-#include "mongoc-cursor-cursorid-private.h"
 #include "mongoc-read-concern-private.h"
 #include "mongoc-util-private.h"
 #include "mongoc-write-concern-private.h"
@@ -34,10 +33,6 @@
 
 
 #define CURSOR_FAILED(cursor_) ((cursor_)->error.domain != 0)
-
-static const bson_t *
-_mongoc_cursor_find_command (mongoc_cursor_t *cursor,
-                             mongoc_server_stream_t *server_stream);
 
 static bool
 _translate_query_opt (const char *query_field,
@@ -630,28 +625,6 @@ _mongoc_cursor_fetch_stream (mongoc_cursor_t *cursor)
 }
 
 
-bool
-_use_find_command (const mongoc_cursor_t *cursor,
-                   const mongoc_server_stream_t *server_stream)
-{
-   /* Find, getMore And killCursors Commands Spec: "the find command cannot be
-    * used to execute other commands" and "the find command does not support the
-    * exhaust flag."
-    */
-   return server_stream->sd->max_wire_version >= WIRE_VERSION_FIND_CMD &&
-          !_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST);
-}
-
-
-bool
-_use_getmore_command (const mongoc_cursor_t *cursor,
-                      const mongoc_server_stream_t *server_stream)
-{
-   return server_stream->sd->max_wire_version >= WIRE_VERSION_FIND_CMD &&
-          !_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST);
-}
-
-
 const bson_t *
 _mongoc_cursor_initial_query (mongoc_cursor_t *cursor)
 {
@@ -1089,28 +1062,6 @@ _mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor, bson_t *command)
       command, MONGOC_CURSOR_FILTER, MONGOC_CURSOR_FILTER_LEN, &cursor->filter);
 }
 
-
-static const bson_t *
-_mongoc_cursor_find_command (mongoc_cursor_t *cursor,
-                             mongoc_server_stream_t *server_stream)
-{
-   bson_t command = BSON_INITIALIZER;
-   const bson_t *bson = NULL;
-
-   ENTRY;
-
-   _mongoc_cursor_prepare_find_command (cursor, &command);
-
-   _mongoc_cursor_cursorid_init (cursor, &command);
-   bson_destroy (&command);
-
-   BSON_ASSERT (cursor->iface.next);
-   _mongoc_cursor_cursorid_next (cursor, &bson);
-
-   RETURN (bson);
-}
-
-
 const bson_t *
 _mongoc_cursor_get_more (mongoc_cursor_t *cursor)
 {
@@ -1261,6 +1212,20 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
          if (cursor->state == DONE) {
             ret = false;
             goto done;
+         }
+      }
+
+      /* a tailable or change streams cursor might be at END_OF_BATCH at the
+       * beginning of next */
+      if (cursor->state == END_OF_BATCH) {
+         cursor->ctx.get_next_batch (cursor);
+         /* TODO: these transitions are weird */
+         if (cursor->state == IN_BATCH) {
+            cursor->ctx.pop_from_batch (cursor, bson);
+            if (*bson) {
+               ret = true;
+               goto done;
+            }
          }
       }
 
@@ -1654,17 +1619,19 @@ mongoc_cursor_new_from_command_reply (mongoc_client_t *client,
    cursor =
       _mongoc_cursor_new_with_opts (client, NULL, NULL, &opts, NULL, NULL);
 
-   _mongoc_cursor_cursorid_init (cursor, &cmd);
-   _mongoc_cursor_cursorid_init_with_reply (cursor, reply, server_id);
+   bson_destroy (&cursor->filter);
+   bson_copy_to (&cmd, &cursor->filter);
+   _mongoc_cursor_ctx_cmd_init_with_reply (
+      cursor, reply /* stolen */, server_id);
    bson_destroy (&cmd);
    bson_destroy (&opts);
 
    return cursor;
 }
 
-static bool
-_batch_reader_start (mongoc_cursor_t *cursor,
-                     mongoc_cursor_batch_reader_t *reader)
+bool
+_mongoc_cursor_batch_reader_start (mongoc_cursor_t *cursor,
+                                   mongoc_cursor_batch_reader_t *reader)
 {
    bson_iter_t iter;
    bson_iter_t child;
@@ -1741,7 +1708,7 @@ _mongoc_cursor_batch_reader_refresh (mongoc_cursor_t *cursor,
    /* server replies to find / aggregate with {cursor: {id: N, firstBatch: []}},
     * to getMore command with {cursor: {id: N, nextBatch: []}}. */
    if (_mongoc_cursor_run_command (cursor, command, opts, &reader->reply) &&
-       _batch_reader_start (cursor, reader)) {
+       _mongoc_cursor_batch_reader_start (cursor, reader)) {
       cursor->state = IN_BATCH;
    } else {
       if (!cursor->error.domain) {
@@ -1753,4 +1720,57 @@ _mongoc_cursor_batch_reader_refresh (mongoc_cursor_t *cursor,
          cursor->state = DONE;
       }
    }
+}
+
+bool
+_mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
+                                        bson_t *command)
+{
+   const char *collection;
+   int collection_len;
+   int64_t batch_size;
+   bool await_data;
+   int32_t max_await_time_ms;
+
+   ENTRY;
+
+   _mongoc_cursor_collection (cursor, &collection, &collection_len);
+
+   bson_init (command);
+   bson_append_int64 (command, "getMore", 7, mongoc_cursor_get_id (cursor));
+   bson_append_utf8 (command, "collection", 10, collection, collection_len);
+
+   batch_size = mongoc_cursor_get_batch_size (cursor);
+
+   /* See find, getMore, and killCursors Spec for batchSize rules */
+   if (batch_size) {
+      bson_append_int64 (command,
+                         MONGOC_CURSOR_BATCH_SIZE,
+                         MONGOC_CURSOR_BATCH_SIZE_LEN,
+                         abs (_mongoc_n_return (cursor)));
+   }
+
+   /* Find, getMore And killCursors Commands Spec: "In the case of a tailable
+      cursor with awaitData == true the driver MUST provide a Cursor level
+      option named maxAwaitTimeMS (See CRUD specification for details). The
+      maxTimeMS option on the getMore command MUST be set to the value of the
+      option maxAwaitTimeMS. If no maxAwaitTimeMS is specified, the driver
+      SHOULD not set maxTimeMS on the getMore command."
+    */
+   await_data = _mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_TAILABLE) &&
+                _mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_AWAIT_DATA);
+
+
+   if (await_data) {
+      max_await_time_ms =
+         (int32_t) mongoc_cursor_get_max_await_time_ms (cursor);
+      if (max_await_time_ms) {
+         bson_append_int32 (command,
+                            MONGOC_CURSOR_MAX_TIME_MS,
+                            MONGOC_CURSOR_MAX_TIME_MS_LEN,
+                            max_await_time_ms);
+      }
+   }
+
+   RETURN (true);
 }

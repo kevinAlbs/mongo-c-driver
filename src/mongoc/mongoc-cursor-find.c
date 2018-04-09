@@ -21,9 +21,9 @@
 
 
 extern void
-_mongoc_cursor_init_find_cmd_ctx (mongoc_cursor_t *cursor);
+_mongoc_cursor_ctx_find_cmd_init (mongoc_cursor_t *cursor);
 extern void
-_mongoc_cursor_init_find_opquery_ctx (mongoc_cursor_t *cursor);
+_mongoc_cursor_ctx_find_opquery_init (mongoc_cursor_t *cursor);
 
 static void
 _destroy (mongoc_cursor_context_t *ctx)
@@ -70,9 +70,9 @@ _prime (mongoc_cursor_t *cursor)
    mongoc_server_stream_cleanup (server_stream);
 
    if (use_find_command) {
-      _mongoc_cursor_init_find_cmd_ctx (cursor);
+      _mongoc_cursor_ctx_find_cmd_init (cursor);
    } else {
-      _mongoc_cursor_init_find_opquery_ctx (cursor);
+      _mongoc_cursor_ctx_find_opquery_init (cursor);
    }
 
    cursor->ctx.prime (cursor);
@@ -95,12 +95,12 @@ _get_next_batch (mongoc_cursor_t *cursor)
 
 
 void
-_mongoc_cursor_init_find_ctx (mongoc_cursor_t *cursor)
+_mongoc_cursor_ctx_find_init (mongoc_cursor_t *cursor)
 {
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.init = _mongoc_cursor_init_find_ctx;
+   cursor->ctx.init = _mongoc_cursor_ctx_find_init;
    cursor->ctx.destroy = _destroy;
    cursor->ctx.get_host = _get_host;
 }

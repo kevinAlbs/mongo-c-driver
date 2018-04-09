@@ -190,7 +190,13 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const mongoc_read_prefs_t *read_prefs,
                               const mongoc_read_concern_t *read_concern);
 void
-_mongoc_cursor_init_find_ctx (mongoc_cursor_t *cursor);
+_mongoc_cursor_ctx_cmd_init_with_reply (mongoc_cursor_t *cursor,
+                                        bson_t *reply,
+                                        uint32_t server_id);
+void
+_mongoc_cursor_ctx_find_init (mongoc_cursor_t *cursor);
+void
+_mongoc_cursor_ctx_cmd_init (mongoc_cursor_t *cursor);
 mongoc_cursor_t *
 _mongoc_cursor_clone (const mongoc_cursor_t *cursor);
 void
@@ -198,9 +204,6 @@ _mongoc_cursor_destroy (mongoc_cursor_t *cursor);
 bool
 _use_find_command (const mongoc_cursor_t *cursor,
                    const mongoc_server_stream_t *server_stream);
-bool
-_use_getmore_command (const mongoc_cursor_t *cursor,
-                      const mongoc_server_stream_t *server_stream);
 mongoc_server_stream_t *
 _mongoc_cursor_fetch_stream (mongoc_cursor_t *cursor);
 void
@@ -269,10 +272,16 @@ _mongoc_cursor_batch_reader_refresh (mongoc_cursor_t *cursor,
                                      const bson_t *command,
                                      const bson_t *opts,
                                      mongoc_cursor_batch_reader_t *reader);
+bool
+_mongoc_cursor_batch_reader_start (mongoc_cursor_t *cursor,
+                                   mongoc_cursor_batch_reader_t *reader);
 void
 _mongoc_cursor_batch_reader_read (mongoc_cursor_t *cursor,
                                   mongoc_cursor_batch_reader_t *reader,
                                   const bson_t **bson);
+bool
+_mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
+                                        bson_t *command);
 /* legacy functions. */
 bool
 _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson);

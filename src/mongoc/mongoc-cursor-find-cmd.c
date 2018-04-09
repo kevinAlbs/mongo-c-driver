@@ -16,7 +16,6 @@
 #include "mongoc.h"
 #include "mongoc-cursor-private.h"
 #include "mongoc-client-private.h"
-#include "mongoc-cursor-cursorid-private.h"
 
 typedef struct _data_find_cmd_t {
    mongoc_cursor_batch_reader_t reader;
@@ -65,7 +64,6 @@ _pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
 static void
 _get_next_batch (mongoc_cursor_t *cursor)
 {
-   /* uint64_t batch_size; */
    data_find_cmd_t *ctx = (data_find_cmd_t *) cursor->ctx.data;
    bson_t getmore_cmd;
    _mongoc_cursor_prepare_getmore_command (cursor, &getmore_cmd);
@@ -77,7 +75,7 @@ _get_next_batch (mongoc_cursor_t *cursor)
 
 /* transition a find cursor to use the find command. */
 void
-_mongoc_cursor_init_find_cmd_ctx (mongoc_cursor_t *cursor)
+_mongoc_cursor_ctx_find_cmd_init (mongoc_cursor_t *cursor)
 {
    data_find_cmd_t *ctx = bson_malloc0 (sizeof (*ctx));
    bson_init (&ctx->reader.reply);
@@ -86,6 +84,6 @@ _mongoc_cursor_init_find_cmd_ctx (mongoc_cursor_t *cursor)
    cursor->ctx.get_next_batch = _get_next_batch;
    cursor->ctx.destroy = _destroy;
    cursor->ctx.get_host = _get_host;
-   cursor->ctx.init = _mongoc_cursor_init_find_cmd_ctx;
+   cursor->ctx.init = _mongoc_cursor_ctx_find_cmd_init;
    cursor->ctx.data = (void *) ctx;
 }
