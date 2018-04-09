@@ -327,7 +327,6 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
    _mongoc_cursor_flags_to_opts (flags, &cursor_opts, &slave_ok);
    cursor = _mongoc_cursor_new_with_opts (collection->client,
                                           collection->ns,
-                                          false,
                                           NULL /* filter */,
                                           &cursor_opts,
                                           read_prefs,
@@ -538,7 +537,6 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
    }
    cursor = _mongoc_cursor_new_with_opts (collection->client,
                                           collection->ns,
-                                          true,
                                           has_unwrapped ? &unwrapped : query,
                                           &opts,
                                           read_prefs,
@@ -614,7 +612,6 @@ mongoc_collection_find_with_opts (mongoc_collection_t *collection,
    mongoc_cursor_t *cursor = _mongoc_cursor_new_with_opts (
       collection->client,
       collection->ns,
-      true /* is_find */,
       filter,
       opts,
       COALESCE (read_prefs, collection->read_prefs),
@@ -688,13 +685,8 @@ mongoc_collection_command (mongoc_collection_t *collection,
     */
 
    /* flags, skip, limit, batch_size, fields are unused */
-   return _mongoc_cursor_new_with_opts (collection->client,
-                                        ns,
-                                        false /* is_find */,
-                                        query,
-                                        NULL,
-                                        read_prefs,
-                                        NULL);
+   return _mongoc_cursor_new_with_opts (
+      collection->client, ns, query, NULL, read_prefs, NULL);
 }
 
 
@@ -1389,7 +1381,6 @@ mongoc_collection_find_indexes_with_opts (mongoc_collection_t *collection,
     * primary node in replicaSet mode". */
    cursor = _mongoc_cursor_new_with_opts (collection->client,
                                           collection->ns,
-                                          false /* is_find */,
                                           &cmd,
                                           opts,
                                           NULL /* read prefs */,
@@ -1407,7 +1398,6 @@ mongoc_collection_find_indexes_with_opts (mongoc_collection_t *collection,
       mongoc_cursor_destroy (cursor);
       cursor = _mongoc_cursor_new_with_opts (collection->client,
                                              collection->ns,
-                                             false /* is_find */,
                                              NULL /* filter */,
                                              NULL /* opts */,
                                              NULL /* read_prefs */,

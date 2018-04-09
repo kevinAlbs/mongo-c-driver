@@ -31,8 +31,9 @@ test_get_host (void)
    hosts = mongoc_uri_get_hosts (uri);
 
    client = test_framework_client_new ();
-   cursor = _mongoc_cursor_new_with_opts (
-      client, "test.test", true /* is_find */, &q, NULL, NULL, NULL);
+   cursor =
+      _mongoc_cursor_new_with_opts (client, "test.test", &q, NULL, NULL, NULL);
+   _mongoc_cursor_init_find_ctx (cursor);
    ASSERT (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
@@ -100,9 +101,10 @@ test_clone (void)
       mongoc_collection_destroy (col);
    }
 
-   cursor = _mongoc_cursor_new_with_opts (
-      client, "test.test", true /* is_find */, &q, NULL, NULL, NULL);
+   cursor =
+      _mongoc_cursor_new_with_opts (client, "test.test", &q, NULL, NULL, NULL);
    ASSERT (cursor);
+   _mongoc_cursor_init_find_ctx (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
 
@@ -166,7 +168,7 @@ test_clone_with_concerns (void)
                                   MONGOC_READ_CONCERN_LEVEL_LOCAL);
 
    cursor = _mongoc_cursor_new_with_opts (
-      client, "test.test", true /* is_find */, &q, NULL, NULL, read_concern);
+      client, "test.test", &q, NULL, NULL, read_concern);
    ASSERT (cursor);
    mongoc_cursor_set_batch_size (cursor, 1);
    ASSERT (mongoc_cursor_set_limit (cursor, 1));
@@ -401,13 +403,8 @@ test_kill_cursor_live (void)
 
    ASSERT_CMPINT (ctx.succeeded_count, ==, 1);
 
-   cursor = _mongoc_cursor_new_with_opts (client,
-                                          collection->ns,
-                                          true, /* is find */
-                                          b,
-                                          NULL,
-                                          NULL,
-                                          NULL);
+   cursor = _mongoc_cursor_new_with_opts (
+      client, collection->ns, b, NULL, NULL, NULL);
 
    cursor->cursor_id = ctx.cursor_id;
    cursor->state = END_OF_BATCH; /* meaning, "finished reading first batch" */

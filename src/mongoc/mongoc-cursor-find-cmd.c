@@ -38,14 +38,6 @@ _destroy (mongoc_cursor_context_t *ctx)
 
 
 static void
-_clone (mongoc_cursor_context_t *src, mongoc_cursor_context_t *dst)
-{
-   data_find_cmd_t *data = bson_malloc0 (sizeof (data_find_cmd_t));
-   bson_init (&data->reader.reply);
-}
-
-
-static void
 _prime (mongoc_cursor_t *cursor)
 {
    data_find_cmd_t *data = (data_find_cmd_t *) cursor->ctx.data;
@@ -76,11 +68,6 @@ _get_next_batch (mongoc_cursor_t *cursor)
    /* uint64_t batch_size; */
    data_find_cmd_t *ctx = (data_find_cmd_t *) cursor->ctx.data;
    bson_t getmore_cmd;
-
-   /* See find, getMore, and killCursors Spec for batchSize rules */
-   /* TODO: when removing the is_find flag, we'll need the following line back
-    * most likely */
-   /* batch_size = (uint64_t) abs (_mongoc_n_return (false, cursor)); */
    _mongoc_cursor_prepare_getmore_command (cursor, &getmore_cmd);
    _mongoc_cursor_batch_reader_refresh (
       cursor, &getmore_cmd, NULL /* opts */, &ctx->reader);
@@ -97,8 +84,8 @@ _mongoc_cursor_init_find_cmd_ctx (mongoc_cursor_t *cursor)
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.clone = _clone;
    cursor->ctx.destroy = _destroy;
    cursor->ctx.get_host = _get_host;
+   cursor->ctx.init = _mongoc_cursor_init_find_cmd_ctx;
    cursor->ctx.data = (void *) ctx;
 }

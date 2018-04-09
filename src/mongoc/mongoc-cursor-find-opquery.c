@@ -42,8 +42,7 @@ _prime (mongoc_cursor_t *cursor)
    }
 
    _mongoc_buffer_clear (&cursor->legacy_response.buffer, false);
-   /* TODO: change op_query to not return the first doc */
-   _mongoc_cursor_op_query (cursor, NULL/* server stream */);
+   _mongoc_cursor_op_query_find (cursor);
 
    if (cursor->error.domain) {
       cursor->state = DONE;
@@ -105,9 +104,9 @@ _get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
 }
 
 static void
-_destroy (mongoc_cursor_context_t* ctx) {}
-
-void _clone (mongoc_cursor_context_t* src, mongoc_cursor_context_t* dst){}
+_destroy (mongoc_cursor_context_t *ctx)
+{
+}
 
 void
 _mongoc_cursor_init_find_opquery_ctx (mongoc_cursor_t *cursor)
@@ -115,7 +114,7 @@ _mongoc_cursor_init_find_opquery_ctx (mongoc_cursor_t *cursor)
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.clone = _clone;
    cursor->ctx.destroy = _destroy;
+   cursor->ctx.init = _mongoc_cursor_init_find_opquery_ctx;
    cursor->ctx.get_host = _get_host;
 }

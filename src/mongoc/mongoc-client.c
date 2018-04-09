@@ -1526,7 +1526,7 @@ mongoc_client_command (mongoc_client_t *client,
 
    /* flags, skip, limit, batch_size, fields are unused */
    cursor = _mongoc_cursor_new_with_opts (
-      client, db_name, false /* is_find */, query, NULL, read_prefs, NULL);
+      client, db_name, query, NULL, read_prefs, NULL);
 
    return cursor;
 }
@@ -1564,9 +1564,8 @@ retry:
     * a new writable stream and retry. If server selection fails or the selected
     * server does not support retryable writes, fall through and allow the
     * original error to be reported. */
-   if (!ret && is_retryable &&
-       (error->domain == MONGOC_ERROR_STREAM ||
-        mongoc_cluster_is_not_master_error (error))) {
+   if (!ret && is_retryable && (error->domain == MONGOC_ERROR_STREAM ||
+                                mongoc_cluster_is_not_master_error (error))) {
       bson_error_t ignored_error;
 
       /* each write command may be retried at most once */
@@ -1579,8 +1578,9 @@ retry:
       retry_server_stream =
          mongoc_cluster_stream_for_writes (&client->cluster, &ignored_error);
 
-      if (retry_server_stream && retry_server_stream->sd->max_wire_version >=
-                                    WIRE_VERSION_RETRY_WRITES) {
+      if (retry_server_stream &&
+          retry_server_stream->sd->max_wire_version >=
+             WIRE_VERSION_RETRY_WRITES) {
          parts->assembled.server_stream = retry_server_stream;
          _mongoc_bson_destroy_if_set (reply);
          GOTO (retry);
@@ -2377,8 +2377,8 @@ mongoc_client_get_database_names_with_opts (mongoc_client_t *client,
    BSON_APPEND_BOOL (&cmd, "nameOnly", true);
 
    /* ignore client read prefs */
-   cursor = _mongoc_cursor_new_with_opts (
-      client, "admin", false /* is_find */, NULL, opts, NULL, NULL);
+   cursor =
+      _mongoc_cursor_new_with_opts (client, "admin", NULL, opts, NULL, NULL);
 
    _mongoc_cursor_array_init (cursor, &cmd, "databases");
    bson_destroy (&cmd);
@@ -2423,8 +2423,8 @@ mongoc_client_find_databases_with_opts (mongoc_client_t *client,
    BSON_APPEND_INT32 (&cmd, "listDatabases", 1);
 
    /* ignore client read prefs */
-   cursor = _mongoc_cursor_new_with_opts (
-      client, "admin", false /* is_find */, NULL, opts, NULL, NULL);
+   cursor =
+      _mongoc_cursor_new_with_opts (client, "admin", NULL, opts, NULL, NULL);
 
    _mongoc_cursor_array_init (cursor, &cmd, "databases");
 

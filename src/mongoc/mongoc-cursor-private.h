@@ -34,7 +34,7 @@ BSON_BEGIN_DECLS
 typedef struct _mongoc_cursor_interface_t mongoc_cursor_interface_t;
 typedef struct _mongoc_cursor_context_t mongoc_cursor_context_t;
 typedef struct _mongoc_cursor_context_t {
-   void (*clone) (mongoc_cursor_context_t *src, mongoc_cursor_context_t *dst);
+   void (*init) (mongoc_cursor_t *cursor);
    void (*destroy) (mongoc_cursor_context_t *ctx);
    void (*prime) (mongoc_cursor_t *cursor);
    void (*pop_from_batch) (mongoc_cursor_t *cursor, const bson_t **out);
@@ -127,8 +127,6 @@ struct _mongoc_cursor_t {
    uint32_t server_id;
    bool slave_ok;
 
-   /* TODO: remove */
-   unsigned is_find : 1;
    mongoc_cursor_state_t state;
 
    bool in_exhaust : 1;
@@ -170,7 +168,7 @@ struct _mongoc_cursor_t {
 
 
 int32_t
-_mongoc_n_return (bool is_initial_request, mongoc_cursor_t *cursor);
+_mongoc_n_return (mongoc_cursor_t *cursor);
 void
 _mongoc_set_cursor_ns (mongoc_cursor_t *cursor, const char *ns, uint32_t nslen);
 bool
@@ -187,7 +185,6 @@ _mongoc_cursor_translate_dollar_query_opts (const bson_t *query,
 mongoc_cursor_t *
 _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const char *db_and_collection,
-                              bool is_find,
                               const bson_t *filter,
                               const bson_t *opts,
                               const mongoc_read_prefs_t *read_prefs,
@@ -283,9 +280,8 @@ _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson);
 bool
 _mongoc_read_from_buffer (mongoc_cursor_t *cursor, const bson_t **bson);
 
-const bson_t *
-_mongoc_cursor_op_query (mongoc_cursor_t *cursor,
-                         mongoc_server_stream_t *server_stream);
+void
+_mongoc_cursor_op_query_find (mongoc_cursor_t *cursor);
 
 BSON_END_DECLS
 

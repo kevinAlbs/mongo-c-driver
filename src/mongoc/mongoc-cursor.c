@@ -111,38 +111,39 @@ _mongoc_cursor_get_opt_bool (const mongoc_cursor_t *cursor, const char *option)
    return false;
 }
 
-
 int32_t
-_mongoc_n_return (bool is_initial_message, mongoc_cursor_t *cursor)
+_mongoc_n_return (mongoc_cursor_t *cursor)
 {
    int64_t limit;
    int64_t batch_size;
    int64_t n_return;
 
-   if (!cursor->is_find && is_initial_message) {
-      /* commands always have n_return of 1 */
-      return 1;
-   }
-
+   /* calculate numberToReturn according to:
+    * https://github.com/mongodb/specifications/blob/master/source/crud/crud.rst#combining-limit-and-batch-size-for-the-wire-protocol
+    */
    limit = mongoc_cursor_get_limit (cursor);
    batch_size = mongoc_cursor_get_batch_size (cursor);
 
    if (limit < 0) {
       n_return = limit;
-   } else if (limit) {
-      int64_t remaining = limit - cursor->count;
-      BSON_ASSERT (remaining > 0);
-
-      if (batch_size) {
-         n_return = BSON_MIN (batch_size, remaining);
-      } else {
-         /* batch_size 0 means accept the default */
-         n_return = remaining;
-      }
+   } else if (limit == 0) {
+      n_return = batch_size;
+   } else if (batch_size == 0) {
+      n_return = limit;
+   } else if (limit < batch_size) {
+      n_return = limit;
    } else {
       n_return = batch_size;
    }
 
+   /* if a specified limit exists, account for documents already returned. */
+   if (limit > 0 && cursor->count) {
+      int64_t remaining = limit - cursor->count;
+      BSON_ASSERT (remaining > 0);
+      n_return = BSON_MIN (n_return, remaining);
+   }
+
+   /* check boundary conditions */
    if (n_return < INT32_MIN) {
       return INT32_MIN;
    } else if (n_return > INT32_MAX) {
@@ -200,7 +201,6 @@ _first_dollar_field (const bson_t *bson)
 mongoc_cursor_t *
 _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const char *db_and_collection,
-                              bool is_find,
                               const bson_t *filter,
                               const bson_t *opts,
                               const mongoc_read_prefs_t *read_prefs,
@@ -219,7 +219,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
 
    cursor = (mongoc_cursor_t *) bson_malloc0 (sizeof *cursor);
    cursor->client = client;
-   cursor->is_find = is_find ? 1 : 0;
    cursor->state = UNPRIMED;
 
    bson_init (&cursor->filter);
@@ -545,7 +544,7 @@ mongoc_cursor_destroy (mongoc_cursor_t *cursor)
    }
 
    if (cursor->ctx.destroy) {
-      cursor->ctx.destroy(&cursor->ctx);
+      cursor->ctx.destroy (&cursor->ctx);
    }
 
    EXIT;
@@ -669,35 +668,16 @@ _mongoc_cursor_initial_query (mongoc_cursor_t *cursor)
       GOTO (done);
    }
 
-   if (!cursor->is_find) {
-      /* cursor created with deprecated mongoc_client_command() */
-      bson_destroy (&cursor->deprecated_reply);
+   /* cursor created with deprecated mongoc_client_command() */
+   bson_destroy (&cursor->deprecated_reply);
 
-      if (_mongoc_cursor_run_command (cursor,
-                                      &cursor->filter,
-                                      &cursor->opts,
-                                      &cursor->deprecated_reply)) {
-         b = &cursor->deprecated_reply;
-      }
-
-      cursor->state = IN_BATCH;
-   } else if (_use_find_command (cursor, server_stream)) {
-      b = _mongoc_cursor_find_command (cursor, server_stream);
-   } else {
-      /* When the user explicitly provides a readConcern -- but the server
-       * doesn't support readConcern, we must error:
-       * https://github.com/mongodb/specifications/blob/master/source/read-write-concern/read-write-concern.rst#errors-1
-       */
-      if (cursor->read_concern->level != NULL &&
-          server_stream->sd->max_wire_version < WIRE_VERSION_READ_CONCERN) {
-         bson_set_error (&cursor->error,
-                         MONGOC_ERROR_COMMAND,
-                         MONGOC_ERROR_PROTOCOL_BAD_WIRE_VERSION,
-                         "The selected server does not support readConcern");
-      } else {
-         b = _mongoc_cursor_op_query (cursor, server_stream);
-      }
+   if (_mongoc_cursor_run_command (
+          cursor, &cursor->filter, &cursor->opts, &cursor->deprecated_reply)) {
+      b = &cursor->deprecated_reply;
    }
+
+   cursor->state = IN_BATCH;
+
 
 done:
    /* no-op if server_stream is NULL */
@@ -1119,9 +1099,6 @@ _mongoc_cursor_find_command (mongoc_cursor_t *cursor,
 
    ENTRY;
 
-   /* cursors created by mongoc_client_command don't use this function */
-   BSON_ASSERT (cursor->is_find);
-
    _mongoc_cursor_prepare_find_command (cursor, &command);
 
    _mongoc_cursor_cursorid_init (cursor, &command);
@@ -1412,8 +1389,8 @@ mongoc_cursor_clone (const mongoc_cursor_t *cursor)
       ret = _mongoc_cursor_clone (cursor);
    }
 
-   if (cursor->ctx.clone) {
-      cursor->ctx.clone(&cursor->ctx, &ret->ctx);
+   if (cursor->ctx.init) {
+      cursor->ctx.init (ret);
    }
 
    RETURN (ret);
@@ -1432,7 +1409,6 @@ _mongoc_cursor_clone (const mongoc_cursor_t *cursor)
    _clone = (mongoc_cursor_t *) bson_malloc0 (sizeof *_clone);
 
    _clone->client = cursor->client;
-   _clone->is_find = cursor->is_find;
    _clone->nslen = cursor->nslen;
    _clone->dblen = cursor->dblen;
    _clone->explicit_session = cursor->explicit_session;
@@ -1675,8 +1651,8 @@ mongoc_cursor_new_from_command_reply (mongoc_client_t *client,
                                   "$gleStats",
                                   NULL);
 
-   cursor = _mongoc_cursor_new_with_opts (
-      client, NULL, true /* is_find */, NULL, &opts, NULL, NULL);
+   cursor =
+      _mongoc_cursor_new_with_opts (client, NULL, NULL, &opts, NULL, NULL);
 
    _mongoc_cursor_cursorid_init (cursor, &cmd);
    _mongoc_cursor_cursorid_init_with_reply (cursor, reply, server_id);

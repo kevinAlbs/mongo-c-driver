@@ -145,7 +145,8 @@ _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
     * make further progress.  We also set end_of_event so that
     * mongoc_cursor_more will be false.
     */
-   limit = cursor->is_find ? mongoc_cursor_get_limit (cursor) : 1;
+   limit =
+      1; /* find cursors don't use this function anymore, this is just 1. */
 
    if (limit && cursor->count >= llabs (limit)) {
       cursor->state = DONE;
@@ -174,6 +175,7 @@ _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
    }
 
 complete:
+   /* NOTE: this check isn't in find cursors anymore. I think it's ok though. */
    tailable = _mongoc_cursor_get_opt_bool (cursor, "tailable");
    if (cursor->state == END_OF_BATCH && !tailable) {
       if (cursor->in_exhaust && !cursor->cursor_id) {
@@ -233,7 +235,7 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
       if (flags & MONGOC_QUERY_TAILABLE_CURSOR) {
          rpc.get_more.n_return = 0;
       } else {
-         rpc.get_more.n_return = _mongoc_n_return (false, cursor);
+         rpc.get_more.n_return = _mongoc_n_return (cursor);
       }
 
       if (!_mongoc_cursor_monitor_legacy_get_more (cursor, server_stream)) {
@@ -536,9 +538,9 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
 #undef OPT_SUBDOCUMENT
 
 
-const bson_t *
-_mongoc_cursor_op_query (mongoc_cursor_t *cursor,
-                         mongoc_server_stream_t *server_stream)
+/* this is *only* for find cursors */
+void
+_mongoc_cursor_op_query_find (mongoc_cursor_t *cursor)
 {
    int64_t started;
    uint32_t request_id;
@@ -548,19 +550,25 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
    bson_t fields = BSON_INITIALIZER;
    mongoc_query_flags_t flags;
    mongoc_assemble_query_result_t result = ASSEMBLE_QUERY_RESULT_INIT;
-   const bson_t *ret = NULL;
    bool succeeded = false;
-   bool owns_stream = false;
+   mongoc_server_stream_t* server_stream;
 
    ENTRY;
 
-   if (!server_stream) {
-      server_stream = _mongoc_cursor_fetch_stream (cursor);
-      owns_stream = true;
-   }
+   server_stream = _mongoc_cursor_fetch_stream (cursor);
 
-   /* cursors created by mongoc_client_command don't use this function */
-   BSON_ASSERT (cursor->is_find);
+   /* When the user explicitly provides a readConcern -- but the server
+       * doesn't support readConcern, we must error:
+       * https://github.com/mongodb/specifications/blob/master/source/read-write-concern/read-write-concern.rst#errors-1
+       */
+   if (cursor->read_concern->level != NULL &&
+       server_stream->sd->max_wire_version < WIRE_VERSION_READ_CONCERN) {
+      bson_set_error (&cursor->error,
+                      MONGOC_ERROR_COMMAND,
+                      MONGOC_ERROR_PROTOCOL_BAD_WIRE_VERSION,
+                      "The selected server does not support readConcern");
+      GOTO (done);
+   }
 
    started = bson_get_monotonic_time ();
 
@@ -591,7 +599,7 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
 
    rpc.query.query = bson_get_data (result.assembled_query);
    rpc.query.flags = result.flags;
-   rpc.query.n_return = _mongoc_n_return (true, cursor);
+   rpc.query.n_return = _mongoc_n_return (cursor);
    if (!bson_empty (&fields)) {
       rpc.query.fields = bson_get_data (&fields);
    }
@@ -668,14 +676,6 @@ _mongoc_cursor_op_query (mongoc_cursor_t *cursor,
    cursor->state = IN_BATCH;
    succeeded = true;
 
-   /* TODO: I'm using owns_stream to distinguish whether or not the caller is
-    * the new cursor.
-    * The real change here should be *not* to return the reply immediately (I
-    * think) */
-   if (!owns_stream) {
-      _mongoc_read_from_buffer (cursor, &ret);
-   }
-
 done:
    if (!succeeded) {
       _mongoc_cursor_monitor_failed (
@@ -683,21 +683,8 @@ done:
       /* TODO: maybe set cursor->state to DONE here? */
    }
 
-   if (owns_stream) {
-      mongoc_server_stream_cleanup (server_stream);
-   }
-
+   mongoc_server_stream_cleanup (server_stream);
    assemble_query_result_cleanup (&result);
    bson_destroy (&query);
    bson_destroy (&fields);
-
-   /* TODO: ditto above */
-   if (owns_stream) {
-      return NULL;
-   }
-   if (!ret) {
-      cursor->state = DONE;
-   }
-
-   RETURN (ret);
 }

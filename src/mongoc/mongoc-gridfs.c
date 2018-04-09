@@ -410,7 +410,6 @@ mongoc_gridfs_remove_by_filename (mongoc_gridfs_t *gridfs,
 
    cursor = _mongoc_cursor_new_with_opts (gridfs->client,
                                           gridfs->files->ns,
-                                          true /* is_find */,
                                           &find_filter,
                                           &find_opts,
                                           NULL /* read_prefs */,
