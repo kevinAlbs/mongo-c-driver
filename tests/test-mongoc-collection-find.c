@@ -229,6 +229,7 @@ _test_collection_op_query_or_find_command (test_collection_find_t *test_data,
          bson_append_document (&actual_result, key, -1, doc);
          i++;
       }
+
       BSON_ASSERT (!mongoc_cursor_error (cursor, NULL));
    }
 
@@ -578,7 +579,8 @@ test_index_spec_modifiers (void)
 {
    /* don't include $max, it needs a slightly different argument to succeed */
    const char *modifiers[] = {
-      "hint", "min",
+      "hint",
+      "min",
    };
 
    const char *mod;

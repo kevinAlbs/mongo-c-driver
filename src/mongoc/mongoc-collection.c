@@ -330,7 +330,6 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
                                     read_prefs,
                                     NULL /* read concern */);
    bson_destroy (&cursor_opts);
-
    if (!_mongoc_get_server_id_from_opts (opts,
                                          MONGOC_ERROR_COMMAND,
                                          MONGOC_ERROR_COMMAND_INVALID_ARG,
@@ -528,6 +527,7 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
 
    bson_init (&opts);
    _mongoc_cursor_flags_to_opts (flags, &opts, &slave_ok);
+   /* check if the query is wrapped in $query */
    has_unwrapped = _mongoc_cursor_translate_dollar_query_opts (
       query, &opts, &unwrapped, &error);
    if (!bson_empty0 (fields)) {

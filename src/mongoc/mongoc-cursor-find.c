@@ -16,7 +16,6 @@
 
 #include "mongoc.h"
 #include "mongoc-cursor-private.h"
-#include "mongoc-util-private.h"
 #include "mongoc-client-private.h"
 
 
@@ -25,31 +24,21 @@ _mongoc_cursor_ctx_find_cmd_init (mongoc_cursor_t *cursor);
 extern void
 _mongoc_cursor_ctx_find_opquery_init (mongoc_cursor_t *cursor);
 
+
 static void
 _prime (mongoc_cursor_t *cursor)
 {
    bool use_find_command;
-   uint32_t server_id;
    mongoc_server_stream_t *server_stream;
 
    /* determine if this should be a command or op_query cursor. */
-   if (!_mongoc_get_server_id_from_opts (&cursor->opts,
-                                         MONGOC_ERROR_CURSOR,
-                                         MONGOC_ERROR_CURSOR_INVALID_CURSOR,
-                                         &server_id,
-                                         &cursor->error)) {
-      cursor->state = DONE;
-      return;
-   }
-
-   /* may set server_id. */
    server_stream = _mongoc_cursor_fetch_stream (cursor);
-
    if (!server_stream) {
       cursor->state = DONE;
       return;
    }
-   /* a find command can not be used for exhaust cursors. */
+   /* find_getmore_killcursors spec:
+    * "The find command does not support the exhaust flag from OP_QUERY." */
    use_find_command =
       server_stream->sd->max_wire_version >= WIRE_VERSION_FIND_CMD &&
       !_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST);
@@ -60,7 +49,7 @@ _prime (mongoc_cursor_t *cursor)
    } else {
       _mongoc_cursor_ctx_find_opquery_init (cursor);
    }
-
+   /* prime with the new context. */
    cursor->ctx.prime (cursor);
 }
 

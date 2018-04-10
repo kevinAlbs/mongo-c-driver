@@ -23,22 +23,12 @@ typedef struct _data_find_cmd_t {
 
 
 static void
-_destroy (mongoc_cursor_context_t *ctx)
-{
-   data_find_cmd_t *data = (data_find_cmd_t *) ctx->data;
-   bson_destroy (&data->response.reply);
-   bson_free (data);
-}
-
-
-static void
 _prime (mongoc_cursor_t *cursor)
 {
    data_find_cmd_t *data = (data_find_cmd_t *) cursor->ctx.data;
    bson_t find_cmd;
+
    bson_init (&find_cmd);
-   /* TODO: The legacy cursor sets the operation ID in _mongoc_cursor_op_query,
-    * the cursorid cursor set it during priming. Which is better? */
    cursor->operation_id = ++cursor->client->cluster.operation_id;
    /* construct { find: "<collection>", filter: {<filter>} } */
    _mongoc_cursor_prepare_find_command (cursor, &find_cmd);
@@ -69,7 +59,16 @@ _get_next_batch (mongoc_cursor_t *cursor)
 
 
 static void
-_clone (mongoc_cursor_context_t *dst, const mongoc_cursor_context_t *src)
+_destroy (mongoc_cursor_ctx_t *ctx)
+{
+   data_find_cmd_t *data = (data_find_cmd_t *) ctx->data;
+   bson_destroy (&data->response.reply);
+   bson_free (data);
+}
+
+
+static void
+_clone (mongoc_cursor_ctx_t *dst, const mongoc_cursor_ctx_t *src)
 {
    data_find_cmd_t *data = bson_malloc0 (sizeof (*data));
    bson_init (&data->response.reply);

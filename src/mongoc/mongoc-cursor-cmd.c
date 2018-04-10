@@ -19,7 +19,6 @@
 
 typedef enum { NONE, RESPONSE, RESPONSE_LEGACY } reading_from_t;
 typedef enum { UNKNOWN, GETMORE_CMD, OP_GETMORE } getmore_type_t;
-
 typedef struct _data_cmd_t {
    /* Two paths:
     * - Mongo 3.2+, sent "getMore" cmd, we're reading reply's "nextBatch" array
@@ -49,15 +48,6 @@ _use_getmore_cmd (mongoc_cursor_t *cursor)
    return ret;
 }
 
-static void
-_destroy (mongoc_cursor_context_t *ctx)
-{
-   data_cmd_t *data = (data_cmd_t *) ctx->data;
-   bson_destroy (&data->response.reply);
-   _mongoc_cursor_response_legacy_destroy(&data->response_legacy);
-   bson_free(data);
-}
-
 
 static void
 _prime (mongoc_cursor_t *cursor)
@@ -67,7 +57,7 @@ _prime (mongoc_cursor_t *cursor)
    bson_init (&copied_opts);
 
    cursor->operation_id = ++cursor->client->cluster.operation_id;
-   /* commands have a cursor field, so copy opts without "batchSize" */
+   /* commands like agg have a cursor field, so copy opts without "batchSize" */
    bson_copy_to_excluding_noinit (
       &cursor->opts, &copied_opts, "batchSize", NULL);
 
@@ -135,11 +125,21 @@ _get_next_batch (mongoc_cursor_t *cursor)
 
 
 static void
-_clone (mongoc_cursor_context_t *dst, const mongoc_cursor_context_t *src)
+_destroy (mongoc_cursor_ctx_t *ctx)
+{
+   data_cmd_t *data = (data_cmd_t *) ctx->data;
+   bson_destroy (&data->response.reply);
+   _mongoc_cursor_response_legacy_destroy (&data->response_legacy);
+   bson_free (data);
+}
+
+
+static void
+_clone (mongoc_cursor_ctx_t *dst, const mongoc_cursor_ctx_t *src)
 {
    data_cmd_t *data = bson_malloc0 (sizeof (*data));
    bson_init (&data->response.reply);
-   _mongoc_cursor_response_legacy_init(&data->response_legacy);
+   _mongoc_cursor_response_legacy_init (&data->response_legacy);
    dst->data = data;
 }
 
@@ -157,7 +157,7 @@ _mongoc_cursor_cmd_new (mongoc_client_t *client,
 
    cursor = _mongoc_cursor_new_with_opts (
       client, db_and_coll, cmd, opts, read_prefs, read_concern);
-   _mongoc_cursor_response_legacy_init(&data->response_legacy);
+   _mongoc_cursor_response_legacy_init (&data->response_legacy);
    bson_init (&data->response.reply);
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
@@ -167,6 +167,7 @@ _mongoc_cursor_cmd_new (mongoc_client_t *client,
    cursor->ctx.data = (void *) data;
    return cursor;
 }
+
 
 mongoc_cursor_t *
 _mongoc_cursor_cmd_new_from_reply (mongoc_client_t *client,
@@ -178,9 +179,10 @@ _mongoc_cursor_cmd_new_from_reply (mongoc_client_t *client,
    mongoc_cursor_t *cursor =
       _mongoc_cursor_cmd_new (client, NULL, cmd, opts, NULL, NULL);
    data_cmd_t *data = (data_cmd_t *) cursor->ctx.data;
+
+   data->reading_from = RESPONSE;
    cursor->state = IN_BATCH;
    cursor->server_id = server_id;
-   data->reading_from = RESPONSE;
    bson_destroy (&data->response.reply);
    if (!bson_steal (&data->response.reply, reply)) {
       bson_destroy (&data->response.reply);

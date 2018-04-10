@@ -91,16 +91,15 @@ BSON_BEGIN_DECLS
 #define MONGOC_CURSOR_TAILABLE_LEN 8
 
 typedef struct _mongoc_cursor_interface_t mongoc_cursor_interface_t;
-typedef struct _mongoc_cursor_context_t mongoc_cursor_context_t;
-typedef struct _mongoc_cursor_context_t {
-   void (*clone) (mongoc_cursor_context_t *dst,
-                  const mongoc_cursor_context_t *src);
-   void (*destroy) (mongoc_cursor_context_t *ctx);
+typedef struct _mongoc_cursor_ctx_t mongoc_cursor_ctx_t;
+typedef struct _mongoc_cursor_ctx_t {
+   void (*clone) (mongoc_cursor_ctx_t *dst, const mongoc_cursor_ctx_t *src);
+   void (*destroy) (mongoc_cursor_ctx_t *ctx);
    void (*prime) (mongoc_cursor_t *cursor);
    void (*pop_from_batch) (mongoc_cursor_t *cursor, const bson_t **out);
    void (*get_next_batch) (mongoc_cursor_t *cursor);
    void *data;
-} mongoc_cursor_context_t;
+} mongoc_cursor_ctx_t;
 
 typedef enum { UNPRIMED, IN_BATCH, END_OF_BATCH, DONE } mongoc_cursor_state_t;
 
@@ -148,7 +147,7 @@ struct _mongoc_cursor_t {
 
    const bson_t *current;
 
-   mongoc_cursor_context_t ctx;
+   mongoc_cursor_ctx_t ctx;
 
    int64_t operation_id;
    int64_t cursor_id;

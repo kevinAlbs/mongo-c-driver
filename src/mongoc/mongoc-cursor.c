@@ -1088,6 +1088,9 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
       RETURN (false);
    }
 
+   /* TODO: try to move all state transitions here. Cursor implementation can
+    * mark a cursor failed by just setting the error, and can signal
+    * END_OF_BATCH implicitly by setting the output doc to NULL. */
    BSON_ASSERT (cursor->ctx.prime);
    if (cursor->state == UNPRIMED) {
       cursor->ctx.prime (cursor);
@@ -1101,7 +1104,7 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
     * beginning of next */
    if (cursor->state == END_OF_BATCH) {
       cursor->ctx.get_next_batch (cursor);
-      /* TODO: these transitions are weird */
+      /* TODO: these transitions are weird, improve. */
       if (cursor->state == IN_BATCH) {
          cursor->ctx.pop_from_batch (cursor, bson);
          if (*bson) {

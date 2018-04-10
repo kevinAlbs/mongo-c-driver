@@ -26,7 +26,7 @@ typedef struct _data_array_t {
 
 
 static void
-_destroy (mongoc_cursor_context_t *ctx)
+_destroy (mongoc_cursor_ctx_t *ctx)
 {
    data_array_t *data = (data_array_t *) ctx->data;
    bson_destroy (&data->array);
@@ -69,7 +69,7 @@ _pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
 }
 
 static void
-_clone (mongoc_cursor_context_t *dst, const mongoc_cursor_context_t *src)
+_clone (mongoc_cursor_ctx_t *dst, const mongoc_cursor_ctx_t *src)
 {
    data_array_t *data = bson_malloc0 (sizeof (*data));
    bson_init (&data->array);
