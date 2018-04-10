@@ -19,6 +19,7 @@
 #include "mongoc-client-private.h"
 
 typedef struct _data_find_opquery_t {
+   mongoc_cursor_response_legacy_t response_legacy;
 } data_find_opquery_t;
 
 static bool
@@ -37,12 +38,12 @@ _hit_limit (mongoc_cursor_t *cursor)
 static void
 _prime (mongoc_cursor_t *cursor)
 {
+   data_find_opquery_t *data = (data_find_opquery_t*)cursor->ctx.data;
    if (_hit_limit (cursor)) {
       return;
    }
 
-   _mongoc_buffer_clear (&cursor->legacy_response.buffer, false);
-   _mongoc_cursor_op_query_find (cursor);
+   _mongoc_cursor_op_query_find (cursor, &data->response_legacy);
 
    if (cursor->error.domain) {
       cursor->state = DONE;
@@ -62,6 +63,7 @@ _prime (mongoc_cursor_t *cursor)
 static void
 _pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
 {
+   data_find_opquery_t *data = (data_find_opquery_t*)cursor->ctx.data;
    const bson_t *bson;
    bool eof = false;
 
@@ -70,7 +72,7 @@ _pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
       return;
    }
 
-   bson = bson_reader_read (cursor->legacy_response.reader, &eof);
+   bson = bson_reader_read (data->response_legacy.reader, &eof);
 
    if (out) {
       *out = bson;
@@ -86,10 +88,9 @@ _pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
 static void
 _get_next_batch (mongoc_cursor_t *cursor)
 {
+   data_find_opquery_t *data = (data_find_opquery_t*)cursor->ctx.data;
    bool r;
-
-   _mongoc_buffer_clear (&cursor->legacy_response.buffer, false);
-   r = _mongoc_cursor_op_getmore (cursor, NULL /* server stream */);
+   r = _mongoc_cursor_op_getmore (cursor, &data->response_legacy);
    if (!r || cursor->error.domain) {
       cursor->state = DONE;
    } else {
@@ -97,10 +98,31 @@ _get_next_batch (mongoc_cursor_t *cursor)
    }
 }
 
+static void
+_clone (mongoc_cursor_context_t *dst, const mongoc_cursor_context_t *src)
+{
+   data_find_opquery_t *data = bson_malloc0 (sizeof (*data));
+   _mongoc_cursor_response_legacy_init (&data->response_legacy);
+   dst->data = data;
+}
+
+static void
+_destroy (mongoc_cursor_context_t *ctx)
+{
+   data_find_opquery_t *data = (data_find_opquery_t*)ctx->data;
+   _mongoc_cursor_response_legacy_destroy (&data->response_legacy);
+   bson_free(data);
+}
+
 void
 _mongoc_cursor_ctx_find_opquery_init (mongoc_cursor_t *cursor)
 {
+   data_find_opquery_t *data = bson_malloc0 (sizeof (*data));
+   _mongoc_cursor_response_legacy_init (&data->response_legacy);
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
+   cursor->ctx.clone = _clone;
+   cursor->ctx.destroy = _destroy;
+   cursor->ctx.data = data;
 }

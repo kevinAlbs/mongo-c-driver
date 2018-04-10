@@ -220,7 +220,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
    bson_init (&cursor->filter);
    bson_init (&cursor->opts);
    bson_init (&cursor->error_doc);
-   bson_init (&cursor->deprecated_reply);
 
    if (filter) {
       if (!bson_validate_with_error (
@@ -323,7 +322,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
       }
    }
 
-   _mongoc_buffer_init (&cursor->legacy_response.buffer, NULL, 0, NULL, NULL);
    (void) _mongoc_read_prefs_validate (read_prefs, &cursor->error);
 
 finish:
@@ -573,23 +571,16 @@ _mongoc_cursor_destroy (mongoc_cursor_t *cursor)
                                   cursor->client_session);
    }
 
-   if (cursor->legacy_response.reader) {
-      bson_reader_destroy (cursor->legacy_response.reader);
-      cursor->legacy_response.reader = NULL;
-   }
-
    if (cursor->client_session && !cursor->explicit_session) {
       mongoc_client_session_destroy (cursor->client_session);
    }
 
-   _mongoc_buffer_destroy (&cursor->legacy_response.buffer);
    mongoc_read_prefs_destroy (cursor->read_prefs);
    mongoc_read_concern_destroy (cursor->read_concern);
    mongoc_write_concern_destroy (cursor->write_concern);
 
    bson_destroy (&cursor->filter);
    bson_destroy (&cursor->opts);
-   bson_destroy (&cursor->deprecated_reply);
    bson_destroy (&cursor->error_doc);
    bson_free (cursor);
 
@@ -629,39 +620,7 @@ _mongoc_cursor_fetch_stream (mongoc_cursor_t *cursor)
 const bson_t *
 _mongoc_cursor_initial_query (mongoc_cursor_t *cursor)
 {
-   mongoc_server_stream_t *server_stream;
-   const bson_t *b = NULL;
-
-   ENTRY;
-
-   BSON_ASSERT (cursor);
-
-   server_stream = _mongoc_cursor_fetch_stream (cursor);
-
-   if (!server_stream) {
-      GOTO (done);
-   }
-
-   /* cursor created with deprecated mongoc_client_command() */
-   bson_destroy (&cursor->deprecated_reply);
-
-   if (_mongoc_cursor_run_command (
-          cursor, &cursor->filter, &cursor->opts, &cursor->deprecated_reply)) {
-      b = &cursor->deprecated_reply;
-   }
-
-   cursor->state = IN_BATCH;
-
-
-done:
-   /* no-op if server_stream is NULL */
-   mongoc_server_stream_cleanup (server_stream);
-
-   if (!b) {
-      cursor->state = DONE;
-   }
-
-   RETURN (b);
+   RETURN (NULL); // TODO DELETE ME
 }
 
 
@@ -704,7 +663,7 @@ _mongoc_cursor_monitor_command (mongoc_cursor_t *cursor,
 
 /* append array of docs from current cursor batch */
 static void
-_mongoc_cursor_append_docs_array (mongoc_cursor_t *cursor, bson_t *docs)
+_mongoc_cursor_append_docs_array (mongoc_cursor_t *cursor, bson_t *docs, mongoc_cursor_response_legacy_t* response)
 {
    bool eof = false;
    char str[16];
@@ -713,17 +672,18 @@ _mongoc_cursor_append_docs_array (mongoc_cursor_t *cursor, bson_t *docs)
    size_t keylen;
    const bson_t *doc;
 
-   while ((doc = bson_reader_read (cursor->legacy_response.reader, &eof))) {
+   while ((doc = bson_reader_read (response->reader, &eof))) {
       keylen = bson_uint32_to_string (i, &key, str, sizeof str);
       bson_append_document (docs, key, (int) keylen, doc);
    }
 
-   bson_reader_reset (cursor->legacy_response.reader);
+   bson_reader_reset (response->reader);
 }
 
 
 void
 _mongoc_cursor_monitor_succeeded (mongoc_cursor_t *cursor,
+                                  mongoc_cursor_response_legacy_t* response,
                                   int64_t duration,
                                   bool first_batch,
                                   mongoc_server_stream_t *stream,
@@ -747,7 +707,7 @@ _mongoc_cursor_monitor_succeeded (mongoc_cursor_t *cursor,
     * {ok: 1, cursor: {id: 17, ns: "...", first/nextBatch: [ ... docs ... ]}}
     */
    bson_init (&docs_array);
-   _mongoc_cursor_append_docs_array (cursor, &docs_array);
+   _mongoc_cursor_append_docs_array (cursor, &docs_array, response);
 
    bson_init (&reply);
    bson_append_int32 (&reply, "ok", 2, 1);
@@ -1063,48 +1023,6 @@ _mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor, bson_t *command)
       command, MONGOC_CURSOR_FILTER, MONGOC_CURSOR_FILTER_LEN, &cursor->filter);
 }
 
-const bson_t *
-_mongoc_cursor_get_more (mongoc_cursor_t *cursor)
-{
-   mongoc_server_stream_t *server_stream;
-   const bson_t *b = NULL;
-
-   ENTRY;
-
-   BSON_ASSERT (cursor);
-
-   server_stream = _mongoc_cursor_fetch_stream (cursor);
-   if (!server_stream) {
-      GOTO (failure);
-   }
-
-   if (!cursor->in_exhaust && !cursor->cursor_id) {
-      bson_set_error (&cursor->error,
-                      MONGOC_ERROR_CURSOR,
-                      MONGOC_ERROR_CURSOR_INVALID_CURSOR,
-                      "No valid cursor was provided.");
-      GOTO (failure);
-   }
-
-   if (!_mongoc_cursor_op_getmore (cursor, server_stream)) {
-      GOTO (failure);
-   }
-
-   mongoc_server_stream_cleanup (server_stream);
-
-   if (cursor->legacy_response.reader) {
-      _mongoc_read_from_buffer (cursor, &b);
-   }
-
-   RETURN (b);
-
-failure:
-   cursor->state = DONE;
-
-   mongoc_server_stream_cleanup (server_stream);
-
-   RETURN (NULL);
-}
 
 bool
 mongoc_cursor_error (mongoc_cursor_t *cursor, bson_error_t *error)
@@ -1398,12 +1316,9 @@ _mongoc_cursor_clone (const mongoc_cursor_t *cursor)
 
    bson_copy_to (&cursor->filter, &_clone->filter);
    bson_copy_to (&cursor->opts, &_clone->opts);
-   bson_init (&_clone->deprecated_reply);
    bson_init (&_clone->error_doc);
 
    bson_strncpy (_clone->ns, cursor->ns, sizeof _clone->ns);
-
-   _mongoc_buffer_init (&_clone->legacy_response.buffer, NULL, 0, NULL, NULL);
 
    mongoc_counter_cursors_active_inc ();
 
@@ -1627,8 +1542,8 @@ mongoc_cursor_new_from_command_reply (mongoc_client_t *client,
 }
 
 bool
-_mongoc_cursor_batch_reader_start (mongoc_cursor_t *cursor,
-                                   mongoc_cursor_batch_reader_t *reader)
+_mongoc_cursor_response_start (mongoc_cursor_t *cursor,
+                                   mongoc_cursor_response_t *response)
 {
    bson_iter_t iter;
    bson_iter_t child;
@@ -1636,7 +1551,7 @@ _mongoc_cursor_batch_reader_start (mongoc_cursor_t *cursor,
    uint32_t nslen;
    bool in_batch = false;
 
-   if (bson_iter_init_find (&iter, &reader->reply, "cursor") &&
+   if (bson_iter_init_find (&iter, &response->reply, "cursor") &&
        BSON_ITER_HOLDS_DOCUMENT (&iter) && bson_iter_recurse (&iter, &child)) {
       while (bson_iter_next (&child)) {
          if (BSON_ITER_IS_KEY (&child, "id")) {
@@ -1647,7 +1562,7 @@ _mongoc_cursor_batch_reader_start (mongoc_cursor_t *cursor,
          } else if (BSON_ITER_IS_KEY (&child, "firstBatch") ||
                     BSON_ITER_IS_KEY (&child, "nextBatch")) {
             if (BSON_ITER_HOLDS_ARRAY (&child) &&
-                bson_iter_recurse (&child, &reader->batch_iter)) {
+                bson_iter_recurse (&child, &response->batch_iter)) {
                in_batch = true;
             }
          }
@@ -1668,8 +1583,8 @@ _mongoc_cursor_batch_reader_start (mongoc_cursor_t *cursor,
 }
 
 void
-_mongoc_cursor_batch_reader_read (mongoc_cursor_t *cursor,
-                                  mongoc_cursor_batch_reader_t *reader,
+_mongoc_cursor_response_read (mongoc_cursor_t *cursor,
+                                  mongoc_cursor_response_t *response,
                                   const bson_t **bson)
 {
    const uint8_t *data = NULL;
@@ -1677,13 +1592,13 @@ _mongoc_cursor_batch_reader_read (mongoc_cursor_t *cursor,
 
    ENTRY;
 
-   if (bson_iter_next (&reader->batch_iter) &&
-       BSON_ITER_HOLDS_DOCUMENT (&reader->batch_iter)) {
-      bson_iter_document (&reader->batch_iter, &data_len, &data);
+   if (bson_iter_next (&response->batch_iter) &&
+       BSON_ITER_HOLDS_DOCUMENT (&response->batch_iter)) {
+      bson_iter_document (&response->batch_iter, &data_len, &data);
 
       /* bson_iter_next guarantees valid BSON, so this must succeed */
-      BSON_ASSERT (bson_init_static (&reader->current_doc, data, data_len));
-      *bson = &reader->current_doc;
+      BSON_ASSERT (bson_init_static (&response->current_doc, data, data_len));
+      *bson = &response->current_doc;
 
       cursor->state = IN_BATCH;
    } else {
@@ -1693,19 +1608,19 @@ _mongoc_cursor_batch_reader_read (mongoc_cursor_t *cursor,
 
 
 void
-_mongoc_cursor_batch_reader_refresh (mongoc_cursor_t *cursor,
+_mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
                                      const bson_t *command,
                                      const bson_t *opts,
-                                     mongoc_cursor_batch_reader_t *reader)
+                                     mongoc_cursor_response_t *response)
 {
    ENTRY;
 
-   bson_destroy (&reader->reply);
+   bson_destroy (&response->reply);
 
    /* server replies to find / aggregate with {cursor: {id: N, firstBatch: []}},
     * to getMore command with {cursor: {id: N, nextBatch: []}}. */
-   if (_mongoc_cursor_run_command (cursor, command, opts, &reader->reply) &&
-       _mongoc_cursor_batch_reader_start (cursor, reader)) {
+   if (_mongoc_cursor_run_command (cursor, command, opts, &response->reply) &&
+       _mongoc_cursor_response_start (cursor, response)) {
       cursor->state = IN_BATCH;
    } else {
       if (!cursor->error.domain) {
