@@ -31,29 +31,6 @@
 
 BSON_BEGIN_DECLS
 
-typedef struct _mongoc_cursor_interface_t mongoc_cursor_interface_t;
-typedef struct _mongoc_cursor_context_t mongoc_cursor_context_t;
-typedef struct _mongoc_cursor_context_t {
-   void (*clone) (mongoc_cursor_context_t *dst,
-                  const mongoc_cursor_context_t *src);
-   void (*destroy) (mongoc_cursor_context_t *ctx);
-   void (*prime) (mongoc_cursor_t *cursor);
-   void (*pop_from_batch) (mongoc_cursor_t *cursor, const bson_t **out);
-   void (*get_next_batch) (mongoc_cursor_t *cursor);
-   void *data;
-} mongoc_cursor_context_t;
-
-struct _mongoc_cursor_interface_t {
-   mongoc_cursor_t *(*clone) (const mongoc_cursor_t *cursor);
-   void (*destroy) (mongoc_cursor_t *cursor);
-   bool (*more) (mongoc_cursor_t *cursor);
-   bool (*next) (mongoc_cursor_t *cursor, const bson_t **bson);
-   bool (*error_document) (mongoc_cursor_t *cursor,
-                           bson_error_t *error,
-                           const bson_t **doc);
-   void (*get_host) (mongoc_cursor_t *cursor, mongoc_host_list_t *host);
-};
-
 #define MONGOC_CURSOR_ALLOW_PARTIAL_RESULTS "allowPartialResults"
 #define MONGOC_CURSOR_ALLOW_PARTIAL_RESULTS_LEN 19
 #define MONGOC_CURSOR_AWAIT_DATA "awaitData"
@@ -113,6 +90,18 @@ struct _mongoc_cursor_interface_t {
 #define MONGOC_CURSOR_TAILABLE "tailable"
 #define MONGOC_CURSOR_TAILABLE_LEN 8
 
+typedef struct _mongoc_cursor_interface_t mongoc_cursor_interface_t;
+typedef struct _mongoc_cursor_context_t mongoc_cursor_context_t;
+typedef struct _mongoc_cursor_context_t {
+   void (*clone) (mongoc_cursor_context_t *dst,
+                  const mongoc_cursor_context_t *src);
+   void (*destroy) (mongoc_cursor_context_t *ctx);
+   void (*prime) (mongoc_cursor_t *cursor);
+   void (*pop_from_batch) (mongoc_cursor_t *cursor, const bson_t **out);
+   void (*get_next_batch) (mongoc_cursor_t *cursor);
+   void *data;
+} mongoc_cursor_context_t;
+
 typedef enum { UNPRIMED, IN_BATCH, END_OF_BATCH, DONE } mongoc_cursor_state_t;
 
 /* pre-3.2 and exhaust cursor responses -- read documents from stream. */
@@ -136,9 +125,7 @@ struct _mongoc_cursor_t {
    bool slave_ok;
 
    mongoc_cursor_state_t state;
-
    bool in_exhaust;
-   bool explicit_session;
 
    bson_t filter;
    bson_t opts;
@@ -146,6 +133,8 @@ struct _mongoc_cursor_t {
    mongoc_read_concern_t *read_concern;
    mongoc_read_prefs_t *read_prefs;
    mongoc_write_concern_t *write_concern;
+
+   bool explicit_session;
    mongoc_client_session_t *client_session;
 
    uint32_t count;
@@ -161,14 +150,9 @@ struct _mongoc_cursor_t {
 
    mongoc_cursor_context_t ctx;
 
-   /* TODO: remove */
-   mongoc_cursor_interface_t iface;
-   void *iface_data;
-
    int64_t operation_id;
    int64_t cursor_id;
 };
-
 
 int32_t
 _mongoc_n_return (mongoc_cursor_t *cursor);
@@ -185,13 +169,6 @@ _mongoc_cursor_translate_dollar_query_opts (const bson_t *query,
                                             bson_t *opts,
                                             bson_t *filter,
                                             bson_error_t *error);
-mongoc_cursor_t *
-_mongoc_cursor_clone (const mongoc_cursor_t *cursor);
-void
-_mongoc_cursor_destroy (mongoc_cursor_t *cursor);
-bool
-_use_find_command (const mongoc_cursor_t *cursor,
-                   const mongoc_server_stream_t *server_stream);
 mongoc_server_stream_t *
 _mongoc_cursor_fetch_stream (mongoc_cursor_t *cursor);
 void
@@ -205,12 +182,6 @@ _mongoc_cursor_run_command (mongoc_cursor_t *cursor,
                             bson_t *reply);
 bool
 _mongoc_cursor_more (mongoc_cursor_t *cursor);
-bool
-_mongoc_cursor_error_document (mongoc_cursor_t *cursor,
-                               bson_error_t *error,
-                               const bson_t **doc);
-void
-_mongoc_cursor_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host);
 
 bool
 _mongoc_cursor_set_opt_int64 (mongoc_cursor_t *cursor,
@@ -233,12 +204,12 @@ _mongoc_cursor_initial_query (mongoc_cursor_t *cursor);
 const bson_t *
 _mongoc_cursor_get_more (mongoc_cursor_t *cursor);
 bool
-_mongoc_cursor_flags (mongoc_cursor_t *cursor,
-                      mongoc_server_stream_t *stream,
-                      mongoc_query_flags_t *flags /* OUT */);
+_mongoc_cursor_opts_to_flags (mongoc_cursor_t *cursor,
+                              mongoc_server_stream_t *stream,
+                              mongoc_query_flags_t *flags /* OUT */);
 void
 _mongoc_cursor_monitor_succeeded (mongoc_cursor_t *cursor,
-                                  mongoc_cursor_response_legacy_t* response,
+                                  mongoc_cursor_response_legacy_t *response,
                                   int64_t duration,
                                   bool first_batch,
                                   mongoc_server_stream_t *stream,
@@ -248,31 +219,28 @@ _mongoc_cursor_monitor_succeeded (mongoc_cursor_t *cursor,
  * {cursor: {id: 1234, ns: "db.collection", nextBatch: [...]}} */
 void
 _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
-                                     const bson_t *command,
-                                     const bson_t *opts,
-                                     mongoc_cursor_response_t *response);
+                                 const bson_t *command,
+                                 const bson_t *opts,
+                                 mongoc_cursor_response_t *response);
 bool
 _mongoc_cursor_response_start (mongoc_cursor_t *cursor,
-                                   mongoc_cursor_response_t *response);
+                               mongoc_cursor_response_t *response);
 void
 _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
-                                  mongoc_cursor_response_t *response,
-                                  const bson_t **bson);
+                              mongoc_cursor_response_t *response,
+                              const bson_t **bson);
 bool
 _mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
                                         bson_t *command);
-/* legacy functions. */
+/* legacy functions defined in mongoc-cursor-legacy.c */
 bool
 _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson);
-
-bool
-_mongoc_read_from_buffer (mongoc_cursor_t *cursor,  mongoc_cursor_response_legacy_t* response, const bson_t **bson);
-
 void
-_mongoc_cursor_op_query_find (mongoc_cursor_t *cursor, mongoc_cursor_response_legacy_t* response);
+_mongoc_cursor_op_query_find (mongoc_cursor_t *cursor,
+                              mongoc_cursor_response_legacy_t *response);
 bool
 _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
-                           mongoc_cursor_response_legacy_t* response);
+                           mongoc_cursor_response_legacy_t *response);
 mongoc_cursor_t *
 _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const char *db_and_collection,
@@ -281,9 +249,10 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const mongoc_read_prefs_t *read_prefs,
                               const mongoc_read_concern_t *read_concern);
 void
-_mongoc_cursor_response_legacy_init (mongoc_cursor_response_legacy_t* response);
+_mongoc_cursor_response_legacy_init (mongoc_cursor_response_legacy_t *response);
 void
-_mongoc_cursor_response_legacy_destroy (mongoc_cursor_response_legacy_t* response);
+_mongoc_cursor_response_legacy_destroy (
+   mongoc_cursor_response_legacy_t *response);
 /* cursor constructors. */
 mongoc_cursor_t *
 _mongoc_cursor_find_new (mongoc_client_t *client,

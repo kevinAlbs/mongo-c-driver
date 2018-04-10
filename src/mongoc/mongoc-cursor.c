@@ -39,6 +39,7 @@ _translate_query_opt (const char *query_field,
                       const char **cmd_field,
                       int *len);
 
+
 bool
 _mongoc_cursor_set_opt_int64 (mongoc_cursor_t *cursor,
                               const char *option,
@@ -105,6 +106,7 @@ _mongoc_cursor_get_opt_bool (const mongoc_cursor_t *cursor, const char *option)
 
    return false;
 }
+
 
 int32_t
 _mongoc_n_return (mongoc_cursor_t *cursor)
@@ -193,7 +195,7 @@ _first_dollar_field (const bson_t *bson)
    } while (0)
 
 
-/* TODO: split this up into separate cursor implementation constructors */
+/* TODO: split this up into separate validation functions? */
 mongoc_cursor_t *
 _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const char *db_and_collection,
@@ -329,6 +331,7 @@ finish:
 
    RETURN (cursor);
 }
+
 
 static bool
 _translate_query_opt (const char *query_field, const char **cmd_field, int *len)
@@ -524,33 +527,18 @@ done:
    RETURN (has_filter);
 }
 
+
 void
 mongoc_cursor_destroy (mongoc_cursor_t *cursor)
-{
-   ENTRY;
-
-   BSON_ASSERT (cursor);
-
-   if (cursor->iface.destroy) {
-      cursor->iface.destroy (cursor);
-   } else {
-      _mongoc_cursor_destroy (cursor);
-   }
-
-   if (cursor->ctx.destroy) {
-      cursor->ctx.destroy (&cursor->ctx);
-   }
-
-   EXIT;
-}
-
-void
-_mongoc_cursor_destroy (mongoc_cursor_t *cursor)
 {
    char db[MONGOC_NAMESPACE_MAX];
    ENTRY;
 
    BSON_ASSERT (cursor);
+
+   if (cursor->ctx.destroy) {
+      cursor->ctx.destroy (&cursor->ctx);
+   }
 
    if (cursor->in_exhaust) {
       cursor->client->in_exhaust = false;
@@ -617,13 +605,6 @@ _mongoc_cursor_fetch_stream (mongoc_cursor_t *cursor)
 }
 
 
-const bson_t *
-_mongoc_cursor_initial_query (mongoc_cursor_t *cursor)
-{
-   RETURN (NULL); // TODO DELETE ME
-}
-
-
 bool
 _mongoc_cursor_monitor_command (mongoc_cursor_t *cursor,
                                 mongoc_server_stream_t *server_stream,
@@ -663,7 +644,9 @@ _mongoc_cursor_monitor_command (mongoc_cursor_t *cursor,
 
 /* append array of docs from current cursor batch */
 static void
-_mongoc_cursor_append_docs_array (mongoc_cursor_t *cursor, bson_t *docs, mongoc_cursor_response_legacy_t* response)
+_mongoc_cursor_append_docs_array (mongoc_cursor_t *cursor,
+                                  bson_t *docs,
+                                  mongoc_cursor_response_legacy_t *response)
 {
    bool eof = false;
    char str[16];
@@ -683,7 +666,7 @@ _mongoc_cursor_append_docs_array (mongoc_cursor_t *cursor, bson_t *docs, mongoc_
 
 void
 _mongoc_cursor_monitor_succeeded (mongoc_cursor_t *cursor,
-                                  mongoc_cursor_response_legacy_t* response,
+                                  mongoc_cursor_response_legacy_t *response,
                                   int64_t duration,
                                   bool first_batch,
                                   mongoc_server_stream_t *stream,
@@ -774,6 +757,7 @@ _mongoc_cursor_monitor_failed (mongoc_cursor_t *cursor,
    EXIT;
 }
 
+
 #define ADD_FLAG(_flags, _value)                                   \
    do {                                                            \
       if (!BSON_ITER_HOLDS_BOOL (&iter)) {                         \
@@ -790,9 +774,9 @@ _mongoc_cursor_monitor_failed (mongoc_cursor_t *cursor,
    } while (false);
 
 bool
-_mongoc_cursor_flags (mongoc_cursor_t *cursor,
-                      mongoc_server_stream_t *stream,
-                      mongoc_query_flags_t *flags /* OUT */)
+_mongoc_cursor_opts_to_flags (mongoc_cursor_t *cursor,
+                              mongoc_server_stream_t *stream,
+                              mongoc_query_flags_t *flags /* OUT */)
 {
    bson_iter_t iter;
    const char *key;
@@ -930,7 +914,8 @@ _mongoc_cursor_run_command (mongoc_cursor_t *cursor,
    bson_strncpy (db, cursor->ns, cursor->dblen + 1);
    parts.assembled.db_name = db;
 
-   if (!_mongoc_cursor_flags (cursor, server_stream, &parts.user_query_flags)) {
+   if (!_mongoc_cursor_opts_to_flags (
+          cursor, server_stream, &parts.user_query_flags)) {
       _mongoc_bson_init_if_set (reply);
       GOTO (done);
    }
@@ -1038,27 +1023,6 @@ mongoc_cursor_error_document (mongoc_cursor_t *cursor,
                               bson_error_t *error,
                               const bson_t **doc)
 {
-   bool ret;
-
-   ENTRY;
-
-   BSON_ASSERT (cursor);
-
-   if (cursor->iface.error_document) {
-      ret = cursor->iface.error_document (cursor, error, doc);
-   } else {
-      ret = _mongoc_cursor_error_document (cursor, error, doc);
-   }
-
-   RETURN (ret);
-}
-
-
-bool
-_mongoc_cursor_error_document (mongoc_cursor_t *cursor,
-                               bson_error_t *error,
-                               const bson_t **doc)
-{
    ENTRY;
 
    BSON_ASSERT (cursor);
@@ -1088,7 +1052,7 @@ _mongoc_cursor_error_document (mongoc_cursor_t *cursor,
 bool
 mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
 {
-   bool ret;
+   bool ret = false;
 
    ENTRY;
 
@@ -1124,57 +1088,50 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
       RETURN (false);
    }
 
-   if (cursor->ctx.prime) {
-      printf ("override. \n");
-      if (cursor->state == UNPRIMED) {
-         cursor->ctx.prime (cursor);
-         if (cursor->state == DONE) {
-            ret = false;
-            goto done;
-         }
+   BSON_ASSERT (cursor->ctx.prime);
+   if (cursor->state == UNPRIMED) {
+      cursor->ctx.prime (cursor);
+      if (cursor->state == DONE) {
+         ret = false;
+         goto done;
       }
+   }
 
-      /* a tailable or change streams cursor might be at END_OF_BATCH at the
-       * beginning of next */
-      if (cursor->state == END_OF_BATCH) {
-         cursor->ctx.get_next_batch (cursor);
-         /* TODO: these transitions are weird */
-         if (cursor->state == IN_BATCH) {
-            cursor->ctx.pop_from_batch (cursor, bson);
-            if (*bson) {
-               ret = true;
-               goto done;
-            }
-         }
-      }
-
+   /* a tailable or change streams cursor might be at END_OF_BATCH at the
+    * beginning of next */
+   if (cursor->state == END_OF_BATCH) {
+      cursor->ctx.get_next_batch (cursor);
+      /* TODO: these transitions are weird */
       if (cursor->state == IN_BATCH) {
          cursor->ctx.pop_from_batch (cursor, bson);
          if (*bson) {
             ret = true;
             goto done;
          }
-
-         if (cursor->state == END_OF_BATCH) {
-            cursor->ctx.get_next_batch (cursor);
-         }
-
-         if (cursor->state == DONE) {
-            ret = false;
-            goto done;
-         }
-
-         cursor->ctx.pop_from_batch (cursor, bson);
-         if (*bson) {
-            ret = true;
-            goto done;
-         }
       }
-      return false;
-   } else if (cursor->iface.next) {
-      ret = cursor->iface.next (cursor, bson);
-   } else {
-      ret = _mongoc_cursor_next (cursor, bson);
+   }
+
+   if (cursor->state == IN_BATCH) {
+      cursor->ctx.pop_from_batch (cursor, bson);
+      if (*bson) {
+         ret = true;
+         goto done;
+      }
+
+      if (cursor->state == END_OF_BATCH) {
+         cursor->ctx.get_next_batch (cursor);
+      }
+
+      if (cursor->state == DONE) {
+         ret = false;
+         goto done;
+      }
+
+      cursor->ctx.pop_from_batch (cursor, bson);
+      if (*bson) {
+         ret = true;
+         goto done;
+      }
    }
 
 done:
@@ -1185,55 +1142,24 @@ done:
    RETURN (ret);
 }
 
+
 bool
 mongoc_cursor_more (mongoc_cursor_t *cursor)
 {
-   bool ret;
-
    ENTRY;
 
    BSON_ASSERT (cursor);
 
-   if (cursor->iface.more) {
-      ret = cursor->iface.more (cursor);
-   } else {
-      ret = _mongoc_cursor_more (cursor);
-   }
-
-   RETURN (ret);
-}
-
-
-bool
-_mongoc_cursor_more (mongoc_cursor_t *cursor)
-{
-   BSON_ASSERT (cursor);
-
    if (CURSOR_FAILED (cursor)) {
-      return false;
+      RETURN (false);
    }
 
-   return cursor->state != DONE;
+   RETURN (cursor->state != DONE);
 }
 
 
 void
 mongoc_cursor_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
-{
-   BSON_ASSERT (cursor);
-   BSON_ASSERT (host);
-
-   if (cursor->iface.get_host) {
-      cursor->iface.get_host (cursor, host);
-   } else {
-      _mongoc_cursor_get_host (cursor, host);
-   }
-
-   EXIT;
-}
-
-void
-_mongoc_cursor_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
 {
    mongoc_server_description_t *description;
 
@@ -1257,37 +1183,14 @@ _mongoc_cursor_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
 
    mongoc_server_description_destroy (description);
 
-   return;
+   EXIT;
 }
+
 
 mongoc_cursor_t *
 mongoc_cursor_clone (const mongoc_cursor_t *cursor)
 {
-   mongoc_cursor_t *ret;
-
-   BSON_ASSERT (cursor);
-
-   if (cursor->iface.clone) {
-      ret = cursor->iface.clone (cursor);
-   } else {
-      ret = _mongoc_cursor_clone (cursor);
-   }
-
-   memcpy (&ret->ctx, &cursor->ctx, sizeof (cursor->ctx));
-   if (cursor->ctx.clone) {
-      cursor->ctx.clone (&ret->ctx, &cursor->ctx);
-   }
-
-   RETURN (ret);
-}
-
-
-mongoc_cursor_t *
-_mongoc_cursor_clone (const mongoc_cursor_t *cursor)
-{
    mongoc_cursor_t *_clone;
-
-   ENTRY;
 
    BSON_ASSERT (cursor);
 
@@ -1319,6 +1222,12 @@ _mongoc_cursor_clone (const mongoc_cursor_t *cursor)
    bson_init (&_clone->error_doc);
 
    bson_strncpy (_clone->ns, cursor->ns, sizeof _clone->ns);
+
+   /* copy the context functions by default. */
+   memcpy (&_clone->ctx, &cursor->ctx, sizeof (cursor->ctx));
+   if (cursor->ctx.clone) {
+      cursor->ctx.clone (&_clone->ctx, &cursor->ctx);
+   }
 
    mongoc_counter_cursors_active_inc ();
 
@@ -1378,6 +1287,7 @@ mongoc_cursor_set_batch_size (mongoc_cursor_t *cursor, uint32_t batch_size)
       cursor, MONGOC_CURSOR_BATCH_SIZE, (int64_t) batch_size);
 }
 
+
 uint32_t
 mongoc_cursor_get_batch_size (const mongoc_cursor_t *cursor)
 {
@@ -1386,6 +1296,7 @@ mongoc_cursor_get_batch_size (const mongoc_cursor_t *cursor)
    return (uint32_t) _mongoc_cursor_get_opt_int64 (
       cursor, MONGOC_CURSOR_BATCH_SIZE, 0);
 }
+
 
 bool
 mongoc_cursor_set_limit (mongoc_cursor_t *cursor, int64_t limit)
@@ -1407,6 +1318,7 @@ mongoc_cursor_set_limit (mongoc_cursor_t *cursor, int64_t limit)
    }
 }
 
+
 int64_t
 mongoc_cursor_get_limit (const mongoc_cursor_t *cursor)
 {
@@ -1425,6 +1337,7 @@ mongoc_cursor_get_limit (const mongoc_cursor_t *cursor)
 
    return limit;
 }
+
 
 bool
 mongoc_cursor_set_hint (mongoc_cursor_t *cursor, uint32_t server_id)
@@ -1446,6 +1359,7 @@ mongoc_cursor_set_hint (mongoc_cursor_t *cursor, uint32_t server_id)
    return true;
 }
 
+
 uint32_t
 mongoc_cursor_get_hint (const mongoc_cursor_t *cursor)
 {
@@ -1454,6 +1368,7 @@ mongoc_cursor_get_hint (const mongoc_cursor_t *cursor)
    return cursor->server_id;
 }
 
+
 int64_t
 mongoc_cursor_get_id (const mongoc_cursor_t *cursor)
 {
@@ -1461,6 +1376,7 @@ mongoc_cursor_get_id (const mongoc_cursor_t *cursor)
 
    return cursor->cursor_id;
 }
+
 
 void
 mongoc_cursor_set_max_await_time_ms (mongoc_cursor_t *cursor,
@@ -1473,6 +1389,7 @@ mongoc_cursor_set_max_await_time_ms (mongoc_cursor_t *cursor,
          cursor, MONGOC_CURSOR_MAX_AWAIT_TIME_MS, (int64_t) max_await_time_ms);
    }
 }
+
 
 uint32_t
 mongoc_cursor_get_max_await_time_ms (const mongoc_cursor_t *cursor)
@@ -1541,9 +1458,10 @@ mongoc_cursor_new_from_command_reply (mongoc_client_t *client,
    return cursor;
 }
 
+
 bool
 _mongoc_cursor_response_start (mongoc_cursor_t *cursor,
-                                   mongoc_cursor_response_t *response)
+                               mongoc_cursor_response_t *response)
 {
    bson_iter_t iter;
    bson_iter_t child;
@@ -1582,10 +1500,11 @@ _mongoc_cursor_response_start (mongoc_cursor_t *cursor,
    return in_batch;
 }
 
+
 void
 _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
-                                  mongoc_cursor_response_t *response,
-                                  const bson_t **bson)
+                              mongoc_cursor_response_t *response,
+                              const bson_t **bson)
 {
    const uint8_t *data = NULL;
    uint32_t data_len = 0;
@@ -1609,9 +1528,9 @@ _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
 
 void
 _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
-                                     const bson_t *command,
-                                     const bson_t *opts,
-                                     mongoc_cursor_response_t *response)
+                                 const bson_t *command,
+                                 const bson_t *opts,
+                                 mongoc_cursor_response_t *response)
 {
    ENTRY;
 
@@ -1633,6 +1552,7 @@ _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
       }
    }
 }
+
 
 bool
 _mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
