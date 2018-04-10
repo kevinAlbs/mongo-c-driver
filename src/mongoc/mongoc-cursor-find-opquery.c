@@ -97,24 +97,10 @@ _get_next_batch (mongoc_cursor_t *cursor)
    }
 }
 
-static void
-_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
-{
-   _mongoc_cursor_get_host (cursor, host);
-}
-
-static void
-_destroy (mongoc_cursor_context_t *ctx)
-{
-}
-
 void
 _mongoc_cursor_ctx_find_opquery_init (mongoc_cursor_t *cursor)
 {
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.destroy = _destroy;
-   cursor->ctx.init = _mongoc_cursor_ctx_find_opquery_init;
-   cursor->ctx.get_host = _get_host;
 }

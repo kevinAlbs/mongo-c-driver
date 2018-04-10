@@ -49,14 +49,13 @@ _mongoc_gridfs_file_list_new (mongoc_gridfs_t *gridfs,
       query, &opts, &unwrapped, &error);
 
 
-   cursor = _mongoc_cursor_new_with_opts (gridfs->client,
-                                          gridfs->files->ns,
-                                          use_unwrapped ? &unwrapped : query,
-                                          NULL /* opts */,
-                                          gridfs->files->read_prefs,
-                                          gridfs->files->read_concern);
+   cursor = _mongoc_cursor_find_new (gridfs->client,
+                                     gridfs->files->ns,
+                                     use_unwrapped ? &unwrapped : query,
+                                     NULL /* opts */,
+                                     gridfs->files->read_prefs,
+                                     gridfs->files->read_concern);
    BSON_ASSERT (cursor);
-   _mongoc_cursor_ctx_find_init (cursor);
    if (limit) {
       mongoc_cursor_set_limit (cursor, limit);
    }

@@ -323,12 +323,12 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
 
    bson_init (&cursor_opts);
    _mongoc_cursor_flags_to_opts (flags, &cursor_opts, &slave_ok);
-   cursor = _mongoc_cursor_new_with_opts (collection->client,
-                                          collection->ns,
-                                          NULL /* filter */,
-                                          &cursor_opts,
-                                          read_prefs,
-                                          NULL /* read concern */);
+   cursor = _mongoc_cursor_cmd_new (collection->client,
+                                    collection->ns,
+                                    NULL /* cmd */,
+                                    &cursor_opts,
+                                    read_prefs,
+                                    NULL /* read concern */);
    bson_destroy (&cursor_opts);
 
    if (!_mongoc_get_server_id_from_opts (opts,
@@ -443,11 +443,8 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
          mongoc_collection_get_read_concern (collection));
    }
 
-   /* TODO: don't do this destroy + copy_to in the caller, do it in the
-    * constructor */
    bson_destroy (&cursor->filter);
    bson_copy_to (&command, &cursor->filter);
-   _mongoc_cursor_ctx_cmd_init (cursor);
 
 done:
    mongoc_server_stream_cleanup (server_stream); /* null ok */
@@ -537,13 +534,12 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
       bson_append_document (
          &opts, MONGOC_CURSOR_PROJECTION, MONGOC_CURSOR_PROJECTION_LEN, fields);
    }
-   cursor = _mongoc_cursor_new_with_opts (collection->client,
-                                          collection->ns,
-                                          has_unwrapped ? &unwrapped : query,
-                                          &opts,
-                                          read_prefs,
-                                          collection->read_concern);
-   _mongoc_cursor_ctx_find_init (cursor);
+   cursor = _mongoc_cursor_find_new (collection->client,
+                                     collection->ns,
+                                     has_unwrapped ? &unwrapped : query,
+                                     &opts,
+                                     read_prefs,
+                                     collection->read_concern);
    if (skip) {
       _mongoc_cursor_set_opt_int64 (cursor, MONGOC_CURSOR_SKIP, skip);
    }
@@ -611,14 +607,13 @@ mongoc_collection_find_with_opts (mongoc_collection_t *collection,
       read_prefs = collection->read_prefs;
    }
 
-   mongoc_cursor_t *cursor = _mongoc_cursor_new_with_opts (
-      collection->client,
-      collection->ns,
-      filter,
-      opts,
-      COALESCE (read_prefs, collection->read_prefs),
-      collection->read_concern);
-   _mongoc_cursor_ctx_find_init (cursor);
+   mongoc_cursor_t *cursor =
+      _mongoc_cursor_find_new (collection->client,
+                               collection->ns,
+                               filter,
+                               opts,
+                               COALESCE (read_prefs, collection->read_prefs),
+                               collection->read_concern);
    return cursor;
 }
 
@@ -688,9 +683,8 @@ mongoc_collection_command (mongoc_collection_t *collection,
     */
 
    /* flags, skip, limit, batch_size, fields are unused */
-   cursor = _mongoc_cursor_new_with_opts (
-      collection->client, ns, query, NULL, read_prefs, NULL);
-   _mongoc_cursor_ctx_cmd_deprecated_init (cursor);
+   cursor = _mongoc_cursor_cmd_deprecated_new (
+      collection->client, ns, query, read_prefs);
    return cursor;
 }
 
@@ -1384,15 +1378,12 @@ mongoc_collection_find_indexes_with_opts (mongoc_collection_t *collection,
 
    /* No read preference. Index Enumeration Spec: "run listIndexes on the
     * primary node in replicaSet mode". */
-   cursor = _mongoc_cursor_new_with_opts (collection->client,
-                                          collection->ns,
-                                          &cmd,
-                                          opts,
-                                          NULL /* read prefs */,
-                                          NULL /* read concern */);
-   bson_destroy (&cursor->filter);
-   bson_copy_to (&cmd, &cursor->filter);
-   _mongoc_cursor_ctx_cmd_init (cursor);
+   cursor = _mongoc_cursor_cmd_new (collection->client,
+                                    collection->ns,
+                                    &cmd,
+                                    opts,
+                                    NULL /* read prefs */,
+                                    NULL /* read concern */);
 
    cursor->ctx.prime (cursor);
 

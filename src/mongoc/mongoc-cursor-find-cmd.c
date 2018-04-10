@@ -21,12 +21,6 @@ typedef struct _data_find_cmd_t {
    mongoc_cursor_batch_reader_t reader;
 } data_find_cmd_t;
 
-static void
-_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
-{
-   _mongoc_cursor_get_host (cursor, host);
-}
-
 
 static void
 _destroy (mongoc_cursor_context_t *ctx)
@@ -73,6 +67,15 @@ _get_next_batch (mongoc_cursor_t *cursor)
 }
 
 
+static void
+_clone (mongoc_cursor_context_t *dst, const mongoc_cursor_context_t *src)
+{
+   data_find_cmd_t *data = bson_malloc0 (sizeof (*data));
+   bson_init (&data->reader.reply);
+   dst->data = data;
+}
+
+
 /* transition a find cursor to use the find command. */
 void
 _mongoc_cursor_ctx_find_cmd_init (mongoc_cursor_t *cursor)
@@ -83,7 +86,6 @@ _mongoc_cursor_ctx_find_cmd_init (mongoc_cursor_t *cursor)
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
    cursor->ctx.destroy = _destroy;
-   cursor->ctx.get_host = _get_host;
-   cursor->ctx.init = _mongoc_cursor_ctx_find_cmd_init;
+   cursor->ctx.clone = _clone;
    cursor->ctx.data = (void *) data;
 }

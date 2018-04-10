@@ -34,13 +34,12 @@ BSON_BEGIN_DECLS
 typedef struct _mongoc_cursor_interface_t mongoc_cursor_interface_t;
 typedef struct _mongoc_cursor_context_t mongoc_cursor_context_t;
 typedef struct _mongoc_cursor_context_t {
-   void (*clone) (mongoc_cursor_context_t *dst, const mongoc_cursor_context_t *src);
+   void (*clone) (mongoc_cursor_context_t *dst,
+                  const mongoc_cursor_context_t *src);
    void (*destroy) (mongoc_cursor_context_t *ctx);
    void (*prime) (mongoc_cursor_t *cursor);
    void (*pop_from_batch) (mongoc_cursor_t *cursor, const bson_t **out);
    void (*get_next_batch) (mongoc_cursor_t *cursor);
-   /* TODO: this might not be needed, right? */
-   void (*get_host) (mongoc_cursor_t *cursor, mongoc_host_list_t *host);
    void *data;
 } mongoc_cursor_context_t;
 
@@ -286,32 +285,40 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const mongoc_read_concern_t *read_concern);
 /* cursor constructors. */
 mongoc_cursor_t *
-_mongoc_cursor_find_new (mongoc_client_t *client, const char* db_and_coll, const bson_t *filter, const bson_t *opts, const mongoc_read_prefs_t *read_prefs, const mongoc_read_concern_t *read_concern);
+_mongoc_cursor_find_new (mongoc_client_t *client,
+                         const char *db_and_coll,
+                         const bson_t *filter,
+                         const bson_t *opts,
+                         const mongoc_read_prefs_t *read_prefs,
+                         const mongoc_read_concern_t *read_concern);
 
 mongoc_cursor_t *
-_mongoc_cursor_cmd_new (mongoc_client_t *client, const char* db_and_coll, const bson_t *cmd, const bson_t *opts, const mongoc_read_prefs_t *read_prefs, const mongoc_read_concern_t *read_concern);
+_mongoc_cursor_cmd_new (mongoc_client_t *client,
+                        const char *db_and_coll,
+                        const bson_t *cmd,
+                        const bson_t *opts,
+                        const mongoc_read_prefs_t *read_prefs,
+                        const mongoc_read_concern_t *read_concern);
 
 mongoc_cursor_t *
-_mongoc_cursor_cmd_new_from_reply (mongoc_client_t *client, const bson_t *reply, const bson_t *opts, uint32_t server_id);
+_mongoc_cursor_cmd_new_from_reply (mongoc_client_t *client,
+                                   const bson_t *cmd,
+                                   const bson_t *opts,
+                                   bson_t *reply,
+                                   uint32_t server_id);
 
 mongoc_cursor_t *
-_mongoc_cursor_cmd_deprecated_new (mongoc_client_t *client, const char* db_and_coll, const bson_t *cmd, const mongoc_read_prefs_t *read_prefs);
+_mongoc_cursor_cmd_deprecated_new (mongoc_client_t *client,
+                                   const char *db_and_coll,
+                                   const bson_t *cmd,
+                                   const mongoc_read_prefs_t *read_prefs);
 
 mongoc_cursor_t *
-_mongoc_cursor_array_new (mongoc_client_t* client, const char* db_and_coll, const bson_t *cmd, const bson_t *opts, const char* field_name);
-
-void
-_mongoc_cursor_ctx_cmd_init_with_reply (mongoc_cursor_t *cursor,
-                                        bson_t *reply,
-                                        uint32_t server_id);
-void
-_mongoc_cursor_ctx_find_init (mongoc_cursor_t *cursor);
-void
-_mongoc_cursor_ctx_cmd_init (mongoc_cursor_t *cursor);
-void
-_mongoc_cursor_ctx_cmd_deprecated_init (mongoc_cursor_t *cursor);
-void
-_mongoc_cursor_ctx_array_init (mongoc_cursor_t *cursor, const char *field_name);
+_mongoc_cursor_array_new (mongoc_client_t *client,
+                          const char *db_and_coll,
+                          const bson_t *cmd,
+                          const bson_t *opts,
+                          const char *field_name);
 
 BSON_END_DECLS
 

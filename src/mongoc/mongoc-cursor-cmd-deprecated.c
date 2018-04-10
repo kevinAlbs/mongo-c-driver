@@ -18,10 +18,6 @@
 #include "mongoc-cursor-private.h"
 #include "mongoc-client-private.h"
 
-typedef struct _data_cmd_deprecated_t {
-} data_cmd_deprecated_t;
-
-
 static void
 _prime (mongoc_cursor_t *cursor)
 {
@@ -50,24 +46,16 @@ _get_next_batch (mongoc_cursor_t *cursor)
    BSON_ASSERT (false);
 }
 
-static void
-_get_host (mongoc_cursor_t *cursor, mongoc_host_list_t *host)
+mongoc_cursor_t *
+_mongoc_cursor_cmd_deprecated_new (mongoc_client_t *client,
+                                   const char *db_and_coll,
+                                   const bson_t *cmd,
+                                   const mongoc_read_prefs_t *read_prefs)
 {
-   _mongoc_cursor_get_host (cursor, host);
-}
-
-static void
-_destroy (mongoc_cursor_context_t *ctx)
-{
-}
-
-void
-_mongoc_cursor_ctx_cmd_deprecated_init (mongoc_cursor_t *cursor)
-{
+   mongoc_cursor_t *cursor = _mongoc_cursor_new_with_opts (
+      client, db_and_coll, cmd, NULL, read_prefs, NULL);
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.destroy = _destroy;
-   cursor->ctx.init = _mongoc_cursor_ctx_cmd_deprecated_init;
-   cursor->ctx.get_host = _get_host;
+   return cursor;
 }

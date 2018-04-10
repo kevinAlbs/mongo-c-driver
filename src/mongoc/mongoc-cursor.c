@@ -1355,7 +1355,7 @@ mongoc_cursor_clone (const mongoc_cursor_t *cursor)
       ret = _mongoc_cursor_clone (cursor);
    }
 
-   memcpy (&ret->ctx, &cursor->ctx, sizeof(cursor->ctx));
+   memcpy (&ret->ctx, &cursor->ctx, sizeof (cursor->ctx));
    if (cursor->ctx.clone) {
       cursor->ctx.clone (&ret->ctx, &cursor->ctx);
    }
@@ -1619,12 +1619,7 @@ mongoc_cursor_new_from_command_reply (mongoc_client_t *client,
                                   NULL);
 
    cursor =
-      _mongoc_cursor_new_with_opts (client, NULL, NULL, &opts, NULL, NULL);
-
-   bson_destroy (&cursor->filter);
-   bson_copy_to (&cmd, &cursor->filter);
-   _mongoc_cursor_ctx_cmd_init_with_reply (
-      cursor, reply /* stolen */, server_id);
+      _mongoc_cursor_cmd_new_from_reply (client, &cmd, &opts, reply, server_id);
    bson_destroy (&cmd);
    bson_destroy (&opts);
 
