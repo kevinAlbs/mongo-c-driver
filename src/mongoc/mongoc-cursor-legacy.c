@@ -111,27 +111,8 @@ _mongoc_cursor_monitor_legacy_query (mongoc_cursor_t *cursor,
 
 
 bool
-_mongoc_read_from_buffer (mongoc_cursor_t *cursor, mongoc_cursor_response_legacy_t* response, const bson_t **bson)
-{
-   bool eof = false;
-
-   BSON_ASSERT (response->reader);
-
-   *bson = bson_reader_read (response->reader, &eof);
-   cursor->state = eof ? END_OF_BATCH : IN_BATCH;
-
-   return *bson ? true : false;
-}
-
-
-bool
-_mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
-{
-   return false;
-}
-
-bool
-_mongoc_cursor_op_getmore (mongoc_cursor_t *cursor, mongoc_cursor_response_legacy_t* response)
+_mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
+                           mongoc_cursor_response_legacy_t *response)
 {
    int64_t started;
    mongoc_rpc_t rpc;
@@ -145,10 +126,10 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor, mongoc_cursor_response_legac
 
    started = bson_get_monotonic_time ();
    cluster = &cursor->client->cluster;
-   
+
    server_stream = _mongoc_cursor_fetch_stream (cursor);
 
-   if (!_mongoc_cursor_flags (cursor, server_stream, &flags)) {
+   if (!_mongoc_cursor_opts_to_flags (cursor, server_stream, &flags)) {
       GOTO (fail);
    }
 
@@ -227,9 +208,9 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor, mongoc_cursor_response_legac
 
    cursor->cursor_id = response->rpc.reply.cursor_id;
 
-   response->reader = bson_reader_new_from_data (
-      response->rpc.reply.documents,
-      (size_t) response->rpc.reply.documents_len);
+   response->reader =
+      bson_reader_new_from_data (response->rpc.reply.documents,
+                                 (size_t) response->rpc.reply.documents_len);
 
    _mongoc_cursor_monitor_succeeded (cursor,
                                      response,
@@ -248,6 +229,7 @@ done:
    mongoc_server_stream_cleanup (server_stream);
    RETURN (ret);
 }
+
 
 #define OPT_CHECK(_type)                                         \
    do {                                                          \
@@ -454,14 +436,13 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
       }
    }
 
-   if (!_mongoc_cursor_flags (cursor, stream, flags)) {
+   if (!_mongoc_cursor_opts_to_flags (cursor, stream, flags)) {
       /* cursor->error is set */
       return NULL;
    }
 
    return pushed_dollar_query ? query : &cursor->filter;
 }
-
 
 #undef OPT_CHECK
 #undef OPT_ERR
@@ -470,9 +451,9 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
 #undef OPT_SUBDOCUMENT
 
 
-/* this is *only* for find cursors */
 void
-_mongoc_cursor_op_query_find (mongoc_cursor_t *cursor, mongoc_cursor_response_legacy_t* response)
+_mongoc_cursor_op_query_find (mongoc_cursor_t *cursor,
+                              mongoc_cursor_response_legacy_t *response)
 {
    int64_t started;
    uint32_t request_id;
@@ -590,7 +571,9 @@ _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor, mongoc_cursor_response_le
 
    cursor->cursor_id = response->rpc.reply.cursor_id;
 
-   response->reader = bson_reader_new_from_data (response->rpc.reply.documents, (size_t) response->rpc.reply.documents_len);
+   response->reader =
+      bson_reader_new_from_data (response->rpc.reply.documents,
+                                 (size_t) response->rpc.reply.documents_len);
 
    if (_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST)) {
       cursor->in_exhaust = true;
@@ -620,13 +603,18 @@ done:
    bson_destroy (&fields);
 }
 
+
 void
-_mongoc_cursor_response_legacy_init (mongoc_cursor_response_legacy_t* response) {
+_mongoc_cursor_response_legacy_init (mongoc_cursor_response_legacy_t *response)
+{
    _mongoc_buffer_init (&response->buffer, NULL, 0, NULL, NULL);
 }
 
+
 void
-_mongoc_cursor_response_legacy_destroy (mongoc_cursor_response_legacy_t* response) {
+_mongoc_cursor_response_legacy_destroy (
+   mongoc_cursor_response_legacy_t *response)
+{
    if (response->reader) {
       bson_reader_destroy (response->reader);
       response->reader = NULL;
