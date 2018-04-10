@@ -17,7 +17,7 @@
 #include "mongoc-cursor-private.h"
 #include "mongoc-client-private.h"
 
-typedef enum { NONE, DOC, STREAM } reading_from_t;
+typedef enum { NONE, RESPONSE, RESPONSE_LEGACY } reading_from_t;
 typedef enum { UNKNOWN, GETMORE_CMD, OP_GETMORE } getmore_type_t;
 
 typedef struct _data_cmd_t {
@@ -26,7 +26,8 @@ typedef struct _data_cmd_t {
     * - Mongo 2.6 to 3, after "aggregate" or similar command we sent OP_GETMORE,
     *   we're reading the raw reply from a stream
     */
-   mongoc_cursor_batch_reader_t reader;
+   mongoc_cursor_response_t response;
+   mongoc_cursor_response_legacy_t response_legacy;
    reading_from_t reading_from;
    getmore_type_t getmore_type; /* cache after first getmore. */
 } data_cmd_t;
@@ -52,7 +53,9 @@ static void
 _destroy (mongoc_cursor_context_t *ctx)
 {
    data_cmd_t *data = (data_cmd_t *) ctx->data;
-   bson_destroy (&data->reader.reply);
+   bson_destroy (&data->response.reply);
+   _mongoc_cursor_response_legacy_destroy(&data->response_legacy);
+   bson_free(data);
 }
 
 
@@ -71,9 +74,9 @@ _prime (mongoc_cursor_t *cursor)
    /* TODO: if filter is placed in context, rename to command. */
    /* server replies to aggregate/listIndexes/listCollections with:
     * {cursor: {id: N, firstBatch: []}} */
-   _mongoc_cursor_batch_reader_refresh (
-      cursor, &cursor->filter, &copied_opts, &data->reader);
-   data->reading_from = DOC;
+   _mongoc_cursor_response_refresh (
+      cursor, &cursor->filter, &copied_opts, &data->response);
+   data->reading_from = RESPONSE;
    bson_destroy (&copied_opts);
 }
 
@@ -86,11 +89,11 @@ _pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
    bool eof;
 
    switch (data->reading_from) {
-   case DOC:
-      _mongoc_cursor_batch_reader_read (cursor, &data->reader, out);
+   case RESPONSE:
+      _mongoc_cursor_response_read (cursor, &data->response, out);
       return;
-   case STREAM:
-      bson = bson_reader_read (cursor->legacy_response.reader, &eof);
+   case RESPONSE_LEGACY:
+      bson = bson_reader_read (data->response_legacy.reader, &eof);
       if (out) {
          *out = bson;
       }
@@ -116,17 +119,17 @@ _get_next_batch (mongoc_cursor_t *cursor)
 
    if (_use_getmore_cmd (cursor)) {
       _mongoc_cursor_prepare_getmore_command (cursor, &getmore_cmd);
-      _mongoc_cursor_batch_reader_refresh (
-         cursor, &getmore_cmd, NULL /* opts */, &data->reader);
+      _mongoc_cursor_response_refresh (
+         cursor, &getmore_cmd, NULL /* opts */, &data->response);
       bson_destroy (&getmore_cmd);
-      data->reading_from = DOC;
+      data->reading_from = RESPONSE;
    } else {
-      if (_mongoc_cursor_op_getmore (cursor, NULL)) {
+      if (_mongoc_cursor_op_getmore (cursor, &data->response_legacy)) {
          cursor->state = IN_BATCH;
       } else {
          cursor->state = DONE;
       }
-      data->reading_from = STREAM;
+      data->reading_from = RESPONSE_LEGACY;
    }
 }
 
@@ -135,7 +138,8 @@ static void
 _clone (mongoc_cursor_context_t *dst, const mongoc_cursor_context_t *src)
 {
    data_cmd_t *data = bson_malloc0 (sizeof (*data));
-   bson_init (&data->reader.reply);
+   bson_init (&data->response.reply);
+   _mongoc_cursor_response_legacy_init(&data->response_legacy);
    dst->data = data;
 }
 
@@ -153,7 +157,8 @@ _mongoc_cursor_cmd_new (mongoc_client_t *client,
 
    cursor = _mongoc_cursor_new_with_opts (
       client, db_and_coll, cmd, opts, read_prefs, read_concern);
-   bson_init (&data->reader.reply);
+   _mongoc_cursor_response_legacy_init(&data->response_legacy);
+   bson_init (&data->response.reply);
    cursor->ctx.prime = _prime;
    cursor->ctx.pop_from_batch = _pop_from_batch;
    cursor->ctx.get_next_batch = _get_next_batch;
@@ -175,14 +180,14 @@ _mongoc_cursor_cmd_new_from_reply (mongoc_client_t *client,
    data_cmd_t *data = (data_cmd_t *) cursor->ctx.data;
    cursor->state = IN_BATCH;
    cursor->server_id = server_id;
-   data->reading_from = DOC;
-   bson_destroy (&data->reader.reply);
-   if (!bson_steal (&data->reader.reply, reply)) {
-      bson_destroy (&data->reader.reply);
-      BSON_ASSERT (bson_steal (&data->reader.reply, bson_copy (reply)));
+   data->reading_from = RESPONSE;
+   bson_destroy (&data->response.reply);
+   if (!bson_steal (&data->response.reply, reply)) {
+      bson_destroy (&data->response.reply);
+      BSON_ASSERT (bson_steal (&data->response.reply, bson_copy (reply)));
    }
 
-   if (!_mongoc_cursor_batch_reader_start (cursor, &data->reader)) {
+   if (!_mongoc_cursor_response_start (cursor, &data->response)) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_CURSOR,
                       MONGOC_ERROR_CURSOR_INVALID_CURSOR,

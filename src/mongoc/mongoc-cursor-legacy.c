@@ -111,13 +111,13 @@ _mongoc_cursor_monitor_legacy_query (mongoc_cursor_t *cursor,
 
 
 bool
-_mongoc_read_from_buffer (mongoc_cursor_t *cursor, const bson_t **bson)
+_mongoc_read_from_buffer (mongoc_cursor_t *cursor, mongoc_cursor_response_legacy_t* response, const bson_t **bson)
 {
    bool eof = false;
 
-   BSON_ASSERT (cursor->legacy_response.reader);
+   BSON_ASSERT (response->reader);
 
-   *bson = bson_reader_read (cursor->legacy_response.reader, &eof);
+   *bson = bson_reader_read (response->reader, &eof);
    cursor->state = eof ? END_OF_BATCH : IN_BATCH;
 
    return *bson ? true : false;
@@ -127,99 +127,33 @@ _mongoc_read_from_buffer (mongoc_cursor_t *cursor, const bson_t **bson)
 bool
 _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
 {
-   int64_t limit;
-   const bson_t *b = NULL;
-   bool tailable;
-
-   ENTRY;
-
-   BSON_ASSERT (cursor);
-
-   if (bson) {
-      *bson = NULL;
-   }
-
-   /*
-    * If we reached our limit, make sure we mark this as done and do not try to
-    * make further progress.  We also set end_of_event so that
-    * mongoc_cursor_more will be false.
-    */
-   limit =
-      1; /* find cursors don't use this function anymore, this is just 1. */
-
-   if (limit && cursor->count >= llabs (limit)) {
-      cursor->state = DONE;
-      RETURN (false);
-   }
-
-   /*
-    * Try to read the next document from the reader if it exists, we might
-    * get NULL back and EOF, in which case we need to submit a getmore.
-    */
-   if (cursor->legacy_response.reader) {
-      _mongoc_read_from_buffer (cursor, &b);
-      if (b) {
-         GOTO (complete);
-      }
-   }
-
-   /*
-    * Check to see if we need to send a GET_MORE for more results.
-    */
-   if (cursor->state == UNPRIMED) {
-      b = _mongoc_cursor_initial_query (cursor);
-   } else if (BSON_UNLIKELY (cursor->state == END_OF_BATCH) &&
-              cursor->cursor_id) {
-      b = _mongoc_cursor_get_more (cursor);
-   }
-
-complete:
-   /* NOTE: this check isn't in find cursors anymore. I think it's ok though. */
-   tailable = _mongoc_cursor_get_opt_bool (cursor, "tailable");
-   if (cursor->state == END_OF_BATCH && !tailable) {
-      if (cursor->in_exhaust && !cursor->cursor_id) {
-         /* the exhaust cursor has received all of the documents. */
-         cursor->state = DONE;
-      } else if (!b) {
-         cursor->state = DONE;
-      }
-   }
-
-   if (bson) {
-      *bson = b;
-   }
-
-   RETURN (!!b);
+   return false;
 }
 
 bool
-_mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
-                           mongoc_server_stream_t *server_stream)
+_mongoc_cursor_op_getmore (mongoc_cursor_t *cursor, mongoc_cursor_response_legacy_t* response)
 {
    int64_t started;
    mongoc_rpc_t rpc;
    uint32_t request_id;
    mongoc_cluster_t *cluster;
    mongoc_query_flags_t flags;
-   bool owns_stream = false;
+   mongoc_server_stream_t *server_stream;
    bool ret = true;
 
    ENTRY;
 
    started = bson_get_monotonic_time ();
    cluster = &cursor->client->cluster;
-
-   if (!server_stream) {
-      server_stream = _mongoc_cursor_fetch_stream (cursor);
-      owns_stream = true;
-   }
+   
+   server_stream = _mongoc_cursor_fetch_stream (cursor);
 
    if (!_mongoc_cursor_flags (cursor, server_stream, &flags)) {
       GOTO (fail);
    }
 
    if (cursor->in_exhaust) {
-      request_id = (uint32_t) cursor->legacy_response.rpc.header.request_id;
+      request_id = (uint32_t) response->rpc.header.request_id;
    } else {
       request_id = ++cluster->request_id;
 
@@ -247,57 +181,58 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
       }
    }
 
-   _mongoc_buffer_clear (&cursor->legacy_response.buffer, false);
+   _mongoc_buffer_clear (&response->buffer, false);
 
    /* reset the last known cursor id. */
    cursor->cursor_id = 0;
 
    if (!_mongoc_client_recv (cursor->client,
-                             &cursor->legacy_response.rpc,
-                             &cursor->legacy_response.buffer,
+                             &response->rpc,
+                             &response->buffer,
                              server_stream,
                              &cursor->error)) {
       GOTO (done);
    }
 
-   if (cursor->legacy_response.rpc.header.opcode != MONGOC_OPCODE_REPLY) {
+   if (response->rpc.header.opcode != MONGOC_OPCODE_REPLY) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_PROTOCOL,
                       MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
                       "Invalid opcode. Expected %d, got %d.",
                       MONGOC_OPCODE_REPLY,
-                      cursor->legacy_response.rpc.header.opcode);
+                      response->rpc.header.opcode);
       GOTO (done);
    }
 
-   if (cursor->legacy_response.rpc.header.response_to != request_id) {
+   if (response->rpc.header.response_to != request_id) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_PROTOCOL,
                       MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
                       "Invalid response_to for getmore. Expected %d, got %d.",
                       request_id,
-                      cursor->legacy_response.rpc.header.response_to);
+                      response->rpc.header.response_to);
       GOTO (done);
    }
 
-   if (!_mongoc_rpc_check_ok (&cursor->legacy_response.rpc,
+   if (!_mongoc_rpc_check_ok (&response->rpc,
                               cursor->client->error_api_version,
                               &cursor->error,
                               &cursor->error_doc)) {
       GOTO (done);
    }
 
-   if (cursor->legacy_response.reader) {
-      bson_reader_destroy (cursor->legacy_response.reader);
+   if (response->reader) {
+      bson_reader_destroy (response->reader);
    }
 
-   cursor->cursor_id = cursor->legacy_response.rpc.reply.cursor_id;
+   cursor->cursor_id = response->rpc.reply.cursor_id;
 
-   cursor->legacy_response.reader = bson_reader_new_from_data (
-      cursor->legacy_response.rpc.reply.documents,
-      (size_t) cursor->legacy_response.rpc.reply.documents_len);
+   response->reader = bson_reader_new_from_data (
+      response->rpc.reply.documents,
+      (size_t) response->rpc.reply.documents_len);
 
    _mongoc_cursor_monitor_succeeded (cursor,
+                                     response,
                                      bson_get_monotonic_time () - started,
                                      false, /* not first batch */
                                      server_stream,
@@ -310,9 +245,7 @@ fail:
       cursor, bson_get_monotonic_time () - started, server_stream, "getMore");
    ret = false;
 done:
-   if (owns_stream) {
-      mongoc_server_stream_cleanup (server_stream);
-   }
+   mongoc_server_stream_cleanup (server_stream);
    RETURN (ret);
 }
 
@@ -539,7 +472,7 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
 
 /* this is *only* for find cursors */
 void
-_mongoc_cursor_op_query_find (mongoc_cursor_t *cursor)
+_mongoc_cursor_op_query_find (mongoc_cursor_t *cursor, mongoc_cursor_response_legacy_t* response)
 {
    int64_t started;
    uint32_t request_id;
@@ -614,52 +547,50 @@ _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor)
       GOTO (done);
    }
 
-   _mongoc_buffer_clear (&cursor->legacy_response.buffer, false);
+   _mongoc_buffer_clear (&response->buffer, false);
 
    if (!_mongoc_client_recv (cursor->client,
-                             &cursor->legacy_response.rpc,
-                             &cursor->legacy_response.buffer,
+                             &response->rpc,
+                             &response->buffer,
                              server_stream,
                              &cursor->error)) {
       GOTO (done);
    }
 
-   if (cursor->legacy_response.rpc.header.opcode != MONGOC_OPCODE_REPLY) {
+   if (response->rpc.header.opcode != MONGOC_OPCODE_REPLY) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_PROTOCOL,
                       MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
                       "Invalid opcode. Expected %d, got %d.",
                       MONGOC_OPCODE_REPLY,
-                      cursor->legacy_response.rpc.header.opcode);
+                      response->rpc.header.opcode);
       GOTO (done);
    }
 
-   if (cursor->legacy_response.rpc.header.response_to != request_id) {
+   if (response->rpc.header.response_to != request_id) {
       bson_set_error (&cursor->error,
                       MONGOC_ERROR_PROTOCOL,
                       MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
                       "Invalid response_to for query. Expected %d, got %d.",
                       request_id,
-                      cursor->legacy_response.rpc.header.response_to);
+                      response->rpc.header.response_to);
       GOTO (done);
    }
 
-   if (!_mongoc_rpc_check_ok (&cursor->legacy_response.rpc,
+   if (!_mongoc_rpc_check_ok (&response->rpc,
                               cursor->client->error_api_version,
                               &cursor->error,
                               &cursor->error_doc)) {
       GOTO (done);
    }
 
-   if (cursor->legacy_response.reader) {
-      bson_reader_destroy (cursor->legacy_response.reader);
+   if (response->reader) {
+      bson_reader_destroy (response->reader);
    }
 
-   cursor->cursor_id = cursor->legacy_response.rpc.reply.cursor_id;
+   cursor->cursor_id = response->rpc.reply.cursor_id;
 
-   cursor->legacy_response.reader = bson_reader_new_from_data (
-      cursor->legacy_response.rpc.reply.documents,
-      (size_t) cursor->legacy_response.rpc.reply.documents_len);
+   response->reader = bson_reader_new_from_data (response->rpc.reply.documents, (size_t) response->rpc.reply.documents_len);
 
    if (_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST)) {
       cursor->in_exhaust = true;
@@ -667,6 +598,7 @@ _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor)
    }
 
    _mongoc_cursor_monitor_succeeded (cursor,
+                                     response,
                                      bson_get_monotonic_time () - started,
                                      true, /* first_batch */
                                      server_stream,
@@ -686,4 +618,18 @@ done:
    assemble_query_result_cleanup (&result);
    bson_destroy (&query);
    bson_destroy (&fields);
+}
+
+void
+_mongoc_cursor_response_legacy_init (mongoc_cursor_response_legacy_t* response) {
+   _mongoc_buffer_init (&response->buffer, NULL, 0, NULL, NULL);
+}
+
+void
+_mongoc_cursor_response_legacy_destroy (mongoc_cursor_response_legacy_t* response) {
+   if (response->reader) {
+      bson_reader_destroy (response->reader);
+      response->reader = NULL;
+   }
+   _mongoc_buffer_destroy (&response->buffer);
 }
