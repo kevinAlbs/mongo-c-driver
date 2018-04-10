@@ -347,7 +347,7 @@ killcursors_succeeded (const mongoc_apm_command_succeeded_t *event)
 }
 
 extern void
-_mongoc_cursor_ctx_find_opquery_init (mongoc_cursor_t *cursor);
+_mongoc_cursor_impl_find_opquery_init (mongoc_cursor_t *cursor);
 
 /* test killing a cursor with mongo_cursor_destroy and a real server */
 static void
@@ -403,7 +403,7 @@ test_kill_cursor_live (void)
 
    cursor =
       _mongoc_cursor_find_new (client, collection->ns, b, NULL, NULL, NULL);
-   _mongoc_cursor_ctx_find_opquery_init (cursor);
+   _mongoc_cursor_impl_find_opquery_init (cursor);
 
    cursor->cursor_id = ctx.cursor_id;
    cursor->state = END_OF_BATCH; /* meaning, "finished reading first batch" */
@@ -1802,7 +1802,10 @@ test_cursor_install (TestSuite *suite)
    TestSuite_AddLive (
       suite, "/Cursor/clone_with_concerns", test_clone_with_concerns);
    TestSuite_AddLive (suite, "/Cursor/limit", test_limit);
-   TestSuite_AddLive (suite, "/Cursor/kill/live", test_kill_cursor_live);
+   TestSuite_AddLive (suite,
+                      ""
+                      "/Cursor/kill/live",
+                      test_kill_cursor_live);
    TestSuite_AddMockServerTest (
       suite, "/Cursor/kill/single", test_kill_cursors_single);
    TestSuite_AddMockServerTest (

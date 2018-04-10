@@ -536,8 +536,8 @@ mongoc_cursor_destroy (mongoc_cursor_t *cursor)
 
    BSON_ASSERT (cursor);
 
-   if (cursor->ctx.destroy) {
-      cursor->ctx.destroy (&cursor->ctx);
+   if (cursor->impl.destroy) {
+      cursor->impl.destroy (&cursor->impl);
    }
 
    if (cursor->in_exhaust) {
@@ -849,6 +849,8 @@ _mongoc_cursor_run_command (mongoc_cursor_t *cursor,
    server_stream = _mongoc_cursor_fetch_stream (cursor);
 
    if (!server_stream) {
+      /* TODO: we should not clear the cursor id here. Because we won't kill it
+       * later in destroy, even though we failed on client side. */
       _mongoc_bson_init_if_set (reply);
       GOTO (done);
    }
@@ -1049,10 +1051,38 @@ mongoc_cursor_error_document (mongoc_cursor_t *cursor,
 }
 
 
+mongoc_cursor_state_t
+_call_transition (mongoc_cursor_t *cursor)
+{
+   mongoc_cursor_state_t state = cursor->state;
+   _mongoc_cursor_impl_transition_t fn = NULL;
+   switch (state) {
+   case UNPRIMED:
+      fn = cursor->impl.prime;
+      break;
+   case IN_BATCH:
+      fn = cursor->impl.pop_from_batch;
+      break;
+   case END_OF_BATCH:
+      fn = cursor->impl.get_next_batch;
+      break;
+   case DONE:
+   default:
+      fn = NULL;
+      break;
+   }
+   if (!fn) {
+      return DONE;
+   }
+   return fn (cursor);
+}
+
+
 bool
 mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
 {
    bool ret = false;
+   bool attempted_refresh = false;
 
    ENTRY;
 
@@ -1066,7 +1096,7 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
    }
 
    if (CURSOR_FAILED (cursor)) {
-      return false;
+      RETURN (false);
    }
 
    if (cursor->state == DONE) {
@@ -1074,7 +1104,7 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
                       MONGOC_ERROR_CURSOR,
                       MONGOC_ERROR_CURSOR_INVALID_CURSOR,
                       "Cannot advance a completed or failed cursor.");
-      return false;
+      RETURN (false);
    }
 
    /*
@@ -1088,57 +1118,44 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
       RETURN (false);
    }
 
-   BSON_ASSERT (cursor->ctx.prime);
-   if (cursor->state == UNPRIMED) {
-      cursor->ctx.prime (cursor);
-      if (cursor->state == DONE) {
-         ret = false;
-         goto done;
-      }
+   cursor->current = NULL;
+
+   /* if an error was set on this cursor before calling next, transition to DONE
+    * immediately. */
+   if (cursor->error.domain) {
+      cursor->state = DONE;
+      GOTO (done);
    }
 
-   /* a tailable or change streams cursor might be at END_OF_BATCH at the
-    * beginning of next */
-   if (cursor->state == END_OF_BATCH) {
-      cursor->ctx.get_next_batch (cursor);
-      /* TODO: these transitions are weird */
-      if (cursor->state == IN_BATCH) {
-         cursor->ctx.pop_from_batch (cursor, bson);
-         if (*bson) {
-            ret = true;
-            goto done;
-         }
-      }
-   }
-
-   if (cursor->state == IN_BATCH) {
-      cursor->ctx.pop_from_batch (cursor, bson);
-      if (*bson) {
-         ret = true;
-         goto done;
-      }
-
+   while (cursor->state != DONE) {
+      /* even when there is no data to return, some cursors remain open and
+       * continue sending empty batches (e.g. a tailable or change stream
+       * cursor). in that case, do not attempt to get another batch. */
       if (cursor->state == END_OF_BATCH) {
-         cursor->ctx.get_next_batch (cursor);
+         if (attempted_refresh) {
+            RETURN (false);
+         }
+         attempted_refresh = true;
       }
 
-      if (cursor->state == DONE) {
-         ret = false;
-         goto done;
+      cursor->state = _call_transition (cursor);
+
+      if (cursor->error.domain) {
+         /* override the state and finish. */
+         cursor->state = DONE;
+         GOTO (done);
       }
 
-      cursor->ctx.pop_from_batch (cursor, bson);
-      if (*bson) {
+      /* check if we received a document. */
+      if (cursor->current) {
+         *bson = cursor->current;
          ret = true;
-         goto done;
+         GOTO (done);
       }
    }
 
 done:
-   cursor->current = *bson;
-
    cursor->count++;
-
    RETURN (ret);
 }
 
@@ -1224,9 +1241,9 @@ mongoc_cursor_clone (const mongoc_cursor_t *cursor)
    bson_strncpy (_clone->ns, cursor->ns, sizeof _clone->ns);
 
    /* copy the context functions by default. */
-   memcpy (&_clone->ctx, &cursor->ctx, sizeof (cursor->ctx));
-   if (cursor->ctx.clone) {
-      cursor->ctx.clone (&_clone->ctx, &cursor->ctx);
+   memcpy (&_clone->impl, &cursor->impl, sizeof (cursor->impl));
+   if (cursor->impl.clone) {
+      cursor->impl.clone (&_clone->impl, &cursor->impl);
    }
 
    mongoc_counter_cursors_active_inc ();
@@ -1258,14 +1275,7 @@ mongoc_cursor_is_alive (const mongoc_cursor_t *cursor) /* IN */
 {
    BSON_ASSERT (cursor);
 
-
-   /* I think this function was incorrect before. done is true when there will
-    * be no additional getMore attempts *and* there are no more documents.
-    * Before: `return !cursor->done`
-    * Should have been `return !cursor->sent || cursor->rpc.reply.cursor_id`
-    */
    return cursor->state != DONE;
-   /* Should be: return cursor->state == UNPRIMED || cursor->cursor_id; */
 }
 
 
@@ -1460,8 +1470,8 @@ mongoc_cursor_new_from_command_reply (mongoc_client_t *client,
 
 
 bool
-_mongoc_cursor_response_start (mongoc_cursor_t *cursor,
-                               mongoc_cursor_response_t *response)
+_mongoc_cursor_start_reading_response (mongoc_cursor_t *cursor,
+                                       mongoc_cursor_response_t *response)
 {
    bson_iter_t iter;
    bson_iter_t child;
@@ -1501,7 +1511,7 @@ _mongoc_cursor_response_start (mongoc_cursor_t *cursor,
 }
 
 
-void
+bool
 _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
                               mongoc_cursor_response_t *response,
                               const bson_t **bson)
@@ -1518,15 +1528,13 @@ _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
       /* bson_iter_next guarantees valid BSON, so this must succeed */
       BSON_ASSERT (bson_init_static (&response->current_doc, data, data_len));
       *bson = &response->current_doc;
-
-      cursor->state = IN_BATCH;
-   } else {
-      cursor->state = cursor->cursor_id ? END_OF_BATCH : DONE;
+      return true;
    }
+   return false;
 }
 
-
-void
+/* returns true if successfully got the next batch. */
+bool
 _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
                                  const bson_t *command,
                                  const bson_t *opts,
@@ -1536,25 +1544,28 @@ _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
 
    bson_destroy (&response->reply);
 
+   /* reset the cursor id. */
+   /* ACTUALLY dont' do this */
+   /* cursor->cursor_id = 0; */
+
    /* server replies to find / aggregate with {cursor: {id: N, firstBatch: []}},
     * to getMore command with {cursor: {id: N, nextBatch: []}}. */
    if (_mongoc_cursor_run_command (cursor, command, opts, &response->reply) &&
-       _mongoc_cursor_response_start (cursor, response)) {
-      cursor->state = IN_BATCH;
-   } else {
-      if (!cursor->error.domain) {
-         bson_set_error (&cursor->error,
-                         MONGOC_ERROR_PROTOCOL,
-                         MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
-                         "Invalid reply to %s command.",
-                         _mongoc_get_command_name (command));
-         cursor->state = DONE;
-      }
+       _mongoc_cursor_start_reading_response (cursor, response)) {
+      return true;
    }
+   if (!cursor->error.domain) {
+      bson_set_error (&cursor->error,
+                      MONGOC_ERROR_PROTOCOL,
+                      MONGOC_ERROR_PROTOCOL_INVALID_REPLY,
+                      "Invalid reply to %s command.",
+                      _mongoc_get_command_name (command));
+   }
+   return false;
 }
 
 
-bool
+void
 _mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
                                         bson_t *command)
 {
@@ -1603,6 +1614,15 @@ _mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
                             max_await_time_ms);
       }
    }
+}
 
-   RETURN (true);
+/* sets the cursor to be empty so it returns NULL on the first call to
+ * cursor_next but does not return an error. */
+void
+_mongoc_cursor_set_empty (mongoc_cursor_t *cursor)
+{
+   memset (&cursor->error, 0, sizeof (bson_error_t));
+   bson_reinit (&cursor->error_doc);
+   /* TODO: STATE: this might be unavoidable. */
+   cursor->state = IN_BATCH;
 }

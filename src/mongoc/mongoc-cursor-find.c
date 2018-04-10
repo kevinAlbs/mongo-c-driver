@@ -16,52 +16,41 @@
 
 #include "mongoc.h"
 #include "mongoc-cursor-private.h"
-#include "mongoc-util-private.h"
 #include "mongoc-client-private.h"
 
 
 extern void
-_mongoc_cursor_ctx_find_cmd_init (mongoc_cursor_t *cursor);
+_mongoc_cursor_impl_find_cmd_init (mongoc_cursor_t *cursor);
 extern void
-_mongoc_cursor_ctx_find_opquery_init (mongoc_cursor_t *cursor);
+_mongoc_cursor_impl_find_opquery_init (mongoc_cursor_t *cursor);
 
-static void
+
+static mongoc_cursor_state_t
 _prime (mongoc_cursor_t *cursor)
 {
    bool use_find_command;
-   uint32_t server_id;
    mongoc_server_stream_t *server_stream;
 
    /* determine if this should be a command or op_query cursor. */
-   if (!_mongoc_get_server_id_from_opts (&cursor->opts,
-                                         MONGOC_ERROR_CURSOR,
-                                         MONGOC_ERROR_CURSOR_INVALID_CURSOR,
-                                         &server_id,
-                                         &cursor->error)) {
-      cursor->state = DONE;
-      return;
-   }
-
-   /* may set server_id. */
    server_stream = _mongoc_cursor_fetch_stream (cursor);
-
    if (!server_stream) {
-      cursor->state = DONE;
-      return;
+      return DONE;
    }
-   /* a find command can not be used for exhaust cursors. */
+   /* find_getmore_killcursors spec:
+    * "The find command does not support the exhaust flag from OP_QUERY." */
    use_find_command =
       server_stream->sd->max_wire_version >= WIRE_VERSION_FIND_CMD &&
       !_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST);
    mongoc_server_stream_cleanup (server_stream);
 
+   /* set all mongoc_impl_t function pointers */
    if (use_find_command) {
-      _mongoc_cursor_ctx_find_cmd_init (cursor);
+      _mongoc_cursor_impl_find_cmd_init (cursor);
    } else {
-      _mongoc_cursor_ctx_find_opquery_init (cursor);
+      _mongoc_cursor_impl_find_opquery_init (cursor);
    }
-
-   cursor->ctx.prime (cursor);
+   /* prime with the new implementation. */
+   return cursor->impl.prime (cursor);
 }
 
 
@@ -76,6 +65,6 @@ _mongoc_cursor_find_new (mongoc_client_t *client,
    mongoc_cursor_t *cursor;
    cursor = _mongoc_cursor_new_with_opts (
       client, db_and_coll, filter, opts, read_prefs, read_concern);
-   cursor->ctx.prime = _prime;
+   cursor->impl.prime = _prime;
    return cursor;
 }

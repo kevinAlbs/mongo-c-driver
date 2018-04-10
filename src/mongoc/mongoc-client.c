@@ -55,13 +55,13 @@
 #include "mongoc-host-list-private.h"
 #include "mongoc-read-prefs-private.h"
 #include "mongoc-client-session-private.h"
+#include "mongoc-cursor-private.h"
 
 #ifdef MONGOC_ENABLE_SSL
 #include "mongoc-stream-tls.h"
 #include "mongoc-ssl-private.h"
 #include "mongoc-cmd-private.h"
 #include "mongoc-opts-private.h"
-#include "mongoc-cursor-private.h"
 
 #endif
 
@@ -2377,6 +2377,7 @@ mongoc_client_get_database_names_with_opts (mongoc_client_t *client,
 
    /* ignore client read prefs */
    cursor = _mongoc_cursor_array_new (client, "admin", &cmd, opts, "databases");
+   bson_destroy (&cmd);
 
    while (mongoc_cursor_next (cursor, &doc)) {
       if (bson_iter_init (&iter, doc) && bson_iter_find (&iter, "name") &&

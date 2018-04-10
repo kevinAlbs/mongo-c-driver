@@ -330,7 +330,6 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
                                     read_prefs,
                                     NULL /* read concern */);
    bson_destroy (&cursor_opts);
-
    if (!_mongoc_get_server_id_from_opts (opts,
                                          MONGOC_ERROR_COMMAND,
                                          MONGOC_ERROR_COMMAND_INVALID_ARG,
@@ -513,7 +512,7 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
 {
    bool has_unwrapped;
    bson_t unwrapped;
-   bson_error_t error;
+   bson_error_t error = {0};
    bson_t opts;
    bool slave_ok;
    mongoc_cursor_t *cursor;
@@ -528,6 +527,7 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
 
    bson_init (&opts);
    _mongoc_cursor_flags_to_opts (flags, &opts, &slave_ok);
+   /* check if the query is wrapped in $query */
    has_unwrapped = _mongoc_cursor_translate_dollar_query_opts (
       query, &opts, &unwrapped, &error);
    if (!bson_empty0 (fields)) {
@@ -544,7 +544,7 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
       _mongoc_cursor_set_opt_int64 (cursor, MONGOC_CURSOR_SKIP, skip);
    }
    if (limit) {
-      /* limit must be casted to int32_t. Although the argument is a uint32_t,
+      /* limit must be cast to int32_t. Although the argument is a uint32_t,
        * callers can specify a negative limit by casting to a signed int32_t
        * value to uint32_t. E.g. to set a limit of -4, the caller passes
        * UINT32_MAX - 3 */
@@ -558,7 +558,6 @@ mongoc_collection_find (mongoc_collection_t *collection,       /* IN */
 
    if (error.domain) {
       memcpy (&cursor->error, &error, sizeof (error));
-      cursor->state = DONE;
    }
 
    return cursor;
@@ -607,14 +606,13 @@ mongoc_collection_find_with_opts (mongoc_collection_t *collection,
       read_prefs = collection->read_prefs;
    }
 
-   mongoc_cursor_t *cursor =
-      _mongoc_cursor_find_new (collection->client,
-                               collection->ns,
-                               filter,
-                               opts,
-                               COALESCE (read_prefs, collection->read_prefs),
-                               collection->read_concern);
-   return cursor;
+   return _mongoc_cursor_find_new (
+      collection->client,
+      collection->ns,
+      filter,
+      opts,
+      COALESCE (read_prefs, collection->read_prefs),
+      collection->read_concern);
 }
 
 
@@ -1385,17 +1383,14 @@ mongoc_collection_find_indexes_with_opts (mongoc_collection_t *collection,
                                     NULL /* read prefs */,
                                     NULL /* read concern */);
 
-   cursor->ctx.prime (cursor);
+   cursor->impl.prime (cursor);
 
    if (mongoc_cursor_error (cursor, &error) &&
        error.code == MONGOC_ERROR_COLLECTION_DOES_NOT_EXIST) {
-      /* collection does not exist. in accordance with the spec we do not
-       * return an error:
+      /* collection does not exist. from spec: return no documents but no err:
        * https://github.com/mongodb/specifications/blob/master/source/enumerate-indexes.rst#enumeration-getting-index-information
-       * so clear it. */
-      memset (&cursor->error, 0, sizeof (bson_error_t));
-      bson_reinit (&cursor->error_doc);
-      cursor->state = IN_BATCH;
+       */
+      _mongoc_cursor_set_empty (cursor);
    }
 
    bson_destroy (&cmd);
