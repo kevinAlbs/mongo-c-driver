@@ -19,6 +19,7 @@
 
 typedef struct _data_find_opquery_t {
    mongoc_cursor_response_legacy_t response_legacy;
+   bson_t filter;
 } data_find_opquery_t;
 
 
@@ -43,7 +44,7 @@ _prime (mongoc_cursor_t *cursor)
       return DONE;
    }
 
-   _mongoc_cursor_op_query_find (cursor, &data->response_legacy);
+   _mongoc_cursor_op_query_find (cursor, &data->filter, &data->response_legacy);
    return IN_BATCH;
 }
 
@@ -80,6 +81,7 @@ _destroy (mongoc_cursor_impl_t *impl)
 {
    data_find_opquery_t *data = (data_find_opquery_t *) impl->data;
    _mongoc_cursor_response_legacy_destroy (&data->response_legacy);
+   bson_destroy (&data->filter);
    bson_free (data);
 }
 
@@ -87,17 +89,20 @@ _destroy (mongoc_cursor_impl_t *impl)
 static void
 _clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 {
-   data_find_opquery_t *data = bson_malloc0 (sizeof (*data));
-   _mongoc_cursor_response_legacy_init (&data->response_legacy);
-   dst->data = data;
+   data_find_opquery_t *data_dst = bson_malloc0 (sizeof (data_find_opquery_t));
+   data_find_opquery_t *data_src = (data_find_opquery_t *) src->data;
+   _mongoc_cursor_response_legacy_init (&data_dst->response_legacy);
+   bson_copy_to (&data_src->filter, &data_dst->filter);
+   dst->data = data_dst;
 }
 
 
 void
-_mongoc_cursor_impl_find_opquery_init (mongoc_cursor_t *cursor)
+_mongoc_cursor_impl_find_opquery_init (mongoc_cursor_t *cursor, bson_t *filter)
 {
    data_find_opquery_t *data = bson_malloc0 (sizeof (*data));
    _mongoc_cursor_response_legacy_init (&data->response_legacy);
+   bson_steal (&data->filter, filter);
    cursor->impl.prime = _prime;
    cursor->impl.pop_from_batch = _pop_from_batch;
    cursor->impl.get_next_batch = _get_next_batch;

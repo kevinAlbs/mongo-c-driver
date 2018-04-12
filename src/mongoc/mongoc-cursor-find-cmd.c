@@ -19,6 +19,7 @@
 
 typedef struct _data_find_cmd_t {
    mongoc_cursor_response_t response;
+   bson_t filter;
 } data_find_cmd_t;
 
 
@@ -31,7 +32,7 @@ _prime (mongoc_cursor_t *cursor)
    bson_init (&find_cmd);
    cursor->operation_id = ++cursor->client->cluster.operation_id;
    /* construct { find: "<collection>", filter: {<filter>} } */
-   _mongoc_cursor_prepare_find_command (cursor, &find_cmd);
+   _mongoc_cursor_prepare_find_command (cursor, &data->filter, &find_cmd);
    _mongoc_cursor_response_refresh (
       cursor, &find_cmd, &cursor->opts, &data->response);
    bson_destroy (&find_cmd);
@@ -81,17 +82,20 @@ _destroy (mongoc_cursor_impl_t *impl)
 static void
 _clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 {
-   data_find_cmd_t *data = bson_malloc0 (sizeof (*data));
-   bson_init (&data->response.reply);
-   dst->data = data;
+   data_find_cmd_t *data_src = (data_find_cmd_t *) src->data;
+   data_find_cmd_t *data_dst = bson_malloc0 (sizeof (data_find_cmd_t));
+   bson_init (&data_dst->response.reply);
+   bson_copy_to (&data_src->filter, &data_dst->filter);
+   dst->data = data_dst;
 }
 
 
 /* transition a find cursor to use the find command. */
 void
-_mongoc_cursor_impl_find_cmd_init (mongoc_cursor_t *cursor)
+_mongoc_cursor_impl_find_cmd_init (mongoc_cursor_t *cursor, bson_t *filter)
 {
    data_find_cmd_t *data = bson_malloc0 (sizeof (*data));
+   bson_steal (&data->filter, filter);
    bson_init (&data->response.reply);
    cursor->impl.prime = _prime;
    cursor->impl.pop_from_batch = _pop_from_batch;

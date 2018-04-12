@@ -194,12 +194,39 @@ _first_dollar_field (const bson_t *bson)
       (c)->state = DONE; \
    } while (0)
 
+/* if src is non-NULL, it is validated and copied to dst. returns false and
+ * sets the cursor error if validation fails. */
+bool
+_mongoc_cursor_check_keys_and_copy_to (mongoc_cursor_t *cursor,
+                                       const char *err_prefix,
+                                       const bson_t *src,
+                                       bson_t *dst)
+{
+   bson_error_t validate_err;
+   bson_init (dst);
+   if (src) {
+      if (!bson_validate_with_error (
+             src, BSON_VALIDATE_EMPTY_KEYS, &validate_err)) {
+         MARK_FAILED (cursor);
+         bson_set_error (&cursor->error,
+                         MONGOC_ERROR_CURSOR,
+                         MONGOC_ERROR_CURSOR_INVALID_CURSOR,
+                         "Invalid %s: %s",
+                         err_prefix,
+                         validate_err.message);
+         return false;
+      }
 
-/* TODO: split this up into separate validation functions? */
+      bson_destroy (dst);
+      bson_copy_to (src, dst);
+   }
+   return true;
+}
+
+
 mongoc_cursor_t *
 _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const char *db_and_collection,
-                              const bson_t *filter,
                               const bson_t *opts,
                               const mongoc_read_prefs_t *read_prefs,
                               const mongoc_read_concern_t *read_concern)
@@ -219,25 +246,8 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
    cursor->client = client;
    cursor->state = UNPRIMED;
 
-   bson_init (&cursor->filter);
    bson_init (&cursor->opts);
    bson_init (&cursor->error_doc);
-
-   if (filter) {
-      if (!bson_validate_with_error (
-             filter, BSON_VALIDATE_EMPTY_KEYS, &validate_err)) {
-         MARK_FAILED (cursor);
-         bson_set_error (&cursor->error,
-                         MONGOC_ERROR_CURSOR,
-                         MONGOC_ERROR_CURSOR_INVALID_CURSOR,
-                         "Invalid filter: %s",
-                         validate_err.message);
-         GOTO (finish);
-      }
-
-      bson_destroy (&cursor->filter);
-      bson_copy_to (filter, &cursor->filter);
-   }
 
    if (opts) {
       if (!bson_validate_with_error (
@@ -567,7 +577,6 @@ mongoc_cursor_destroy (mongoc_cursor_t *cursor)
    mongoc_read_concern_destroy (cursor->read_concern);
    mongoc_write_concern_destroy (cursor->write_concern);
 
-   bson_destroy (&cursor->filter);
    bson_destroy (&cursor->opts);
    bson_destroy (&cursor->error_doc);
    bson_free (cursor);
@@ -849,8 +858,6 @@ _mongoc_cursor_run_command (mongoc_cursor_t *cursor,
    server_stream = _mongoc_cursor_fetch_stream (cursor);
 
    if (!server_stream) {
-      /* TODO: we should not clear the cursor id here. Because we won't kill it
-       * later in destroy, even though we failed on client side. */
       _mongoc_bson_init_if_set (reply);
       GOTO (done);
    }
@@ -995,7 +1002,9 @@ _mongoc_cursor_collection (const mongoc_cursor_t *cursor,
 
 
 void
-_mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor, bson_t *command)
+_mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor,
+                                     const bson_t *filter,
+                                     bson_t *command)
 {
    const char *collection;
    int collection_len;
@@ -1007,7 +1016,7 @@ _mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor, bson_t *command)
                      collection,
                      collection_len);
    bson_append_document (
-      command, MONGOC_CURSOR_FILTER, MONGOC_CURSOR_FILTER_LEN, &cursor->filter);
+      command, MONGOC_CURSOR_FILTER, MONGOC_CURSOR_FILTER_LEN, filter);
 }
 
 
@@ -1234,7 +1243,6 @@ mongoc_cursor_clone (const mongoc_cursor_t *cursor)
       _clone->client_session = cursor->client_session;
    }
 
-   bson_copy_to (&cursor->filter, &_clone->filter);
    bson_copy_to (&cursor->opts, &_clone->opts);
    bson_init (&_clone->error_doc);
 
@@ -1533,8 +1541,8 @@ _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
    return false;
 }
 
-/* returns true if successfully got the next batch. */
-bool
+/* sets cursor error if could not get the next batch. */
+void
 _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
                                  const bson_t *command,
                                  const bson_t *opts,
@@ -1552,7 +1560,7 @@ _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
     * to getMore command with {cursor: {id: N, nextBatch: []}}. */
    if (_mongoc_cursor_run_command (cursor, command, opts, &response->reply) &&
        _mongoc_cursor_start_reading_response (cursor, response)) {
-      return true;
+      return;
    }
    if (!cursor->error.domain) {
       bson_set_error (&cursor->error,
@@ -1561,7 +1569,6 @@ _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
                       "Invalid reply to %s command.",
                       _mongoc_get_command_name (command));
    }
-   return false;
 }
 
 
@@ -1623,6 +1630,5 @@ _mongoc_cursor_set_empty (mongoc_cursor_t *cursor)
 {
    memset (&cursor->error, 0, sizeof (bson_error_t));
    bson_reinit (&cursor->error_doc);
-   /* TODO: STATE: this might be unavoidable. */
    cursor->state = IN_BATCH;
 }

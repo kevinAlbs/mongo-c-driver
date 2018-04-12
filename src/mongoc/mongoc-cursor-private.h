@@ -126,7 +126,6 @@ struct _mongoc_cursor_t {
    mongoc_cursor_state_t state;
    bool in_exhaust;
 
-   bson_t filter;
    bson_t opts;
 
    mongoc_read_concern_t *read_concern;
@@ -145,7 +144,7 @@ struct _mongoc_cursor_t {
    bson_error_t error;
    bson_t error_doc; /* always initialized, and set with server errors. */
 
-   const bson_t *current; /* CAN I USE THIS? */
+   const bson_t *current;
 
    mongoc_cursor_impl_t impl;
 
@@ -197,7 +196,9 @@ _mongoc_cursor_monitor_command (mongoc_cursor_t *cursor,
                                 const bson_t *cmd,
                                 const char *cmd_name);
 void
-_mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor, bson_t *command);
+_mongoc_cursor_prepare_find_command (mongoc_cursor_t *cursor,
+                                     const bson_t *filter,
+                                     bson_t *command);
 const bson_t *
 _mongoc_cursor_initial_query (mongoc_cursor_t *cursor);
 const bson_t *
@@ -216,7 +217,7 @@ _mongoc_cursor_monitor_succeeded (mongoc_cursor_t *cursor,
 /* start iterating a reply like
  * {cursor: {id: 1234, ns: "db.collection", firstBatch: [...]}} or
  * {cursor: {id: 1234, ns: "db.collection", nextBatch: [...]}} */
-bool
+void
 _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
                                  const bson_t *command,
                                  const bson_t *opts,
@@ -233,19 +234,24 @@ _mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
                                         bson_t *command);
 void
 _mongoc_cursor_set_empty (mongoc_cursor_t *cursor);
+bool
+_mongoc_cursor_check_keys_and_copy_to (mongoc_cursor_t *cursor,
+                                       const char *err_prefix,
+                                       const bson_t *src,
+                                       bson_t *dst);
 /* legacy functions defined in mongoc-cursor-legacy.c */
 bool
 _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson);
 bool
 _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor,
+                              bson_t *filter,
                               mongoc_cursor_response_legacy_t *response);
-bool
+void
 _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                            mongoc_cursor_response_legacy_t *response);
 mongoc_cursor_t *
 _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                               const char *db_and_collection,
-                              const bson_t *filter,
                               const bson_t *opts,
                               const mongoc_read_prefs_t *read_prefs,
                               const mongoc_read_concern_t *read_concern);

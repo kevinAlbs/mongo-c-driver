@@ -21,6 +21,7 @@
  * mongoc_database_command, and mongoc_collection_command. It runs the command
  * on the first call to mongoc_cursor_next and returns the only result. */
 typedef struct _data_cmd_deprecated_t {
+   bson_t cmd;
    bson_t reply;
 } data_cmd_deprecated_t;
 
@@ -31,7 +32,7 @@ _prime (mongoc_cursor_t *cursor)
    data_cmd_deprecated_t *data = (data_cmd_deprecated_t *) cursor->impl.data;
    bson_destroy (&data->reply);
    if (_mongoc_cursor_run_command (
-          cursor, &cursor->filter, &cursor->opts, &data->reply)) {
+          cursor, &data->cmd, &cursor->opts, &data->reply)) {
       return IN_BATCH;
    } else {
       return DONE;
@@ -51,9 +52,12 @@ _pop_from_batch (mongoc_cursor_t *cursor)
 static void
 _clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 {
-   data_cmd_deprecated_t *data = bson_malloc0 (sizeof (data_cmd_deprecated_t));
-   bson_init (&data->reply);
-   dst->data = data;
+   data_cmd_deprecated_t *data_src = (data_cmd_deprecated_t *) src->data;
+   data_cmd_deprecated_t *data_dst =
+      bson_malloc0 (sizeof (data_cmd_deprecated_t));
+   bson_init (&data_dst->reply);
+   bson_copy_to (&data_src->cmd, &data_dst->cmd);
+   dst->data = data_dst;
 }
 
 
@@ -62,6 +66,7 @@ _destroy (mongoc_cursor_impl_t *impl)
 {
    data_cmd_deprecated_t *data = (data_cmd_deprecated_t *) impl->data;
    bson_destroy (&data->reply);
+   bson_destroy (&data->cmd);
    bson_free (data);
 }
 
@@ -73,8 +78,9 @@ _mongoc_cursor_cmd_deprecated_new (mongoc_client_t *client,
                                    const mongoc_read_prefs_t *read_prefs)
 {
    mongoc_cursor_t *cursor = _mongoc_cursor_new_with_opts (
-      client, db_and_coll, cmd, NULL, read_prefs, NULL);
+      client, db_and_coll, NULL, read_prefs, NULL);
    data_cmd_deprecated_t *data = bson_malloc0 (sizeof (data_cmd_deprecated_t));
+   _mongoc_cursor_check_keys_and_copy_to (cursor, "command", cmd, &data->cmd);
    bson_init (&data->reply);
    cursor->impl.prime = _prime;
    cursor->impl.pop_from_batch = _pop_from_batch;
