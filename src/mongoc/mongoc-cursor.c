@@ -1067,6 +1067,7 @@ _call_transition (mongoc_cursor_t *cursor)
       fn = cursor->impl.get_next_batch;
       break;
    case DONE:
+   default:
       fn = NULL;
       break;
    }
