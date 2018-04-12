@@ -107,7 +107,7 @@ _mongoc_cursor_monitor_legacy_query (mongoc_cursor_t *cursor,
 }
 
 
-bool
+bool /* TODO: return value unused now */
 _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                            mongoc_cursor_response_legacy_t *response)
 {
@@ -216,12 +216,12 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                                      server_stream,
                                      "getMore");
 
-   GOTO (fail);
-
+   GOTO (done);
 fail:
    _mongoc_cursor_monitor_failed (
       cursor, bson_get_monotonic_time () - started, server_stream, "getMore");
    ret = false;
+done:
    mongoc_server_stream_cleanup (server_stream);
    RETURN (ret);
 }
