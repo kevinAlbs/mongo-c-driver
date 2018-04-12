@@ -170,6 +170,7 @@ libmongoc_la_SOURCES = \
 	src/mongoc/mongoc-compression.c \
 	src/mongoc/mongoc-counters.c \
 	src/mongoc/mongoc-cursor.c \
+	src/mongoc/mongoc-cursor-legacy.c \
 	src/mongoc/mongoc-cursor-array.c \
 	src/mongoc/mongoc-cursor-cmd.c \
 	src/mongoc/mongoc-cursor-cmd-deprecated.c \
