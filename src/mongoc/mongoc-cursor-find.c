@@ -18,11 +18,15 @@
 #include "mongoc-cursor-private.h"
 #include "mongoc-client-private.h"
 
+typedef struct _data_find_t {
+   bson_t filter;
+} data_find_t;
+
 
 extern void
-_mongoc_cursor_impl_find_cmd_init (mongoc_cursor_t *cursor);
+_mongoc_cursor_impl_find_cmd_init (mongoc_cursor_t *cursor, bson_t *filter);
 extern void
-_mongoc_cursor_impl_find_opquery_init (mongoc_cursor_t *cursor);
+_mongoc_cursor_impl_find_opquery_init (mongoc_cursor_t *cursor, bson_t *filter);
 
 
 static mongoc_cursor_state_t
@@ -30,6 +34,7 @@ _prime (mongoc_cursor_t *cursor)
 {
    bool use_find_command;
    mongoc_server_stream_t *server_stream;
+   data_find_t *data = (data_find_t *) cursor->impl.data;
 
    /* determine if this should be a command or op_query cursor. */
    server_stream = _mongoc_cursor_fetch_stream (cursor);
@@ -45,12 +50,32 @@ _prime (mongoc_cursor_t *cursor)
 
    /* set all mongoc_impl_t function pointers */
    if (use_find_command) {
-      _mongoc_cursor_impl_find_cmd_init (cursor);
+      _mongoc_cursor_impl_find_cmd_init (cursor, &data->filter /* stolen */);
    } else {
-      _mongoc_cursor_impl_find_opquery_init (cursor);
+      _mongoc_cursor_impl_find_opquery_init (cursor,
+                                             &data->filter /* stolen */);
    }
    /* prime with the new implementation. */
    return cursor->impl.prime (cursor);
+}
+
+
+static void
+_clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
+{
+   data_find_t *data_dst = bson_malloc0 (sizeof (data_find_t));
+   data_find_t *data_src = (data_find_t *) src->data;
+   bson_copy_to (&data_src->filter, &data_dst->filter);
+   dst->data = data_dst;
+}
+
+
+static void
+_destroy (mongoc_cursor_impl_t *impl)
+{
+   data_find_t *data = (data_find_t *) impl->data;
+   bson_destroy (&data->filter);
+   bson_free (data);
 }
 
 
@@ -63,8 +88,14 @@ _mongoc_cursor_find_new (mongoc_client_t *client,
                          const mongoc_read_concern_t *read_concern)
 {
    mongoc_cursor_t *cursor;
+   data_find_t *data = bson_malloc0 (sizeof (data_find_t));
    cursor = _mongoc_cursor_new_with_opts (
-      client, db_and_coll, filter, opts, read_prefs, read_concern);
+      client, db_and_coll, opts, read_prefs, read_concern);
+   _mongoc_cursor_check_keys_and_copy_to (
+      cursor, "filter", filter, &data->filter);
    cursor->impl.prime = _prime;
+   cursor->impl.clone = _clone;
+   cursor->impl.destroy = _destroy;
+   cursor->impl.data = data;
    return cursor;
 }

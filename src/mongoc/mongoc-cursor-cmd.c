@@ -29,6 +29,7 @@ typedef struct _data_cmd_t {
    mongoc_cursor_response_legacy_t response_legacy;
    reading_from_t reading_from;
    getmore_type_t getmore_type; /* cache after first getmore. */
+   bson_t cmd;
 } data_cmd_t;
 
 
@@ -65,11 +66,10 @@ _prime (mongoc_cursor_t *cursor)
    bson_copy_to_excluding_noinit (
       &cursor->opts, &copied_opts, "batchSize", NULL);
 
-   /* TODO: if filter is placed in context, rename to command. */
    /* server replies to aggregate/listIndexes/listCollections with:
     * {cursor: {id: N, firstBatch: []}} */
    _mongoc_cursor_response_refresh (
-      cursor, &cursor->filter, &copied_opts, &data->response);
+      cursor, &data->cmd, &copied_opts, &data->response);
    data->reading_from = CMD_RESPONSE;
    bson_destroy (&copied_opts);
    return IN_BATCH;
@@ -89,6 +89,7 @@ _pop_from_batch (mongoc_cursor_t *cursor)
       cursor->current = bson_reader_read (data->response_legacy.reader, NULL);
       break;
    case NONE:
+   default:
       fprintf (stderr, "trying to pop from an uninitialized cursor reader.\n");
       BSON_ASSERT (false);
    }
@@ -133,10 +134,12 @@ _destroy (mongoc_cursor_impl_t *impl)
 static void
 _clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 {
-   data_cmd_t *data = bson_malloc0 (sizeof (*data));
-   bson_init (&data->response.reply);
-   _mongoc_cursor_response_legacy_init (&data->response_legacy);
-   dst->data = data;
+   data_cmd_t *data_src = (data_cmd_t *) src->data;
+   data_cmd_t *data_dst = bson_malloc0 (sizeof (data_cmd_t));
+   bson_init (&data_dst->response.reply);
+   _mongoc_cursor_response_legacy_init (&data_dst->response_legacy);
+   bson_copy_to (&data_src->cmd, &data_dst->cmd);
+   dst->data = data_dst;
 }
 
 
@@ -152,8 +155,9 @@ _mongoc_cursor_cmd_new (mongoc_client_t *client,
    data_cmd_t *data = bson_malloc0 (sizeof (*data));
 
    cursor = _mongoc_cursor_new_with_opts (
-      client, db_and_coll, cmd, opts, read_prefs, read_concern);
+      client, db_and_coll, opts, read_prefs, read_concern);
    _mongoc_cursor_response_legacy_init (&data->response_legacy);
+   _mongoc_cursor_check_keys_and_copy_to (cursor, "command", cmd, &data->cmd);
    bson_init (&data->response.reply);
    cursor->impl.prime = _prime;
    cursor->impl.pop_from_batch = _pop_from_batch;

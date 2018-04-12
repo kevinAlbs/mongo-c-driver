@@ -75,6 +75,7 @@ _mongoc_cursor_monitor_legacy_get_more (mongoc_cursor_t *cursor,
 
 static bool
 _mongoc_cursor_monitor_legacy_query (mongoc_cursor_t *cursor,
+                                     const bson_t *filter,
                                      mongoc_server_stream_t *server_stream)
 {
    bson_t doc;
@@ -94,7 +95,7 @@ _mongoc_cursor_monitor_legacy_query (mongoc_cursor_t *cursor,
    bson_strncpy (db, cursor->ns, cursor->dblen + 1);
 
    /* simulate a MongoDB 3.2+ "find" command */
-   _mongoc_cursor_prepare_find_command (cursor, &doc);
+   _mongoc_cursor_prepare_find_command (cursor, filter, &doc);
 
    bson_copy_to_excluding_noinit (
       &cursor->opts, &doc, "serverId", "maxAwaitTimeMS", "sessionId", NULL);
@@ -107,7 +108,7 @@ _mongoc_cursor_monitor_legacy_query (mongoc_cursor_t *cursor,
 }
 
 
-bool /* TODO: return value unused now */
+void
 _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                            mongoc_cursor_response_legacy_t *response)
 {
@@ -117,7 +118,6 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
    mongoc_cluster_t *cluster;
    mongoc_query_flags_t flags;
    mongoc_server_stream_t *server_stream;
-   bool ret = true;
 
    ENTRY;
 
@@ -220,10 +220,8 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
 fail:
    _mongoc_cursor_monitor_failed (
       cursor, bson_get_monotonic_time () - started, server_stream, "getMore");
-   ret = false;
 done:
    mongoc_server_stream_cleanup (server_stream);
-   RETURN (ret);
 }
 
 
@@ -281,12 +279,12 @@ done:
    } while (false)
 
 
-#define PUSH_DOLLAR_QUERY()                                          \
-   do {                                                              \
-      if (!pushed_dollar_query) {                                    \
-         pushed_dollar_query = true;                                 \
-         bson_append_document (query, "$query", 6, &cursor->filter); \
-      }                                                              \
+#define PUSH_DOLLAR_QUERY()                                   \
+   do {                                                       \
+      if (!pushed_dollar_query) {                             \
+         pushed_dollar_query = true;                          \
+         bson_append_document (query, "$query", 6, filter); \
+      }                                                       \
    } while (false)
 
 
@@ -303,6 +301,7 @@ done:
 static bson_t *
 _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
                                         mongoc_server_stream_t *stream,
+                                        bson_t *filter,
                                         bson_t *query /* OUT */,
                                         bson_t *fields /* OUT */,
                                         mongoc_query_flags_t *flags /* OUT */,
@@ -437,7 +436,7 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
       return NULL;
    }
 
-   return pushed_dollar_query ? query : &cursor->filter;
+   return pushed_dollar_query ? query : filter;
 }
 
 #undef OPT_CHECK
@@ -449,6 +448,7 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
 
 bool
 _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor,
+                              bson_t *filter,
                               mongoc_cursor_response_legacy_t *response)
 {
    int64_t started;
@@ -496,7 +496,7 @@ _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor,
    rpc.query.fields = NULL;
 
    query_ptr = _mongoc_cursor_parse_opts_for_op_query (
-      cursor, server_stream, &query, &fields, &flags, &rpc.query.skip);
+      cursor, server_stream, filter, &query, &fields, &flags, &rpc.query.skip);
 
    if (!query_ptr) {
       /* invalid opts. cursor->error is set */
@@ -515,7 +515,7 @@ _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor,
 
    /* cursor from mongoc_collection_find[_with_opts] is about to send its
     * initial OP_QUERY to pre-3.2 MongoDB */
-   if (!_mongoc_cursor_monitor_legacy_query (cursor, server_stream)) {
+   if (!_mongoc_cursor_monitor_legacy_query (cursor, filter, server_stream)) {
       GOTO (done);
    }
 

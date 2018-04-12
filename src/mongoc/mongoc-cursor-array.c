@@ -18,20 +18,12 @@
 #include "mongoc-client-private.h"
 
 typedef struct _data_array_t {
+   bson_t cmd;
    bson_t array;
    bson_iter_t iter;
    bson_t bson; /* current document */
    const char *field_name;
 } data_array_t;
-
-
-static void
-_destroy (mongoc_cursor_impl_t *impl)
-{
-   data_array_t *data = (data_array_t *) impl->data;
-   bson_destroy (&data->array);
-   bson_free (data);
-}
 
 
 static mongoc_cursor_state_t
@@ -44,7 +36,7 @@ _prime (mongoc_cursor_t *cursor)
    /* this cursor is currently only used with the listDatabases command iterates
     * over the array in the response's "databases" field */
    if (_mongoc_cursor_run_command (
-          cursor, &cursor->filter, &cursor->opts, &data->array) &&
+          cursor, &data->cmd, &cursor->opts, &data->array) &&
        bson_iter_init_find (&iter, &data->array, data->field_name) &&
        BSON_ITER_HOLDS_ARRAY (&iter) &&
        bson_iter_recurse (&iter, &data->iter)) {
@@ -79,6 +71,16 @@ _clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 }
 
 
+static void
+_destroy (mongoc_cursor_impl_t *impl)
+{
+   data_array_t *data = (data_array_t *) impl->data;
+   bson_destroy (&data->array);
+   bson_destroy (&data->cmd);
+   bson_free (data);
+}
+
+
 mongoc_cursor_t *
 _mongoc_cursor_array_new (mongoc_client_t *client,
                           const char *db_and_coll,
@@ -87,8 +89,9 @@ _mongoc_cursor_array_new (mongoc_client_t *client,
                           const char *field_name)
 {
    mongoc_cursor_t *cursor =
-      _mongoc_cursor_new_with_opts (client, db_and_coll, cmd, opts, NULL, NULL);
+      _mongoc_cursor_new_with_opts (client, db_and_coll, opts, NULL, NULL);
    data_array_t *data = bson_malloc0 (sizeof (*data));
+   bson_copy_to (cmd, &data->cmd);
    bson_init (&data->array);
    data->field_name = field_name;
    cursor->impl.prime = _prime;

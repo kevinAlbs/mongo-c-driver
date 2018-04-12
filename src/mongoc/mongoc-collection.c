@@ -254,6 +254,45 @@ mongoc_collection_copy (mongoc_collection_t *collection) /* IN */
 }
 
 
+static bool
+_make_agg_cmd (const char *coll,
+               const bson_t *pipeline,
+               const bson_t *opts,
+               bson_t *command,
+               bson_error_t *err)
+{
+   bson_iter_t iter;
+   int32_t batch_size = 0;
+   bson_t child;
+
+   BSON_APPEND_UTF8 (command, "aggregate", coll);
+   /*
+    * The following will allow @pipeline to be either an array of
+    * items for the pipeline, or {"pipeline": [...]}.
+    */
+   if (bson_iter_init_find (&iter, pipeline, "pipeline") &&
+       BSON_ITER_HOLDS_ARRAY (&iter)) {
+      if (!bson_append_iter (command, "pipeline", 8, &iter)) {
+         bson_set_error (err,
+                         MONGOC_ERROR_COMMAND,
+                         MONGOC_ERROR_COMMAND_INVALID_ARG,
+                         "Failed to append \"pipeline\" to create command.");
+         return false;
+      }
+   } else {
+      BSON_APPEND_ARRAY (command, "pipeline", pipeline);
+   }
+
+   bson_append_document_begin (command, "cursor", 6, &child);
+   if (opts && bson_iter_init_find (&iter, opts, "batchSize") &&
+       BSON_ITER_HOLDS_NUMBER (&iter)) {
+      batch_size = (int32_t) bson_iter_as_int64 (&iter);
+      BSON_APPEND_INT32 (&child, "batchSize", batch_size);
+   }
+   bson_append_document_end (command, &child);
+   return true;
+}
+
 /*
  *--------------------------------------------------------------------------
  *
@@ -307,12 +346,12 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
    bson_iter_t ar;
    mongoc_cursor_t *cursor;
    uint32_t server_id;
-   int32_t batch_size = 0;
    bson_iter_t iter;
    bson_t command;
-   bson_t child;
    bson_t cursor_opts;
    bool slave_ok;
+   bool created_command;
+   bson_error_t create_cmd_err = {0};
 
    ENTRY;
 
@@ -323,13 +362,23 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
 
    bson_init (&cursor_opts);
    _mongoc_cursor_flags_to_opts (flags, &cursor_opts, &slave_ok);
+   created_command = _make_agg_cmd (
+      collection->collection, pipeline, opts, &command, &create_cmd_err);
    cursor = _mongoc_cursor_cmd_new (collection->client,
                                     collection->ns,
-                                    NULL /* cmd */,
+                                    created_command ? &command : NULL,
                                     &cursor_opts,
                                     read_prefs,
                                     NULL /* read concern */);
+   bson_destroy (&command);
    bson_destroy (&cursor_opts);
+
+   if (!created_command) {
+      /* copy error back to cursor. */
+      memcpy (&cursor->error, &create_cmd_err, sizeof (bson_error_t));
+      GOTO (done);
+   }
+
    if (!_mongoc_get_server_id_from_opts (opts,
                                          MONGOC_ERROR_COMMAND,
                                          MONGOC_ERROR_COMMAND_INVALID_ARG,
@@ -373,25 +422,6 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
       GOTO (done);
    }
 
-   BSON_APPEND_UTF8 (&command, "aggregate", collection->collection);
-
-   /*
-    * The following will allow @pipeline to be either an array of
-    * items for the pipeline, or {"pipeline": [...]}.
-    */
-   if (bson_iter_init_find (&iter, pipeline, "pipeline") &&
-       BSON_ITER_HOLDS_ARRAY (&iter)) {
-      if (!bson_append_iter (&command, "pipeline", 8, &iter)) {
-         bson_set_error (&cursor->error,
-                         MONGOC_ERROR_COMMAND,
-                         MONGOC_ERROR_COMMAND_INVALID_ARG,
-                         "Failed to append \"pipeline\" to create command.");
-         GOTO (done);
-      }
-   } else {
-      BSON_APPEND_ARRAY (&command, "pipeline", pipeline);
-   }
-
    if (bson_iter_init_find (&iter, pipeline, "pipeline") &&
        BSON_ITER_HOLDS_ARRAY (&iter) && bson_iter_recurse (&iter, &ar)) {
       while (bson_iter_next (&ar)) {
@@ -401,14 +431,6 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
          }
       }
    }
-
-   bson_append_document_begin (&command, "cursor", 6, &child);
-   if (opts && bson_iter_init_find (&iter, opts, "batchSize") &&
-       BSON_ITER_HOLDS_NUMBER (&iter)) {
-      batch_size = (int32_t) bson_iter_as_int64 (&iter);
-      BSON_APPEND_INT32 (&child, "batchSize", batch_size);
-   }
-   bson_append_document_end (&command, &child);
 
    if (opts) {
       bson_concat (&cursor->opts, opts);
@@ -442,12 +464,8 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
          mongoc_collection_get_read_concern (collection));
    }
 
-   bson_destroy (&cursor->filter);
-   bson_copy_to (&command, &cursor->filter);
-
 done:
    mongoc_server_stream_cleanup (server_stream); /* null ok */
-   bson_destroy (&command);
 
    /* we always return the cursor, even if it fails; users can detect the
     * failure on performing a cursor operation. see CDRIVER-880. */
