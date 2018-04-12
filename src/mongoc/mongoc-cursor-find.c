@@ -48,7 +48,7 @@ _prime (mongoc_cursor_t *cursor)
       !_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST);
    mongoc_server_stream_cleanup (server_stream);
 
-   /* set all mongoc_impl_t function pointers */
+   /* set all mongoc_impl_t function pointers. */
    if (use_find_command) {
       _mongoc_cursor_impl_find_cmd_init (cursor, &data->filter /* stolen */);
    } else {
@@ -91,8 +91,7 @@ _mongoc_cursor_find_new (mongoc_client_t *client,
    data_find_t *data = bson_malloc0 (sizeof (data_find_t));
    cursor = _mongoc_cursor_new_with_opts (
       client, db_and_coll, opts, read_prefs, read_concern);
-   _mongoc_cursor_check_keys_and_copy_to (
-      cursor, "filter", filter, &data->filter);
+   _mongoc_cursor_check_and_copy_to (cursor, "filter", filter, &data->filter);
    cursor->impl.prime = _prime;
    cursor->impl.clone = _clone;
    cursor->impl.destroy = _destroy;

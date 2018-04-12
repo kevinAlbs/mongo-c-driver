@@ -33,24 +33,24 @@ typedef struct _data_cmd_t {
 } data_cmd_t;
 
 
-static bool
-_use_getmore_cmd (mongoc_cursor_t *cursor)
+static getmore_type_t
+_getmore_type (mongoc_cursor_t *cursor)
 {
    mongoc_server_stream_t *server_stream;
-   bool ret;
+   bool use_cmd;
    data_cmd_t *data = (data_cmd_t *) cursor->impl.data;
    if (data->getmore_type != UNKNOWN) {
-      return data->getmore_type == GETMORE_CMD;
+      return data->getmore_type;
    }
    server_stream = _mongoc_cursor_fetch_stream (cursor);
    if (!server_stream) {
-      return false;
+      return UNKNOWN;
    }
-   ret = server_stream->sd->max_wire_version >= WIRE_VERSION_FIND_CMD &&
-         !_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST);
-   data->getmore_type = ret ? GETMORE_CMD : OP_GETMORE;
+   use_cmd = server_stream->sd->max_wire_version >= WIRE_VERSION_FIND_CMD &&
+             !_mongoc_cursor_get_opt_bool (cursor, MONGOC_CURSOR_EXHAUST);
+   data->getmore_type = use_cmd ? GETMORE_CMD : OP_GETMORE;
    mongoc_server_stream_cleanup (server_stream);
-   return ret;
+   return data->getmore_type;
 }
 
 
@@ -106,18 +106,24 @@ _get_next_batch (mongoc_cursor_t *cursor)
 {
    data_cmd_t *data = (data_cmd_t *) cursor->impl.data;
    bson_t getmore_cmd;
+   getmore_type_t getmore_type = _getmore_type (cursor);
 
-   if (_use_getmore_cmd (cursor)) {
+   switch (getmore_type) {
+   case GETMORE_CMD:
       _mongoc_cursor_prepare_getmore_command (cursor, &getmore_cmd);
       _mongoc_cursor_response_refresh (
          cursor, &getmore_cmd, NULL /* opts */, &data->response);
       bson_destroy (&getmore_cmd);
       data->reading_from = CMD_RESPONSE;
-   } else {
+      return IN_BATCH;
+   case OP_GETMORE:
       _mongoc_cursor_op_getmore (cursor, &data->response_legacy);
       data->reading_from = OP_GETMORE_RESPONSE;
+      return IN_BATCH;
+   case UNKNOWN:
+   default:
+      return DONE;
    }
-   return IN_BATCH;
 }
 
 
@@ -157,7 +163,7 @@ _mongoc_cursor_cmd_new (mongoc_client_t *client,
    cursor = _mongoc_cursor_new_with_opts (
       client, db_and_coll, opts, read_prefs, read_concern);
    _mongoc_cursor_response_legacy_init (&data->response_legacy);
-   _mongoc_cursor_check_keys_and_copy_to (cursor, "command", cmd, &data->cmd);
+   _mongoc_cursor_check_and_copy_to (cursor, "command", cmd, &data->cmd);
    bson_init (&data->response.reply);
    cursor->impl.prime = _prime;
    cursor->impl.pop_from_batch = _pop_from_batch;

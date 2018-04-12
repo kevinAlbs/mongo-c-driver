@@ -225,7 +225,7 @@ _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
 bool
 _mongoc_cursor_start_reading_response (mongoc_cursor_t *cursor,
                                        mongoc_cursor_response_t *response);
-bool
+void
 _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
                               mongoc_cursor_response_t *response,
                               const bson_t **bson);
@@ -235,10 +235,10 @@ _mongoc_cursor_prepare_getmore_command (mongoc_cursor_t *cursor,
 void
 _mongoc_cursor_set_empty (mongoc_cursor_t *cursor);
 bool
-_mongoc_cursor_check_keys_and_copy_to (mongoc_cursor_t *cursor,
-                                       const char *err_prefix,
-                                       const bson_t *src,
-                                       bson_t *dst);
+_mongoc_cursor_check_and_copy_to (mongoc_cursor_t *cursor,
+                                  const char *err_prefix,
+                                  const bson_t *src,
+                                  bson_t *dst);
 /* legacy functions defined in mongoc-cursor-legacy.c */
 bool
 _mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson);

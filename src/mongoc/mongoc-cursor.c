@@ -197,10 +197,10 @@ _first_dollar_field (const bson_t *bson)
 /* if src is non-NULL, it is validated and copied to dst. returns false and
  * sets the cursor error if validation fails. */
 bool
-_mongoc_cursor_check_keys_and_copy_to (mongoc_cursor_t *cursor,
-                                       const char *err_prefix,
-                                       const bson_t *src,
-                                       bson_t *dst)
+_mongoc_cursor_check_and_copy_to (mongoc_cursor_t *cursor,
+                                  const char *err_prefix,
+                                  const bson_t *src,
+                                  bson_t *dst)
 {
    bson_error_t validate_err;
    bson_init (dst);
@@ -1519,7 +1519,7 @@ _mongoc_cursor_start_reading_response (mongoc_cursor_t *cursor,
 }
 
 
-bool
+void
 _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
                               mongoc_cursor_response_t *response,
                               const bson_t **bson)
@@ -1536,9 +1536,7 @@ _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
       /* bson_iter_next guarantees valid BSON, so this must succeed */
       BSON_ASSERT (bson_init_static (&response->current_doc, data, data_len));
       *bson = &response->current_doc;
-      return true;
    }
-   return false;
 }
 
 /* sets cursor error if could not get the next batch. */
@@ -1551,10 +1549,6 @@ _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
    ENTRY;
 
    bson_destroy (&response->reply);
-
-   /* reset the cursor id. */
-   /* ACTUALLY dont' do this */
-   /* cursor->cursor_id = 0; */
 
    /* server replies to find / aggregate with {cursor: {id: N, firstBatch: []}},
     * to getMore command with {cursor: {id: N, nextBatch: []}}. */

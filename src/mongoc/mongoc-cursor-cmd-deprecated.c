@@ -80,7 +80,7 @@ _mongoc_cursor_cmd_deprecated_new (mongoc_client_t *client,
    mongoc_cursor_t *cursor = _mongoc_cursor_new_with_opts (
       client, db_and_coll, NULL, read_prefs, NULL);
    data_cmd_deprecated_t *data = bson_malloc0 (sizeof (data_cmd_deprecated_t));
-   _mongoc_cursor_check_keys_and_copy_to (cursor, "command", cmd, &data->cmd);
+   _mongoc_cursor_check_and_copy_to (cursor, "command", cmd, &data->cmd);
    bson_init (&data->reply);
    cursor->impl.prime = _prime;
    cursor->impl.pop_from_batch = _pop_from_batch;
