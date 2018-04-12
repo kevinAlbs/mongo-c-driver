@@ -52,10 +52,7 @@ _mongoc_cursor_monitor_legacy_get_more (mongoc_cursor_t *cursor,
    }
 
    bson_init (&doc);
-   if (!_mongoc_cursor_prepare_getmore_command (cursor, &doc)) {
-      bson_destroy (&doc);
-      RETURN (false);
-   }
+   _mongoc_cursor_prepare_getmore_command (cursor, &doc);
 
    bson_strncpy (db, cursor->ns, cursor->dblen + 1);
    mongoc_apm_command_started_init (&event,
@@ -153,12 +150,12 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
       }
 
       if (!_mongoc_cursor_monitor_legacy_get_more (cursor, server_stream)) {
-         GOTO (done);
+         GOTO (fail);
       }
 
       if (!mongoc_cluster_legacy_rpc_sendv_to_server (
              cluster, &rpc, server_stream, &cursor->error)) {
-         GOTO (done);
+         GOTO (fail);
       }
    }
 
@@ -172,7 +169,7 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                              &response->buffer,
                              server_stream,
                              &cursor->error)) {
-      GOTO (done);
+      GOTO (fail);
    }
 
    if (response->rpc.header.opcode != MONGOC_OPCODE_REPLY) {
@@ -182,7 +179,7 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                       "Invalid opcode. Expected %d, got %d.",
                       MONGOC_OPCODE_REPLY,
                       response->rpc.header.opcode);
-      GOTO (done);
+      GOTO (fail);
    }
 
    if (response->rpc.header.response_to != request_id) {
@@ -192,14 +189,14 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                       "Invalid response_to for getmore. Expected %d, got %d.",
                       request_id,
                       response->rpc.header.response_to);
-      GOTO (done);
+      GOTO (fail);
    }
 
    if (!_mongoc_rpc_check_ok (&response->rpc,
                               cursor->client->error_api_version,
                               &cursor->error,
                               &cursor->error_doc)) {
-      GOTO (done);
+      GOTO (fail);
    }
 
    if (response->reader) {
@@ -219,13 +216,12 @@ _mongoc_cursor_op_getmore (mongoc_cursor_t *cursor,
                                      server_stream,
                                      "getMore");
 
-   GOTO (done);
+   GOTO (fail);
 
 fail:
    _mongoc_cursor_monitor_failed (
       cursor, bson_get_monotonic_time () - started, server_stream, "getMore");
    ret = false;
-done:
    mongoc_server_stream_cleanup (server_stream);
    RETURN (ret);
 }
@@ -451,7 +447,7 @@ _mongoc_cursor_parse_opts_for_op_query (mongoc_cursor_t *cursor,
 #undef OPT_SUBDOCUMENT
 
 
-void
+bool
 _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor,
                               mongoc_cursor_response_legacy_t *response)
 {
@@ -586,21 +582,20 @@ _mongoc_cursor_op_query_find (mongoc_cursor_t *cursor,
                                      true, /* first_batch */
                                      server_stream,
                                      "find");
-
-   cursor->state = IN_BATCH;
    succeeded = true;
 
 done:
    if (!succeeded) {
       _mongoc_cursor_monitor_failed (
          cursor, bson_get_monotonic_time () - started, server_stream, "find");
-      /* TODO: maybe set cursor->state to DONE here? */
+      return false;
    }
 
    mongoc_server_stream_cleanup (server_stream);
    assemble_query_result_cleanup (&result);
    bson_destroy (&query);
    bson_destroy (&fields);
+   return true;
 }
 
 

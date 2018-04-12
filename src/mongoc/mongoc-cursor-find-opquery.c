@@ -29,82 +29,63 @@ _hit_limit (mongoc_cursor_t *cursor)
    limit = mongoc_cursor_get_limit (cursor);
    /* mark as done if we've hit the limit. */
    if (limit && cursor->count >= llabs (limit)) {
-      cursor->state = DONE;
       return true;
    }
    return false;
 }
 
 
-static void
+static mongoc_cursor_state_t
 _prime (mongoc_cursor_t *cursor)
 {
-   data_find_opquery_t *data = (data_find_opquery_t *) cursor->ctx.data;
+   data_find_opquery_t *data = (data_find_opquery_t *) cursor->impl.data;
    if (_hit_limit (cursor)) {
-      return;
+      return DONE;
    }
 
    _mongoc_cursor_op_query_find (cursor, &data->response_legacy);
-   if (cursor->error.domain) {
-      cursor->state = DONE;
-      return;
-   }
-
-   cursor->state = IN_BATCH;
+   return IN_BATCH;
 }
 
 
-static void
-_pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
+static mongoc_cursor_state_t
+_pop_from_batch (mongoc_cursor_t *cursor)
 {
-   data_find_opquery_t *data = (data_find_opquery_t *) cursor->ctx.data;
-   const bson_t *bson;
-   bool eof = false;
+   data_find_opquery_t *data = (data_find_opquery_t *) cursor->impl.data;
 
    if (_hit_limit (cursor)) {
-      cursor->state = DONE;
-      return;
+      return DONE;
    }
 
-   bson = bson_reader_read (data->response_legacy.reader, &eof);
-
-   if (out) {
-      *out = bson;
-   }
-
-   if (eof) {
-      cursor->state = cursor->cursor_id ? END_OF_BATCH : DONE;
-   } else if (!bson) {
-      cursor->state = DONE;
+   cursor->current = bson_reader_read (data->response_legacy.reader, NULL);
+   if (cursor->current) {
+      return IN_BATCH;
+   } else {
+      return cursor->cursor_id ? END_OF_BATCH : DONE;
    }
 }
 
 
-static void
+static mongoc_cursor_state_t
 _get_next_batch (mongoc_cursor_t *cursor)
 {
-   data_find_opquery_t *data = (data_find_opquery_t *) cursor->ctx.data;
-   bool r;
-   r = _mongoc_cursor_op_getmore (cursor, &data->response_legacy);
-   if (!r || cursor->error.domain) {
-      cursor->state = DONE;
-   } else {
-      cursor->state = IN_BATCH;
-   }
+   data_find_opquery_t *data = (data_find_opquery_t *) cursor->impl.data;
+   _mongoc_cursor_op_getmore (cursor, &data->response_legacy);
+   return IN_BATCH;
 }
 
 
 static void
-_destroy (mongoc_cursor_ctx_t *ctx)
+_destroy (mongoc_cursor_impl_t *impl)
 {
-   data_find_opquery_t *data = (data_find_opquery_t *) ctx->data;
+   data_find_opquery_t *data = (data_find_opquery_t *) impl->data;
    _mongoc_cursor_response_legacy_destroy (&data->response_legacy);
    bson_free (data);
 }
 
 
 static void
-_clone (mongoc_cursor_ctx_t *dst, const mongoc_cursor_ctx_t *src)
+_clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 {
    data_find_opquery_t *data = bson_malloc0 (sizeof (*data));
    _mongoc_cursor_response_legacy_init (&data->response_legacy);
@@ -113,14 +94,14 @@ _clone (mongoc_cursor_ctx_t *dst, const mongoc_cursor_ctx_t *src)
 
 
 void
-_mongoc_cursor_ctx_find_opquery_init (mongoc_cursor_t *cursor)
+_mongoc_cursor_impl_find_opquery_init (mongoc_cursor_t *cursor)
 {
    data_find_opquery_t *data = bson_malloc0 (sizeof (*data));
    _mongoc_cursor_response_legacy_init (&data->response_legacy);
-   cursor->ctx.prime = _prime;
-   cursor->ctx.pop_from_batch = _pop_from_batch;
-   cursor->ctx.get_next_batch = _get_next_batch;
-   cursor->ctx.destroy = _destroy;
-   cursor->ctx.clone = _clone;
-   cursor->ctx.data = data;
+   cursor->impl.prime = _prime;
+   cursor->impl.pop_from_batch = _pop_from_batch;
+   cursor->impl.get_next_batch = _get_next_batch;
+   cursor->impl.destroy = _destroy;
+   cursor->impl.clone = _clone;
+   cursor->impl.data = data;
 }

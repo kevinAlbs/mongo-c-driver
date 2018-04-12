@@ -62,7 +62,6 @@ _mongoc_gridfs_file_list_new (mongoc_gridfs_t *gridfs,
    bson_destroy (&unwrapped);
    if (error.domain) {
       memcpy (&cursor->error, &error, sizeof (bson_error_t));
-      cursor->state = DONE;
    }
 
    list = (mongoc_gridfs_file_list_t *) bson_malloc0 (sizeof *list);

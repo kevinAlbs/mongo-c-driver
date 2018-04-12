@@ -167,7 +167,6 @@ mongoc_database_command (mongoc_database_t *database,
                          const mongoc_read_prefs_t *read_prefs)
 {
    char ns[MONGOC_NAMESPACE_MAX];
-   mongoc_cursor_t *cursor;
 
    BSON_ASSERT (database);
    BSON_ASSERT (command);
@@ -182,9 +181,8 @@ mongoc_database_command (mongoc_database_t *database,
     */
 
    /* flags, skip, limit, batch_size, fields are unused */
-   cursor = _mongoc_cursor_cmd_deprecated_new (
+   return _mongoc_cursor_cmd_deprecated_new (
       database->client, ns, command, read_prefs);
-   return cursor;
 }
 
 
@@ -757,7 +755,10 @@ mongoc_database_find_collections_with_opts (mongoc_database_t *database,
     * replicaset mode" */
    cursor = _mongoc_cursor_cmd_new (
       database->client, database->name, &cmd, opts, NULL, NULL);
-   cursor->ctx.prime (cursor);
+   cursor->state = cursor->impl.prime (cursor);
+   if (cursor->error.domain) {
+      cursor->state = DONE;
+   }
    bson_destroy (&cmd);
 
    return cursor;

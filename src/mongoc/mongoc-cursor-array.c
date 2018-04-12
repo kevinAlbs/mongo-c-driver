@@ -26,55 +26,58 @@ typedef struct _data_array_t {
 
 
 static void
-_destroy (mongoc_cursor_ctx_t *ctx)
+_destroy (mongoc_cursor_impl_t *impl)
 {
-   data_array_t *data = (data_array_t *) ctx->data;
+   data_array_t *data = (data_array_t *) impl->data;
    bson_destroy (&data->array);
    bson_free (data);
 }
 
 
-static void
+static mongoc_cursor_state_t
 _prime (mongoc_cursor_t *cursor)
 {
    bson_iter_t iter;
-   data_array_t *data = (data_array_t *) cursor->ctx.data;
+   data_array_t *data = (data_array_t *) cursor->impl.data;
 
    bson_destroy (&data->array);
+   /* this cursor is currently only used with the listDatabases command iterates
+    * over the array in the response's "databases" field */
    if (_mongoc_cursor_run_command (
           cursor, &cursor->filter, &cursor->opts, &data->array) &&
        bson_iter_init_find (&iter, &data->array, data->field_name) &&
        BSON_ITER_HOLDS_ARRAY (&iter) &&
        bson_iter_recurse (&iter, &data->iter)) {
-      cursor->state = IN_BATCH;
-      return;
+      return IN_BATCH;
    }
-   cursor->state = DONE;
+   return DONE;
 }
 
 
-static void
-_pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
+static mongoc_cursor_state_t
+_pop_from_batch (mongoc_cursor_t *cursor)
 {
    uint32_t document_len;
    const uint8_t *document;
-   data_array_t *data = (data_array_t *) cursor->ctx.data;
+   data_array_t *data = (data_array_t *) cursor->impl.data;
    if (bson_iter_next (&data->iter)) {
       bson_iter_document (&data->iter, &document_len, &document);
       bson_init_static (&data->bson, document, document_len);
-      *out = &data->bson;
-   } else {
-      cursor->state = DONE;
+      cursor->current = &data->bson;
+      return IN_BATCH;
    }
+   return DONE;
 }
 
+
 static void
-_clone (mongoc_cursor_ctx_t *dst, const mongoc_cursor_ctx_t *src)
+_clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 {
    data_array_t *data = bson_malloc0 (sizeof (*data));
    bson_init (&data->array);
    dst->data = data;
 }
+
 
 mongoc_cursor_t *
 _mongoc_cursor_array_new (mongoc_client_t *client,
@@ -88,10 +91,10 @@ _mongoc_cursor_array_new (mongoc_client_t *client,
    data_array_t *data = bson_malloc0 (sizeof (*data));
    bson_init (&data->array);
    data->field_name = field_name;
-   cursor->ctx.prime = _prime;
-   cursor->ctx.pop_from_batch = _pop_from_batch;
-   cursor->ctx.destroy = _destroy;
-   cursor->ctx.clone = _clone;
-   cursor->ctx.data = (void *) data;
+   cursor->impl.prime = _prime;
+   cursor->impl.pop_from_batch = _pop_from_batch;
+   cursor->impl.destroy = _destroy;
+   cursor->impl.clone = _clone;
+   cursor->impl.data = (void *) data;
    return cursor;
 }

@@ -17,36 +17,39 @@
 #include "mongoc-cursor-private.h"
 #include "mongoc-client-private.h"
 
+/* This cursor is returned by the deprecated functions mongoc_client_command,
+ * mongoc_database_command, and mongoc_collection_command. It runs the command
+ * on the first call to mongoc_cursor_next and returns the only result. */
 typedef struct _data_cmd_deprecated_t {
    bson_t reply;
 } data_cmd_deprecated_t;
 
 
-static void
+static mongoc_cursor_state_t
 _prime (mongoc_cursor_t *cursor)
 {
-   data_cmd_deprecated_t *data = (data_cmd_deprecated_t *) cursor->ctx.data;
+   data_cmd_deprecated_t *data = (data_cmd_deprecated_t *) cursor->impl.data;
    bson_destroy (&data->reply);
    if (_mongoc_cursor_run_command (
           cursor, &cursor->filter, &cursor->opts, &data->reply)) {
-      cursor->state = IN_BATCH;
+      return IN_BATCH;
    } else {
-      cursor->state = DONE;
+      return DONE;
    }
 }
 
 
-static void
-_pop_from_batch (mongoc_cursor_t *cursor, const bson_t **out)
+static mongoc_cursor_state_t
+_pop_from_batch (mongoc_cursor_t *cursor)
 {
-   data_cmd_deprecated_t *data = (data_cmd_deprecated_t *) cursor->ctx.data;
-   *out = &data->reply;
-   cursor->state = DONE;
+   data_cmd_deprecated_t *data = (data_cmd_deprecated_t *) cursor->impl.data;
+   cursor->current = &data->reply;
+   return DONE;
 }
 
 
 static void
-_clone (mongoc_cursor_ctx_t *dst, const mongoc_cursor_ctx_t *src)
+_clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 {
    data_cmd_deprecated_t *data = bson_malloc0 (sizeof (data_cmd_deprecated_t));
    bson_init (&data->reply);
@@ -55,9 +58,9 @@ _clone (mongoc_cursor_ctx_t *dst, const mongoc_cursor_ctx_t *src)
 
 
 static void
-_destroy (mongoc_cursor_ctx_t *ctx)
+_destroy (mongoc_cursor_impl_t *impl)
 {
-   data_cmd_deprecated_t *data = (data_cmd_deprecated_t *) ctx->data;
+   data_cmd_deprecated_t *data = (data_cmd_deprecated_t *) impl->data;
    bson_destroy (&data->reply);
    bson_free (data);
 }
@@ -73,10 +76,10 @@ _mongoc_cursor_cmd_deprecated_new (mongoc_client_t *client,
       client, db_and_coll, cmd, NULL, read_prefs, NULL);
    data_cmd_deprecated_t *data = bson_malloc0 (sizeof (data_cmd_deprecated_t));
    bson_init (&data->reply);
-   cursor->ctx.prime = _prime;
-   cursor->ctx.pop_from_batch = _pop_from_batch;
-   cursor->ctx.data = data;
-   cursor->ctx.clone = _clone;
-   cursor->ctx.destroy = _destroy;
+   cursor->impl.prime = _prime;
+   cursor->impl.pop_from_batch = _pop_from_batch;
+   cursor->impl.data = data;
+   cursor->impl.clone = _clone;
+   cursor->impl.destroy = _destroy;
    return cursor;
 }

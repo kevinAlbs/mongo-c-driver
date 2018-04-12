@@ -171,7 +171,11 @@ libmongoc_la_SOURCES = \
 	src/mongoc/mongoc-counters.c \
 	src/mongoc/mongoc-cursor.c \
 	src/mongoc/mongoc-cursor-array.c \
-	src/mongoc/mongoc-cursor-cursorid.c \
+	src/mongoc/mongoc-cursor-cmd.c \
+	src/mongoc/mongoc-cursor-cmd-deprecated.c \
+	src/mongoc/mongoc-cursor-find.c \
+	src/mongoc/mongoc-cursor-find-cmd.c \
+	src/mongoc/mongoc-cursor-find-opquery.c \
 	src/mongoc/mongoc-database.c \
 	src/mongoc/mongoc-find-and-modify.c \
 	src/mongoc/mongoc-host-list.c \
