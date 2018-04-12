@@ -279,12 +279,12 @@ done:
    } while (false)
 
 
-#define PUSH_DOLLAR_QUERY()                                   \
-   do {                                                       \
-      if (!pushed_dollar_query) {                             \
-         pushed_dollar_query = true;                          \
+#define PUSH_DOLLAR_QUERY()                                 \
+   do {                                                     \
+      if (!pushed_dollar_query) {                           \
+         pushed_dollar_query = true;                        \
          bson_append_document (query, "$query", 6, filter); \
-      }                                                       \
+      }                                                     \
    } while (false)
 
 
@@ -588,14 +588,13 @@ done:
    if (!succeeded) {
       _mongoc_cursor_monitor_failed (
          cursor, bson_get_monotonic_time () - started, server_stream, "find");
-      return false;
    }
 
    mongoc_server_stream_cleanup (server_stream);
    assemble_query_result_cleanup (&result);
    bson_destroy (&query);
    bson_destroy (&fields);
-   return true;
+   return succeeded;
 }
 
 

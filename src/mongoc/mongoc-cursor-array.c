@@ -22,7 +22,7 @@ typedef struct _data_array_t {
    bson_t array;
    bson_iter_t iter;
    bson_t bson; /* current document */
-   const char *field_name;
+   char *field_name;
 } data_array_t;
 
 
@@ -33,8 +33,8 @@ _prime (mongoc_cursor_t *cursor)
    data_array_t *data = (data_array_t *) cursor->impl.data;
 
    bson_destroy (&data->array);
-   /* this cursor is currently only used with the listDatabases command iterates
-    * over the array in the response's "databases" field */
+   /* this cursor is only used with the listDatabases command. it iterates
+    * over the array in the response's "databases" field. */
    if (_mongoc_cursor_run_command (
           cursor, &data->cmd, &cursor->opts, &data->array) &&
        bson_iter_init_find (&iter, &data->array, data->field_name) &&
@@ -65,9 +65,12 @@ _pop_from_batch (mongoc_cursor_t *cursor)
 static void
 _clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 {
-   data_array_t *data = bson_malloc0 (sizeof (*data));
-   bson_init (&data->array);
-   dst->data = data;
+   data_array_t *data_dst = bson_malloc0 (sizeof (data_array_t));
+   data_array_t *data_src = (data_array_t *) src->data;
+   bson_init (&data_dst->array);
+   bson_copy_to (&data_src->cmd, &data_dst->cmd);
+   data_dst->field_name = bson_strdup (data_src->field_name);
+   dst->data = data_dst;
 }
 
 
@@ -77,6 +80,7 @@ _destroy (mongoc_cursor_impl_t *impl)
    data_array_t *data = (data_array_t *) impl->data;
    bson_destroy (&data->array);
    bson_destroy (&data->cmd);
+   bson_free (data->field_name);
    bson_free (data);
 }
 
@@ -93,7 +97,7 @@ _mongoc_cursor_array_new (mongoc_client_t *client,
    data_array_t *data = bson_malloc0 (sizeof (*data));
    bson_copy_to (cmd, &data->cmd);
    bson_init (&data->array);
-   data->field_name = field_name;
+   data->field_name = bson_strdup (field_name);
    cursor->impl.prime = _prime;
    cursor->impl.pop_from_batch = _pop_from_batch;
    cursor->impl.destroy = _destroy;

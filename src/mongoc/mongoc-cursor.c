@@ -189,25 +189,19 @@ _first_dollar_field (const bson_t *bson)
 }
 
 
-#define MARK_FAILED(c)   \
-   do {                  \
-      (c)->state = DONE; \
-   } while (0)
-
 /* if src is non-NULL, it is validated and copied to dst. returns false and
  * sets the cursor error if validation fails. */
 bool
-_mongoc_cursor_check_keys_and_copy_to (mongoc_cursor_t *cursor,
-                                       const char *err_prefix,
-                                       const bson_t *src,
-                                       bson_t *dst)
+_mongoc_cursor_check_and_copy_to (mongoc_cursor_t *cursor,
+                                  const char *err_prefix,
+                                  const bson_t *src,
+                                  bson_t *dst)
 {
    bson_error_t validate_err;
    bson_init (dst);
    if (src) {
       if (!bson_validate_with_error (
              src, BSON_VALIDATE_EMPTY_KEYS, &validate_err)) {
-         MARK_FAILED (cursor);
          bson_set_error (&cursor->error,
                          MONGOC_ERROR_CURSOR,
                          MONGOC_ERROR_CURSOR_INVALID_CURSOR,
@@ -252,7 +246,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
    if (opts) {
       if (!bson_validate_with_error (
              opts, BSON_VALIDATE_EMPTY_KEYS, &validate_err)) {
-         MARK_FAILED (cursor);
          bson_set_error (&cursor->error,
                          MONGOC_ERROR_CURSOR,
                          MONGOC_ERROR_CURSOR_INVALID_CURSOR,
@@ -263,7 +256,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
 
       dollar_field = _first_dollar_field (opts);
       if (dollar_field) {
-         MARK_FAILED (cursor);
          bson_set_error (&cursor->error,
                          MONGOC_ERROR_CURSOR,
                          MONGOC_ERROR_CURSOR_INVALID_CURSOR,
@@ -275,7 +267,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
       if (bson_iter_init_find (&iter, opts, "sessionId")) {
          if (!_mongoc_client_session_from_iter (
                 client, &iter, &cursor->client_session, &cursor->error)) {
-            MARK_FAILED (cursor);
             GOTO (finish);
          }
 
@@ -288,7 +279,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                                             MONGOC_ERROR_CURSOR_INVALID_CURSOR,
                                             &server_id,
                                             &cursor->error)) {
-         MARK_FAILED (cursor);
          GOTO (finish);
       }
 
@@ -318,7 +308,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                          MONGOC_ERROR_CURSOR,
                          MONGOC_ERROR_CURSOR_INVALID_CURSOR,
                          "Cannot specify both 'exhaust' and 'limit'.");
-         MARK_FAILED (cursor);
          GOTO (finish);
       }
 
@@ -329,7 +318,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
                          MONGOC_ERROR_CURSOR,
                          MONGOC_ERROR_CURSOR_INVALID_CURSOR,
                          "Cannot use exhaust cursor with sharded cluster.");
-         MARK_FAILED (cursor);
          GOTO (finish);
       }
    }
@@ -1060,7 +1048,7 @@ mongoc_cursor_error_document (mongoc_cursor_t *cursor,
 }
 
 
-mongoc_cursor_state_t
+static mongoc_cursor_state_t
 _call_transition (mongoc_cursor_t *cursor)
 {
    mongoc_cursor_state_t state = cursor->state;
@@ -1083,7 +1071,11 @@ _call_transition (mongoc_cursor_t *cursor)
    if (!fn) {
       return DONE;
    }
-   return fn (cursor);
+   state = fn (cursor);
+   if (cursor->error.domain) {
+      state = DONE;
+   }
+   return state;
 }
 
 
@@ -1149,16 +1141,14 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
 
       cursor->state = _call_transition (cursor);
 
-      if (cursor->error.domain) {
-         /* override the state and finish. */
-         cursor->state = DONE;
-         GOTO (done);
-      }
-
       /* check if we received a document. */
       if (cursor->current) {
          *bson = cursor->current;
          ret = true;
+         GOTO (done);
+      }
+
+      if (cursor->state == DONE) {
          GOTO (done);
       }
    }
@@ -1281,9 +1271,7 @@ mongoc_cursor_clone (const mongoc_cursor_t *cursor)
 bool
 mongoc_cursor_is_alive (const mongoc_cursor_t *cursor) /* IN */
 {
-   BSON_ASSERT (cursor);
-
-   return cursor->state != DONE;
+   return mongoc_cursor_more ((mongoc_cursor_t *) cursor);
 }
 
 
@@ -1519,7 +1507,7 @@ _mongoc_cursor_start_reading_response (mongoc_cursor_t *cursor,
 }
 
 
-bool
+void
 _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
                               mongoc_cursor_response_t *response,
                               const bson_t **bson)
@@ -1536,9 +1524,7 @@ _mongoc_cursor_response_read (mongoc_cursor_t *cursor,
       /* bson_iter_next guarantees valid BSON, so this must succeed */
       BSON_ASSERT (bson_init_static (&response->current_doc, data, data_len));
       *bson = &response->current_doc;
-      return true;
    }
-   return false;
 }
 
 /* sets cursor error if could not get the next batch. */
@@ -1551,10 +1537,6 @@ _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
    ENTRY;
 
    bson_destroy (&response->reply);
-
-   /* reset the cursor id. */
-   /* ACTUALLY dont' do this */
-   /* cursor->cursor_id = 0; */
 
    /* server replies to find / aggregate with {cursor: {id: N, firstBatch: []}},
     * to getMore command with {cursor: {id: N, nextBatch: []}}. */
