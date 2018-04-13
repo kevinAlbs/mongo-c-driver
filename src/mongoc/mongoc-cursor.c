@@ -202,7 +202,6 @@ _mongoc_cursor_check_and_copy_to (mongoc_cursor_t *cursor,
    if (src) {
       if (!bson_validate_with_error (
              src, BSON_VALIDATE_EMPTY_KEYS, &validate_err)) {
-         cursor->state = DONE;
          bson_set_error (&cursor->error,
                          MONGOC_ERROR_CURSOR,
                          MONGOC_ERROR_CURSOR_INVALID_CURSOR,
@@ -268,7 +267,6 @@ _mongoc_cursor_new_with_opts (mongoc_client_t *client,
       if (bson_iter_init_find (&iter, opts, "sessionId")) {
          if (!_mongoc_client_session_from_iter (
                 client, &iter, &cursor->client_session, &cursor->error)) {
-            cursor->state = DONE;
             GOTO (finish);
          }
 
