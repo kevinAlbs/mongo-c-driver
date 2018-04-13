@@ -74,6 +74,7 @@ static void
 _destroy (mongoc_cursor_impl_t *impl)
 {
    data_find_cmd_t *data = (data_find_cmd_t *) impl->data;
+   bson_destroy (&data->filter);
    bson_destroy (&data->response.reply);
    bson_free (data);
 }
