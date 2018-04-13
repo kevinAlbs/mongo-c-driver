@@ -1834,8 +1834,8 @@ test_list_databases_clone (void)
    mongoc_client_t *client;
    mongoc_cursor_t *cursor, *cursor_clone;
    mongoc_collection_t *coll;
-   client = test_framework_client_new ();
    bson_error_t err;
+   client = test_framework_client_new ();
    const bson_t *bson;
    const bson_t *bson_clone;
    bool ret;
