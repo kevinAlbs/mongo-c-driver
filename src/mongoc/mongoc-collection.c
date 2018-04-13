@@ -359,7 +359,6 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
    BSON_ASSERT (pipeline);
 
    bson_init (&command);
-
    bson_init (&cursor_opts);
    _mongoc_cursor_flags_to_opts (flags, &cursor_opts, &slave_ok);
    created_command = _make_agg_cmd (

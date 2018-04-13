@@ -55,6 +55,8 @@ _prime (mongoc_cursor_t *cursor)
       _mongoc_cursor_impl_find_opquery_init (cursor,
                                              &data->filter /* stolen */);
    }
+   /* destroy this impl data since impl functions have been replaced. */
+   bson_free (data);
    /* prime with the new implementation. */
    return cursor->impl.prime (cursor);
 }

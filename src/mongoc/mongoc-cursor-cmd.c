@@ -132,6 +132,7 @@ _destroy (mongoc_cursor_impl_t *impl)
 {
    data_cmd_t *data = (data_cmd_t *) impl->data;
    bson_destroy (&data->response.reply);
+   bson_destroy (&data->cmd);
    _mongoc_cursor_response_legacy_destroy (&data->response_legacy);
    bson_free (data);
 }

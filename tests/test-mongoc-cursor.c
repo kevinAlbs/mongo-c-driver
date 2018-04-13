@@ -347,7 +347,7 @@ killcursors_succeeded (const mongoc_apm_command_succeeded_t *event)
 }
 
 extern void
-_mongoc_cursor_impl_find_opquery_init (mongoc_cursor_t *cursor);
+_mongoc_cursor_impl_find_opquery_init (mongoc_cursor_t *cursor, bson_t* filter);
 
 /* test killing a cursor with mongo_cursor_destroy and a real server */
 static void
@@ -401,9 +401,10 @@ test_kill_cursor_live (void)
 
    ASSERT_CMPINT (ctx.succeeded_count, ==, 1);
 
+   b = bson_new();
    cursor =
       _mongoc_cursor_find_new (client, collection->ns, b, NULL, NULL, NULL);
-   _mongoc_cursor_impl_find_opquery_init (cursor);
+   _mongoc_cursor_impl_find_opquery_init (cursor, b);
 
    cursor->cursor_id = ctx.cursor_id;
    cursor->state = END_OF_BATCH; /* meaning, "finished reading first batch" */
