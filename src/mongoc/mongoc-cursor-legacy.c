@@ -279,12 +279,12 @@ done:
    } while (false)
 
 
-#define PUSH_DOLLAR_QUERY()                                   \
-   do {                                                       \
-      if (!pushed_dollar_query) {                             \
-         pushed_dollar_query = true;                          \
+#define PUSH_DOLLAR_QUERY()                                 \
+   do {                                                     \
+      if (!pushed_dollar_query) {                           \
+         pushed_dollar_query = true;                        \
          bson_append_document (query, "$query", 6, filter); \
-      }                                                       \
+      }                                                     \
    } while (false)
 
 

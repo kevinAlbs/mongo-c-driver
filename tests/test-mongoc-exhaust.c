@@ -324,7 +324,7 @@ test_cursor_set_max_await_time_ms (void)
    mongoc_client_t *client;
    mongoc_collection_t *collection;
    mongoc_cursor_t *cursor;
-   const bson_t* bson;
+   const bson_t *bson;
 
    client = test_framework_client_new ();
    collection =
