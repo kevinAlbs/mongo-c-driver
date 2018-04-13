@@ -1143,14 +1143,14 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
 
       cursor->state = _call_transition (cursor);
 
-      if (cursor->state == DONE) {
-         GOTO (done);
-      }
-
       /* check if we received a document. */
       if (cursor->current) {
          *bson = cursor->current;
          ret = true;
+         GOTO (done);
+      }
+
+      if (cursor->state == DONE) {
          GOTO (done);
       }
    }
