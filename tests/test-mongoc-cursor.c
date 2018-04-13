@@ -1835,18 +1835,16 @@ test_list_databases_clone (void)
    mongoc_cursor_t *cursor, *cursor_clone;
    mongoc_collection_t *coll;
    bson_error_t err;
-   client = test_framework_client_new ();
    const bson_t *bson;
    const bson_t *bson_clone;
    bool ret;
    /* ensure at least one database exists by inserting. */
+   client = test_framework_client_new ();
    coll = mongoc_client_get_collection (client, "test", "test");
    ret = mongoc_collection_insert_one (coll, tmp_bson ("{}"), NULL, NULL, &err);
    ASSERT_OR_PRINT (ret, err);
-
    cursor = mongoc_client_find_databases_with_opts (client, NULL);
    cursor_clone = mongoc_cursor_clone (cursor);
-
    while (mongoc_cursor_next (cursor, &bson)) {
       BSON_ASSERT (mongoc_cursor_next (cursor_clone, &bson_clone));
       BSON_ASSERT (bson_compare (bson, bson_clone) == 0);
