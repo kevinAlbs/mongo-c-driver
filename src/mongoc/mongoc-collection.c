@@ -265,6 +265,7 @@ _make_agg_cmd (const char *coll,
    int32_t batch_size = 0;
    bson_t child;
 
+   bson_init (command);
    BSON_APPEND_UTF8 (command, "aggregate", coll);
    /*
     * The following will allow @pipeline to be either an array of
@@ -358,7 +359,6 @@ mongoc_collection_aggregate (mongoc_collection_t *collection,       /* IN */
    BSON_ASSERT (collection);
    BSON_ASSERT (pipeline);
 
-   bson_init (&command);
    bson_init (&cursor_opts);
    _mongoc_cursor_flags_to_opts (flags, &cursor_opts, &slave_ok);
    created_command = _make_agg_cmd (
