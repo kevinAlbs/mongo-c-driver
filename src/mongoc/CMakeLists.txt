@@ -92,7 +92,6 @@ set (src_mongoc_DIST_noinst_hs
    mongoc-crypto-common-crypto-private.h
    mongoc-crypto-openssl-private.h
    mongoc-crypto-private.h
-   mongoc-cursor-cursorid-private.h
    mongoc-cursor-private.h
    mongoc-cyrus-private.h
    mongoc-database-private.h
