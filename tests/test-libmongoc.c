@@ -2165,7 +2165,7 @@ test_framework_skip_if_max_wire_version_more_than_5 (void)
    if (!TestSuite_CheckLive ()) {
       return 0;
    }
-   return test_framework_max_wire_version_at_least (6);
+   return test_framework_max_wire_version_at_least (6) ? 0 : 1;
 }
 
 int
