@@ -19,6 +19,7 @@ set -o errexit  # Exit the script with error if any of the commands fail
 #       SNAPPY                  Build against bundled or external Snappy, or none
 #       SSL                     Build against OpenSSL or native or none
 #       SASL                    Build against SASL or not
+#       ENABLE_SHM_COUNTERS     Build with SHM counters
 
 # Options for this script.
 RELEASE=${RELEASE:-OFF}
@@ -26,6 +27,7 @@ DEBUG=${DEBUG:-OFF}
 VALGRIND=${VALGRIND:-OFF}
 ANALYZE=${ANALYZE:-OFF}
 COVERAGE=${COVERAGE:-OFF}
+ENABLE_SHM_COUNTERS=${ENABLE_SHM_COUNTERS:-AUTO}
 
 # CMake options.
 SASL=${SASL:-OFF}
@@ -64,12 +66,8 @@ DEBUG_AND_RELEASE_FLAGS="\
    -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF \
    -DCMAKE_PREFIX_PATH=$INSTALL_DIR \
    -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+   -DENABLE_SHM_COUNTERS=$ENABLE_SHM_COUNTERS \
 "
-
-if [ -z "$DISABLE_COUNTERS" ]; then
-# counters are enabled by default for the counter tests.
-   DEBUG_AND_RELEASE_FLAGS="$DEBUG_AND_RELEASE_FLAGS -DENABLE_COUNTERS=ON"
-fi
 
 if [ ! -z "$ZLIB" ]; then
    DEBUG_AND_RELEASE_FLAGS="$DEBUG_AND_RELEASE_FLAGS -DENABLE_ZLIB=${ZLIB}"

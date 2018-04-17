@@ -480,6 +480,7 @@ test_counters_auth (void *ctx)
       uri, MONGOC_URI_SOCKETCHECKINTERVALMS, 99999);
    reset_all_counters ();
    client = mongoc_client_new_from_uri (uri);
+   test_framework_set_ssl_opts (client);
    BSON_ASSERT (client);
    ret = mongoc_client_command_simple (
       client, "test", tmp_bson ("{'ping': 1}"), NULL, NULL, &err);
@@ -507,6 +508,7 @@ test_counters_dns (void)
    mongoc_server_description_destroy (sd);
    mongoc_client_destroy (client);
    client = mongoc_client_new ("mongodb://invalidhostname/");
+   test_framework_set_ssl_opts (client);
    sd = mongoc_client_select_server (client, false, NULL, &err);
    ASSERT (!sd);
    DIFF_AND_RESET (dns_success, ==, 0);
@@ -532,6 +534,7 @@ test_counters_streams_timeout ()
    uri = mongoc_uri_copy (mock_server_get_uri (server));
    mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_SOCKETTIMEOUTMS, 300);
    client = mongoc_client_new_from_uri (uri);
+   test_framework_set_ssl_opts (client);
    mongoc_uri_destroy (uri);
    sd = mongoc_client_select_server (client, true, NULL, &err);
    mongoc_server_description_destroy (sd);
