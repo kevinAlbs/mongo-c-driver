@@ -157,6 +157,9 @@ _get_config_bitfield (void)
    bf |= MONGOC_MD_FLAG_ENABLE_DNSAPI;
 #endif
 
+#ifdef MONGOC_ENABLE_COUNTERS
+   bf |= MONGOC_MD_FLAG_ENABLE_COUNTERS;
+#endif
    return bf;
 }
 
@@ -393,7 +396,8 @@ _append_platform_field (bson_t *doc, const char *platform)
                             1 +
 
                             /* key size */
-                            (int) strlen (HANDSHAKE_PLATFORM_FIELD) + 1 +
+                            (int) strlen (HANDSHAKE_PLATFORM_FIELD) +
+                            1 +
 
                             /* 4 bytes for length of string */
                             4);

@@ -331,6 +331,12 @@
 #endif
 
 
+#define MONGOC_ENABLE_COUNTERS @MONGOC_ENABLE_COUNTERS@
+
+#if MONGOC_ENABLE_COUNTERS != 1
+#  undef MONGOC_ENABLE_COUNTERS
+#endif
+
 /*
  * NOTICE:
  * If you're about to update this file and add a config flag, make sure to

@@ -32,7 +32,8 @@ option (ENABLE_AUTOMATIC_INIT_AND_CLEANUP "Enable automatic init and cleanup (GC
 option (ENABLE_CRYPTO_SYSTEM_PROFILE "Use system crypto profile (OpenSSL only)" OFF)
 option (ENABLE_TRACING "Turn on verbose debug output" OFF)
 option (ENABLE_COVERAGE "Turn on compile options for lcov" OFF)
-set (ENABLE_SHM_COUNTERS AUTO CACHE STRING "Enable shared memory performance counters. Set to ON/AUTO/OFF, default AUTO.")
+option (ENABLE_COUNTERS "Enable memory performance counters. Set to ON/OFF, default OFF." OFF)
+set (ENABLE_SHM_COUNTERS AUTO CACHE STRING "Enable memory performance counters to use shared memory. Set to ON/AUTO/OFF, default AUTO. OFF when ENABLE_COUNTERS is OFF.")
 set (ENABLE_BSON AUTO CACHE STRING "Where to find libbson. Set to BUNDLED/SYSTEM/AUTO, default AUTO.")
 set (ENABLE_SNAPPY AUTO CACHE STRING "Enable snappy support. Set to ON/AUTO/OFF, default AUTO.")
 set (ENABLE_ZLIB AUTO CACHE STRING "Enable zlib support")
@@ -403,6 +404,14 @@ endif ()
 
 if (NOT ENABLE_SHM_COUNTERS MATCHES "ON|OFF|AUTO")
    message (FATAL_ERROR "ENABLE_SHM_COUNTERS option must be ON, OFF, or AUTO")
+endif ()
+
+set (MONGOC_ENABLE_COUNTERS 0)
+
+if (NOT ENABLE_COUNTERS)
+   set (ENABLE_SHM_COUNTERS OFF)
+else ()
+   set (MONGOC_ENABLE_COUNTERS 1)
 endif ()
 
 if (ENABLE_SHM_COUNTERS STREQUAL "AUTO")

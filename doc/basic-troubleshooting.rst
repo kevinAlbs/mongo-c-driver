@@ -12,14 +12,14 @@ The following is a short list of things to check when you have a problem.
 * Have you leaked any clients or cursors as can be found with ``mongoc-stat <PID>``?
 * Have packets been delivered to the server? See egress bytes from ``mongoc-stat <PID>``.
 * Does ``valgrind`` show any leaks? Ensure you call ``mongoc_cleanup()`` at the end of your process to cleanup lingering allocations from the MongoDB C driver.
-* If compiling your own copy of MongoDB C driver, consider configuring with ``--enable-tracing`` to enable function tracing and hex dumps of network packets to ``STDERR`` and ``STDOUT``.
+* If compiling your own copy of MongoDB C driver, consider configuring with ``-DENABLE_TRACING=ON`` to enable function tracing and hex dumps of network packets to ``STDERR`` and ``STDOUT``.
 
 Performance Counters
 --------------------
 
-The MongoDB C driver comes with a unique feature to help developers and sysadmins troubleshoot problems in production.
-Performance counters are available for each process using the driver.
-The counters can be accessed outside of the application process via a shared memory segment.
+The MongoDB C driver comes with an optional unique feature to help developers and sysadmins troubleshoot problems in production.
+Performance counters are available for each process using the driver if compiled with ``-DENABLE_COUNTERS=ON``.
+On some platforms, the counters can be accessed outside of the application process via a shared memory segment.
 This means that you can graph statistics about your application process easily from tools like Munin or Nagios.
 Your author often uses ``watch --interval=0.5 -d mongoc-stat $PID`` to monitor an application.
 

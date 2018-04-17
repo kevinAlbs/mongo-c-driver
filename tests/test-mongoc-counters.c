@@ -373,7 +373,7 @@ test_counters_streams (void *ctx)
    DIFF_AND_RESET (streams_active, ==, 1);
    DIFF_AND_RESET (streams_disposed, ==, 0);
 #ifdef MONGOC_ENABLE_SSL
-   if (!test_framework_skip_if_crypto ()) {
+   do {
       const mongoc_ssl_opt_t *default_opts = mongoc_ssl_opt_get_default ();
       mongoc_ssl_opt_t *opts = bson_malloc0 (sizeof (mongoc_ssl_opt_t));
       mongoc_stream_t *ssl_buffered_stream_socket;
@@ -387,7 +387,7 @@ test_counters_streams (void *ctx)
       DIFF_AND_RESET (streams_active, ==, -3);
       DIFF_AND_RESET (streams_disposed, ==, 3);
       used_ssl = true;
-   }
+   } while (0);
 #endif
    if (!used_ssl) {
       mongoc_stream_destroy (buffered_stream_sock);
@@ -546,6 +546,7 @@ test_counters_streams_timeout ()
 void
 test_counters_install (TestSuite *suite)
 {
+#ifdef MONGOC_ENABLE_COUNTERS
    TestSuite_AddFull (suite,
                       "/counters/op_msg",
                       test_counters_op_msg,
@@ -598,4 +599,5 @@ test_counters_install (TestSuite *suite)
    TestSuite_AddLive (suite, "/counters/dns", test_counters_dns);
    TestSuite_AddMockServerTest (
       suite, "/counters/streams_timeout", test_counters_streams_timeout);
+#endif
 }

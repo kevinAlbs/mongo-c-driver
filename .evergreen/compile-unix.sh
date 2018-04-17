@@ -66,6 +66,11 @@ DEBUG_AND_RELEASE_FLAGS="\
    -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
 "
 
+if [ -z "$DISABLE_COUNTERS" ]; then
+# counters are enabled by default for the counter tests.
+   DEBUG_AND_RELEASE_FLAGS="$DEBUG_AND_RELEASE_FLAGS -DENABLE_COUNTERS=ON"
+fi
+
 if [ ! -z "$ZLIB" ]; then
    DEBUG_AND_RELEASE_FLAGS="$DEBUG_AND_RELEASE_FLAGS -DENABLE_ZLIB=${ZLIB}"
 fi
