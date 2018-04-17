@@ -406,7 +406,7 @@ test_kill_cursor_live (void)
       _mongoc_cursor_find_new (client, collection->ns, b, NULL, NULL, NULL);
    /* override the typical priming, and immediately transition to an OPQUERY
     * find cursor. */
-   bson_free (cursor->impl.data);
+   cursor->impl.destroy(&cursor->impl);
    _mongoc_cursor_impl_find_opquery_init (cursor, b);
 
    cursor->cursor_id = ctx.cursor_id;

@@ -1400,7 +1400,9 @@ mongoc_collection_find_indexes_with_opts (mongoc_collection_t *collection,
                                     NULL /* read prefs */,
                                     NULL /* read concern */);
 
-   cursor->impl.prime (cursor);
+   if (!mongoc_cursor_error (cursor, &error)) {
+      cursor->impl.prime (cursor);
+   }
 
    if (mongoc_cursor_error (cursor, &error) &&
        error.code == MONGOC_ERROR_COLLECTION_DOES_NOT_EXIST) {
