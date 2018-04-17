@@ -23,8 +23,7 @@
 #include "mock_server/future-functions.h"
 
 /* test statistics counters excluding OP_INSERT, OP_UPDATE, and OP_DELETE since
- * those were superseded by write commands in 2.6.
- * protocol_ingress_error is also untested currently, because of difficulty. */
+ * those were superseded by write commands in 2.6. */
 
 /* define a count function for each counter. */
 #define COUNTER(id, category, name, description)                \
