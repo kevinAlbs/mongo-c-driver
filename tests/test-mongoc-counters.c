@@ -375,12 +375,11 @@ test_counters_streams (void *ctx)
 #ifdef MONGOC_ENABLE_SSL
    do {
       const mongoc_ssl_opt_t *default_opts = mongoc_ssl_opt_get_default ();
-      mongoc_ssl_opt_t *opts = bson_malloc0 (sizeof (mongoc_ssl_opt_t));
+      mongoc_ssl_opt_t opts = *default_opts;
       mongoc_stream_t *ssl_buffered_stream_socket;
 
-      memcpy (opts, default_opts, sizeof (mongoc_ssl_opt_t));
       ssl_buffered_stream_socket = mongoc_stream_tls_new_with_hostname (
-         buffered_stream_sock, NULL, opts, 0);
+         buffered_stream_sock, NULL, &opts, 0);
       DIFF_AND_RESET (streams_active, ==, 1);
       DIFF_AND_RESET (streams_disposed, ==, 0);
       mongoc_stream_destroy (ssl_buffered_stream_socket);
@@ -451,6 +450,8 @@ test_counters_streams (void *ctx)
    mongoc_stream_destroy (gridfs_stream);
    DIFF_AND_RESET (streams_active, ==, -1);
    DIFF_AND_RESET (streams_disposed, ==, 1);
+   mongoc_gridfs_file_destroy (file);
+   mongoc_gridfs_destroy (gridfs);
    mongoc_client_destroy (client);
 }
 
@@ -519,13 +520,16 @@ test_counters_streams_timeout ()
    mongoc_client_t *client;
    request_t *request;
    mongoc_uri_t *uri;
+   mongoc_server_description_t* sd;
 
    server = mock_server_with_autoismaster (WIRE_VERSION_MAX);
    mock_server_run (server);
    uri = mongoc_uri_copy (mock_server_get_uri (server));
    mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_SOCKETTIMEOUTMS, 300);
    client = mongoc_client_new_from_uri (uri);
-   mongoc_client_select_server (client, true, NULL, &err);
+   mongoc_uri_destroy (uri);
+   sd = mongoc_client_select_server (client, true, NULL, &err);
+   mongoc_server_description_destroy (sd);
    reset_all_counters ();
    future = future_client_command_simple (
       client, "test", tmp_bson ("{'ping': 1}"), NULL, NULL, &err);
