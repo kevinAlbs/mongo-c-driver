@@ -392,7 +392,7 @@ test_counters_streams (void *ctx)
       DIFF_AND_RESET (streams_active, ==, -2);
       DIFF_AND_RESET (streams_disposed, ==, 2);
    }
-   /* check a file stream. */
+/* check a file stream. */
 #ifdef WIN32
    file_stream = mongoc_stream_file_new_for_path (
       BINARY_DIR "/temp.dat", O_CREAT | O_WRONLY | O_TRUNC, _S_IWRITE);
@@ -526,7 +526,7 @@ test_counters_streams_timeout ()
    mongoc_client_t *client;
    request_t *request;
    mongoc_uri_t *uri;
-   mongoc_server_description_t* sd;
+   mongoc_server_description_t *sd;
 
    server = mock_server_with_autoismaster (WIRE_VERSION_MAX);
    mock_server_run (server);

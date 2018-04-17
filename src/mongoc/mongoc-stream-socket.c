@@ -332,6 +332,6 @@ mongoc_stream_socket_new (mongoc_socket_t *sock) /* IN */
    stream->vtable.poll = _mongoc_stream_socket_poll;
    stream->sock = sock;
 
-   mongoc_counter_streams_active_inc();
+   mongoc_counter_streams_active_inc ();
    return (mongoc_stream_t *) stream;
 }
