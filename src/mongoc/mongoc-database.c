@@ -755,9 +755,8 @@ mongoc_database_find_collections_with_opts (mongoc_database_t *database,
     * replicaset mode" */
    cursor = _mongoc_cursor_cmd_new (
       database->client, database->name, &cmd, opts, NULL, NULL);
-   cursor->state = cursor->impl.prime (cursor);
-   if (cursor->error.domain) {
-      cursor->state = DONE;
+   if (cursor->error.domain == 0) {
+      cursor->state = cursor->impl.prime (cursor);
    }
    bson_destroy (&cmd);
 
