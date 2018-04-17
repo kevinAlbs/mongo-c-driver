@@ -168,6 +168,7 @@ set (src_mongoc_DIST_cs
    mongoc-compression.c
    mongoc-counters.c
    mongoc-cursor.c
+   mongoc-cursor-legacy.c
    mongoc-cursor-array.c
    mongoc-cursor-find.c
    mongoc-cursor-find-cmd.c
