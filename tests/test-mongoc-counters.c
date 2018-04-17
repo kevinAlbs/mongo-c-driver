@@ -24,7 +24,7 @@
 
 /* test statistics counters excluding OP_INSERT, OP_UPDATE, and OP_DELETE since
  * those were superseded by write commands in 2.6. */
-
+#ifdef MONGOC_ENABLE_COUNTERS
 /* define a count function for each counter. */
 #define COUNTER(id, category, name, description)                \
    uint32_t prev_##id;                                          \
@@ -59,7 +59,6 @@ reset_all_counters ()
 #include "mongoc-counters.defs"
 #undef COUNTER
 }
-
 
 /* create a client and disable server selection after performing it. */
 static mongoc_client_t *
@@ -553,7 +552,7 @@ test_counters_streams_timeout ()
    mongoc_client_destroy (client);
    mock_server_destroy (server);
 }
-
+#endif
 
 void
 test_counters_install (TestSuite *suite)
