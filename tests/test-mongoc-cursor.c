@@ -404,6 +404,9 @@ test_kill_cursor_live (void)
    b = bson_new ();
    cursor =
       _mongoc_cursor_find_new (client, collection->ns, b, NULL, NULL, NULL);
+   /* override the typical priming, and immediately transition to an OPQUERY
+    * find cursor. */
+   bson_free (cursor->impl.data);
    _mongoc_cursor_impl_find_opquery_init (cursor, b);
 
    cursor->cursor_id = ctx.cursor_id;
@@ -1824,6 +1827,7 @@ test_find_error_is_alive (void)
    BSON_ASSERT (!mongoc_cursor_is_alive (cursor));
    BSON_ASSERT (!mongoc_cursor_more (cursor));
    BSON_ASSERT (!mongoc_cursor_next (cursor, &bson));
+   mongoc_cursor_destroy (cursor);
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
 }
@@ -1849,6 +1853,8 @@ test_list_databases_clone (void)
       BSON_ASSERT (mongoc_cursor_next (cursor_clone, &bson_clone));
       BSON_ASSERT (bson_compare (bson, bson_clone) == 0);
    }
+   mongoc_cursor_destroy (cursor);
+   mongoc_cursor_destroy (cursor_clone);
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
 }
