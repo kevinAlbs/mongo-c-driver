@@ -25,7 +25,8 @@ Your author often uses ``watch --interval=0.5 -d mongoc-stat $PID`` to monitor a
 
 Performance counters are only available on UNIX platforms (excluding macOS) which support shared memory segments.
 On supported platforms they are enabled by default.
-They can be disabled with the cmake option ``-DENABLE_SHM_COUNTERS=OFF``.
+Applications can be built without the counters by specifying the cmake option ``-DENABLE_SHM_COUNTERS=OFF``. Additionally, if
+performance counters are already compiled, they can be disabled at runtime by specifying the environment variable ``MONGOC_DISABLE_SHM``.
 
 Performance counters keep track the following:
 

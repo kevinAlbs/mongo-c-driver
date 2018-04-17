@@ -138,7 +138,7 @@ enum {
    LAST_COUNTER
 };
 
-#ifdef MONGOC_ENABLE_COUNTERS
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
 #define COUNTER(ident, Category, Name, Description)                   \
    static BSON_INLINE void mongoc_counter_##ident##_add (int64_t val) \
    {                                                                  \

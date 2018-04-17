@@ -76,8 +76,8 @@ _mongoc_stream_file_destroy (mongoc_stream_t *stream)
 
    bson_free (file);
 
-   mongoc_counter_streams_active_dec();
-   mongoc_counter_streams_disposed_inc();
+   mongoc_counter_streams_active_dec ();
+   mongoc_counter_streams_disposed_inc ();
 
    EXIT;
 }
@@ -153,7 +153,9 @@ _mongoc_stream_file_readv (mongoc_stream_t *stream, /* IN */
    GOTO (done);
 #endif
 done:
-   mongoc_counter_streams_ingress_add (ret > 0 ? ret : 0);
+   if (ret > 0) {
+      mongoc_counter_streams_ingress_add (ret);
+   }
    return ret;
 }
 
@@ -185,7 +187,9 @@ _mongoc_stream_file_writev (mongoc_stream_t *stream, /* IN */
    goto done;
 #endif
 done:
-   mongoc_counter_streams_egress_add(ret > 0 ? ret : 0);
+   if (ret > 0) {
+      mongoc_counter_streams_egress_add (ret);
+   }
    return ret;
 }
 
@@ -215,7 +219,7 @@ mongoc_stream_file_new (int fd) /* IN */
    stream->vtable.check_closed = _mongoc_stream_file_check_closed;
    stream->fd = fd;
 
-   mongoc_counter_streams_active_inc();
+   mongoc_counter_streams_active_inc ();
    return (mongoc_stream_t *) stream;
 }
 

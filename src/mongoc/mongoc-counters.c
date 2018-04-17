@@ -62,7 +62,7 @@ typedef struct {
 
 BSON_STATIC_ASSERT2 (counters_t, sizeof (mongoc_counters_t) == 64);
 
-#ifdef MONGOC_ENABLE_COUNTERS
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
 static void *gCounterFallback = NULL;
 #endif
 
@@ -87,7 +87,7 @@ mongoc_counters_use_shm (void)
 }
 #endif
 
-#ifdef MONGOC_ENABLE_COUNTERS
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
 /**
  * mongoc_counters_calc_size:
  *
@@ -126,7 +126,7 @@ mongoc_counters_calc_size (void)
 void
 _mongoc_counters_cleanup (void)
 {
-#ifdef MONGOC_ENABLE_COUNTERS
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
    if (gCounterFallback) {
       bson_free (gCounterFallback);
       gCounterFallback = NULL;
@@ -153,7 +153,7 @@ _mongoc_counters_cleanup (void)
  *
  * Returns: A shared memory segment, or malloc'd memory on failure.
  */
-#ifdef MONGOC_ENABLE_COUNTERS
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
 static void *
 mongoc_counters_alloc (size_t size)
 {
@@ -283,7 +283,7 @@ mongoc_counters_register (mongoc_counters_t *counters,
 void
 _mongoc_counters_init (void)
 {
-#ifdef MONGOC_ENABLE_COUNTERS
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
    mongoc_counter_info_t *info;
    mongoc_counters_t *counters;
    size_t infos_size;
