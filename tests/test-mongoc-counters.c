@@ -393,8 +393,13 @@ test_counters_streams (void *ctx)
       DIFF_AND_RESET (streams_disposed, ==, 2);
    }
    /* check a file stream. */
+#ifdef WIN32
+   file_stream = mongoc_stream_file_new_for_path (
+      BINARY_DIR "/temp.dat", O_CREAT | O_WRONLY | O_TRUNC, _S_IWRITE);
+#else
    file_stream = mongoc_stream_file_new_for_path (
       BINARY_DIR "/temp.dat", O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
+#endif
    BSON_ASSERT (file_stream);
    DIFF_AND_RESET (streams_active, ==, 1);
    DIFF_AND_RESET (streams_disposed, ==, 0);
