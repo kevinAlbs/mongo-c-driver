@@ -80,6 +80,7 @@ _client_new_disable_ss (bool use_compression)
       bson_free (compressors);
    }
    client = mongoc_client_new_from_uri (uri);
+   test_framework_set_ssl_opts (client);
    sd = mongoc_client_select_server (client, true, NULL, &err);
    ASSERT_OR_PRINT (sd, err);
    mongoc_server_description_destroy (sd);
