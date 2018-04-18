@@ -20,7 +20,6 @@
 #include "mongoc-cursor-private.h"
 #include "mongoc-collection-private.h"
 #include "mongoc-client-session-private.h"
-#include "mongoc-rpc-private.h"
 
 #define CHANGE_STREAM_ERR(_str)         \
    bson_set_error (&stream->err,        \
@@ -36,33 +35,24 @@
       }                                                               \
    } while (0);
 
+/* Construct the aggregate command in cmd:
+ * { aggregate: collname, pipeline: [], cursor: { batchSize: x } } */
 static void
-_mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
+_make_command (mongoc_change_stream_t *stream, bson_t *cmd)
 {
-   mongoc_client_session_t *cs = NULL;
+   bson_iter_t iter;
    bson_t change_stream_stage; /* { $changeStream: <change_stream_doc> } */
    bson_t change_stream_doc;
    bson_t pipeline;
    bson_t cursor_doc;
-   bson_t command_opts;
-   bson_t command; /* { aggregate: "coll", pipeline: [], ... } */
-   bson_t reply;
-   bson_iter_t iter;
-   bson_error_t err = {0};
-   mongoc_server_description_t *sd;
-   uint32_t server_id;
 
-   BSON_ASSERT (stream);
-
-   /* Construct the aggregate command */
-   /* { aggregate: collname, pipeline: [], cursor: { batchSize: x } } */
-   bson_init (&command);
-   bson_append_utf8 (&command,
+   bson_init (cmd);
+   bson_append_utf8 (cmd,
                      "aggregate",
                      9,
                      stream->coll->collection,
                      stream->coll->collectionlen);
-   bson_append_array_begin (&command, "pipeline", 8, &pipeline);
+   bson_append_array_begin (cmd, "pipeline", 8, &pipeline);
 
    /* Append the $changeStream stage */
    bson_append_document_begin (&pipeline, "0", 1, &change_stream_stage);
@@ -75,7 +65,8 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
    bson_append_document_end (&change_stream_stage, &change_stream_doc);
    bson_append_document_end (&pipeline, &change_stream_stage);
 
-   /* Append user pipeline if it exists */
+   /* Append the user pipeline if one was passed. If the user passed an invalid
+    * pipeline doc, append it anyway, and rely on the server error. */
    if (bson_iter_init_find (&iter, &stream->pipeline_to_append, "pipeline") &&
        BSON_ITER_HOLDS_ARRAY (&iter)) {
       bson_iter_t child_iter;
@@ -83,29 +74,41 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
       char buf[16];
       const char *key_str;
 
-      BSON_ASSERT (bson_iter_recurse (&iter, &child_iter));
+      bson_iter_recurse (&iter, &child_iter);
       while (bson_iter_next (&child_iter)) {
-         if (BSON_ITER_HOLDS_DOCUMENT (&child_iter)) {
-            size_t keyLen =
-               bson_uint32_to_string (key_int, &key_str, buf, sizeof (buf));
-            bson_append_value (
-               &pipeline, key_str, (int) keyLen, bson_iter_value (&child_iter));
-            ++key_int;
-         }
+         size_t keyLen =
+            bson_uint32_to_string (key_int, &key_str, buf, sizeof (buf));
+         bson_append_value (
+            &pipeline, key_str, (int) keyLen, bson_iter_value (&child_iter));
+         ++key_int;
       }
    }
 
-   bson_append_array_end (&command, &pipeline);
+   bson_append_array_end (cmd, &pipeline);
 
    /* Add batch size if needed */
-   bson_append_document_begin (&command, "cursor", 6, &cursor_doc);
+   bson_append_document_begin (cmd, "cursor", 6, &cursor_doc);
    if (stream->batch_size > 0) {
       bson_append_int32 (&cursor_doc, "batchSize", 9, stream->batch_size);
    }
-   bson_append_document_end (&command, &cursor_doc);
+   bson_append_document_end (cmd, &cursor_doc);
+}
 
+static void
+_mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
+{
+   mongoc_client_session_t *cs = NULL;
+   bson_t command_opts;
+   bson_t command; /* { aggregate: "coll", pipeline: [], ... } */
+   bson_t reply;
+   bson_iter_t iter;
+   bson_error_t err = {0};
+   mongoc_server_description_t *sd;
+   uint32_t server_id;
+
+   BSON_ASSERT (stream);
+   _make_command (stream, &command);
    bson_copy_to (&stream->opts, &command_opts);
-
    sd = mongoc_client_select_server (stream->coll->client,
                                      false /* for_writes */,
                                      stream->coll->read_prefs,
@@ -115,6 +118,9 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
       stream->err = err;
       goto cleanup;
    }
+   server_id = mongoc_server_description_id (sd);
+   bson_append_int32 (&command_opts, "serverId", 8, server_id);
+   mongoc_server_description_destroy (sd);
 
    if (bson_iter_init_find (&iter, &command_opts, "sessionId")) {
       if (!_mongoc_client_session_from_iter (
@@ -147,9 +153,6 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
          goto cleanup;
       }
    }
-
-   server_id = mongoc_server_description_id (sd);
-   bson_append_int32 (&command_opts, "serverId", 8, server_id);
 
    /* use inherited read preference and read concern of the collection */
    if (!mongoc_collection_read_command_with_opts (
@@ -194,7 +197,6 @@ _mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
 cleanup:
    bson_destroy (&command);
    bson_destroy (&command_opts);
-   mongoc_server_description_destroy (sd);
 }
 
 mongoc_change_stream_t *
@@ -267,10 +269,22 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
       }
    }
 
+   /* Accept two forms of user pipeline:
+    * 1. A document with the key "pipeline": { "pipeline": [...] }
+    * 2. An array-like document: { "0": {}, "1": {}, ... }
+    * If the passed pipeline is invalid, we pass it along and let the server
+    * error instead.
+    */
    if (!bson_empty (pipeline)) {
       bson_iter_t iter;
-      if (bson_iter_init_find (&iter, pipeline, "pipeline")) {
+      if (bson_iter_init_find (&iter, pipeline, "pipeline") &&
+          BSON_ITER_HOLDS_ARRAY (&iter)) {
          SET_BSON_OR_ERR (&stream->pipeline_to_append, "pipeline");
+      } else {
+         if (!BSON_APPEND_ARRAY (
+                &stream->pipeline_to_append, "pipeline", pipeline)) {
+            CHANGE_STREAM_ERR ("pipeline");
+         }
       }
    }
 

@@ -1025,19 +1025,92 @@ test_change_stream_live_read_prefs (void *test_ctx)
    mongoc_client_destroy (client);
 }
 
-
-void
-test_change_stream_server_selection_fails (void) {
-   const bson_t* bson;
+/* Test that a failed server selection returns an error. This verifies a bug
+ * is fixed, which would trigger an assert in this case. */
+static void
+test_change_stream_server_selection_fails (void)
+{
+   const bson_t *bson;
    bson_error_t err;
-   mongoc_client_t* client = mongoc_client_new("mongodb://localhost:12345/");
-   mongoc_collection_t* coll = mongoc_client_get_collection(client, "test", "test");
-   mongoc_change_stream_t* cs = mongoc_collection_watch(coll, tmp_bson("{}"), NULL);
+   mongoc_client_t *client = mongoc_client_new ("mongodb://localhost:12345/");
+   mongoc_collection_t *coll =
+      mongoc_client_get_collection (client, "test", "test");
+   mongoc_change_stream_t *cs =
+      mongoc_collection_watch (coll, tmp_bson ("{}"), NULL);
 
    mongoc_change_stream_next (cs, &bson);
-   BSON_ASSERT (mongoc_change_stream_error_document(cs, &err, &bson));
-   ASSERT_ERROR_CONTAINS (err, MONGOC_ERROR_SERVER_SELECTION, MONGOC_ERROR_SERVER_SELECTION_FAILURE, "No suitable servers found");
+   BSON_ASSERT (mongoc_change_stream_error_document (cs, &err, &bson));
+   ASSERT_ERROR_CONTAINS (err,
+                          MONGOC_ERROR_SERVER_SELECTION,
+                          MONGOC_ERROR_SERVER_SELECTION_FAILURE,
+                          "No suitable servers found");
    mongoc_change_stream_destroy (cs);
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+}
+
+typedef struct {
+   char *pattern;
+   int agg_count;
+} array_started_ctx_t;
+
+static void
+_accepts_array_started (const mongoc_apm_command_started_t *event)
+{
+   const bson_t *cmd = mongoc_apm_command_started_get_command (event);
+   const char *cmd_name = mongoc_apm_command_started_get_command_name (event);
+   array_started_ctx_t *ctx =
+      (array_started_ctx_t *) mongoc_apm_command_started_get_context (event);
+   if (strcmp (cmd_name, "aggregate") != 0) {
+      return;
+   }
+   ctx->agg_count++;
+   ASSERT_MATCH (cmd, ctx->pattern);
+}
+/* Test that watch accepts an array document {0: {}, 1: {}} as the pipeline,
+ * similar to mongoc_collection_aggregate */
+static void
+test_change_stream_accepts_array (void *unused)
+{
+   mongoc_client_t *client = test_framework_client_new ();
+   mongoc_apm_callbacks_t *callbacks = mongoc_apm_callbacks_new ();
+   array_started_ctx_t ctx = {0};
+   mongoc_collection_t *coll;
+   mongoc_change_stream_t *stream;
+   const bson_t *bson;
+   bson_error_t err;
+   bson_t *opts =
+      tmp_bson ("{'maxAwaitTimeMS': 1}"); /* to speed up the test. */
+
+   /* set up apm callbacks to listen for the agg commands. */
+   ctx.pattern =
+      bson_strdup ("{'aggregate': 'test', 'pipeline': [ {'$changeStream': {}}, "
+                   "{'$match': {'x': 1}}, {'$project': {'x': 1}}]}");
+   mongoc_apm_set_command_started_cb (callbacks, _accepts_array_started);
+   mongoc_client_set_apm_callbacks (client, callbacks, &ctx);
+   coll = mongoc_client_get_collection (client, "test", "test");
+   /* try starting a change stream with a { "pipeline": [...] } argument */
+   stream = mongoc_collection_watch (
+      coll,
+      tmp_bson ("{'pipeline': [{'$match': {'x': 1}}, {'$project': {'x': 1}}]}"),
+      opts);
+   (void) mongoc_change_stream_next (stream, &bson);
+   ASSERT_OR_PRINT (!mongoc_change_stream_error_document (stream, &err, &bson),
+                    err);
+   ASSERT_CMPINT32 (ctx.agg_count, ==, 1);
+   mongoc_change_stream_destroy (stream);
+   /* try with an array like document. */
+   stream = mongoc_collection_watch (
+      coll,
+      tmp_bson ("{'0': {'$match': {'x': 1}}, '1': {'$project': {'x': 1}}}"),
+      opts);
+   (void) mongoc_change_stream_next (stream, &bson);
+   ASSERT_OR_PRINT (!mongoc_change_stream_error_document (stream, &err, &bson),
+                    err);
+   ASSERT_CMPINT32 (ctx.agg_count, ==, 2);
+   bson_free (ctx.pattern);
+   mongoc_change_stream_destroy (stream);
+   mongoc_apm_callbacks_destroy (callbacks);
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
 }
@@ -1101,5 +1174,14 @@ test_change_stream_install (TestSuite *suite)
                       NULL,
                       test_framework_skip_if_not_rs_version_6);
 
-   TestSuite_Add (suite, "/change_stream/server_selection_fails", test_change_stream_server_selection_fails);
+   TestSuite_Add (suite,
+                  "/change_stream/server_selection_fails",
+                  test_change_stream_server_selection_fails);
+
+   TestSuite_AddFull (suite,
+                      "/change_stream/accepts_array",
+                      test_change_stream_accepts_array,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_not_rs_version_6);
 }
