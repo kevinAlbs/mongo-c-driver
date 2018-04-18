@@ -24,7 +24,7 @@
 
 /* test statistics counters excluding OP_INSERT, OP_UPDATE, and OP_DELETE since
  * those were superseded by write commands in 2.6. */
-#ifdef MONGOC_ENABLE_COUNTERS
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
 /* define a count function for each counter. */
 #define COUNTER(id, category, name, description)                \
    uint32_t prev_##id;                                          \
@@ -557,7 +557,7 @@ test_counters_streams_timeout ()
 void
 test_counters_install (TestSuite *suite)
 {
-#ifdef MONGOC_ENABLE_COUNTERS
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
    TestSuite_AddFull (suite,
                       "/counters/op_msg",
                       test_counters_op_msg,

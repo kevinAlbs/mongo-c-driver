@@ -157,7 +157,7 @@ _get_config_bitfield (void)
    bf |= MONGOC_MD_FLAG_ENABLE_DNSAPI;
 #endif
 
-#ifdef MONGOC_ENABLE_COUNTERS
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
    bf |= MONGOC_MD_FLAG_ENABLE_COUNTERS;
 #endif
    return bf;
