@@ -1027,6 +1027,22 @@ test_change_stream_live_read_prefs (void *test_ctx)
 
 
 void
+test_change_stream_server_selection_fails (void) {
+   const bson_t* bson;
+   bson_error_t err;
+   mongoc_client_t* client = mongoc_client_new("mongodb://localhost:12345/");
+   mongoc_collection_t* coll = mongoc_client_get_collection(client, "test", "test");
+   mongoc_change_stream_t* cs = mongoc_collection_watch(coll, tmp_bson("{}"), NULL);
+
+   mongoc_change_stream_next (cs, &bson);
+   BSON_ASSERT (mongoc_change_stream_error_document(cs, &err, &bson));
+   ASSERT_ERROR_CONTAINS (err, MONGOC_ERROR_SERVER_SELECTION, MONGOC_ERROR_SERVER_SELECTION_FAILURE, "No suitable servers found");
+   mongoc_change_stream_destroy (cs);
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+}
+
+void
 test_change_stream_install (TestSuite *suite)
 {
    TestSuite_AddMockServerTest (
@@ -1084,4 +1100,6 @@ test_change_stream_install (TestSuite *suite)
                       NULL,
                       NULL,
                       test_framework_skip_if_not_rs_version_6);
+
+   TestSuite_Add (suite, "/change_stream/server_selection_fails", test_change_stream_server_selection_fails);
 }
