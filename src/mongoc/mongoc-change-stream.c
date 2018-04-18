@@ -95,11 +95,11 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
    bson_append_document_end (command, &cursor_doc);
 }
 
-/* Construct and send the aggregate command and create a resulting cursor.
+/* Construct and send the aggregate command and create the resulting cursor.
  * Returns false on error, and sets stream->err. On error, stream->cursor
- * is set to NULL, otherwise it is created and must be destroyed. */
+ * remains NULL, otherwise it is created and must be destroyed. */
 static bool
-_recreate_cursor (mongoc_change_stream_t *stream)
+_make_cursor (mongoc_change_stream_t *stream)
 {
    mongoc_client_session_t *cs = NULL;
    bson_t command_opts;
@@ -109,18 +109,14 @@ _recreate_cursor (mongoc_change_stream_t *stream)
    mongoc_server_description_t *sd;
    uint32_t server_id;
 
-   if (stream->cursor) {
-      mongoc_cursor_destroy (stream->cursor);
-      stream->cursor = NULL;
-   }
    BSON_ASSERT (stream);
+   BSON_ASSERT (!stream->cursor);
    _make_command (stream, &command);
    bson_copy_to (&stream->opts, &command_opts);
    sd = mongoc_client_select_server (stream->coll->client,
                                      false /* for_writes */,
                                      stream->coll->read_prefs,
                                      &stream->err);
-
    if (!sd) {
       goto cleanup;
    }
@@ -295,7 +291,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
    }
 
    if (stream->err.code == 0) {
-      _recreate_cursor (stream);
+      (void) _make_cursor (stream);
    }
 
    return stream;
@@ -351,7 +347,10 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
       }
 
       if (resumable) {
-         if (!_recreate_cursor (stream)) {
+         /* recreate the cursor */
+         mongoc_cursor_destroy (stream->cursor);
+         stream->cursor = NULL;
+         if (!_make_cursor (stream)) {
             goto end;
          }
          if (!mongoc_cursor_next (stream->cursor, bson)) {

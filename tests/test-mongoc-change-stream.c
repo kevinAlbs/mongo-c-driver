@@ -562,7 +562,8 @@ test_change_stream_resumable_error ()
    const bson_t *next_doc = NULL;
    const char *not_master_err =
       "{ 'code': 10107, 'errmsg': 'not master', 'ok': 0 }";
-   const char *watch_cmd = "{ 'aggregate': 'coll', 'pipeline' "
+   const char *watch_cmd =
+      "{ 'aggregate': 'coll', 'pipeline' "
       ": [ { '$changeStream': { 'fullDocument': 'default' } } ], "
       "'cursor': {  } }";
 
@@ -578,10 +579,7 @@ test_change_stream_resumable_error ()
    future = future_collection_watch (coll, tmp_bson ("{}"), NULL);
 
    request = mock_server_receives_command (
-      server,
-      "db",
-      MONGOC_QUERY_SLAVE_OK,
-      watch_cmd);
+      server, "db", MONGOC_QUERY_SLAVE_OK, watch_cmd);
 
    mock_server_replies_simple (request,
                                "{'cursor': {'id': 123, 'ns': "
@@ -609,10 +607,7 @@ test_change_stream_resumable_error ()
     */
    /* Retry command */
    request = mock_server_receives_command (
-      server,
-      "db",
-      MONGOC_QUERY_SLAVE_OK,
-      watch_cmd);
+      server, "db", MONGOC_QUERY_SLAVE_OK, watch_cmd);
    mock_server_replies_simple (
       request,
       "{'cursor': {'id': 124,'ns': 'db.coll','firstBatch': []},'ok': 1 }");
@@ -643,10 +638,7 @@ test_change_stream_resumable_error ()
 
    /* Retry command */
    request = mock_server_receives_command (
-      server,
-      "db",
-      MONGOC_QUERY_SLAVE_OK,
-      watch_cmd);
+      server, "db", MONGOC_QUERY_SLAVE_OK, watch_cmd);
    mock_server_replies_simple (
       request,
       "{'cursor': {'id': 125,'ns': 'db.coll','firstBatch': []},'ok': 1 }");
@@ -678,10 +670,7 @@ test_change_stream_resumable_error ()
 
    /* Retry command */
    request = mock_server_receives_command (
-      server,
-      "db",
-      MONGOC_QUERY_SLAVE_OK,
-      watch_cmd);
+      server, "db", MONGOC_QUERY_SLAVE_OK, watch_cmd);
    mock_server_replies_simple (request,
                                "{'cursor': {'id': 126, 'ns': "
                                "'db.coll','firstBatch': []},'ok': 1 "
@@ -707,16 +696,13 @@ test_change_stream_resumable_error ()
    /* Test an error on the initial aggregate when resuming. */
    future = future_collection_watch (coll, tmp_bson ("{}"), NULL);
    request = mock_server_receives_command (
-      server,
-      "db",
-      MONGOC_QUERY_SLAVE_OK,
-      watch_cmd);
+      server, "db", MONGOC_QUERY_SLAVE_OK, watch_cmd);
    mock_server_replies_simple (request,
                                "{'cursor': {'id': 123, 'ns': "
-                                  "'db.coll','firstBatch': []},'ok': 1 "
-                                  "}");
+                               "'db.coll','firstBatch': []},'ok': 1 "
+                               "}");
    stream = future_get_mongoc_change_stream_ptr (future);
-      ASSERT (stream);
+   ASSERT (stream);
    future = future_change_stream_next (stream, &next_doc);
    request =
       mock_server_receives_command (server,
@@ -729,10 +715,7 @@ test_change_stream_resumable_error ()
 
    /* Retry command */
    request = mock_server_receives_command (
-      server,
-      "db",
-      MONGOC_QUERY_SLAVE_OK,
-      watch_cmd);
+      server, "db", MONGOC_QUERY_SLAVE_OK, watch_cmd);
    mock_server_replies_simple (request,
                                "{'code': 123, 'errmsg': 'bad cmd', 'ok': 0}");
    request_destroy (request);
@@ -1084,32 +1067,6 @@ test_change_stream_server_selection_fails (void)
  * verifies a bug is fixed, which would try to access a NULL cursor. */
 static void
 test_change_stream_next_after_error (void *unused)
-{
-   mongoc_client_t *client = test_framework_client_new ();
-   mongoc_collection_t *coll;
-   mongoc_change_stream_t *stream;
-   const bson_t *bson;
-   bson_error_t err;
-   mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
-   coll = mongoc_client_get_collection (client, "test", "test");
-   stream = mongoc_collection_watch (
-      coll, tmp_bson ("{'pipeline': ['invalid_stage']}"), NULL);
-   BSON_ASSERT (!mongoc_change_stream_next (stream, &bson));
-   BSON_ASSERT (mongoc_change_stream_error_document (stream, &err, &bson));
-   ASSERT_ERROR_CONTAINS (
-      err,
-      MONGOC_ERROR_SERVER,
-      14,
-      "Each element of the 'pipeline' array must be an object");
-   mongoc_change_stream_destroy (stream);
-   mongoc_collection_destroy (coll);
-   mongoc_client_destroy (client);
-}
-
-/* Test an error on the initial aggregate after resuming. This
- * verifies a bug is fixed, which would try to access a NULL cursor. */
-static void
-test_change_stream_nonresumable_error_without_cursor (void *unused)
 {
    mongoc_client_t *client = test_framework_client_new ();
    mongoc_collection_t *coll;
