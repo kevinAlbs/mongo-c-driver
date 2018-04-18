@@ -38,7 +38,7 @@
 /* Construct the aggregate command in cmd:
  * { aggregate: collname, pipeline: [], cursor: { batchSize: x } } */
 static void
-_make_command (mongoc_change_stream_t *stream, bson_t *cmd)
+_make_command (mongoc_change_stream_t *stream, bson_t *command)
 {
    bson_iter_t iter;
    bson_t change_stream_stage; /* { $changeStream: <change_stream_doc> } */
@@ -46,13 +46,13 @@ _make_command (mongoc_change_stream_t *stream, bson_t *cmd)
    bson_t pipeline;
    bson_t cursor_doc;
 
-   bson_init (cmd);
-   bson_append_utf8 (cmd,
+   bson_init (command);
+   bson_append_utf8 (command,
                      "aggregate",
                      9,
                      stream->coll->collection,
                      stream->coll->collectionlen);
-   bson_append_array_begin (cmd, "pipeline", 8, &pipeline);
+   bson_append_array_begin (command, "pipeline", 8, &pipeline);
 
    /* Append the $changeStream stage */
    bson_append_document_begin (&pipeline, "0", 1, &change_stream_stage);
@@ -65,8 +65,7 @@ _make_command (mongoc_change_stream_t *stream, bson_t *cmd)
    bson_append_document_end (&change_stream_stage, &change_stream_doc);
    bson_append_document_end (&pipeline, &change_stream_stage);
 
-   /* Append the user pipeline if one was passed. If the user passed an invalid
-    * pipeline doc, append it anyway, and rely on the server error. */
+   /* Append user pipeline if it exists */
    if (bson_iter_init_find (&iter, &stream->pipeline_to_append, "pipeline") &&
        BSON_ITER_HOLDS_ARRAY (&iter)) {
       bson_iter_t child_iter;
@@ -74,8 +73,10 @@ _make_command (mongoc_change_stream_t *stream, bson_t *cmd)
       char buf[16];
       const char *key_str;
 
-      bson_iter_recurse (&iter, &child_iter);
+      BSON_ASSERT (bson_iter_recurse (&iter, &child_iter));
       while (bson_iter_next (&child_iter)) {
+         /* The user pipeline may consist of invalid stages or non-documents.
+          * Append anyway, and rely on the server error. */
          size_t keyLen =
             bson_uint32_to_string (key_int, &key_str, buf, sizeof (buf));
          bson_append_value (
@@ -84,18 +85,18 @@ _make_command (mongoc_change_stream_t *stream, bson_t *cmd)
       }
    }
 
-   bson_append_array_end (cmd, &pipeline);
+   bson_append_array_end (command, &pipeline);
 
    /* Add batch size if needed */
-   bson_append_document_begin (cmd, "cursor", 6, &cursor_doc);
+   bson_append_document_begin (command, "cursor", 6, &cursor_doc);
    if (stream->batch_size > 0) {
       bson_append_int32 (&cursor_doc, "batchSize", 9, stream->batch_size);
    }
-   bson_append_document_end (cmd, &cursor_doc);
+   bson_append_document_end (command, &cursor_doc);
 }
 
 static void
-_mongoc_change_stream_make_cursor (mongoc_change_stream_t *stream)
+_make_cursor (mongoc_change_stream_t *stream)
 {
    mongoc_client_session_t *cs = NULL;
    bson_t command_opts;
@@ -289,7 +290,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
    }
 
    if (stream->err.code == 0) {
-      _mongoc_change_stream_make_cursor (stream);
+      _make_cursor (stream);
    }
 
    return stream;
@@ -345,7 +346,7 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
 
       if (resumable) {
          mongoc_cursor_destroy (stream->cursor);
-         _mongoc_change_stream_make_cursor (stream);
+         _make_cursor (stream);
          if (!mongoc_cursor_next (stream->cursor, bson)) {
             resumable =
                !mongoc_cursor_error_document (stream->cursor, &err, &err_doc);
