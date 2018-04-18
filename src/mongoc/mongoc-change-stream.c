@@ -95,28 +95,33 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
    bson_append_document_end (command, &cursor_doc);
 }
 
-static void
-_make_cursor (mongoc_change_stream_t *stream)
+/* Construct and send the aggregate command and create a resulting cursor.
+ * Returns false on error, and sets stream->err. On error, stream->cursor
+ * is set to NULL, otherwise it is created and must be destroyed. */
+static bool
+_recreate_cursor (mongoc_change_stream_t *stream)
 {
    mongoc_client_session_t *cs = NULL;
    bson_t command_opts;
    bson_t command; /* { aggregate: "coll", pipeline: [], ... } */
    bson_t reply;
    bson_iter_t iter;
-   bson_error_t err = {0};
    mongoc_server_description_t *sd;
    uint32_t server_id;
 
+   if (stream->cursor) {
+      mongoc_cursor_destroy (stream->cursor);
+      stream->cursor = NULL;
+   }
    BSON_ASSERT (stream);
    _make_command (stream, &command);
    bson_copy_to (&stream->opts, &command_opts);
    sd = mongoc_client_select_server (stream->coll->client,
                                      false /* for_writes */,
                                      stream->coll->read_prefs,
-                                     &err);
+                                     &stream->err);
 
    if (!sd) {
-      stream->err = err;
       goto cleanup;
    }
    server_id = mongoc_server_description_id (sd);
@@ -157,11 +162,10 @@ _make_cursor (mongoc_change_stream_t *stream)
 
    /* use inherited read preference and read concern of the collection */
    if (!mongoc_collection_read_command_with_opts (
-          stream->coll, &command, NULL, &command_opts, &reply, &err)) {
+          stream->coll, &command, NULL, &command_opts, &reply, &stream->err)) {
       bson_destroy (&stream->err_doc);
       bson_copy_to (&reply, &stream->err_doc);
       bson_destroy (&reply);
-      stream->err = err;
       goto cleanup;
    }
 
@@ -198,6 +202,7 @@ _make_cursor (mongoc_change_stream_t *stream)
 cleanup:
    bson_destroy (&command);
    bson_destroy (&command_opts);
+   return stream->err.code == 0;
 }
 
 mongoc_change_stream_t *
@@ -290,7 +295,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
    }
 
    if (stream->err.code == 0) {
-      _make_cursor (stream);
+      _recreate_cursor (stream);
    }
 
    return stream;
@@ -309,6 +314,7 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
       goto end;
    }
 
+   BSON_ASSERT (stream->cursor);
    if (!mongoc_cursor_next (stream->cursor, bson)) {
       const bson_t *err_doc;
       bson_error_t err;
@@ -345,8 +351,9 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
       }
 
       if (resumable) {
-         mongoc_cursor_destroy (stream->cursor);
-         _make_cursor (stream);
+         if (!_recreate_cursor (stream)) {
+            goto end;
+         }
          if (!mongoc_cursor_next (stream->cursor, bson)) {
             resumable =
                !mongoc_cursor_error_document (stream->cursor, &err, &err_doc);
@@ -387,9 +394,12 @@ end:
     * cursor for use with getMore operations, the session MUST be returned to
     * the pool immediately following a getMore operation that indicates that the
     * cursor has been exhausted." */
-   if (stream->implicit_session && stream->cursor->rpc.reply.cursor_id == 0) {
-      mongoc_client_session_destroy (stream->implicit_session);
-      stream->implicit_session = NULL;
+   if (stream->implicit_session) {
+      /* If creating the change stream cursor errored, it may be null. */
+      if (!stream->cursor || stream->cursor->rpc.reply.cursor_id == 0) {
+         mongoc_client_session_destroy (stream->implicit_session);
+         stream->implicit_session = NULL;
+      }
    }
    return ret;
 }
