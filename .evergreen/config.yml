@@ -804,7 +804,7 @@ tasks:
             script: |
               set -o errexit
               set -o xtrace
-              DEBUG=ON CC='${CC}' MARCH='${MARCH}' ENABLE_SHM_COUNTERS=OFF=OFF sh .evergreen/compile.sh
+              DEBUG=ON CC='${CC}' MARCH='${MARCH}' ENABLE_SHM_COUNTERS=OFF sh .evergreen/compile.sh
         - func: "upload build"
 
     - name: debug-compile-sanitizer-address-clang
