@@ -692,6 +692,7 @@ test_change_stream_resumable_error ()
    ASSERT_ERROR_CONTAINS (err, MONGOC_ERROR_SERVER, 10107, "not master");
    ASSERT_MATCH (err_doc, not_master_err);
    future_destroy (future);
+   mongoc_change_stream_destroy (stream);
 
    /* Test an error on the initial aggregate when resuming. */
    future = future_collection_watch (coll, tmp_bson ("{}"), NULL);
@@ -703,6 +704,9 @@ test_change_stream_resumable_error ()
                                "}");
    stream = future_get_mongoc_change_stream_ptr (future);
    ASSERT (stream);
+   request_destroy (request);
+   future_destroy (future);
+
    future = future_change_stream_next (stream, &next_doc);
    request =
       mock_server_receives_command (server,
@@ -1073,8 +1077,12 @@ test_change_stream_next_after_error (void *unused)
    mongoc_change_stream_t *stream;
    const bson_t *bson;
    bson_error_t err;
+
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
-   coll = mongoc_client_get_collection (client, "test", "test");
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (coll, tmp_bson (NULL), NULL, NULL, &err),
+      err);
    stream = mongoc_collection_watch (
       coll, tmp_bson ("{'pipeline': ['invalid_stage']}"), NULL);
    BSON_ASSERT (!mongoc_change_stream_next (stream, &bson));
@@ -1125,11 +1133,14 @@ test_change_stream_accepts_array (void *unused)
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
    /* set up apm callbacks to listen for the agg commands. */
    ctx.pattern =
-      bson_strdup ("{'aggregate': 'test', 'pipeline': [ {'$changeStream': {}}, "
+      bson_strdup ("{'aggregate': 'coll', 'pipeline': [ {'$changeStream': {}}, "
                    "{'$match': {'x': 1}}, {'$project': {'x': 1}}]}");
    mongoc_apm_set_command_started_cb (callbacks, _accepts_array_started);
    mongoc_client_set_apm_callbacks (client, callbacks, &ctx);
-   coll = mongoc_client_get_collection (client, "test", "test");
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (coll, tmp_bson (NULL), NULL, NULL, &err),
+      err);
    /* try starting a change stream with a { "pipeline": [...] } argument */
    stream = mongoc_collection_watch (
       coll,
@@ -1152,7 +1163,7 @@ test_change_stream_accepts_array (void *unused)
    /* try with malformed { "pipeline": [...] } argument. */
    bson_free (ctx.pattern);
    ctx.pattern = bson_strdup (
-      "{'aggregate': 'test', 'pipeline': [ {'$changeStream': {}}, 42 ]}");
+      "{'aggregate': 'coll', 'pipeline': [ {'$changeStream': {}}, 42 ]}");
    stream =
       mongoc_collection_watch (coll, tmp_bson ("{'pipeline': [42] }"), NULL);
    (void) mongoc_change_stream_next (stream, &bson);
