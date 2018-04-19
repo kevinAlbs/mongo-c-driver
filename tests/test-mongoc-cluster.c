@@ -1407,6 +1407,15 @@ test_cluster_ismaster_hangup (void)
    _test_cluster_ismaster_fails (true);
 }
 
+static void
+test_cluster_command_error_op_msg () {
+
+}
+
+static void
+test_cluster_command_error_op_query ()
+{
+}
 
 void
 test_cluster_install (TestSuite *suite)
@@ -1532,4 +1541,10 @@ test_cluster_install (TestSuite *suite)
       suite, "/Cluster/ismaster_fails", test_cluster_ismaster_fails);
    TestSuite_AddMockServerTest (
       suite, "/Cluster/ismaster_hangup", test_cluster_ismaster_hangup);
+   TestSuite_AddMockServerTest (
+      suite, "/Cluster/command_error/op_msg",
+      test_cluster_command_error_op_msg);
+   TestSuite_AddMockServerTest (
+      suite, "/Cluster/command_error/op_query",
+      test_cluster_command_error_op_query);
 }
