@@ -1160,6 +1160,7 @@ test_change_stream_accepts_array (void *unused)
    ASSERT_OR_PRINT (!mongoc_change_stream_error_document (stream, &err, &bson),
                     err);
    ASSERT_CMPINT32 (ctx.agg_count, ==, 2);
+   mongoc_change_stream_destroy (stream);
    /* try with malformed { "pipeline": [...] } argument. */
    bson_free (ctx.pattern);
    ctx.pattern = bson_strdup (
