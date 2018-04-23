@@ -164,6 +164,10 @@ _get_config_bitfield (void)
 #ifdef MONGOC_ENABLE_SHM_COUNTERS
    bf |= MONGOC_MD_FLAG_ENABLE_SHM_COUNTERS;
 #endif
+
+#ifdef MONGOC_TRACE
+   bf |= MONGOC_MD_FLAG_TRACE;
+#endif
    return bf;
 }
 
