@@ -515,7 +515,7 @@ test_mongoc_handshake_cannot_send (void)
 }
 
 extern char *
-_get_config_hex_string (void);
+_mongoc_handshake_get_config_hex_string (void);
 
 static bool
 _get_bit (char *config_str, uint32_t bit)
@@ -543,7 +543,7 @@ void
 test_handshake_platform_config ()
 {
    /* Parse the config string, and check that it matches the defined flags. */
-   char *config_str = _get_config_hex_string ();
+   char *config_str = _mongoc_handshake_get_config_hex_string ();
    uint32_t total_bytes = (LAST_MONGOC_MD_FLAG + 7) / 8;
    uint32_t total_bits = 8 * total_bytes;
    uint32_t i;

@@ -54,14 +54,14 @@ _set_bit (uint8_t *bf, uint32_t byte_count, uint32_t bit)
 
 /* returns a hex string for all config flag bits, which must be freed. */
 char *
-_get_config_hex_string (void)
+_mongoc_handshake_get_config_hex_string (void)
 {
-   uint32_t byte_count =
-      (LAST_MONGOC_MD_FLAG + 7) / 8; /* ceil (num_bits / 8) */
+   uint32_t byte_count;
    uint8_t *bf;
    bson_string_t *str;
    int i;
 
+   byte_count = (LAST_MONGOC_MD_FLAG + 7) / 8; /* ceil (num_bits / 8) */
    /* allocate enough bytes to fit all config bits. */
    bf = (uint8_t *) bson_malloc0 (byte_count);
 
@@ -185,7 +185,6 @@ _get_config_hex_string (void)
    _set_bit (bf, byte_count, MONGOC_TRACE);
 #endif
 
-   /* allocate room for "0x", two hex chars per byte, and trailing null. */
    str = bson_string_new ("0x");
    for (i = 0; i < byte_count; i++) {
       bson_string_append_printf (str, "%02x", bf[i]);
@@ -365,7 +364,7 @@ _set_platform_string (mongoc_handshake_t *handshake)
 
    str = bson_string_new ("");
 
-   config_str = _get_config_hex_string ();
+   config_str = _mongoc_handshake_get_config_hex_string ();
    bson_string_append_printf (str, "cfg=%s", config_str);
    bson_free (config_str);
 
