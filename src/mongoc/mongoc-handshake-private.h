@@ -41,7 +41,7 @@ BSON_BEGIN_DECLS
 
 /* When adding a new field to mongoc-config.h.in, update this! */
 typedef enum {
-   /* The bit position (from the rhs) of each config flag. Do not reorder. */
+   /* The bit position (from the RHS) of each config flag. Do not reorder. */
    MONGOC_MD_FLAG_ENABLE_CRYPTO = 0,
    MONGOC_MD_FLAG_ENABLE_CRYPTO_CNG,
    MONGOC_MD_FLAG_ENABLE_CRYPTO_COMMON_CRYPTO,
@@ -73,7 +73,7 @@ typedef enum {
    MONGOC_MD_FLAG_HAVE_SCHED_GETCPU,
    MONGOC_MD_FLAG_ENABLE_SHM_COUNTERS,
    MONGOC_MD_FLAG_TRACE,
-   /* Add additional config flags here, before LAST_MONGOC_MD_FLAG. */
+   /* Add additional config flags here, above LAST_MONGOC_MD_FLAG. */
    LAST_MONGOC_MD_FLAG
 } mongoc_handshake_config_flag_bit_t;
 

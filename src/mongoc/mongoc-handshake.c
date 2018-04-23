@@ -190,6 +190,7 @@ _get_config_hex_string (void)
    for (i = 0; i < byte_count; i++) {
       bson_string_append_printf (str, "%02x", bf[i]);
    }
+   bson_free (bf);
    /* free the bson_string_t, but keep the underlying char* alive. */
    return bson_string_free (str, false);
 
