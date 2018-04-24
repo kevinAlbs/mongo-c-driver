@@ -20,7 +20,13 @@ main (int argc, char *argv[])
    bson_t query;
    char *str;
 
+   uint8_t data[] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+   uint16_t s = ntohs (*(short *) (data + 4));
+
+   printf("here, s=%x\n", s);
+
    mongoc_init ();
+
 
    if (argc > 1) {
       uristr = argv[1];
