@@ -981,6 +981,8 @@ mongoc_add_example (mongoc-dump TRUE ${SOURCE_DIR}/examples/mongoc-dump.c)
 mongoc_add_example (mongoc-ping TRUE ${SOURCE_DIR}/examples/mongoc-ping.c)
 mongoc_add_example (mongoc-tail TRUE ${SOURCE_DIR}/examples/mongoc-tail.c)
 mongoc_add_example (fam TRUE ${SOURCE_DIR}/examples/find_and_modify_with_opts/fam.c)
+mongoc_add_example (poc TRUE ${SOURCE_DIR}/examples/poc.c)
+
 if (NOT WIN32 AND ENABLE_EXAMPLES)
    mongoc_add_example (example-pool TRUE ${SOURCE_DIR}/examples/example-pool.c)
    target_link_libraries (example-pool Threads::Threads)
