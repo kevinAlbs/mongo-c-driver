@@ -255,7 +255,7 @@ _test_common_advancing_past_end (void *ctx)
 static void
 test_common_cursor_functions_install (TestSuite *suite)
 {
-   /* test functionality that is common to all cursor implementations. */
+   /* test functionality common to all cursor implementations. */
    TEST_FOREACH_CURSOR ("/Cursor/common/get_host", _test_common_get_host);
    TEST_FOREACH_CURSOR ("/Cursor/common/clone", _test_common_clone);
    TEST_FOREACH_CURSOR ("/Cursor/common/clone_w_concerns",
