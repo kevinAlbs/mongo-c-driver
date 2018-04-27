@@ -43,3 +43,6 @@ Returns
 
 A cursor where each result corresponds to the server's representation of a collection in this database.
 
+Note, the cursor functions :symbol:`mongoc_cursor_set_limit` and
+:symbol:`mongoc_cursor_set_batch_size` will not affect the returned cursor.
+
