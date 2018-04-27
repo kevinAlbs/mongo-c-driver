@@ -30,7 +30,7 @@ Returns
 
 A cursor where each result corresponds to the server's representation of a collection in this database.
 
-Note, the cursor functions :symbol:`mongoc_cursor_set_limit`, :symbol:`mongoc_cursor_set_batch_size`, and :symbol:`mongoc_cursor_set_max_await_time_ms` has no useful affect the returned cursor.
+The cursor functions :symbol:`mongoc_cursor_set_limit`, :symbol:`mongoc_cursor_set_batch_size`, and :symbol:`mongoc_cursor_set_max_await_time_ms` have no use on the returned cursor.
 
 Examples
 --------
