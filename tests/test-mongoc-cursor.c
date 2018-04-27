@@ -11,64 +11,62 @@
 #include "mongoc-write-concern-private.h"
 #include "test-conveniences.h"
 
-
+/* steals cursor */
 static void
-test_get_host (void)
+_test_cursor_common_get_host (mongoc_cursor_t *cursor)
 {
    const mongoc_host_list_t *hosts;
-   mongoc_host_list_t host;
-   mongoc_client_t *client;
-   mongoc_cursor_t *cursor;
-   char *uri_str = test_framework_get_uri_str ();
+   mongoc_host_list_t cursor_host;
    mongoc_uri_t *uri;
    const bson_t *doc;
    bson_error_t error;
    bool r;
-   bson_t q = BSON_INITIALIZER;
 
-   uri = mongoc_uri_new (uri_str);
-
+   uri = test_framework_get_uri ();
    hosts = mongoc_uri_get_hosts (uri);
-
-   client = test_framework_client_new ();
-   cursor = _mongoc_cursor_find_new (client, "test.test", &q, NULL, NULL, NULL);
-   ASSERT (cursor);
-   mongoc_cursor_set_batch_size (cursor, 1);
-   ASSERT (mongoc_cursor_set_limit (cursor, 1));
    r = mongoc_cursor_next (cursor, &doc);
    if (!r && mongoc_cursor_error (cursor, &error)) {
       test_error ("%s", error.message);
       abort ();
    }
-
-   BSON_ASSERT (doc == mongoc_cursor_current (cursor));
-
-   mongoc_cursor_get_host (cursor, &host);
-
+   mongoc_cursor_get_host (cursor, &cursor_host);
    /* In a production deployment the driver can discover servers not in the seed
     * list, but for this test assume the cursor uses one of the seeds. */
    while (hosts) {
-      if (!strcmp (host.host_and_port, hosts->host_and_port)) {
+      if (strcmp (cursor_host.host_and_port, hosts->host_and_port) == 0) {
          /* the cursor is using this server */
-         ASSERT_CMPSTR (host.host, hosts->host);
-         ASSERT_CMPINT (host.port, ==, hosts->port);
-         ASSERT_CMPINT (host.family, ==, hosts->family);
+         ASSERT_CMPSTR (cursor_host.host, hosts->host);
+         ASSERT_CMPINT (cursor_host.port, ==, hosts->port);
+         ASSERT_CMPINT (cursor_host.family, ==, hosts->family);
          break;
       }
-
       hosts = hosts->next;
    }
-
-   if (!hosts) {
-      test_error (
-         "cursor using host %s not in seeds: %s", host.host_and_port, uri_str);
-      abort ();
-   }
-
-   bson_destroy (&q);
-   bson_free (uri_str);
    mongoc_uri_destroy (uri);
    mongoc_cursor_destroy (cursor);
+}
+
+static void
+test_get_host (void)
+{
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   client = test_framework_client_new ();
+   coll = mongoc_client_get_collection (client, "test", "test");
+
+   /* find cursor. */
+   _test_cursor_common_get_host (
+      mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), NULL, NULL));
+   /* command cursor */
+   _test_cursor_common_get_host (mongoc_collection_aggregate (
+      coll, MONGOC_QUERY_NONE, tmp_bson ("{}"), NULL, NULL));
+   /* command deprecated cursor */
+   _test_cursor_common_get_host (mongoc_collection_command (
+      coll, MONGOC_QUERY_NONE, 0, 0, 0, tmp_bson ("{'ping': 1}"), NULL, NULL));
+   /* array cursor */
+   _test_cursor_common_get_host (
+      mongoc_client_find_databases_with_opts (client, NULL));
+   mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
 }
 
@@ -405,7 +403,7 @@ test_kill_cursor_live (void)
       _mongoc_cursor_find_new (client, collection->ns, b, NULL, NULL, NULL);
    /* override the typical priming, and immediately transition to an OPQUERY
     * find cursor. */
-   cursor->impl.destroy(&cursor->impl);
+   cursor->impl.destroy (&cursor->impl);
    _mongoc_cursor_impl_find_opquery_init (cursor, b);
 
    cursor->cursor_id = ctx.cursor_id;
@@ -1286,7 +1284,6 @@ test_cursor_hint_mongos_cmd (void)
 }
 
 
-#ifdef TODO_CDRIVER_2286
 /* Tests CDRIVER-562: after calling ismaster to handshake a new connection we
  * must update topology description with the server response. If not, this test
  * fails under auth with "auth failed" because we use the wrong auth protocol.
@@ -1342,7 +1339,6 @@ test_hint_no_warmup_pooled (void)
 {
    _test_cursor_hint_no_warmup (true);
 }
-#endif
 
 
 static void
@@ -1846,16 +1842,18 @@ test_list_databases_clone (void)
    cursor_clone = mongoc_cursor_clone (cursor);
    while (mongoc_cursor_next (cursor, &bson)) {
       bson_iter_t iter;
-      const char* lhs, *rhs;
+      const char *lhs, *rhs;
       BSON_ASSERT (mongoc_cursor_next (cursor_clone, &bson_clone));
       /* check that the database names match. */
-      bson_iter_init_find(&iter, bson, "name");
-      lhs = bson_iter_utf8(&iter, NULL);
-      bson_iter_init_find(&iter, bson_clone, "name");
-      rhs = bson_iter_utf8(&iter, NULL);
+      bson_iter_init_find (&iter, bson, "name");
+      lhs = bson_iter_utf8 (&iter, NULL);
+      bson_iter_init_find (&iter, bson_clone, "name");
+      rhs = bson_iter_utf8 (&iter, NULL);
       if (bson_compare (bson, bson_clone) != 0) {
-         fprintf(stderr, "bson does not match\n");
-         printf("lhs=%s, rhs=%s\n", bson_as_json(bson, NULL), bson_as_json(bson_clone, NULL));
+         fprintf (stderr, "bson does not match\n");
+         printf ("lhs=%s, rhs=%s\n",
+                 bson_as_json (bson, NULL),
+                 bson_as_json (bson_clone, NULL));
       }
       ASSERT_CMPSTR (lhs, rhs);
    }
@@ -1941,12 +1939,10 @@ test_cursor_install (TestSuite *suite)
       suite, "/Cursor/hint/mongos", test_cursor_hint_mongos);
    TestSuite_AddMockServerTest (
       suite, "/Cursor/hint/mongos/cmd", test_cursor_hint_mongos_cmd);
-#ifdef TODO_CDRIVER_2286
    TestSuite_AddLive (
       suite, "/Cursor/hint/no_warmup/single", test_hint_no_warmup_single);
    TestSuite_AddLive (
       suite, "/Cursor/hint/no_warmup/pooled", test_hint_no_warmup_pooled);
-#endif
    TestSuite_AddLive (suite, "/Cursor/tailable/alive", test_tailable_alive);
    TestSuite_AddMockServerTest (
       suite, "/Cursor/n_return/find_cmd", test_n_return_find_cmd);
