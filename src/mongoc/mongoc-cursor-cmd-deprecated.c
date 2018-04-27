@@ -55,6 +55,7 @@ _get_next_batch (mongoc_cursor_t *cursor) {
    return DONE;
 }
 
+
 static void
 _clone (mongoc_cursor_impl_t *dst, const mongoc_cursor_impl_t *src)
 {

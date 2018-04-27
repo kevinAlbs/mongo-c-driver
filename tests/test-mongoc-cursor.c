@@ -62,7 +62,6 @@ _make_array_cursor (mongoc_collection_t *coll)
 }
 
 
-/* steals cursor */
 static void
 _test_common_get_host (void *ctx)
 {
