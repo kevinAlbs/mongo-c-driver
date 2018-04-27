@@ -159,6 +159,7 @@ _test_common_clone_w_concerns (void *ctx)
    mongoc_write_concern_set_journal (write_concern, true);
    mongoc_write_concern_set_wmajority (write_concern, 1000);
    cursor->write_concern = write_concern;
+   mongoc_read_concern_destroy (cursor->read_concern);
    cursor->read_concern = read_concern;
    /* don't call mongoc_cursor_next (), since the test may run against a version
    * of MongoDB that doesn't support read/write concerns, and we are only
