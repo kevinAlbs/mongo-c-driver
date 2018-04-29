@@ -42,16 +42,29 @@ _make_find_cursor (mongoc_collection_t *coll)
 static mongoc_cursor_t *
 _make_cmd_cursor (mongoc_collection_t *coll)
 {
+   return mongoc_collection_find_indexes_with_opts (coll, NULL);
+}
+
+
+static mongoc_cursor_t *
+_make_cmd_cursor_from_agg (mongoc_collection_t *coll)
+{
    return mongoc_collection_aggregate (
-      coll, MONGOC_QUERY_NONE, tmp_bson ("{}"), NULL, NULL);
+      coll, MONGOC_QUERY_SLAVE_OK, tmp_bson ("{}"), NULL, NULL);
 }
 
 
 static mongoc_cursor_t *
 _make_cmd_deprecated_cursor (mongoc_collection_t *coll)
 {
-   return mongoc_collection_command (
-      coll, MONGOC_QUERY_NONE, 0, 0, 0, tmp_bson ("{'ping': 1}"), NULL, NULL);
+   return mongoc_collection_command (coll,
+                                     MONGOC_QUERY_SLAVE_OK,
+                                     0,
+                                     0,
+                                     0,
+                                     tmp_bson ("{'ping': 1}"),
+                                     NULL,
+                                     NULL);
 }
 
 
@@ -222,34 +235,107 @@ _test_common_advancing_past_end (void *ctx)
                           MONGOC_ERROR_CURSOR,
                           MONGOC_ERROR_CURSOR_INVALID_CURSOR,
                           "Cannot advance a completed or failed cursor.");
-   /* this is not a server error, the error document shoudl be NULL. */
+   /* this is not a server error, the error document should be NULL. */
    BSON_ASSERT (bson_empty (err_doc));
    mongoc_cursor_destroy (cursor);
    CURSOR_COMMON_TEARDOWN;
 }
 
 
-#define TEST_FOREACH_CURSOR(prefix, fn)                                       \
-   TestSuite_AddFull (suite,                                                  \
-                      prefix "/find",                                         \
-                      fn,                                                     \
-                      NULL,                                                   \
-                      _make_find_cursor,                                      \
-                      TestSuite_CheckLive);                                   \
-   TestSuite_AddFull (                                                        \
-      suite, prefix "/cmd", fn, NULL, _make_cmd_cursor, TestSuite_CheckLive); \
-   TestSuite_AddFull (suite,                                                  \
-                      prefix "/cmd_deprecated",                               \
-                      fn,                                                     \
-                      NULL,                                                   \
-                      _make_cmd_deprecated_cursor,                            \
-                      TestSuite_CheckLive);                                   \
-   TestSuite_AddFull (suite,                                                  \
-                      prefix "/array",                                        \
-                      fn,                                                     \
-                      NULL,                                                   \
-                      _make_array_cursor,                                     \
+typedef struct {
+   char *expected_host_and_port;
+} test_common_server_hint_ctx_t;
+
+
+static void
+_test_common_server_hint_command_started (const mongoc_apm_command_started_t* event) {
+   const mongoc_host_list_t* host = mongoc_apm_command_started_get_host (event);
+   test_common_server_hint_ctx_t* ctx = mongoc_apm_command_started_get_context (event);
+   BSON_ASSERT(strcmp(host->host_and_port, ctx->expected_host_and_port) == 0);
+}
+
+
+static void
+_test_common_server_hint (void *ctx)
+{
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   make_cursor_fn ctor;
+   mongoc_cursor_t *cursor;
+   const bson_t *doc;
+   bson_error_t err;
+   mongoc_server_description_t *sd;
+   mongoc_read_prefs_t *read_prefs;
+   test_common_server_hint_ctx_t test_ctx;
+   mongoc_apm_callbacks_t* callbacks;
+
+   CURSOR_COMMON_SETUP;
+   /* set APM callbacks, and then set server hint. Make sure we target the same
+    * host that we select. */
+   callbacks = mongoc_apm_callbacks_new ();
+   mongoc_apm_set_command_started_cb (callbacks, _test_common_server_hint_command_started);
+   cursor = ctor (coll);
+   read_prefs = mongoc_read_prefs_new (MONGOC_READ_SECONDARY_PREFERRED);
+   sd = mongoc_client_select_server (client, false, read_prefs, &err);
+   test_ctx.expected_host_and_port = bson_strdup(sd->host.host_and_port);
+   mongoc_read_prefs_destroy (read_prefs);
+   mongoc_client_set_apm_callbacks (client, callbacks, &test_ctx);
+   mongoc_apm_callbacks_destroy (callbacks);
+   ASSERT_OR_PRINT (sd, err);
+   BSON_ASSERT (mongoc_cursor_set_hint (cursor, sd->id));
+   ASSERT_CMPUINT32 (mongoc_cursor_get_hint (cursor), ==, sd->id);
+   mongoc_server_description_destroy (sd);
+
+   BSON_ASSERT (mongoc_cursor_next (cursor, &doc));
+   ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &err), err);
+   mongoc_cursor_destroy (cursor);
+   bson_free (test_ctx.expected_host_and_port);
+   CURSOR_COMMON_TEARDOWN;
+}
+
+#define TEST_CURSOR_FIND(prefix, fn)     \
+   TestSuite_AddFull (suite,             \
+                      prefix "/find",    \
+                      fn,                \
+                      NULL,              \
+                      _make_find_cursor, \
                       TestSuite_CheckLive);
+
+#define TEST_CURSOR_CMD(prefix, fn) \
+   TestSuite_AddFull (              \
+      suite, prefix "/cmd", fn, NULL, _make_cmd_cursor, TestSuite_CheckLive);
+
+#define TEST_CURSOR_CMD_DEPRECATED(prefix, fn)     \
+   TestSuite_AddFull (suite,                       \
+                      prefix "/cmd_deprecated",    \
+                      fn,                          \
+                      NULL,                        \
+                      _make_cmd_deprecated_cursor, \
+                      TestSuite_CheckLive);
+
+#define TEST_CURSOR_ARRAY(prefix, fn)     \
+   TestSuite_AddFull (suite,              \
+                      prefix "/array",    \
+                      fn,                 \
+                      NULL,               \
+                      _make_array_cursor, \
+                      TestSuite_CheckLive);
+
+#define TEST_CURSOR_AGG(prefix, fn)              \
+   TestSuite_AddFull (suite,                     \
+                      prefix "/agg",             \
+                      fn,                        \
+                      NULL,                      \
+                      _make_cmd_cursor_from_agg, \
+                      TestSuite_CheckLive);
+
+
+#define TEST_FOREACH_CURSOR(prefix, fn)     \
+   TEST_CURSOR_FIND (prefix, fn);           \
+   TEST_CURSOR_CMD (prefix, fn);            \
+   TEST_CURSOR_CMD_DEPRECATED (prefix, fn); \
+   TEST_CURSOR_ARRAY (prefix, fn);          \
+   TEST_CURSOR_AGG (prefix, fn);
 
 
 static void
@@ -262,6 +348,10 @@ test_common_cursor_functions_install (TestSuite *suite)
                         _test_common_clone_w_concerns);
    TEST_FOREACH_CURSOR ("/Cursor/common/advancing_past_end",
                         _test_common_advancing_past_end);
+   /* an agg/cmd cursors do not support setting server id. test others. */
+   TEST_CURSOR_FIND ("/Cursor/common/hint", _test_common_server_hint);
+   TEST_CURSOR_CMD_DEPRECATED ("/Cursor/common/hint", _test_common_server_hint);
+   TEST_CURSOR_ARRAY ("/Cursor/common/hint", _test_common_server_hint);
 }
 
 
