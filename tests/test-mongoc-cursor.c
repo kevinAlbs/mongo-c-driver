@@ -32,49 +32,8 @@
 
 typedef mongoc_cursor_t *(*make_cursor_fn) (mongoc_collection_t *);
 
-static mongoc_cursor_t *
-_make_find_cursor (mongoc_collection_t *coll)
-{
-   return mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), NULL, NULL);
-}
 
-
-static mongoc_cursor_t *
-_make_cmd_cursor (mongoc_collection_t *coll)
-{
-   return mongoc_collection_find_indexes_with_opts (coll, NULL);
-}
-
-
-static mongoc_cursor_t *
-_make_cmd_cursor_from_agg (mongoc_collection_t *coll)
-{
-   return mongoc_collection_aggregate (
-      coll, MONGOC_QUERY_SLAVE_OK, tmp_bson ("{}"), NULL, NULL);
-}
-
-
-static mongoc_cursor_t *
-_make_cmd_deprecated_cursor (mongoc_collection_t *coll)
-{
-   return mongoc_collection_command (coll,
-                                     MONGOC_QUERY_SLAVE_OK,
-                                     0,
-                                     0,
-                                     0,
-                                     tmp_bson ("{'ping': 1}"),
-                                     NULL,
-                                     NULL);
-}
-
-
-static mongoc_cursor_t *
-_make_array_cursor (mongoc_collection_t *coll)
-{
-   return mongoc_client_find_databases_with_opts (coll->client, NULL);
-}
-
-
+/* test that the host a cursor returns belongs to a server it connected to. */
 static void
 _test_common_get_host (void *ctx)
 {
@@ -117,6 +76,7 @@ _test_common_get_host (void *ctx)
 }
 
 
+/* test that a cloned cursor returns the same results. */
 static void
 _test_common_clone (void *ctx)
 {
@@ -147,6 +107,7 @@ _test_common_clone (void *ctx)
 }
 
 
+/* test cloning cursors with read and write concerns set. */
 static void
 _test_common_clone_w_concerns (void *ctx)
 {
@@ -205,6 +166,7 @@ _test_common_clone_w_concerns (void *ctx)
 }
 
 
+/* test calling mongoc_cursor_next again after it returns false. */
 static void
 _test_common_advancing_past_end (void *ctx)
 {
@@ -248,13 +210,21 @@ typedef struct {
 
 
 static void
-_test_common_server_hint_command_started (const mongoc_apm_command_started_t* event) {
-   const mongoc_host_list_t* host = mongoc_apm_command_started_get_host (event);
-   test_common_server_hint_ctx_t* ctx = mongoc_apm_command_started_get_context (event);
-   BSON_ASSERT(strcmp(host->host_and_port, ctx->expected_host_and_port) == 0);
+_test_common_server_hint_command_started (
+   const mongoc_apm_command_started_t *event)
+{
+   const mongoc_host_list_t *host = mongoc_apm_command_started_get_host (event);
+   const char *cmd = mongoc_apm_command_started_get_command_name (event);
+   test_common_server_hint_ctx_t *ctx;
+   if (strcmp (cmd, "find") == 0 || strcmp (cmd, "ping") == 0 ||
+       strcmp (cmd, "listDatabases") == 0) {
+      ctx = (test_common_server_hint_ctx_t *)
+         mongoc_apm_command_started_get_context (event);
+      ASSERT_CMPSTR (host->host_and_port, ctx->expected_host_and_port);
+   }
 }
 
-
+/* test setting the server id (hint) on cursors that support it. */
 static void
 _test_common_server_hint (void *ctx)
 {
@@ -267,17 +237,18 @@ _test_common_server_hint (void *ctx)
    mongoc_server_description_t *sd;
    mongoc_read_prefs_t *read_prefs;
    test_common_server_hint_ctx_t test_ctx;
-   mongoc_apm_callbacks_t* callbacks;
+   mongoc_apm_callbacks_t *callbacks;
 
    CURSOR_COMMON_SETUP;
    /* set APM callbacks, and then set server hint. Make sure we target the same
     * host that we select. */
    callbacks = mongoc_apm_callbacks_new ();
-   mongoc_apm_set_command_started_cb (callbacks, _test_common_server_hint_command_started);
+   mongoc_apm_set_command_started_cb (callbacks,
+                                      _test_common_server_hint_command_started);
    cursor = ctor (coll);
    read_prefs = mongoc_read_prefs_new (MONGOC_READ_SECONDARY_PREFERRED);
    sd = mongoc_client_select_server (client, false, read_prefs, &err);
-   test_ctx.expected_host_and_port = bson_strdup(sd->host.host_and_port);
+   test_ctx.expected_host_and_port = bson_strdup (sd->host.host_and_port);
    mongoc_read_prefs_destroy (read_prefs);
    mongoc_client_set_apm_callbacks (client, callbacks, &test_ctx);
    mongoc_apm_callbacks_destroy (callbacks);
@@ -291,6 +262,159 @@ _test_common_server_hint (void *ctx)
    mongoc_cursor_destroy (cursor);
    bson_free (test_ctx.expected_host_and_port);
    CURSOR_COMMON_TEARDOWN;
+}
+
+/* test setting options on unprimed, non-aggregate cursors */
+static void
+_test_common_opts (void *ctx)
+{
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   make_cursor_fn ctor;
+   mongoc_cursor_t *cursor;
+   const bson_t *doc;
+   mongoc_server_description_t *sd;
+   bson_error_t err;
+
+   CURSOR_COMMON_SETUP;
+   sd = mongoc_client_select_server (client, true, NULL, &err);
+   ASSERT_OR_PRINT (sd, err);
+   cursor = ctor (coll);
+   BSON_ASSERT (mongoc_cursor_set_hint (cursor, sd->id));
+   ASSERT_CMPINT (mongoc_cursor_get_hint (cursor), ==, sd->id);
+   mongoc_cursor_set_batch_size (cursor, 1);
+   ASSERT_CMPINT (mongoc_cursor_get_batch_size (cursor), ==, 1);
+   BSON_ASSERT (mongoc_cursor_set_limit (cursor, 2));
+   ASSERT_CMPINT ((int) mongoc_cursor_get_limit (cursor), ==, 2);
+   mongoc_cursor_set_max_await_time_ms (cursor, 3);
+   ASSERT_CMPINT (mongoc_cursor_get_max_await_time_ms (cursor), ==, 3);
+   /* prime the cursor. */
+   BSON_ASSERT (mongoc_cursor_next (cursor, &doc));
+   /* options should be unchanged. */
+   ASSERT_CMPINT (mongoc_cursor_get_hint (cursor), ==, sd->id);
+   ASSERT_CMPINT (mongoc_cursor_get_batch_size (cursor), ==, 1);
+   ASSERT_CMPINT ((int) mongoc_cursor_get_limit (cursor), ==, 2);
+   ASSERT_CMPINT (mongoc_cursor_get_max_await_time_ms (cursor), ==, 3);
+   /* trying to set hint again logs an error. */
+   capture_logs (true);
+   BSON_ASSERT (!mongoc_cursor_set_hint (cursor, 123));
+   capture_logs (false);
+   ASSERT_CMPINT (mongoc_cursor_get_hint (cursor), ==, sd->id);
+   /* batch size can be set again without issue. */
+   mongoc_cursor_set_batch_size (cursor, 4);
+   ASSERT_CMPINT (mongoc_cursor_get_batch_size (cursor), ==, 4);
+   /* limit cannot be set. */
+   BSON_ASSERT (!mongoc_cursor_set_limit (cursor, 5));
+   ASSERT_CMPINT ((int) mongoc_cursor_get_limit (cursor), ==, 2);
+   /* max await time ms cannot be set (but fails quietly). */
+   mongoc_cursor_set_max_await_time_ms (cursor, 6);
+   ASSERT_CMPINT (mongoc_cursor_get_max_await_time_ms (cursor), ==, 3);
+   mongoc_cursor_destroy (cursor);
+   mongoc_server_description_destroy (sd);
+   CURSOR_COMMON_TEARDOWN;
+}
+
+
+/* test setting options on cursors that are primed on construction. */
+static void
+_test_common_opts_after_prime (void *ctx)
+{
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   make_cursor_fn ctor;
+   mongoc_cursor_t *cursor;
+
+   CURSOR_COMMON_SETUP;
+   cursor = ctor (coll);
+   /* trying to set hint logs an error. */
+   capture_logs (true);
+   BSON_ASSERT (!mongoc_cursor_set_hint (cursor, 123));
+   capture_logs (false);
+   ASSERT_CMPINT (mongoc_cursor_get_hint (cursor), !=, 0);
+   /* batch size can be set again without issue. */
+   mongoc_cursor_set_batch_size (cursor, 4);
+   ASSERT_CMPINT (mongoc_cursor_get_batch_size (cursor), ==, 4);
+   /* limit cannot be set. */
+   BSON_ASSERT (!mongoc_cursor_set_limit (cursor, 5));
+   ASSERT_CMPINT ((int) mongoc_cursor_get_limit (cursor), ==, 0);
+   /* max await time ms cannot be set (but fails quietly). */
+   mongoc_cursor_set_max_await_time_ms (cursor, 6);
+   ASSERT_CMPINT (mongoc_cursor_get_max_await_time_ms (cursor), ==, 0);
+   mongoc_cursor_destroy (cursor);
+   CURSOR_COMMON_TEARDOWN;
+}
+
+
+/* test setting options on a cursor constructed from an aggregation. */
+static void
+_test_common_opts_agg (void *ctx)
+{
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   make_cursor_fn ctor;
+   mongoc_cursor_t *cursor;
+
+   CURSOR_COMMON_SETUP;
+   cursor = ctor (coll);
+   /* trying to set hint logs an error. */
+   capture_logs (true);
+   BSON_ASSERT (!mongoc_cursor_set_hint (cursor, 123));
+   capture_logs (false);
+   ASSERT_CMPINT (mongoc_cursor_get_hint (cursor), !=, 0);
+   /* batch size can be set again without issue. */
+   mongoc_cursor_set_batch_size (cursor, 4);
+   ASSERT_CMPINT (mongoc_cursor_get_batch_size (cursor), ==, 4);
+   /* limit can be set. */
+   BSON_ASSERT (mongoc_cursor_set_limit (cursor, 5));
+   ASSERT_CMPINT ((int) mongoc_cursor_get_limit (cursor), ==, 5);
+   /* max await time ms can be set. */
+   mongoc_cursor_set_max_await_time_ms (cursor, 6);
+   ASSERT_CMPINT (mongoc_cursor_get_max_await_time_ms (cursor), ==, 6);
+   mongoc_cursor_destroy (cursor);
+   CURSOR_COMMON_TEARDOWN;
+}
+
+
+static mongoc_cursor_t *
+_make_find_cursor (mongoc_collection_t *coll)
+{
+   return mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), NULL, NULL);
+}
+
+
+static mongoc_cursor_t *
+_make_cmd_cursor (mongoc_collection_t *coll)
+{
+   return mongoc_collection_find_indexes_with_opts (coll, NULL);
+}
+
+
+static mongoc_cursor_t *
+_make_cmd_cursor_from_agg (mongoc_collection_t *coll)
+{
+   return mongoc_collection_aggregate (
+      coll, MONGOC_QUERY_SLAVE_OK, tmp_bson ("{}"), NULL, NULL);
+}
+
+
+static mongoc_cursor_t *
+_make_cmd_deprecated_cursor (mongoc_collection_t *coll)
+{
+   return mongoc_collection_command (coll,
+                                     MONGOC_QUERY_SLAVE_OK,
+                                     0,
+                                     0,
+                                     0,
+                                     tmp_bson ("{'ping': 1}"),
+                                     NULL,
+                                     NULL);
+}
+
+
+static mongoc_cursor_t *
+_make_array_cursor (mongoc_collection_t *coll)
+{
+   return mongoc_client_find_databases_with_opts (coll->client, NULL);
 }
 
 #define TEST_CURSOR_FIND(prefix, fn)     \
@@ -352,6 +476,15 @@ test_common_cursor_functions_install (TestSuite *suite)
    TEST_CURSOR_FIND ("/Cursor/common/hint", _test_common_server_hint);
    TEST_CURSOR_CMD_DEPRECATED ("/Cursor/common/hint", _test_common_server_hint);
    TEST_CURSOR_ARRAY ("/Cursor/common/hint", _test_common_server_hint);
+   /* find, cmd_depr, and array cursors can have all options set. */
+   TEST_CURSOR_FIND ("/Cursor/common/opts", _test_common_opts);
+   TEST_CURSOR_CMD_DEPRECATED ("/Cursor/common/opts", _test_common_opts);
+   TEST_CURSOR_ARRAY ("/Cursor/common/opts", _test_common_opts);
+   /* a command cursor created from find_indexes_with_opts is already primed. */
+   TEST_CURSOR_CMD ("/Cursor/common/opts", _test_common_opts_after_prime);
+   /* a command cursor created from an agg has the server id set, but is not
+    * primed. */
+   TEST_CURSOR_AGG ("/Cursor/common/opts", _test_common_opts_agg);
 }
 
 
