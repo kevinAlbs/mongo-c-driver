@@ -44,3 +44,11 @@ after_failure:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gdb; fi
   - find /cores . -name \*core\* -exec ./.travis.scripts/debug-core.sh {} \;
 
+# Exclude gcc on osx since it's just an alias for clang.
+matrix:
+  exclude:
+  - compiler: gcc
+  - os: osx
+
+git:
+  depth: 1
