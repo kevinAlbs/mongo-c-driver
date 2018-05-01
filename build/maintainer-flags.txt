@@ -3,6 +3,7 @@
 -Wdeclaration-after-statement
 -Wempty-body
 -Wformat
+-Wformat-nonliteral
 -Wformat-security
 -Winit-self
 -Winline

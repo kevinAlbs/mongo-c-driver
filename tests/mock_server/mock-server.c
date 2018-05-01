@@ -539,7 +539,9 @@ mock_server_auto_ismaster (mock_server_t *server,
    bson_iter_t iter;
 
    va_start (args, response_json);
+   BEGIN_IGNORE_FORMAT_NONLITERAL
    formatted_response_json = bson_strdupv_printf (response_json, args);
+   END_IGNORE_FORMAT_NONLITERAL
    va_end (args);
    tmp = tmp_bson (formatted_response_json);
 
@@ -845,7 +847,9 @@ mock_server_receives_command (mock_server_t *server,
 
    va_start (args, command_json);
    if (command_json) {
+      BEGIN_IGNORE_FORMAT_NONLITERAL
       formatted_command_json = bson_strdupv_printf (command_json, args);
+      END_IGNORE_FORMAT_NONLITERAL
    }
    va_end (args);
 

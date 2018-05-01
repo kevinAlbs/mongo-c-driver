@@ -87,7 +87,9 @@ tmp_bson (const char *json, ...)
 
    if (json) {
       va_start (args, json);
+      BEGIN_IGNORE_FORMAT_NONLITERAL
       formatted = bson_strdupv_printf (json, args);
+      END_IGNORE_FORMAT_NONLITERAL
       va_end (args);
 
       double_quoted = single_quotes_to_double (formatted);
@@ -387,8 +389,10 @@ match_json (const bson_t *doc,
    bool matches;
 
    va_start (args, json_pattern);
+   BEGIN_IGNORE_FORMAT_NONLITERAL
    json_pattern_formatted =
       bson_strdupv_printf (json_pattern ? json_pattern : "{}", args);
+   END_IGNORE_FORMAT_NONLITERAL
    va_end (args);
 
    double_quoted = single_quotes_to_double (json_pattern_formatted);
@@ -462,7 +466,9 @@ match_err (match_ctx_t *ctx, const char *fmt, ...)
    BSON_ASSERT (ctx);
 
    va_start (args, fmt);
+   BEGIN_IGNORE_FORMAT_NONLITERAL
    formatted = bson_strdupv_printf (fmt, args);
+   END_IGNORE_FORMAT_NONLITERAL
    va_end (args);
 
    if (ctx->errmsg) {

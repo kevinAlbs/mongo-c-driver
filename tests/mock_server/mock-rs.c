@@ -16,6 +16,7 @@
 
 
 #include <bson.h>
+#include <mongoc-util-private.h>
 
 #include "mongoc-client-private.h"
 
@@ -519,7 +520,9 @@ mock_rs_receives_command (mock_rs_t *rs,
 
    va_start (args, command_json);
    if (command_json) {
+      BEGIN_IGNORE_FORMAT_NONLITERAL
       formatted_command_json = bson_strdupv_printf (command_json, args);
+      END_IGNORE_FORMAT_NONLITERAL
    }
    va_end (args);
 

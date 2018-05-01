@@ -49,6 +49,17 @@
 #define END_IGNORE_DEPRECATIONS
 #endif
 
+#if BSON_GNUC_CHECK_VERSION(4, 6)
+#define BEGIN_IGNORE_FORMAT_NONLITERAL \
+   _Pragma ("GCC diagnostic push")     \
+      _Pragma ("GCC diagnostic ignored \"-Wformat-nonliteral\"")
+#define END_IGNORE_FORMAT_NONLITERAL _Pragma ("GCC diagnostic pop")
+#elif defined(__clang__)
+#define BEGIN_IGNORE_FORMAT_NONLITERAL \
+   _Pragma ("clang diagnostic push")   \
+      _Pragma ("clang diagnostic ignored \"-Wformat-nonliteral\"")
+#define END_IGNORE_FORMAT_NONLITERAL _Pragma ("clang diagnostic pop")
+#endif
 
 #define COALESCE(x, y) ((x == 0) ? (y) : (x))
 

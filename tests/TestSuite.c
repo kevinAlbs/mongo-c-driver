@@ -32,6 +32,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <mongoc-util-private.h>
 
 #else
 #include <windows.h>
@@ -58,7 +59,9 @@ test_msg (const char *format, ...)
    va_list ap;
 
    va_start (ap, format);
+   BEGIN_IGNORE_FORMAT_NONLITERAL
    vprintf (format, ap);
+   END_IGNORE_FORMAT_NONLITERAL
    printf ("\n");
    fflush (stdout);
    va_end (ap);
@@ -1022,7 +1025,9 @@ test_suite_mock_server_log (const char *msg, ...)
 
    if (gTestSuite->mock_server_log || gTestSuite->mock_server_log_buf) {
       va_start (ap, msg);
+      BEGIN_IGNORE_FORMAT_NONLITERAL
       formatted_msg = bson_strdupv_printf (msg, ap);
+      END_IGNORE_FORMAT_NONLITERAL
       va_end (ap);
 
       if (gTestSuite->mock_server_log_buf) {
