@@ -48,7 +48,7 @@ after_failure:
 matrix:
   exclude:
   - compiler: gcc
-  - os: osx
+    os: osx
 
 git:
   depth: 1
