@@ -23,6 +23,7 @@
 #include "mongoc.h"
 #include "mongoc-socket-private.h"
 #include "mongoc-util-private.h"
+#include "mongoc-trace-private.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "async"
@@ -64,6 +65,9 @@ mongoc_async_run (mongoc_async_t *async)
 
    now = bson_get_monotonic_time ();
    poll_size = 0;
+
+   ENTRY;
+   TRACE("time is %" PRId64, now);
 
    /* CDRIVER-1571 reset start times in case a stream initiator was slow */
    DL_FOREACH (async->cmds, acmd)
@@ -111,6 +115,7 @@ mongoc_async_run (mongoc_async_t *async)
             poller[nstreams].revents = 0;
             expire_at = BSON_MIN (
                expire_at, acmd->connect_started + acmd->timeout_msec * 1000);
+            TRACE("stream expires in %" PRId64 "ms", acmd->timeout_msec);
             ++nstreams;
          }
       }
@@ -125,11 +130,15 @@ mongoc_async_run (mongoc_async_t *async)
 
       if (nstreams > 0) {
          /* we need at least one stream to poll. */
+         TRACE ("%s", "polling started");
          nactive =
             mongoc_stream_poll (poller, nstreams, (int32_t) poll_timeout_msec);
+         TRACE ("%s", "polling returned");
       } else {
          /* currently this does not get hit. we always have at least one command
           * initialized with a stream. */
+         TRACE ("%s", "unexpected, we're not polling anything.");
+         BSON_ASSERT (false);
          _mongoc_usleep (poll_timeout_msec * 1000);
       }
 
@@ -202,4 +211,5 @@ mongoc_async_run (mongoc_async_t *async)
 
    bson_free (poller);
    bson_free (acmds_polled);
+   EXIT;
 }

@@ -2,10 +2,14 @@
 #include <mongoc-thread-private.h>
 #include <mongoc-util-private.h>
 #include <mongoc-stream-tls.h>
+#include <mongoc-trace-private.h>
 
 #ifdef MONGOC_ENABLE_SSL_OPENSSL
 #include <openssl/err.h>
 #endif
+
+#undef MONGOC_LOG_DOMAIN
+#define MONGOC_LOG_DOMAIN "tls-test"
 
 #include "ssl-test.h"
 #include "test-conveniences.h"
@@ -68,7 +72,9 @@ ssl_error_server (void *ptr)
    mongoc_cond_signal (&data->cond);
    mongoc_mutex_unlock (&data->cond_mutex);
 
+   TRACE ("%s", "server accepting connection");
    conn_sock = mongoc_socket_accept (listen_sock, -1);
+   TRACE ("%s", "server accepted connection");
    BSON_ASSERT (conn_sock);
 
    sock_stream = mongoc_stream_socket_new (conn_sock);
@@ -80,6 +86,7 @@ ssl_error_server (void *ptr)
 
    switch (data->behavior) {
    case SSL_TEST_BEHAVIOR_STALL_BEFORE_HANDSHAKE:
+      TRACE("server going to sleep for %" PRId64 "ms\n", data->handshake_stall_ms);
       _mongoc_usleep (data->handshake_stall_ms * 1000);
       break;
    case SSL_TEST_BEHAVIOR_HANGUP_AFTER_HANDSHAKE:
@@ -97,7 +104,7 @@ ssl_error_server (void *ptr)
    }
 
    data->server_result->result = SSL_TEST_SUCCESS;
-
+   TRACE ("%s", "server closing stream\n");
    mongoc_stream_close (ssl_stream);
    mongoc_stream_destroy (ssl_stream);
    mongoc_socket_destroy (listen_sock);
@@ -272,8 +279,12 @@ handshake_stall_client (void *ptr)
    mongoc_client_read_command_with_opts (
       client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &reply, &error);
 
+   printf("got error: %s, %d, %d\n", error.message, error.domain, error.code);
+
    /* time is in microseconds */
    duration_ms = (bson_get_monotonic_time () - start_time) / 1000;
+
+   printf("duration: %" PRId64 "\n", duration_ms);
 
    if (llabs (duration_ms - connect_timeout_ms) > 100) {
       fprintf (stderr,
@@ -281,6 +292,8 @@ handshake_stall_client (void *ptr)
                duration_ms);
       abort ();
    }
+
+   /* TODO: assert that we get a timeout error. Darwin does not. */
 
    data->client_result->result = SSL_TEST_SUCCESS;
 
@@ -292,6 +305,7 @@ handshake_stall_client (void *ptr)
 }
 
 
+/* TODO: secure channel (windows) => secure transport (macos) */
 /* CDRIVER-2222 this should be reenabled for Apple Secure Channel too */
 #if !defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
 static void
