@@ -274,7 +274,7 @@ handshake_stall_client (void *ptr)
       client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &reply, &error);
 
    ASSERT_ERROR_CONTAINS (error,
-                          MONGOC_ERROR_STREAM,
+                          MONGOC_ERROR_SERVER_SELECTION,
                           MONGOC_ERROR_STREAM_CONNECT,
                           "socket timeout");
 
