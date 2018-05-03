@@ -275,7 +275,7 @@ handshake_stall_client (void *ptr)
 
    ASSERT_ERROR_CONTAINS (error,
                           MONGOC_ERROR_SERVER_SELECTION,
-                          MONGOC_ERROR_STREAM_CONNECT,
+                          MONGOC_ERROR_SERVER_SELECTION_FAILURE,
                           "socket timeout");
 
    /* time is in microseconds */
