@@ -407,10 +407,17 @@ done:
 
 
 bool
+mongoc_cluster_is_not_master_or_recovering_error (const bson_error_t *error)
+{
+   return strstr (error->message, "not master") ||
+          strstr (error->message, "node is recovering");
+}
+
+
+bool
 mongoc_cluster_is_not_master_error (const bson_error_t *error)
 {
-   return !strncmp (error->message, "not master", 10) ||
-          !strncmp (error->message, "node is recovering", 18);
+   return strstr (error->message, "not master") != NULL;
 }
 
 
@@ -419,13 +426,21 @@ handle_not_master_error (mongoc_cluster_t *cluster,
                          uint32_t server_id,
                          const bson_error_t *error)
 {
-   if (mongoc_cluster_is_not_master_error (error)) {
+   mongoc_topology_t *topology = cluster->client->topology;
+
+   if (mongoc_cluster_is_not_master_or_recovering_error (error)) {
       /* Server Discovery and Monitoring Spec: "When the client sees a 'not
        * master' or 'node is recovering' error it MUST replace the server's
        * description with a default ServerDescription of type Unknown."
        */
-      mongoc_topology_invalidate_server (
-         cluster->client->topology, server_id, error);
+      mongoc_topology_invalidate_server (topology, server_id, error);
+      if (topology->single_threaded) {
+         if (mongoc_cluster_is_not_master_error (error)) {
+            _mongoc_topology_wait_and_scan_one (topology, server_id);
+         }
+      } else {
+         _mongoc_topology_request_scan_one (topology, server_id);
+      }
    }
 }
 
