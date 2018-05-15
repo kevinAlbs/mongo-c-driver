@@ -1,5 +1,7 @@
 #include <mongoc.h>
 #include <mongoc-uri-private.h>
+#include <mongoc-host-list-private.h>
+#include <mongoc-client-pool-private.h>
 
 #include "mongoc-client-private.h"
 #include "mongoc-util-private.h"
@@ -1640,6 +1642,153 @@ test_cluster_time_updated_during_handshake ()
    mongoc_uri_destroy (uri);
 }
 
+/* returns the last used time of the topology scanner node for the secondary. */
+static int64_t
+_get_last_used (mongoc_client_t *client, uint32_t server_id)
+{
+   mongoc_topology_scanner_node_t *node;
+   int64_t last_used;
+
+   node =
+      mongoc_topology_scanner_get_node (client->topology->scanner, server_id);
+   BSON_ASSERT (node);
+   last_used = node->last_used;
+   return last_used;
+}
+
+static void
+_test_request_immediate_check (bool pooled,
+                               const char *err_response,
+                               bool should_scan)
+{
+   mock_server_t *primary, *secondary;
+
+   char *primary_ismaster;
+   char *secondary_ismaster;
+   char *uri_str;
+   mongoc_uri_t *uri;
+   mongoc_client_pool_t *client_pool = NULL;
+   mongoc_client_t *client = NULL;
+   bson_t reply;
+   bson_error_t error = {0};
+   future_t *future = NULL;
+   request_t *request;
+   const int64_t minHBMS = 50;
+   const int64_t serverSelectionDurationMS = 300;
+   int64_t primary_last_used;
+   int64_t secondary_last_used;
+
+   primary = mock_server_new ();
+   secondary = mock_server_new ();
+   mock_server_run (primary);
+   mock_server_run (secondary);
+
+   /* make ok ismaster replies for each member. */
+   primary_ismaster = bson_strdup_printf (
+      "{'ok': 1, 'ismaster': true, 'setName': 'rs', 'minWireVersion': 3, "
+      "'maxWireVersion': 6, 'secondary': false, 'hosts': ['%s', '%s']}",
+      mock_server_get_host_and_port (primary),
+      mock_server_get_host_and_port (secondary));
+   mock_server_auto_ismaster (primary, primary_ismaster);
+   secondary_ismaster = bson_strdup_printf (
+      "{'ok': 1, 'ismaster': false, 'setName': 'rs', 'minWireVersion': 3, "
+      "'maxWireVersion': 6, 'secondary': true, 'hosts': ['%s', '%s']}",
+      mock_server_get_host_and_port (primary),
+      mock_server_get_host_and_port (secondary));
+   mock_server_auto_ismaster (secondary, secondary_ismaster);
+
+   /* set a high heartbeatFrequency. Only the first and requested scans run. */
+   uri_str = bson_strdup_printf (
+      "mongodb://%s,%s/?replicaSet=rs&heartbeatFrequencyMS=999999",
+      mock_server_get_host_and_port (primary),
+      mock_server_get_host_and_port (secondary));
+   uri = mongoc_uri_new (uri_str);
+   bson_free (uri_str);
+
+   if (pooled) {
+      mongoc_topology_t *topology;
+      client_pool = mongoc_client_pool_new (uri);
+      topology = _mongoc_client_pool_get_topology (client_pool);
+      /* set a small minHeartbeatFrequency, so scans don't block for 500ms. */
+      topology->min_heartbeat_frequency_msec = minHBMS;
+      client = mongoc_client_pool_pop (client_pool);
+      /* upon popping a client, the background monitoring thread is started. */
+      /* wait for the initial server selection to finish. */
+      _mongoc_usleep (serverSelectionDurationMS * 1000);
+   } else {
+      mongoc_server_description_t *sd;
+      client = mongoc_client_new_from_uri (uri);
+      /* set a small minHeartbeatFrequency, so scans don't block for 500ms. */
+      client->topology->min_heartbeat_frequency_msec = minHBMS;
+      sd = mongoc_client_select_server (client, false, NULL, &error);
+      ASSERT_OR_PRINT (sd, error);
+      mongoc_server_description_destroy (sd);
+   }
+   mongoc_uri_destroy (uri);
+
+   printf ("getting last used\n");
+   primary_last_used = _get_last_used (client, 1);
+   secondary_last_used = _get_last_used (client, 2);
+
+   printf ("running ping\n");
+   future = future_client_command_simple (
+      client, "db", tmp_bson ("{'ping': 1}"), NULL, &reply, &error);
+
+   request = mock_server_receives_msg (
+      primary, MONGOC_QUERY_NONE, tmp_bson ("{'ping': 1}"));
+   mock_server_replies_simple (request, err_response);
+   request_destroy (request);
+   BSON_ASSERT (!future_get_bool (future));
+   future_destroy (future);
+
+   /* wait for long enough for the scan to finish. */
+   _mongoc_usleep ((minHBMS + serverSelectionDurationMS) * 1000);
+   if (should_scan) {
+      ASSERT_CMPINT64 (primary_last_used, <, _get_last_used (client, 1));
+   } else {
+      ASSERT_CMPINT64 (primary_last_used, ==, _get_last_used (client, 1));
+   }
+   ASSERT_CMPINT64 (secondary_last_used, ==, _get_last_used (client, 2));
+
+   if (pooled) {
+      mongoc_client_pool_push (client_pool, client);
+      mongoc_client_pool_destroy (client_pool);
+   } else {
+      mongoc_client_destroy (client);
+   }
+   bson_free (primary_ismaster);
+   bson_free (secondary_ismaster);
+   mock_server_destroy (primary);
+   mock_server_destroy (secondary);
+}
+
+
+static void
+test_request_immediate_check ()
+{
+   _test_request_immediate_check (false /* pooled */,
+                                  "{'ok': 0, 'errmsg': 'not master'}",
+                                  true /* should_scan */);
+   /* from SDAM spec: "For a "node is recovering" error, single-threaded clients
+    * MUST NOT check the server". */
+   _test_request_immediate_check (false /* pooled */,
+                                  "{'ok': 0, 'errmsg': 'node is recovering'}",
+                                  false /* should_scan */);
+   _test_request_immediate_check (false /* pooled */,
+                                  "{'ok': 0, 'errmsg': 'random error'}",
+                                  false /* should_scan */);
+   _test_request_immediate_check (true /* pooled */,
+                                  "{'ok': 0, 'errmsg': 'not master'}",
+                                  true /* should_scan */);
+   _test_request_immediate_check (true /* pooled */,
+                                  "{'ok': 0, 'errmsg': 'node is recovering'}",
+                                  true /* should_scan */);
+   _test_request_immediate_check (true /* pooled */,
+                                  "{'ok': 0, 'errmsg': 'random error'}",
+                                  false /* should_scan */);
+}
+
+
 void
 test_topology_install (TestSuite *suite)
 {
@@ -1779,4 +1928,6 @@ test_topology_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite,
                                 "/Topology/handshake/updates_clustertime",
                                 test_cluster_time_updated_during_handshake);
+   TestSuite_AddMockServerTest (
+      suite, "/Topology/request_immediate_check", test_request_immediate_check);
 }
