@@ -1734,6 +1734,7 @@ _test_request_scan_on_error (bool pooled,
    request_destroy (request);
    BSON_ASSERT (!future_get_bool (future));
    future_destroy (future);
+   bson_destroy (&reply);
 
    if (pooled) {
       /* a scan is requested immediately. wait for the scan to finish. */
@@ -1767,6 +1768,7 @@ _test_request_scan_on_error (bool pooled,
       request_destroy (request);
       BSON_ASSERT (future_get_bool (future));
       future_destroy (future);
+      bson_destroy (&reply);
    }
 
    if (should_scan) {
