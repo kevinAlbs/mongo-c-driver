@@ -33,9 +33,6 @@
 static void
 _mongoc_topology_background_thread_stop (mongoc_topology_t *topology);
 
-static void
-_mongoc_topology_request_scan (mongoc_topology_t *topology);
-
 static bool
 _mongoc_topology_reconcile_add_nodes (mongoc_server_description_t *sd,
                                       mongoc_topology_t *topology)
@@ -439,28 +436,6 @@ mongoc_topology_scan_all (mongoc_topology_t *topology, bool obey_cooldown)
    mongoc_mutex_unlock (&topology->mutex);
 }
 
-static void
-mongoc_topology_scan_one (mongoc_topology_t *topology, uint32_t id, bool obey_cooldown) {
-   mongoc_topology_scanner_node_t* node;
-   int64_t now = bson_get_monotonic_time ();
-
-   mongoc_topology_reconcile (topology);
-   node = mongoc_topology_scanner_get_node (topology->scanner, id);
-   if (!node) {
-      /* if the node was removed, skip. */
-      return;
-   }
-   if (obey_cooldown && mongoc_topology_scanner_node_in_cooldown (node, now)) {
-      return;
-   }
-   mongoc_topology_scanner_scan (topology->scanner, id);
-   mongoc_mutex_unlock (&topology->mutex);
-   mongoc_topology_scanner_work (topology->scanner);
-   mongoc_mutex_lock (&topology->mutex);
-   _mongoc_topology_scanner_finish (topology->scanner);
-   mongoc_mutex_unlock (&topology->mutex);
-   /* do not update last_scan or stale since this only scanned one node. */
-}
 
 /*
  *--------------------------------------------------------------------------
@@ -484,32 +459,6 @@ _mongoc_topology_do_blocking_scan (mongoc_topology_t *topology,
    mongoc_topology_scanner_get_error (topology->scanner, error);
 }
 
-/*
- *--------------------------------------------------------------------------
- *
- * _mongoc_topology_wait_and_scan_one --
- *
- *       Scan a single server in the single-threaded case. If
- *       minHeartbeatFrequencyMS has not passed since the last scan, then
- *       sleep first.
- *
- *--------------------------------------------------------------------------
- */
-void
-_mongoc_topology_wait_and_scan_one (mongoc_topology_t *topology, uint32_t id) {
-   int64_t now = bson_get_monotonic_time ();
-   int64_t scan_after;
-
-   topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_SINGLE_THREADED;
-   _mongoc_handshake_freeze ();
-
-   scan_after = topology->last_scan + topology->min_heartbeat_frequency_msec * 1000;
-   if (scan_after > now) {
-      _mongoc_usleep (scan_after - now);
-   }
-
-   mongoc_topology_scan_one (topology, id, true);
-}
 
 bool
 mongoc_topology_compatible (const mongoc_topology_description_t *td,
@@ -936,34 +885,12 @@ _mongoc_topology_host_by_id (mongoc_topology_t *topology,
  *--------------------------------------------------------------------------
  */
 
-static void
+void
 _mongoc_topology_request_scan (mongoc_topology_t *topology)
 {
    topology->scan_requested = true;
 
    mongoc_cond_signal (&topology->cond_server);
-}
-
-/*
- *--------------------------------------------------------------------------
- *
- * _mongoc_topology_scan_server --
- *
- *        Scan (or request to scan) a single server. See the SDAM spec
- *        "Requesting an immediate check". Takes the topology lock.
- *--------------------------------------------------------------------------
- */
-void
-_mongoc_topology_request_scan_one (mongoc_topology_t *topology, uint32_t id) {
-   /* if a scan was already requested, ignore. */
-   mongoc_mutex_lock (&topology->mutex);
-   if (topology->scan_requested) {
-      return;
-   }
-   topology->scan_requested = true;
-   topology->scan_by_id = id;
-   mongoc_cond_signal (&topology->cond_server);
-   mongoc_mutex_unlock (&topology->mutex);
 }
 
 /*
@@ -1209,12 +1136,7 @@ _mongoc_topology_run_background (void *data)
       }
 
       topology->scan_requested = false;
-      if (topology->scan_by_id) {
-         mongoc_topology_scan_one (topology, topology->scan_by_id, false /* obey cooldown */);
-      } else {
-         mongoc_topology_scan_all (topology, false /* obey cooldown */);
-      }
-      topology->scan_by_id = 0;
+      mongoc_topology_scan_all (topology, false /* obey cooldown */);
 
       last_scan = bson_get_monotonic_time ();
    }

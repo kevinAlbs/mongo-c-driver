@@ -59,7 +59,6 @@ typedef struct _mongoc_topology_t {
 
    mongoc_topology_scanner_state_t scanner_state;
    bool scan_requested;
-   uint32_t scan_by_id;
    bool shutdown_requested;
    bool single_threaded;
    bool stale;
@@ -153,7 +152,5 @@ _mongoc_topology_do_blocking_scan (mongoc_topology_t *topology,
                                    bson_error_t *error);
 bson_t* _mongoc_topology_get_ismaster (mongoc_topology_t* topology);
 void
-_mongoc_topology_request_scan_one (mongoc_topology_t *topology, uint32_t id);
-void
-_mongoc_topology_wait_and_scan_one (mongoc_topology_t *topology, uint32_t id);
+_mongoc_topology_request_scan (mongoc_topology_t *topology);
 #endif

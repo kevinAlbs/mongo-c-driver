@@ -436,10 +436,10 @@ handle_not_master_error (mongoc_cluster_t *cluster,
       mongoc_topology_invalidate_server (topology, server_id, error);
       if (topology->single_threaded) {
          if (mongoc_cluster_is_not_master_error (error)) {
-            _mongoc_topology_wait_and_scan_one (topology, server_id);
+            cluster->client->topology->stale = true;
          }
       } else {
-         _mongoc_topology_request_scan_one (topology, server_id);
+         _mongoc_topology_request_scan (topology);
       }
    }
 }
