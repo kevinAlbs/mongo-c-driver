@@ -1659,7 +1659,10 @@ _test_request_scan_on_error (bool pooled,
                                const char *err_response,
                                bool should_scan)
 {
-   mock_server_t *server;
+   mock_server_t *primary, *secondary;
+
+   char *primary_ismaster;
+   char *secondary_ismaster;
    char *uri_str;
    mongoc_uri_t *uri;
    mongoc_client_pool_t *client_pool = NULL;
@@ -1670,15 +1673,33 @@ _test_request_scan_on_error (bool pooled,
    request_t *request;
    const int64_t minHBMS = 50;
    const int64_t serverSelectionDurationMS = 300;
-   int64_t last_scan;
+   int64_t primary_last_used;
+   int64_t secondary_last_used;
 
-   server = mock_server_with_autoismaster (WIRE_VERSION_MAX);
-   mock_server_run (server);
+   primary = mock_server_new ();
+   secondary = mock_server_new ();
+   mock_server_run (primary);
+   mock_server_run (secondary);
+
+   /* make ok ismaster replies for each member. */
+   primary_ismaster = bson_strdup_printf (
+      "{'ok': 1, 'ismaster': true, 'setName': 'rs', 'minWireVersion': 3, "
+      "'maxWireVersion': 6, 'secondary': false, 'hosts': ['%s', '%s']}",
+      mock_server_get_host_and_port (primary),
+      mock_server_get_host_and_port (secondary));
+   mock_server_auto_ismaster (primary, primary_ismaster);
+   secondary_ismaster = bson_strdup_printf (
+      "{'ok': 1, 'ismaster': false, 'setName': 'rs', 'minWireVersion': 3, "
+      "'maxWireVersion': 6, 'secondary': true, 'hosts': ['%s', '%s']}",
+      mock_server_get_host_and_port (primary),
+      mock_server_get_host_and_port (secondary));
+   mock_server_auto_ismaster (secondary, secondary_ismaster);
 
    /* set a high heartbeatFrequency. Only the first and requested scans run. */
    uri_str = bson_strdup_printf (
-      "mongodb://%s/?heartbeatFrequencyMS=999999",
-      mock_server_get_host_and_port (server));
+      "mongodb://%s,%s/?replicaSet=rs&heartbeatFrequencyMS=999999",
+      mock_server_get_host_and_port (primary),
+      mock_server_get_host_and_port (secondary));
    uri = mongoc_uri_new (uri_str);
    bson_free (uri_str);
 
