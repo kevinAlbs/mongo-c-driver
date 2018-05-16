@@ -1647,7 +1647,7 @@ static int64_t
 _get_last_scan (mongoc_client_t *client)
 {
    int64_t last_scan;
-   mongoc_topology_t* topology = client->topology;
+   mongoc_topology_t *topology = client->topology;
    mongoc_mutex_lock (&topology->mutex);
    last_scan = topology->last_scan;
    mongoc_mutex_unlock (&topology->mutex);
@@ -1656,13 +1656,12 @@ _get_last_scan (mongoc_client_t *client)
 
 static void
 _test_request_scan_on_error (bool pooled,
-                               const char *err_response,
-                               bool should_scan)
+                             const char *err_response,
+                             bool should_scan,
+                             bool should_mark_unknown)
 {
    mock_server_t *primary, *secondary;
-
-   char *primary_ismaster;
-   char *secondary_ismaster;
+   char *primary_ismaster, *secondary_ismaster;
    char *uri_str;
    mongoc_uri_t *uri;
    mongoc_client_pool_t *client_pool = NULL;
@@ -1672,14 +1671,15 @@ _test_request_scan_on_error (bool pooled,
    future_t *future = NULL;
    request_t *request;
    const int64_t minHBMS = 50;
-   const int64_t serverSelectionDurationMS = 300;
-   int64_t primary_last_used;
-   int64_t secondary_last_used;
+   const int64_t serverSelectionDurationMS = 100;
+   int64_t last_scan;
+   mongoc_read_prefs_t *read_prefs;
 
    primary = mock_server_new ();
    secondary = mock_server_new ();
    mock_server_run (primary);
    mock_server_run (secondary);
+   read_prefs = mongoc_read_prefs_new (MONGOC_READ_PRIMARY_PREFERRED);
 
    /* make ok ismaster replies for each member. */
    primary_ismaster = bson_strdup_printf (
@@ -1723,28 +1723,46 @@ _test_request_scan_on_error (bool pooled,
       mongoc_server_description_destroy (sd);
    }
    mongoc_uri_destroy (uri);
-
+   /* now that the initial server selection is completed, record the time. */
    last_scan = _get_last_scan (client);
-
-   printf ("running ping\n");
+   /* run a ping command on the primary. */
    future = future_client_command_simple (
-      client, "db", tmp_bson ("{'ping': 1}"), NULL, &reply, &error);
+      client, "db", tmp_bson ("{'ping': 1}"), read_prefs, &reply, &error);
    request = mock_server_receives_msg (
-      server, MONGOC_QUERY_NONE, tmp_bson ("{'ping': 1}"));
+      primary, MONGOC_QUERY_NONE, tmp_bson ("{'ping': 1}"));
    mock_server_replies_simple (request, err_response);
    request_destroy (request);
    BSON_ASSERT (!future_get_bool (future));
    future_destroy (future);
 
    if (pooled) {
-      /* wait for long enough for the scan to finish. */
+      /* a scan is requested immediately. wait for the scan to finish. */
       _mongoc_usleep ((minHBMS + serverSelectionDurationMS) * 1000);
    } else {
-      /* a single threaded client marks the topology as stale. a scan won't occur until the next command. */
+      /* check if the server should have been marked as UNKNOWN. We can't
+       * easily check this for pooled clients without racing. */
+      mongoc_server_description_t *sd;
+      sd = (mongoc_server_description_t *) mongoc_set_get (
+         client->topology->description.servers, 1);
+      if (should_mark_unknown) {
+         BSON_ASSERT (sd->type == MONGOC_SERVER_UNKNOWN);
+      } else {
+         BSON_ASSERT (sd->type == MONGOC_SERVER_RS_PRIMARY);
+      }
+
+      /* a single threaded client may mark the topology as stale. if a scan
+       * should occur, it won't be triggered until the next command. */
       future = future_client_command_simple (
-         client, "db", tmp_bson ("{'ping': 1}"), NULL, &reply, &error);
-      request = mock_server_receives_msg (
-         server, MONGOC_QUERY_NONE, tmp_bson ("{'ping': 1}"));
+         client, "db", tmp_bson ("{'ping': 1}"), read_prefs, &reply, &error);
+      if (should_scan || !should_mark_unknown) {
+         request = mock_server_receives_msg (
+            primary, MONGOC_QUERY_NONE, tmp_bson ("{'ping': 1}"));
+      } else {
+         /* if the primary was marked as UNKNOWN, and no scan occurred, the ping
+          * goes to the secondary. */
+         request = mock_server_receives_msg (
+            secondary, MONGOC_QUERY_NONE, tmp_bson ("{'ping': 1}"));
+      }
       mock_server_replies_simple (request, "{'ok': 1}");
       request_destroy (request);
       BSON_ASSERT (future_get_bool (future));
@@ -1754,16 +1772,20 @@ _test_request_scan_on_error (bool pooled,
    if (should_scan) {
       ASSERT_CMPINT64 (last_scan, <, _get_last_scan (client));
    } else {
-      ASSERT_CMPINT64 (last_scan, ==,_get_last_scan (client));
+      ASSERT_CMPINT64 (last_scan, ==, _get_last_scan (client));
    }
 
+   mongoc_read_prefs_destroy (read_prefs);
    if (pooled) {
       mongoc_client_pool_push (client_pool, client);
       mongoc_client_pool_destroy (client_pool);
    } else {
       mongoc_client_destroy (client);
    }
-   mock_server_destroy (server);
+   bson_free (primary_ismaster);
+   bson_free (secondary_ismaster);
+   mock_server_destroy (primary);
+   mock_server_destroy (secondary);
 }
 
 
@@ -1771,23 +1793,29 @@ static void
 test_request_scan_on_error ()
 {
    _test_request_scan_on_error (false /* pooled */,
-                                  "{'ok': 0, 'errmsg': 'not master'}",
-                                  true /* should_scan */);
+                                "{'ok': 0, 'errmsg': 'not master'}",
+                                true /* should_scan */,
+                                true /* should_mark_unknown */);
    _test_request_scan_on_error (false /* pooled */,
-                                  "{'ok': 0, 'errmsg': 'node is recovering'}",
-                                  false /* should_scan */);
+                                "{'ok': 0, 'errmsg': 'node is recovering'}",
+                                false /* should_scan */,
+                                true);
    _test_request_scan_on_error (false /* pooled */,
-                                  "{'ok': 0, 'errmsg': 'random error'}",
-                                  false /* should_scan */);
+                                "{'ok': 0, 'errmsg': 'random error'}",
+                                false /* should_scan */,
+                                false);
    _test_request_scan_on_error (true /* pooled */,
-                                  "{'ok': 0, 'errmsg': 'not master'}",
-                                  true /* should_scan */);
+                                "{'ok': 0, 'errmsg': 'not master'}",
+                                true /* should_scan */,
+                                true);
    _test_request_scan_on_error (true /* pooled */,
-                                  "{'ok': 0, 'errmsg': 'node is recovering'}",
-                                  true /* should_scan */);
+                                "{'ok': 0, 'errmsg': 'node is recovering'}",
+                                true /* should_scan */,
+                                true);
    _test_request_scan_on_error (true /* pooled */,
-                                  "{'ok': 0, 'errmsg': 'random error'}",
-                                  false /* should_scan */);
+                                "{'ok': 0, 'errmsg': 'random error'}",
+                                false /* should_scan */,
+                                false);
 }
 
 
