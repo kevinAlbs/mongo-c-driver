@@ -278,6 +278,8 @@ _mongoc_scram_start (mongoc_scram_t *scram,
                       "secure nonce in sasl step 1");
       goto FAIL;
    }
+   /* hmm... by fixing nonce, I can at least get a reproducible conversation*/
+   memset(nonce, 0, 24);
 
    scram->encoded_nonce_len = bson_b64_ntop (nonce,
                                              sizeof (nonce),
@@ -532,9 +534,13 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
    BSON_ASSERT (outbuflen);
 
    /* all our passwords go through md5 thanks to MONGODB-CR */
-   tmp = bson_strdup_printf ("%s:mongo:%s", scram->user, scram->pass);
-   hashed_password = _mongoc_hex_md5 (tmp);
-   bson_zero_free (tmp, strlen (tmp));
+   if (scram->crypto.algorithm == MONGOC_CRYPTO_ALGORITHM_SHA_1) {
+      tmp = bson_strdup_printf ("%s:mongo:%s", scram->user, scram->pass);
+      hashed_password = _mongoc_hex_md5 (tmp);
+      bson_zero_free (tmp, strlen (tmp));
+   } else {
+      hashed_password = bson_strdup (scram->pass);
+   }
 
    /* we need all of the incoming message for the final client proof */
    if (!_mongoc_scram_buf_write ((char *) inbuf,
@@ -574,7 +580,6 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
                          "SCRAM Failure: unknown key (%c) in sasl step 2",
                          *ptr);
          goto FAIL;
-         break;
       }
 
       ptr++;
@@ -682,7 +687,8 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
       goto FAIL;
    }
 
-   if (16 != decoded_salt_len) {
+   printf("decoded salt='%s' and length=%d\n", val_s, decoded_salt_len);
+   if (16 != decoded_salt_len && 28 != decoded_salt_len) {
       bson_set_error (error,
                       MONGOC_ERROR_SCRAM,
                       MONGOC_ERROR_SCRAM_PROTOCOL_ERROR,
@@ -861,7 +867,6 @@ _mongoc_scram_step3 (mongoc_scram_t *scram,
                          "SCRAM Failure: unknown key (%c) in sasl step 3",
                          *ptr);
          goto FAIL;
-         break;
       }
 
       ptr++;

@@ -55,6 +55,7 @@ mongoc_crypto_init (mongoc_crypto_t *crypto,
    }
    BSON_ASSERT (crypto->hmac);
    BSON_ASSERT (crypto->hash);
+   crypto->algorithm = algo;
 }
 
 void

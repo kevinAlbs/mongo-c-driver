@@ -47,6 +47,7 @@ struct _mongoc_crypto_t {
                  const unsigned char *input,
                  const size_t input_len,
                  unsigned char *hash_out);
+   mongoc_crypto_hash_algorithm_t algorithm;
 };
 
 void
