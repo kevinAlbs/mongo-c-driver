@@ -711,6 +711,14 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
                       "SCRAM Failure: iterations is negative in sasl step2");
       goto FAIL;
    }
+   /* TODO: test */
+   if (iterations < 4096) {
+      bson_set_error (error,
+                     MONGOC_ERROR_SCRAM,
+                     MONGOC_ERROR_SCRAM_PROTOCOL_ERROR,
+                     "SCRAM Failure: iterations must be at least 4096");
+      goto FAIL;
+   }
 
    /* Save the presecrets for caching */
    scram->hashed_password = bson_strdup (hashed_password);
@@ -952,25 +960,19 @@ _mongoc_scram_step (mongoc_scram_t *scram,
    switch (scram->step) {
    case 1:
       return _mongoc_scram_start (scram, outbuf, outbufmax, outbuflen, error);
-      break;
    case 2:
       return _mongoc_scram_step2 (
          scram, inbuf, inbuflen, outbuf, outbufmax, outbuflen, error);
-      break;
    case 3:
       return _mongoc_scram_step3 (
          scram, inbuf, inbuflen, outbuf, outbufmax, outbuflen, error);
-      break;
    default:
       bson_set_error (error,
                       MONGOC_ERROR_SCRAM,
                       MONGOC_ERROR_SCRAM_NOT_DONE,
                       "SCRAM Failure: maximum steps detected");
       return false;
-      break;
    }
-
-   return true;
 }
 
 bool

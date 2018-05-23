@@ -1349,7 +1349,7 @@ _mongoc_cluster_auth_node (mongoc_cluster_t *cluster,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_AUTHENTICATE,
                       "The \"%s\" authentication mechanism requires libmongoc "
-                      "built with --enable-ssl",
+                      "built with ENABLE_SSL",
                       mechanism);
 #endif
    } else if (0 == strcasecmp (mechanism, "SCRAM-SHA-1")) {
@@ -1360,7 +1360,7 @@ _mongoc_cluster_auth_node (mongoc_cluster_t *cluster,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_AUTHENTICATE,
                       "The \"%s\" authentication mechanism requires libmongoc "
-                      "built with --enable-ssl",
+                      "built with ENABLE_SSL",
                       mechanism);
 #endif
    } else if (0 == strcasecmp (mechanism, "GSSAPI")) {
@@ -1371,7 +1371,7 @@ _mongoc_cluster_auth_node (mongoc_cluster_t *cluster,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_AUTHENTICATE,
                       "The \"%s\" authentication mechanism requires libmongoc "
-                      "built with --enable-sasl",
+                      "built with ENABLE_SSL",
                       mechanism);
 #endif
    } else if (0 == strcasecmp (mechanism, "PLAIN")) {
@@ -1546,6 +1546,7 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
    /* take critical fields from a fresh ismaster */
    cluster_node = _mongoc_cluster_node_new (stream, host->host_and_port);
 
+   /* CDRIVER-2579 pass 'saslSupportedMechs' to ismaster to determine the default auth mechanism. */
    sd = _mongoc_cluster_run_ismaster (cluster, cluster_node, server_id, error);
    if (!sd) {
       GOTO (error);
