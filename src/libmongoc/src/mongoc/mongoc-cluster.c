@@ -1162,7 +1162,7 @@ static bool
 _mongoc_cluster_auth_node_scram (mongoc_cluster_t *cluster,
                                  mongoc_stream_t *stream,
                                  mongoc_server_description_t *sd,
-                                 mongoc_scram_algorithm_t algorithm,
+                                 mongoc_crypto_hash_algorithm_t algo,
                                  bson_error_t *error)
 {
    mongoc_cmd_parts_t parts;
@@ -1187,11 +1187,10 @@ _mongoc_cluster_auth_node_scram (mongoc_cluster_t *cluster,
       auth_source = "admin";
    }
 
-   _mongoc_scram_init (&scram);
+   _mongoc_scram_init (&scram, algo);
 
    _mongoc_scram_set_pass (&scram, mongoc_uri_get_password (cluster->uri));
    _mongoc_scram_set_user (&scram, mongoc_uri_get_username (cluster->uri));
-   scram.algorithm = algorithm;
 
    /* Apply previously cached SCRAM secrets if available */
    if (cluster->scram_cache) {
@@ -1208,9 +1207,9 @@ _mongoc_cluster_auth_node_scram (mongoc_cluster_t *cluster,
 
       if (scram.step == 1) {
          BSON_APPEND_INT32 (&cmd, "saslStart", 1);
-         if (algorithm == MONGOC_SCRAM_SHA_1) {
+         if (algo == MONGOC_CRYPTO_ALGORITHM_SHA_1) {
             BSON_APPEND_UTF8 (&cmd, "mechanism", "SCRAM-SHA-1");
-         } else if (algorithm == MONGOC_SCRAM_SHA_256) {
+         } else if (algo == MONGOC_CRYPTO_ALGORITHM_SHA_256) {
             BSON_APPEND_UTF8 (&cmd, "mechanism", "SCRAM-SHA-256");
          } else {
             BSON_ASSERT (false);
@@ -1362,7 +1361,8 @@ _mongoc_cluster_auth_node (mongoc_cluster_t *cluster,
 #endif
    } else if (0 == strcasecmp (mechanism, "SCRAM-SHA-1")) {
 #ifdef MONGOC_ENABLE_CRYPTO
-      ret = _mongoc_cluster_auth_node_scram (cluster, stream, sd, MONGOC_SCRAM_SHA_1, error);
+      ret = _mongoc_cluster_auth_node_scram (
+         cluster, stream, sd, MONGOC_CRYPTO_ALGORITHM_SHA_1, error);
 #else
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
@@ -1371,9 +1371,10 @@ _mongoc_cluster_auth_node (mongoc_cluster_t *cluster,
                       "built with ENABLE_SSL",
                       mechanism);
 #endif
-   }  else if (0 == strcasecmp (mechanism, "SCRAM-SHA-256")) {
+   } else if (0 == strcasecmp (mechanism, "SCRAM-SHA-256")) {
 #ifdef MONGOC_ENABLE_CRYPTO
-      ret = _mongoc_cluster_auth_node_scram (cluster, stream, sd, MONGOC_SCRAM_SHA_256, error);
+      ret = _mongoc_cluster_auth_node_scram (
+         cluster, stream, sd, MONGOC_CRYPTO_ALGORITHM_SHA_256, error);
 #else
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
@@ -1565,7 +1566,8 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
    /* take critical fields from a fresh ismaster */
    cluster_node = _mongoc_cluster_node_new (stream, host->host_and_port);
 
-   /* CDRIVER-2579 pass 'saslSupportedMechs' to ismaster to determine the default auth mechanism. */
+   /* CDRIVER-2579 pass 'saslSupportedMechs' to ismaster to determine the
+    * default auth mechanism. */
    sd = _mongoc_cluster_run_ismaster (cluster, cluster_node, server_id, error);
    if (!sd) {
       GOTO (error);

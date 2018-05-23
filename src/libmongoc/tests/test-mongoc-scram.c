@@ -1,6 +1,7 @@
 #include <mongoc.h>
 
 #include "mongoc-scram-private.h"
+#include "mongoc-crypto-private.h"
 
 #include "TestSuite.h"
 
@@ -14,7 +15,7 @@ test_mongoc_scram_step_username_not_set (void)
    uint32_t buflen = 0;
    bson_error_t error;
 
-   _mongoc_scram_init (&scram);
+   _mongoc_scram_init (&scram, MONGOC_CRYPTO_ALGORITHM_SHA_1);
    _mongoc_scram_set_pass (&scram, "password");
 
    success = _mongoc_scram_step (

@@ -36,13 +36,13 @@ mongoc_crypto_common_crypto_hmac_sha1 (mongoc_crypto_t *crypto,
                                        int key_len,
                                        const unsigned char *data,
                                        int data_len,
-                                       unsigned char *mac_out);
+                                       unsigned char *hmac_out);
 
 bool
 mongoc_crypto_common_crypto_sha1 (mongoc_crypto_t *crypto,
                                   const unsigned char *input,
                                   const size_t input_len,
-                                  unsigned char *output);
+                                  unsigned char *hash_out);
 
 void
 mongoc_crypto_common_crypto_hmac_sha256 (mongoc_crypto_t *crypto,
@@ -50,13 +50,13 @@ mongoc_crypto_common_crypto_hmac_sha256 (mongoc_crypto_t *crypto,
                                          int key_len,
                                          const unsigned char *data,
                                          int data_len,
-                                         unsigned char *mac_out);
+                                         unsigned char *hmac_out);
 
 bool
 mongoc_crypto_common_crypto_sha256 (mongoc_crypto_t *crypto,
                                     const unsigned char *input,
                                     const size_t input_len,
-                                    unsigned char *output /* OUT */);
+                                    unsigned char *hash_out);
 
 BSON_END_DECLS
 
