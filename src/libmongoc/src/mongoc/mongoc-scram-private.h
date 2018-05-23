@@ -37,7 +37,10 @@ BSON_BEGIN_DECLS
 #define MONGOC_SCRAM_B64_HASH_SIZE \
    MONGOC_SCRAM_B64_ENCODED_SIZE (MONGOC_SCRAM_HASH_SIZE)
 
-typedef enum { MONGOC_SCRAM_SHA_1, MONGOC_SCRAM_SHA_256 } mongoc_scram_hash_t;
+typedef enum {
+   MONGOC_SCRAM_SHA_1,
+   MONGOC_SCRAM_SHA_256
+} mongoc_scram_algorithm_t;
 
 typedef struct _mongoc_scram_cache_t {
    /* pre-secrets */
@@ -48,6 +51,7 @@ typedef struct _mongoc_scram_cache_t {
    uint8_t client_key[MONGOC_SCRAM_HASH_SIZE];
    uint8_t server_key[MONGOC_SCRAM_HASH_SIZE];
    uint8_t salted_password[MONGOC_SCRAM_HASH_SIZE];
+   mongoc_scram_algorithm_t algorithm;
 } mongoc_scram_cache_t;
 
 typedef struct _mongoc_scram_t {

@@ -36,13 +36,23 @@ struct _mongoc_crypto_t {
    void (*hmac_sha1) (mongoc_crypto_t *crypto,
                       const void *key,
                       int key_len,
-                      const unsigned char *d,
-                      int n,
-                      unsigned char *md /* OUT */);
+                      const unsigned char *data,
+                      int data_len,
+                      unsigned char *mac_out /* OUT */);
    bool (*sha1) (mongoc_crypto_t *crypto,
                  const unsigned char *input,
                  const size_t input_len,
                  unsigned char *output /* OUT */);
+   void (*hmac_sha256) (mongoc_crypto_t *crypto,
+                        const void *key,
+                        int key_len,
+                        const unsigned char *data,
+                        int data_len,
+                        unsigned char *mac_out /* OUT */);
+   bool (*sha256) (mongoc_crypto_t *crypto,
+                   const unsigned char *input,
+                   const size_t input_len,
+                   unsigned char *output /* OUT */);
 };
 
 void
@@ -52,16 +62,29 @@ void
 mongoc_crypto_hmac_sha1 (mongoc_crypto_t *crypto,
                          const void *key,
                          int key_len,
-                         const unsigned char *d,
-                         int n,
-                         unsigned char *md /* OUT */);
+                         const unsigned char *data,
+                         int data_len,
+                         unsigned char *mac_out);
 
 bool
 mongoc_crypto_sha1 (mongoc_crypto_t *crypto,
                     const unsigned char *input,
                     const size_t input_len,
-                    unsigned char *output /* OUT */);
+                    unsigned char *output);
 
+void
+mongoc_crypto_hmac_sha256 (mongoc_crypto_t *crypto,
+                           const void *key,
+                           int key_len,
+                           const unsigned char *data,
+                           int data_len,
+                           unsigned char *mac_out);
+
+bool
+mongoc_crypto_sha256 (mongoc_crypto_t *crypto,
+                      const unsigned char *input,
+                      const size_t input_len,
+                      unsigned char *output);
 
 BSON_END_DECLS
 #endif /* MONGOC_CRYPTO_PRIVATE_H */

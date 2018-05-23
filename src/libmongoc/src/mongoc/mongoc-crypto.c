@@ -34,12 +34,18 @@ mongoc_crypto_init (mongoc_crypto_t *crypto)
 #ifdef MONGOC_ENABLE_CRYPTO_LIBCRYPTO
    crypto->hmac_sha1 = mongoc_crypto_openssl_hmac_sha1;
    crypto->sha1 = mongoc_crypto_openssl_sha1;
+   crypto->hmac_sha256 = NULL;
+   crypto->sha256 = NULL;
 #elif defined(MONGOC_ENABLE_CRYPTO_COMMON_CRYPTO)
    crypto->hmac_sha1 = mongoc_crypto_common_crypto_hmac_sha1;
    crypto->sha1 = mongoc_crypto_common_crypto_sha1;
+   crypto->hmac_sha256 = mongoc_crypto_common_crypto_hmac_sha256;
+   crypto->sha256 = mongoc_crypto_common_crypto_sha256;
 #elif defined(MONGOC_ENABLE_CRYPTO_CNG)
    crypto->hmac_sha1 = mongoc_crypto_cng_hmac_sha1;
    crypto->sha1 = mongoc_crypto_cng_sha1;
+   crypto->hmac_sha256 = NULL;
+   crypto->sha256 = NULL;
 #endif
 }
 
@@ -47,19 +53,39 @@ void
 mongoc_crypto_hmac_sha1 (mongoc_crypto_t *crypto,
                          const void *key,
                          int key_len,
-                         const unsigned char *d,
-                         int n,
-                         unsigned char *md /* OUT */)
+                         const unsigned char *data,
+                         int data_len,
+                         unsigned char *mac_out)
 {
-   crypto->hmac_sha1 (crypto, key, key_len, d, n, md);
+   crypto->hmac_sha1 (crypto, key, key_len, data, data_len, mac_out);
 }
 
 bool
 mongoc_crypto_sha1 (mongoc_crypto_t *crypto,
                     const unsigned char *input,
                     const size_t input_len,
-                    unsigned char *output /* OUT */)
+                    unsigned char *output)
 {
    return crypto->sha1 (crypto, input, input_len, output);
+}
+
+void
+mongoc_crypto_hmac_sha256 (mongoc_crypto_t *crypto,
+                           const void *key,
+                           int key_len,
+                           const unsigned char *data,
+                           int data_len,
+                           unsigned char *mac_out)
+{
+   crypto->hmac_sha256 (crypto, key, key_len, data, data_len, mac_out);
+}
+
+bool
+mongoc_crypto_sha256 (mongoc_crypto_t *crypto,
+                      const unsigned char *input,
+                      const size_t input_len,
+                      unsigned char *output /* OUT */)
+{
+   return crypto->sha256 (crypto, input, input_len, output);
 }
 #endif
