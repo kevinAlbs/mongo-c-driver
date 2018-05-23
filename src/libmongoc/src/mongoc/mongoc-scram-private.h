@@ -51,7 +51,6 @@ typedef struct _mongoc_scram_cache_t {
    uint8_t client_key[MONGOC_SCRAM_HASH_SIZE];
    uint8_t server_key[MONGOC_SCRAM_HASH_SIZE];
    uint8_t salted_password[MONGOC_SCRAM_HASH_SIZE];
-   mongoc_scram_algorithm_t algorithm;
 } mongoc_scram_cache_t;
 
 typedef struct _mongoc_scram_t {
@@ -73,6 +72,7 @@ typedef struct _mongoc_scram_t {
 #ifdef MONGOC_ENABLE_CRYPTO
    mongoc_crypto_t crypto;
 #endif
+   mongoc_scram_algorithm_t algorithm;
    mongoc_scram_cache_t *cache;
 } mongoc_scram_t;
 
