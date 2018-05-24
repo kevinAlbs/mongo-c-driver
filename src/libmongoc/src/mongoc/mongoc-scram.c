@@ -534,8 +534,8 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
 
    uint8_t decoded_salt[MONGOC_SCRAM_B64_HASH_MAX_SIZE] = {0};
    int32_t decoded_salt_len;
-   int32_t expected_length =
-      scram->crypto.algorithm == MONGOC_CRYPTO_ALGORITHM_SHA_1 ? 16 : 28;
+   /* the decoded salt leaves four trailing bytes to add the int32 0x00000001 */
+   const int32_t expected_salt_length = _scram_hash_size (scram) - 4;
    bool rval = true;
 
    int iterations;
@@ -546,18 +546,24 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
    BSON_ASSERT (outbufmax);
    BSON_ASSERT (outbuflen);
 
-   /* all our passwords go through md5 thanks to MONGODB-CR */
    if (scram->crypto.algorithm == MONGOC_CRYPTO_ALGORITHM_SHA_1) {
+      /* Auth spec for SCRAM-SHA-1: "The password variable MUST be the mongodb
+       * hashed variant. The mongo hashed variant is computed as hash = HEX(
+       * MD5( UTF8( username + ':mongo:' + plain_text_password )))" */
       tmp = bson_strdup_printf ("%s:mongo:%s", scram->user, scram->pass);
       hashed_password = _mongoc_hex_md5 (tmp);
       bson_zero_free (tmp, strlen (tmp));
-   } else {
-      /* Auth spec: "Passwords MUST be prepared with SASLprep, per RFC 5802". */
+   } else if (scram->crypto.algorithm == MONGOC_CRYPTO_ALGORITHM_SHA_256) {
+      /* Auth spec for SCRAM-SHA-256: "Passwords MUST be prepared with SASLprep,
+       * per RFC 5802. Passwords are used directly for key derivation ; they
+       * MUST NOT be digested as they are in SCRAM-SHA-1." */
       hashed_password = _mongoc_sasl_prep (
          scram->user, scram->pass, (int) strlen (scram->pass), error);
       if (!hashed_password) {
          goto BUFFER_AUTH;
       }
+   } else {
+      BSON_ASSERT (false);
    }
 
    /* we need all of the incoming message for the final client proof */
@@ -705,9 +711,7 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
       goto FAIL;
    }
 
-   printf ("decoded salt='%s' and length=%d\n", val_s, decoded_salt_len);
-
-   if (expected_length != decoded_salt_len) {
+   if (expected_salt_length != decoded_salt_len) {
       bson_set_error (error,
                       MONGOC_ERROR_SCRAM,
                       MONGOC_ERROR_SCRAM_PROTOCOL_ERROR,
@@ -736,7 +740,7 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
                       "SCRAM Failure: iterations is negative in sasl step2");
       goto FAIL;
    }
-   /* TODO: test */
+
    if (iterations < 4096) {
       bson_set_error (error,
                       MONGOC_ERROR_SCRAM,

@@ -47,10 +47,12 @@ mongoc_crypto_init (mongoc_crypto_t *crypto,
 #endif
    } else if (algo == MONGOC_CRYPTO_ALGORITHM_SHA_256) {
 #ifdef MONGOC_ENABLE_CRYPTO_LIBCRYPTO
+      /* TODO: CDRIVER-2491 */
 #elif defined(MONGOC_ENABLE_CRYPTO_COMMON_CRYPTO)
       crypto->hmac = mongoc_crypto_common_crypto_hmac_sha256;
       crypto->hash = mongoc_crypto_common_crypto_sha256;
 #elif defined(MONGOC_ENABLE_CRYPTO_CNG)
+      /* TODO: CDRIVER-2491 */
 #endif
    }
    BSON_ASSERT (crypto->hmac);

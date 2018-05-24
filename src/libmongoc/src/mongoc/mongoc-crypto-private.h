@@ -60,13 +60,13 @@ mongoc_crypto_hmac (mongoc_crypto_t *crypto,
                     int key_len,
                     const unsigned char *data,
                     int data_len,
-                    unsigned char *mac_out);
+                    unsigned char *hmac_out);
 
 bool
 mongoc_crypto_hash (mongoc_crypto_t *crypto,
                     const unsigned char *input,
                     const size_t input_len,
-                    unsigned char *output);
+                    unsigned char *hash_out);
 
 BSON_END_DECLS
 #endif /* MONGOC_CRYPTO_PRIVATE_H */
