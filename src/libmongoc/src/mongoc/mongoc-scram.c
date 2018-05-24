@@ -1134,7 +1134,10 @@ _mongoc_sasl_prep (const char *in_utf8, int in_utf8_len, bson_error_t *err)
    return _mongoc_sasl_prep_impl ("password", in_utf8, in_utf8_len, err);
 #else
    if (_mongoc_sasl_prep_required (in_utf8)) {
-      bson_set_error ();
+      bson_set_error (err,
+                      MONGOC_ERROR_SCRAM,
+                      MONGOC_ERROR_SCRAM_PROTOCOL_ERROR,
+                      "SCRAM Failure: could not SASLPrep password");
       return NULL;
    }
    return bson_strdup (in_utf8);
