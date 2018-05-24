@@ -70,6 +70,7 @@ _mongoc_cluster_get_conversation_id (const bson_t *reply)
 
    return 0;
 }
+#endif
 
 /*
  *--------------------------------------------------------------------------
@@ -94,14 +95,18 @@ _mongoc_cluster_auth_node_sasl (mongoc_cluster_t *cluster,
                                 mongoc_server_description_t *sd,
                                 bson_error_t *error)
 {
-#ifdef MONGOC_ENABLE_SASL_CYRUS
+#ifndef MONGOC_ENABLE_SASL
+   bson_set_error (error,
+                   MONGOC_ERROR_CLIENT,
+                   MONGOC_ERROR_CLIENT_AUTHENTICATE,
+                   "The GSSAPI authentication mechanism requires libmongoc "
+                   "built with ENABLE_SASL");
+   return false;
+#elif defined(MONGOC_ENABLE_SASL_CYRUS)
    return _mongoc_cluster_auth_node_cyrus (cluster, stream, sd, error);
-#endif
-#ifdef MONGOC_ENABLE_SASL_SSPI
+#elif defined(MONGOC_ENABLE_SASL_SSPI)
    return _mongoc_cluster_auth_node_sspi (cluster, stream, sd, error);
-#endif
-#ifdef MONGOC_ENABLE_SASL_GSSAPI
+#elif defined(MONGOC_ENABLE_SASL_GSSAPI)
    return _mongoc_cluster_auth_node_gssapi (cluster, stream, sd, error);
 #endif
 }
-#endif

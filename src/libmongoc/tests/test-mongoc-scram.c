@@ -1,7 +1,7 @@
 #include <mongoc.h>
 
-#include "mongoc-scram-private.h"
 #include "mongoc-crypto-private.h"
+#include "mongoc-scram-private.h"
 
 #include "TestSuite.h"
 
@@ -41,7 +41,7 @@ typedef struct {
 /* test that an error is reported if the server responds with an iteration
  * count that is less than 4096 */
 static void
-test_iteraton_count (int count, bool should_succeed)
+test_iteration_count (int count, bool should_succeed)
 {
    mongoc_scram_t scram;
    uint8_t buf[4096] = {0};
@@ -58,7 +58,7 @@ test_iteraton_count (int count, bool should_succeed)
    _mongoc_scram_set_pass (&scram, "password");
    memcpy (scram.encoded_nonce, client_nonce, sizeof (scram.encoded_nonce));
    scram.encoded_nonce_len = (int32_t) strlen (client_nonce);
-   scram.auth_message = bson_malloc0(4096);
+   scram.auth_message = bson_malloc0 (4096);
    scram.auth_messagemax = 4096;
    /* prepare the server's "response" from step 1 as the input for step 2. */
    memcpy (buf, server_response, strlen (server_response) + 1);
@@ -82,10 +82,10 @@ test_iteraton_count (int count, bool should_succeed)
 static void
 test_mongoc_scram_iteration_count (void)
 {
-   test_iteraton_count (1000, false);
-   test_iteraton_count (4095, false);
-   test_iteraton_count (4096, true);
-   test_iteraton_count (10000, true);
+   test_iteration_count (1000, false);
+   test_iteration_count (4095, false);
+   test_iteration_count (4096, true);
+   test_iteration_count (10000, true);
 }
 
 static void
@@ -111,7 +111,7 @@ test_mongoc_scram_sasl_prep (void)
                      _mongoc_sasl_prep_required (tests[i].original));
       memset (&err, 0, sizeof (err));
       normalized = _mongoc_sasl_prep (
-         "username", tests[i].original, strlen (tests[i].original), &err);
+         tests[i].original, strlen (tests[i].original), &err);
       if (tests[i].should_succeed) {
          ASSERT_CMPSTR (tests[i].normalized, normalized);
          ASSERT_CMPINT (err.code, ==, 0);

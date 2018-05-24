@@ -555,12 +555,12 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
       bson_zero_free (tmp, strlen (tmp));
    } else if (scram->crypto.algorithm == MONGOC_CRYPTO_ALGORITHM_SHA_256) {
       /* Auth spec for SCRAM-SHA-256: "Passwords MUST be prepared with SASLprep,
-       * per RFC 5802. Passwords are used directly for key derivation ; they
+       * per RFC 5802. Passwords are used directly for key derivation; they
        * MUST NOT be digested as they are in SCRAM-SHA-1." */
-      hashed_password = _mongoc_sasl_prep (
-         scram->user, scram->pass, (int) strlen (scram->pass), error);
+      hashed_password =
+         _mongoc_sasl_prep (scram->pass, (int) strlen (scram->pass), error);
       if (!hashed_password) {
-         goto BUFFER_AUTH;
+         goto FAIL;
       }
    } else {
       BSON_ASSERT (false);
@@ -741,6 +741,9 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
       goto FAIL;
    }
 
+   /* drivers MUST enforce a minimum iteration count of 4096 and MUST error if
+    * the authentication conversation specifies a lower count. This mitigates
+    * downgrade attacks by a man-in-the-middle attacker. */
    if (iterations < 4096) {
       bson_set_error (error,
                       MONGOC_ERROR_SCRAM,
@@ -1125,16 +1128,16 @@ _mongoc_sasl_prep_impl (const char *name,
 #endif
 
 char *
-_mongoc_sasl_prep (const char *name,
-                   const char *in_utf8,
-                   int in_utf8_len,
-                   bson_error_t *err)
+_mongoc_sasl_prep (const char *in_utf8, int in_utf8_len, bson_error_t *err)
 {
 #ifdef MONGOC_ENABLE_ICU
-   return _mongoc_sasl_prep_impl (name, in_utf8, in_utf8_len, err);
+   return _mongoc_sasl_prep_impl ("password", in_utf8, in_utf8_len, err);
 #else
-   fprintf (stderr, "sasl_prep is not enabled.");
-   BSON_ASSERT (false);
+   if (_mongoc_sasl_prep_required (in_utf8)) {
+      bson_set_error ();
+      return NULL;
+   }
+   return bson_strdup (in_utf8);
 #endif
 }
 #endif
