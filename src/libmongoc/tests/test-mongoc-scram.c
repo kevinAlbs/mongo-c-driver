@@ -44,7 +44,7 @@ static void
 test_iteraton_count (int count, bool should_succeed)
 {
    mongoc_scram_t scram;
-   uint8_t buf[4096] = {0}, auth_message_buf[4096] = {0};
+   uint8_t buf[4096] = {0};
    uint32_t buflen = 0;
    bson_error_t error;
    const char *client_nonce = "YWJjZA==";
@@ -58,8 +58,8 @@ test_iteraton_count (int count, bool should_succeed)
    _mongoc_scram_set_pass (&scram, "password");
    memcpy (scram.encoded_nonce, client_nonce, sizeof (scram.encoded_nonce));
    scram.encoded_nonce_len = (int32_t) strlen (client_nonce);
-   scram.auth_message = auth_message_buf;
-   scram.auth_messagemax = sizeof (auth_message_buf);
+   scram.auth_message = bson_malloc0(4096);
+   scram.auth_messagemax = 4096;
    /* prepare the server's "response" from step 1 as the input for step 2. */
    memcpy (buf, server_response, strlen (server_response) + 1);
    buflen = (int32_t) strlen (server_response);
@@ -76,6 +76,7 @@ test_iteraton_count (int count, bool should_succeed)
                              "SCRAM Failure: iterations must be at least 4096");
    }
    bson_free (server_response);
+   _mongoc_scram_destroy (&scram);
 }
 
 static void
