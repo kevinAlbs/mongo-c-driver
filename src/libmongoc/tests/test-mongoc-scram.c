@@ -37,6 +37,56 @@ typedef struct {
    bool should_succeed;
 } sasl_prep_testcase_t;
 
+
+/* test that an error is reported if the server responds with an iteration
+ * count that is less than 4096 */
+static void
+test_iteraton_count (int count, bool should_succeed)
+{
+   mongoc_scram_t scram;
+   uint8_t buf[4096] = {0}, auth_message_buf[4096] = {0};
+   uint32_t buflen = 0;
+   bson_error_t error;
+   const char *client_nonce = "YWJjZA==";
+   char *server_response;
+   bool success;
+
+   server_response = bson_strdup_printf (
+      "r=YWJjZA==YWJjZA==,s=r6+P1iLmSJvhrRyuFi6Wsg==,i=%d", count);
+   /* set up the scram state to immediately test step 2. */
+   _mongoc_scram_init (&scram, MONGOC_CRYPTO_ALGORITHM_SHA_1);
+   _mongoc_scram_set_pass (&scram, "password");
+   memcpy (scram.encoded_nonce, client_nonce, sizeof (scram.encoded_nonce));
+   scram.encoded_nonce_len = (int32_t) strlen (client_nonce);
+   scram.auth_message = auth_message_buf;
+   scram.auth_messagemax = sizeof (auth_message_buf);
+   /* prepare the server's "response" from step 1 as the input for step 2. */
+   memcpy (buf, server_response, strlen (server_response) + 1);
+   buflen = (int32_t) strlen (server_response);
+   scram.step = 1;
+   success = _mongoc_scram_step (
+      &scram, buf, buflen, buf, sizeof buf, &buflen, &error);
+   if (should_succeed) {
+      ASSERT_OR_PRINT (success, error);
+   } else {
+      BSON_ASSERT (!success);
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_SCRAM,
+                             MONGOC_ERROR_SCRAM_PROTOCOL_ERROR,
+                             "SCRAM Failure: iterations must be at least 4096");
+   }
+   bson_free (server_response);
+}
+
+static void
+test_mongoc_scram_iteration_count (void)
+{
+   test_iteraton_count (1000, false);
+   test_iteraton_count (4095, false);
+   test_iteraton_count (4096, true);
+   test_iteraton_count (10000, true);
+}
+
 static void
 test_mongoc_scram_sasl_prep (void)
 {
@@ -83,5 +133,7 @@ test_scram_install (TestSuite *suite)
                   "/scram/username_not_set",
                   test_mongoc_scram_step_username_not_set);
    TestSuite_Add (suite, "/scram/sasl_prep", test_mongoc_scram_sasl_prep);
+   TestSuite_Add (
+      suite, "/scram/iteration_count", test_mongoc_scram_iteration_count);
 #endif
 }
