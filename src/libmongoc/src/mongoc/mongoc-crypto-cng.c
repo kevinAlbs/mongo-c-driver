@@ -34,7 +34,7 @@ _mongoc_crypto_cng_hmac_or_hash (BCRYPT_ALG_HANDLE algorithm,
                                  size_t key_length,
                                  void *data,
                                  size_t data_length,
-                                 void *mac_out)
+                                 void *hmac_out)
 {
    char *hash_object_buffer = 0;
    ULONG hash_object_length = 0;

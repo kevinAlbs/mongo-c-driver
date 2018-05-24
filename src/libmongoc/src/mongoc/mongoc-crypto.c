@@ -66,9 +66,9 @@ mongoc_crypto_hmac (mongoc_crypto_t *crypto,
                     int key_len,
                     const unsigned char *data,
                     int data_len,
-                    unsigned char *mac_out)
+                    unsigned char *hmac_out)
 {
-   crypto->hmac (crypto, key, key_len, data, data_len, mac_out);
+   crypto->hmac (crypto, key, key_len, data, data_len, hmac_out);
 }
 
 bool
