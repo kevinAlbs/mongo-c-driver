@@ -189,6 +189,7 @@ _drop_scram_users (void)
    ASSERT_OR_PRINT (res, error);
    res = mongoc_database_remove_user (db, "both", &error);
    ASSERT_OR_PRINT (res, error);
+   mongoc_database_destroy (db);
    mongoc_client_destroy (client);
 }
 
@@ -274,6 +275,7 @@ _try_auth (const char *user,
                              MONGOC_ERROR_CLIENT_AUTHENTICATE,
                              "Authentication failed");
    }
+   bson_destroy (&reply);
    mongoc_uri_destroy (uri);
    mongoc_client_destroy (client);
 }
