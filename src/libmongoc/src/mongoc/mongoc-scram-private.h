@@ -74,8 +74,10 @@ typedef struct _mongoc_scram_t {
    mongoc_scram_cache_t *cache;
 } mongoc_scram_t;
 
+#ifdef MONGOC_ENABLE_CRYPTO
 void
 _mongoc_scram_init (mongoc_scram_t *scram, mongoc_crypto_hash_algorithm_t algo);
+#endif
 
 mongoc_scram_cache_t *
 _mongoc_scram_get_cache (mongoc_scram_t *scram);
