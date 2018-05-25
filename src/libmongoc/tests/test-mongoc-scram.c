@@ -1,4 +1,7 @@
 #include <mongoc.h>
+#include <mock_server/mock-server.h>
+#include <mock_server/future.h>
+#include <mock_server/future-functions.h>
 
 #include "mongoc-crypto-private.h"
 #include "mongoc-scram-private.h"
@@ -189,38 +192,55 @@ _drop_scram_users (void)
    mongoc_client_destroy (client);
 }
 
-typedef struct {
-   bool attempted_auth;
-   char mechanism_used[64];
-} scram_ctx_t;
-
 static void
-_cmd_started_scram_cb (const mongoc_apm_command_started_t *event)
+_check_mechanism (const char *user,
+                  const char *pwd,
+                  const char *mechanism,
+                  const char *mechanism_expected)
 {
-   const char *cmd_name;
+   mock_server_t *server;
+   mongoc_client_t *client;
+   mongoc_uri_t *uri;
+   future_t *future;
+   request_t *request;
+   const bson_t *sasl_doc;
    const char *mechanism_used;
-   scram_ctx_t *scram_ctx;
-   const bson_t *cmd;
-   cmd_name = mongoc_apm_command_started_get_command_name (event);
-   cmd = mongoc_apm_command_started_get_command (event);
-   printf ("%s\n", bson_as_json (cmd, NULL));
-   if (strcmp (cmd_name, "saslStart") != 0) {
-      return;
-   }
-   cmd = mongoc_apm_command_started_get_command (event);
-   printf ("%s\n", bson_as_json (cmd, NULL));
-   scram_ctx = (scram_ctx_t *) mongoc_apm_command_started_get_context (event);
-   scram_ctx->attempted_auth = true;
 
-   mechanism_used = bson_lookup_utf8 (cmd, "mechanism");
-   memcpy (
-      scram_ctx->mechanism_used, mechanism_used, strlen (mechanism_used) + 1);
+   server = mock_server_with_autoismaster (WIRE_VERSION_MAX);
+   mock_server_run (server);
+   uri = mongoc_uri_copy (mock_server_get_uri (server));
+   mongoc_uri_set_username (uri, user);
+   mongoc_uri_set_password (uri, pwd);
+   if (mechanism) {
+      mongoc_uri_set_auth_mechanism (uri, mechanism);
+   }
+
+   client = mongoc_client_new_from_uri (uri);
+   future = future_client_command_simple (client,
+                                          "admin",
+                                          tmp_bson ("{'dbstats': 1}"),
+                                          NULL /* read_prefs. */,
+                                          NULL /* reply. */,
+                                          NULL /* error. */);
+   request =
+      mock_server_receives_msg (server, MONGOC_QUERY_NONE, tmp_bson ("{}"));
+   sasl_doc = request_get_doc (request, 0);
+   mechanism_used = bson_lookup_utf8 (sasl_doc, "mechanism");
+   ASSERT_CMPSTR (mechanism_used, mechanism_expected);
+   /* we're not actually going to auth, just hang up. */
+   mock_server_hangs_up (request);
+   future_wait (future);
+   future_destroy (future);
+   request_destroy (request);
+   mongoc_uri_destroy (uri);
+   mongoc_client_destroy (client);
+   mock_server_destroy (server);
 }
 
 static void
 _try_auth (const char *user,
            const char *pwd,
-           const char *mechanism_expected,
+           const char *mechanism,
            bool should_succeed)
 {
    mongoc_uri_t *uri;
@@ -228,17 +248,15 @@ _try_auth (const char *user,
    bson_error_t error;
    bson_t reply;
    bool res;
-   mongoc_apm_callbacks_t *callbacks;
-   scram_ctx_t scram_ctx = {0};
 
+   printf ("%s %s %s\n", user, pwd, mechanism);
    uri = test_framework_get_uri ();
    mongoc_uri_set_username (uri, user);
    mongoc_uri_set_password (uri, pwd);
+   if (mechanism) {
+      mongoc_uri_set_auth_mechanism (uri, mechanism);
+   }
    client = mongoc_client_new_from_uri (uri);
-   callbacks = mongoc_apm_callbacks_new ();
-   mongoc_apm_set_command_started_cb (callbacks, _cmd_started_scram_cb);
-   mongoc_client_set_apm_callbacks (client, callbacks, &scram_ctx);
-   mongoc_apm_callbacks_destroy (callbacks);
    mongoc_client_set_error_api (client, 2);
    res = mongoc_client_command_simple (client,
                                        "admin",
@@ -249,7 +267,6 @@ _try_auth (const char *user,
    if (should_succeed) {
       ASSERT_OR_PRINT (res, error);
       ASSERT_MATCH (&reply, "{'db': 'admin', 'ok': 1}");
-      ASSERT_CMPSTR (scram_ctx.mechanism_used, mechanism_expected);
    } else {
       ASSERT (!res);
       ASSERT_ERROR_CONTAINS (error,
@@ -261,11 +278,43 @@ _try_auth (const char *user,
    mongoc_client_destroy (client);
 }
 
+/* test the auth tests described in the auth spec. */
 static void
 test_mongoc_scram_auth (void *ctx)
 {
+   /* Auth spec: "Create three test users, one with only SHA-1, one with only
+    * SHA-256 and one with both" */
    _create_scram_users ();
+   /* Auth spec: "For each test user, verify that you can connect and run a
+      command requiring authentication for the following cases:
+      - Explicitly specifying each mechanism the user supports.
+      - Specifying no mechanism and relying on mechanism negotiation."
+   */
+   _try_auth ("sha1", "sha1", NULL, true);
    _try_auth ("sha1", "sha1", "SCRAM-SHA-1", true);
+   _try_auth ("sha256", "sha256", "SCRAM-SHA-256", true);
+   _try_auth ("both", "both", NULL, true);
+   _try_auth ("both", "both", "SCRAM-SHA-1", true);
+   _try_auth ("both", "both", "SCRAM-SHA-256", true);
+
+   /* Auth spec: "For a test user supporting both SCRAM-SHA-1 and SCRAM-SHA-256,
+    * drivers should verify that negotiation selects SCRAM-SHA-256" */
+   /* TODO: CDRIVER-2579, after mechanism is negotiated, SCRAM-SHA-256 should be
+    * the default:
+    * _check_mechanism ("sha256", "sha256", NULL, "SCRAM-SHA-256");
+    * _try_auth ("sha256", "sha256", NULL, true);
+    */
+   _check_mechanism ("sha1", "sha1", NULL, "SCRAM-SHA-1");
+   _check_mechanism ("both", "both", NULL, "SCRAM-SHA-1");
+   _check_mechanism ("both", "both", "SCRAM-SHA-1", "SCRAM-SHA-1");
+   _check_mechanism ("both", "both", "SCRAM-SHA-256", "SCRAM-SHA-256");
+
+   /* Test some failure auths. */
+   _try_auth ("sha1", "bad", NULL, false);
+   _try_auth ("sha256", "bad", NULL, false);
+   _try_auth ("both", "bad", NULL, false);
+   _try_auth ("sha1", "bad", "SCRAM-SHA-256", false);
+   _try_auth ("sha256", "bad", "SCRAM-SHA-1", false);
    _drop_scram_users ();
 }
 
