@@ -53,7 +53,8 @@ mongoc_crypto_init (mongoc_crypto_t *crypto,
       crypto->hmac = mongoc_crypto_common_crypto_hmac_sha256;
       crypto->hash = mongoc_crypto_common_crypto_sha256;
 #elif defined(MONGOC_ENABLE_CRYPTO_CNG)
-/* TODO: CDRIVER-2491 */
+      crypto->hmac = mongoc_crypto_cng_hmac_sha256;
+      crypto->hash = mongoc_crypto_cng_sha256;
 #endif
    }
    BSON_ASSERT (crypto->hmac);

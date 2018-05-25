@@ -34,7 +34,7 @@ _mongoc_crypto_cng_hmac_or_hash (BCRYPT_ALG_HANDLE algorithm,
                                  size_t key_length,
                                  void *data,
                                  size_t data_length,
-                                 void *hmac_out)
+                                 void *output)
 {
    char *hash_object_buffer = 0;
    ULONG hash_object_length = 0;
@@ -89,7 +89,7 @@ _mongoc_crypto_cng_hmac_or_hash (BCRYPT_ALG_HANDLE algorithm,
       goto cleanup;
    }
 
-   status = BCryptFinishHash (hash, mac_out, mac_length, 0);
+   status = BCryptFinishHash (hash, output, mac_length, 0);
    if (!NT_SUCCESS (status)) {
       MONGOC_ERROR ("BCryptFinishHash(): %x", status);
       goto cleanup;
@@ -110,9 +110,9 @@ void
 mongoc_crypto_cng_hmac_sha1 (mongoc_crypto_t *crypto,
                              const void *key,
                              int key_len,
-                             const unsigned char *d,
-                             int n,
-                             unsigned char *md /* OUT */)
+                             const unsigned char *data,
+                             int data_lenn,
+                             unsigned char *hmac_out)
 {
    static BCRYPT_ALG_HANDLE algorithm = 0;
    NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -126,14 +126,15 @@ mongoc_crypto_cng_hmac_sha1 (mongoc_crypto_t *crypto,
       }
    }
 
-   _mongoc_crypto_cng_hmac_or_hash (algorithm, key, key_len, d, n, md);
+   _mongoc_crypto_cng_hmac_or_hash (
+      algorithm, key, key_len, data, data_len, hmac_out);
 }
 
 bool
 mongoc_crypto_cng_sha1 (mongoc_crypto_t *crypto,
                         const unsigned char *input,
                         const size_t input_len,
-                        unsigned char *output /* OUT */)
+                        unsigned char *hash_out)
 {
    static BCRYPT_ALG_HANDLE algorithm = 0;
    NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -148,6 +149,54 @@ mongoc_crypto_cng_sha1 (mongoc_crypto_t *crypto,
    }
 
    return _mongoc_crypto_cng_hmac_or_hash (
-      algorithm, NULL, 0, input, input_len, output);
+      algorithm, NULL, 0, input, input_len, hash_out);
+}
+
+void
+mongoc_crypto_cng_hmac_sha256 (mongoc_crypto_t *crypto,
+                               const void *key,
+                               int key_len,
+                               const unsigned char *data,
+                               int data_lenn,
+                               unsigned char *hmac_out)
+{
+   static BCRYPT_ALG_HANDLE algorithm = 0;
+   NTSTATUS status = STATUS_UNSUCCESSFUL;
+
+   if (!algorithm) {
+      status = BCryptOpenAlgorithmProvider (&algorithm,
+                                            BCRYPT_SHA256_ALGORITHM,
+                                            NULL,
+                                            BCRYPT_ALG_HANDLE_HMAC_FLAG);
+      if (!NT_SUCCESS (status)) {
+         MONGOC_ERROR ("BCryptOpenAlgorithmProvider(): %x", status);
+         return;
+      }
+   }
+
+   _mongoc_crypto_cng_hmac_or_hash (
+      algorithm, key, key_len, data, data_len, hmac_out);
+}
+
+bool
+mongoc_crypto_cng_sha256 (mongoc_crypto_t *crypto,
+                          const unsigned char *input,
+                          const size_t input_len,
+                          unsigned char *hash_out)
+{
+   static BCRYPT_ALG_HANDLE algorithm = 0;
+   NTSTATUS status = STATUS_UNSUCCESSFUL;
+
+   if (!algorithm) {
+      status = BCryptOpenAlgorithmProvider (
+         &algorithm, BCRYPT_SHA256_ALGORITHM, NULL, 0);
+      if (!NT_SUCCESS (status)) {
+         MONGOC_ERROR ("BCryptOpenAlgorithmProvider(): %x", status);
+         return false;
+      }
+   }
+
+   return _mongoc_crypto_cng_hmac_or_hash (
+      algorithm, NULL, 0, input, input_len, hash_out);
 }
 #endif
