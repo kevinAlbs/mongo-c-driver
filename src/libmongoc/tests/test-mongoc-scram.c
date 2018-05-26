@@ -320,6 +320,23 @@ test_mongoc_scram_auth (void *ctx)
    _drop_scram_users ();
 }
 
+static bool
+_skip_if_no_sha256 ()
+{
+   mongoc_uri_t *uri;
+   mongoc_client_t *client;
+
+   uri = test_framework_get_uri ();
+   mongoc_uri_set_auth_mechanism (uri, "SCRAM-SHA-256");
+   client = mongoc_client_new_from_uri (uri);
+   return mongoc_client_command_simple (client,
+                                        "admin",
+                                        tmp_bson ("{'dbstats': 1}"),
+                                        NULL /* read_prefs. */,
+                                        NULL /* reply */,
+                                        NULL /* error */);
+}
+
 void
 test_scram_install (TestSuite *suite)
 {
@@ -335,7 +352,9 @@ test_scram_install (TestSuite *suite)
                       test_mongoc_scram_auth,
                       NULL /* dtor */,
                       NULL /* ctx */,
-                      skip_if_scram_auth_not_enabled,
+                      test_framework_skip_if_no_auth,
+                      test_framework_skip_if_max_wire_version_less_than_6,
+                      _skip_if_no_sha256,
                       TestSuite_CheckLive);
 #endif
 }
