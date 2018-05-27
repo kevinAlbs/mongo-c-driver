@@ -544,8 +544,9 @@ else ()
 endif () # ENABLE_SSL
 
 
+set (SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cluster-sasl.c)
+
 if (MONGOC_ENABLE_SASL)
-   set (SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cluster-sasl.c)
    set (SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-sasl.c)
    if (MONGOC_ENABLE_SASL_CYRUS)
       message (STATUS "Compiling against Cyrus SASL")

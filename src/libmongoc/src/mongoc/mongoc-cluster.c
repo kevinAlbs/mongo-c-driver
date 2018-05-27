@@ -26,9 +26,7 @@
 #include "mongoc-error.h"
 #include "mongoc-host-list-private.h"
 #include "mongoc-log.h"
-#ifdef MONGOC_ENABLE_SASL
 #include "mongoc-cluster-sasl-private.h"
-#endif
 #ifdef MONGOC_ENABLE_SSL
 #include "mongoc-ssl.h"
 #include "mongoc-ssl-private.h"

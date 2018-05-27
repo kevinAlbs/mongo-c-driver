@@ -18,7 +18,6 @@
 #include <bson.h>
 #include "mongoc-config.h"
 
-#ifdef MONGOC_ENABLE_SASL
 #include "mongoc-cluster-private.h"
 #include "mongoc-log.h"
 #include "mongoc-trace-private.h"
@@ -26,6 +25,8 @@
 #include "mongoc-stream-socket.h"
 #include "mongoc-error.h"
 #include "mongoc-util-private.h"
+
+#ifdef MONGOC_ENABLE_SASL
 
 #ifdef MONGOC_ENABLE_SASL_CYRUS
 #include "mongoc-cluster-cyrus-private.h"

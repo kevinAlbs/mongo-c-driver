@@ -131,12 +131,6 @@ test_mongoc_scram_sasl_prep (void)
 }
 #endif
 
-static bool
-skip_if_scram_auth_not_enabled (void)
-{
-   return true; /* TODO */
-}
-
 static void
 _create_scram_users (void)
 {
@@ -347,6 +341,7 @@ test_scram_install (TestSuite *suite)
    TestSuite_Add (suite, "/scram/sasl_prep", test_mongoc_scram_sasl_prep);
    TestSuite_Add (
       suite, "/scram/iteration_count", test_mongoc_scram_iteration_count);
+#endif
    TestSuite_AddFull (suite,
                       "/scram/auth_tests",
                       test_mongoc_scram_auth,
@@ -356,5 +351,4 @@ test_scram_install (TestSuite *suite)
                       test_framework_skip_if_max_wire_version_less_than_6,
                       _skip_if_no_sha256,
                       TestSuite_CheckLive);
-#endif
 }
