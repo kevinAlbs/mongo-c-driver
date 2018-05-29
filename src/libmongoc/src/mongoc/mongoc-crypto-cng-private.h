@@ -30,7 +30,7 @@
 
 BSON_BEGIN_DECLS
 
-MONGOC_EXPORT (void)
+void
 mongoc_crypto_cng_hmac_sha1 (mongoc_crypto_t *crypto,
                              const void *key,
                              int key_len,
@@ -38,13 +38,13 @@ mongoc_crypto_cng_hmac_sha1 (mongoc_crypto_t *crypto,
                              int data_len,
                              unsigned char *hmac_out);
 
-MONGOC_EXPORT (bool)
+bool
 mongoc_crypto_cng_sha1 (mongoc_crypto_t *crypto,
                         const unsigned char *input,
                         const size_t input_len,
                         unsigned char *hash_out);
 
-MONGOC_EXPORT (void)
+void
 mongoc_crypto_cng_hmac_sha256 (mongoc_crypto_t *crypto,
                                const void *key,
                                int key_len,
@@ -52,7 +52,7 @@ mongoc_crypto_cng_hmac_sha256 (mongoc_crypto_t *crypto,
                                int data_len,
                                unsigned char *hmac_out);
 
-MONGOC_EXPORT (bool)
+bool
 mongoc_crypto_cng_sha256 (mongoc_crypto_t *crypto,
                           const unsigned char *input,
                           const size_t input_len,
