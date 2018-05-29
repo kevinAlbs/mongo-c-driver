@@ -319,16 +319,20 @@ _skip_if_no_sha256 ()
 {
    mongoc_uri_t *uri;
    mongoc_client_t *client;
+   bool res;
 
    uri = test_framework_get_uri ();
    mongoc_uri_set_auth_mechanism (uri, "SCRAM-SHA-256");
    client = mongoc_client_new_from_uri (uri);
-   return mongoc_client_command_simple (client,
+   res = mongoc_client_command_simple (client,
                                         "admin",
                                         tmp_bson ("{'dbstats': 1}"),
-                                        NULL /* read_prefs. */,
+                                        NULL /* read_prefs */,
                                         NULL /* reply */,
                                         NULL /* error */);
+   mongoc_uri_destroy (uri);
+   mongoc_client_destroy (client);
+   return res;
 }
 
 void
