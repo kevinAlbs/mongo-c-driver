@@ -111,7 +111,7 @@ mongoc_crypto_cng_hmac_sha1 (mongoc_crypto_t *crypto,
                              const void *key,
                              int key_len,
                              const unsigned char *data,
-                             int data_lenn,
+                             int data_len,
                              unsigned char *hmac_out)
 {
    static BCRYPT_ALG_HANDLE algorithm = 0;
@@ -157,7 +157,7 @@ mongoc_crypto_cng_hmac_sha256 (mongoc_crypto_t *crypto,
                                const void *key,
                                int key_len,
                                const unsigned char *data,
-                               int data_lenn,
+                               int data_len,
                                unsigned char *hmac_out)
 {
    static BCRYPT_ALG_HANDLE algorithm = 0;
