@@ -244,7 +244,6 @@ _try_auth (const char *user,
    bson_t reply;
    bool res;
 
-   printf ("%s %s %s\n", user, pwd, mechanism);
    uri = test_framework_get_uri ();
    mongoc_uri_set_username (uri, user);
    mongoc_uri_set_password (uri, pwd);

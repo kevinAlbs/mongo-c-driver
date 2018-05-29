@@ -39,14 +39,14 @@ SCRAM-SHA-1 and SCRAM-SHA-256 credentials:
 
 .. code-block:: none
 
-  mongoc_client_t *client =  mongoc_client_new ("mongodb://user:password@localhost?authSource=mydb");
+  mongoc_client_t *client =  mongoc_client_new ("mongodb://user:password@localhost/?authSource=mydb");
   /* the correct authMechanism is negotiated between the driver and server. */
 
 Alternatively, SCRAM-SHA-256 can be explicitly specified as an authMechanism.
 
 .. code-block:: none
 
-  mongoc_client_t *client =  mongoc_client_new ("mongodb://user:password@localhost?authMechanism=SCRAM-SHA-256&authSource=mydb");
+  mongoc_client_t *client =  mongoc_client_new ("mongodb://user:password@localhost/?authMechanism=SCRAM-SHA-256&authSource=mydb");
 
 Passwords for SCRAM-SHA-256 undergo the preprocessing step known as SASLPrep
 specified in `RFC 4013 <https://tools.ietf.org/html/rfc4013>`_. SASLPrep will
