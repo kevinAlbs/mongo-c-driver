@@ -379,6 +379,7 @@ set (SOURCES ${SOURCES}
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-client.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-client-pool.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cluster.c
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cluster-sasl.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-collection.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-compression.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-counters.c
@@ -542,9 +543,6 @@ if (NOT ENABLE_SSL STREQUAL OFF)
 else ()
    message (STATUS "SSL disabled")
 endif () # ENABLE_SSL
-
-
-set (SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cluster-sasl.c)
 
 if (MONGOC_ENABLE_SASL)
    set (SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-sasl.c)
