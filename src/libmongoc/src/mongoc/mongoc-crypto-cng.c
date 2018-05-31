@@ -43,17 +43,17 @@ mongoc_crypto_cng_init (void)
 {
    NTSTATUS status = STATUS_UNSUCCESSFUL;
    memset (&_sha1_hash, 0, sizeof (_sha1_hash));
-   mongoc_mutex_init (&_sha1_hash->mutex);
+   mongoc_mutex_init (&_sha1_hash.mutex);
    status = BCryptOpenAlgorithmProvider (
-      &_sha1_hash->algo, BCRYPT_SHA1_ALGORITHM, NULL, 0);
+      &_sha1_hash.algo, BCRYPT_SHA1_ALGORITHM, NULL, 0);
    if (!NT_SUCCESS (status)) {
       MONGOC_ERROR ("BCryptOpenAlgorithmProvider(SHA1): %x", status);
    }
 
    memset (&_sha1_hmac, 0, sizeof (_sha1_hmac));
-   mongoc_mutex_init (&_sha1_hmac->mutex);
+   mongoc_mutex_init (&_sha1_hmac.mutex);
 
-   status = BCryptOpenAlgorithmProvider (&_sha1_hmac->algo,
+   status = BCryptOpenAlgorithmProvider (&_sha1_hmac.algo,
                                          BCRYPT_SHA1_ALGORITHM,
                                          NULL,
                                          BCRYPT_ALG_HANDLE_HMAC_FLAG);
@@ -62,16 +62,16 @@ mongoc_crypto_cng_init (void)
    }
 
    memset (&_sha256_hash, 0, sizeof (_sha256_hash));
-   mongoc_mutex_init (&_sha256_hash->mutex);
+   mongoc_mutex_init (&_sha256_hash.mutex);
    status = BCryptOpenAlgorithmProvider (
-      &_sha256_hash->algo, BCRYPT_SHA256_ALGORITHM, NULL, 0);
+      &_sha256_hash.algo, BCRYPT_SHA256_ALGORITHM, NULL, 0);
    if (!NT_SUCCESS (status)) {
       MONGOC_ERROR ("BCryptOpenAlgorithmProvider(SHA256): %x", status);
    }
 
    memset (&_sha256_hmac, 0, sizeof (_sha256_hmac));
-   mongoc_mutex_init (&_sha256_hmac->mutex);
-   status = BCryptOpenAlgorithmProvider (&_sha256_hash->algo,
+   mongoc_mutex_init (&_sha256_hmac.mutex);
+   status = BCryptOpenAlgorithmProvider (&_sha256_hash.algo,
                                          BCRYPT_SHA256_ALGORITHM,
                                          NULL,
                                          BCRYPT_ALG_HANDLE_HMAC_FLAG);
@@ -185,16 +185,16 @@ mongoc_crypto_cng_hmac_sha1 (mongoc_crypto_t *crypto,
 {
    NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-   mongoc_mutex_lock (&_sha1_hmac->mutex);
+   mongoc_mutex_lock (&_sha1_hmac.mutex);
 
-   if (!_sha1_hmac->algo) {
-      mongoc_mutex_unlock (&_sha1_hmac->mutex);
+   if (!_sha1_hmac.algo) {
+      mongoc_mutex_unlock (&_sha1_hmac.mutex);
       return;
    }
 
    _mongoc_crypto_cng_hmac_or_hash (
-      _sha1_hmac->algo, key, key_len, data, data_len, hmac_out);
-   mongoc_mutex_unlock (&_sha1_hmac->mutex);
+      _sha1_hmac.algo, key, key_len, data, data_len, hmac_out);
+   mongoc_mutex_unlock (&_sha1_hmac.mutex);
 }
 
 bool
@@ -206,15 +206,15 @@ mongoc_crypto_cng_sha1 (mongoc_crypto_t *crypto,
    NTSTATUS status = STATUS_UNSUCCESSFUL;
    bool res;
 
-   mongoc_mutex_lock (&_sha1_hash->mutex);
-   if (!_sha1_hash->algo) {
-      mongoc_mutex_unlock (&_sha1_hash->mutex);
+   mongoc_mutex_lock (&_sha1_hash.mutex);
+   if (!_sha1_hash.algo) {
+      mongoc_mutex_unlock (&_sha1_hash.mutex);
       return false;
    }
 
    res = _mongoc_crypto_cng_hmac_or_hash (
-      _sha1_hash->algo, NULL, 0, input, input_len, hash_out);
-   mongoc_mutex_unlock (&_sha1_hash->mutex);
+      _sha1_hash.algo, NULL, 0, input, input_len, hash_out);
+   mongoc_mutex_unlock (&_sha1_hash.mutex);
    return res;
 }
 
@@ -228,16 +228,16 @@ mongoc_crypto_cng_hmac_sha256 (mongoc_crypto_t *crypto,
 {
    NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-   mongoc_mutex_lock (&_sha256_hmac->mutex);
+   mongoc_mutex_lock (&_sha256_hmac.mutex);
 
-   if (!_sha256_hmac->algo) {
-      mongoc_mutex_unlock (&_sha256_hmac->mutex);
+   if (!_sha256_hmac.algo) {
+      mongoc_mutex_unlock (&_sha256_hmac.mutex);
       return;
    }
 
    _mongoc_crypto_cng_hmac_or_hash (
-      _sha256_hmac->algo, key, key_len, data, data_len, hmac_out);
-   mongoc_mutex_unlock (&_sha256_hmac->mutex);
+      _sha256_hmac.algo, key, key_len, data, data_len, hmac_out);
+   mongoc_mutex_unlock (&_sha256_hmac.mutex);
 }
 
 bool
@@ -249,14 +249,14 @@ mongoc_crypto_cng_sha256 (mongoc_crypto_t *crypto,
    NTSTATUS status = STATUS_UNSUCCESSFUL;
    bool res;
 
-   mongoc_mutex_lock (&_sha256_hash->mutex);
-   if (!_sha256_hash->algo) {
-      mongoc_mutex_unlock (&_sha256_hash->mutex);
+   mongoc_mutex_lock (&_sha256_hash.mutex);
+   if (!_sha256_hash.algo) {
+      mongoc_mutex_unlock (&_sha256_hash.mutex);
       return false;
    }
 
    res = _mongoc_crypto_cng_hmac_or_hash (
-      _sha256_hash->algo, NULL, 0, input, input_len, hash_out);
+      _sha256_hash.algo, NULL, 0, input, input_len, hash_out);
    return res;
 }
 #endif
