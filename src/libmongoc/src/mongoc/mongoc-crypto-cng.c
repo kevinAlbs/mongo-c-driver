@@ -71,7 +71,7 @@ mongoc_crypto_cng_init (void)
 
    memset (&_sha256_hmac, 0, sizeof (_sha256_hmac));
    mongoc_mutex_init (&_sha256_hmac.mutex);
-   status = BCryptOpenAlgorithmProvider (&_sha256_hash.algo,
+   status = BCryptOpenAlgorithmProvider (&_sha256_hmac.algo,
                                          BCRYPT_SHA256_ALGORITHM,
                                          NULL,
                                          BCRYPT_ALG_HANDLE_HMAC_FLAG);
