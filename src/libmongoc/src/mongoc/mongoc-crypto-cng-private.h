@@ -31,10 +31,10 @@
 BSON_BEGIN_DECLS
 
 void
-mongoc_crypto_cng_init ();
+mongoc_crypto_cng_init (void);
 
 void
-mongoc_crypto_cng_cleanup ();
+mongoc_crypto_cng_cleanup (void);
 
 void
 mongoc_crypto_cng_hmac_sha1 (mongoc_crypto_t *crypto,
