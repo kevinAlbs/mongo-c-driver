@@ -19,7 +19,7 @@
 #include "mongoc-crypto-private.h"
 #include "mongoc-crypto-cng-private.h"
 #include "mongoc-log.h"
-#include "mongoc-thread-private"
+#include "mongoc-thread-private.h"
 
 #include <windows.h>
 #include <stdio.h>
