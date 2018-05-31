@@ -31,6 +31,7 @@
 #include "mongoc-thread-private.h"
 #include "common-b64-private.h"
 #if defined(MONGOC_ENABLE_CRYPTO_CNG)
+#include "mongoc-crypto-private.h"
 #include "mongoc-crypto-cng-private.h"
 #endif
 
