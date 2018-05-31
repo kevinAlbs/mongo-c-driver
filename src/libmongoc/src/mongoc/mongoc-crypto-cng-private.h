@@ -31,6 +31,12 @@
 BSON_BEGIN_DECLS
 
 void
+mongoc_crypto_cng_init ();
+
+void
+mongoc_crypto_cng_cleanup ();
+
+void
 mongoc_crypto_cng_hmac_sha1 (mongoc_crypto_t *crypto,
                              const void *key,
                              int key_len,
