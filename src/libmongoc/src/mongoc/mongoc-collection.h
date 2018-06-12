@@ -334,6 +334,13 @@ MONGOC_EXPORT (mongoc_change_stream_t *)
 mongoc_collection_watch (const mongoc_collection_t *coll,
                          const bson_t *pipeline,
                          const bson_t *opts);
+int64_t
+mongoc_collection_count_documents (mongoc_collection_t *coll,
+                                   const bson_t *query,
+                                   const mongoc_read_prefs_t *read_prefs,
+                                   const bson_t *opts,
+                                   bson_t *reply,
+                                   bson_error_t *error);
 
 BSON_END_DECLS
 

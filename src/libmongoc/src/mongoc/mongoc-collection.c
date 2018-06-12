@@ -964,6 +964,97 @@ mongoc_collection_count_with_opts (
    RETURN (ret);
 }
 
+/* --------------------------------------------------------------------------
+ *
+ * _make_aggregate_for_count --
+ *
+ *       Construct an aggregate pipeline with the following form:
+ *       { pipeline: [ { $group: { _id: null, n: { sum: 1 } } }.
+ *
+ *--------------------------------------------------------------------------
+ */
+static void _make_aggregate_for_count (const mongoc_collection_t* coll, const bson_t* opts, bson_t* out) {
+   bson_iter_t iter;
+   bson_t pipeline;
+   bson_t group_stage;
+   bson_t group_stage_doc;
+   bson_t sum;
+   bson_t empty;
+   bool has_skip = false;
+
+   bson_init (out);
+   bson_append_utf8 (out, "aggregate", 9, coll->collection, coll->collectionlen);
+   bson_append_document_begin (out, "cursor", 6, &empty);
+   bson_append_document_end (out, &empty);
+   bson_append_array_begin (out, "pipeline", 8, &pipeline);
+   bson_append_document_begin (&pipeline, "0", 1, &group_stage);
+   bson_append_document_begin (&group_stage, "$group", 6, &group_stage_doc);
+   bson_append_null (&group_stage_doc, "_id", 3);
+   bson_append_document_begin (&group_stage_doc, "n", 1, &sum);
+   bson_append_int32 (&sum, "sum", 3, 1);
+   bson_append_document_end (&group_stage_doc, &sum);
+   bson_append_document_end (&group_stage, &group_stage_doc);
+   bson_append_document_end (&pipeline, &group_stage);
+   /* if @opts includes "skip", or "count", append $skip and $count stages to
+    * the aggregate pipeline. */
+   if (opts && bson_iter_init_find (&iter, opts, "skip")) {
+      bson_t skip_stage;
+      has_skip = true;
+      bson_append_document_begin (&pipeline, "1", 1, &skip_stage);
+      bson_append_value (&skip_stage, "$skip", 5, bson_iter_value (&iter));
+      bson_append_document_end (&pipeline, &skip_stage);
+   }
+   if (opts && bson_iter_init_find (&iter, opts, "limit")) {
+      const char* key = has_skip ? "2" : "1";
+      bson_t limit_stage;
+      bson_append_document_begin (&pipeline, key, 1, &limit_stage);
+      bson_append_value (&limit_stage, "$limit", 6, bson_iter_value (&iter));
+      bson_append_document_end (&pipeline, &limit_stage);
+   }
+   bson_append_array_end (out, &pipeline);
+}
+
+int64_t
+mongoc_collection_count_documents (mongoc_collection_t *coll,
+                                   const bson_t *query,
+                                   const mongoc_read_prefs_t *read_prefs,
+                                   const bson_t *opts,
+                                   bson_t *reply,
+                                   bson_error_t *error) {
+   bson_t aggregate_cmd;
+   bson_t aggregate_opts;
+   bool ret;
+   const bson_t* result;
+   mongoc_cursor_t* cursor;
+
+   BSON_ASSERT (coll);
+   BSON_ASSERT (query);
+
+   _make_aggregate_for_count (coll, opts, &aggregate_cmd);
+   bson_init (&aggregate_opts);
+   if (opts) {
+      bson_copy_to_excluding_noinit (opts, &aggregate_opts, "skip", "limit");
+   }
+
+   ret = mongoc_collection_read_command_with_opts (coll, &aggregate_cmd, read_prefs, opts, reply, error);
+   bson_destroy (&aggregate_cmd);
+
+   if (!ret) {
+      return -1;
+   }
+
+   /* cursor = mongoc_cursor_new_from_command_reply_with_opts (); */
+}
+
+int64_t
+mongoc_collection_estimate_document_count (mongoc_collection_t *coll,
+                                   const mongoc_read_prefs_t *read_prefs,
+                                   const bson_t *opts,
+                                   bson_t *reply,
+                                   bson_error_t *error) {
+
+}
+
 
 /*
  *--------------------------------------------------------------------------

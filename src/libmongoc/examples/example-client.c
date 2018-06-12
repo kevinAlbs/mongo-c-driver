@@ -46,6 +46,13 @@ main (int argc, char *argv[])
 #endif
 
    collection = mongoc_client_get_collection (client, "test", collection_name);
+
+   do {
+      bson_t query = BSON_INITIALIZER;
+      bson_t* opts = BCON_NEW ("skip", BCON_INT32(64), "limit", BCON_INT32(5));
+      mongoc_collection_count_documents (collection, &query, NULL, opts, NULL, NULL);
+   } while (0);
+
    cursor = mongoc_collection_find_with_opts (
       collection,
       &query,
