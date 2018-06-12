@@ -531,9 +531,11 @@ mongoc_server_description_handle_ismaster (mongoc_server_description_t *sd,
       if (strcmp ("ok", bson_iter_key (&iter)) == 0) {
          if (!bson_iter_as_bool (&iter)) {
             uint32_t unused;
-            const char *msg;
+            const char *msg = NULL;
             _mongoc_parse_error_reply (ismaster_response, false, &unused, &msg);
-            bson_strncpy (sd->error.message, msg, sizeof (error->message));
+            if (msg) {
+               bson_strncpy (sd->error.message, msg, sizeof (error->message));
+            }
             /* ismaster response returned ok: 0. According to auth spec: "If the
              * isMaster of the MongoDB Handshake fails with an error, drivers
              * MUST treat this an an authentication error." */
