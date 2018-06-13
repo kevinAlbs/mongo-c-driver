@@ -373,10 +373,8 @@ test_mongoc_scram_auth (void *ctx)
    /* Auth spec: "Create three test users, one with only SHA-1, one with only
     * SHA-256 and one with both" */
    _create_scram_users ();
-
    _test_mongoc_scram_auth (false);
    _test_mongoc_scram_auth (true);
-
    _drop_scram_users ();
 }
 
@@ -401,6 +399,83 @@ _skip_if_no_sha256 ()
    return res ? 1 : 0;
 }
 
+#define ROMAN_NUMERAL_NINE "\xE2\x85\xA8"
+#define ROMAN_NUMERAL_FOUR "\xE2\x85\xA3"
+
+static bool
+skip_if_no_icu (void)
+{
+#ifdef MONGOC_ENABLE_ICU
+   return true;
+#else
+   return false;
+#endif
+}
+
+static void
+_create_saslprep_users ()
+{
+   mongoc_client_t *client;
+   bool res;
+   bson_error_t error;
+   client = test_framework_client_new ();
+   res = mongoc_client_command_simple (
+      client,
+      "admin",
+      tmp_bson ("{'createUser': 'IX', 'pwd': 'IX', 'roles': ['root'], "
+                "'mechanisms': ['SCRAM-SHA-256']}"),
+      NULL /* read_prefs */,
+      NULL /* reply */,
+      &error);
+   ASSERT_OR_PRINT (res, error);
+   res = mongoc_client_command_simple (
+      client,
+      "admin",
+      tmp_bson ("{'createUser': '" ROMAN_NUMERAL_NINE
+                "', 'pwd': '" ROMAN_NUMERAL_FOUR
+                "', 'roles': ['root'], 'mechanisms': ['SCRAM-SHA-256']}"),
+      NULL /* read_prefs */,
+      NULL /* reply */,
+      &error);
+   ASSERT_OR_PRINT (res, error);
+   mongoc_client_destroy (client);
+}
+
+static void
+_drop_saslprep_users ()
+{
+   mongoc_client_t *client;
+   mongoc_database_t *db;
+   bool res;
+   bson_error_t error;
+   client = test_framework_client_new ();
+   db = mongoc_client_get_database (client, "admin");
+   res = mongoc_database_remove_user (db, "IX", &error);
+   ASSERT_OR_PRINT (res, error);
+   res = mongoc_database_remove_user (db, ROMAN_NUMERAL_NINE, &error);
+   ASSERT_OR_PRINT (res, error);
+   mongoc_database_destroy (db);
+   mongoc_client_destroy (client);
+}
+
+static void
+_test_mongoc_scram_saslprep_auth (bool pooled)
+{
+   _try_auth (pooled, "IX", "IX", NULL, true);
+   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, true);
+   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, true);
+   _try_auth (pooled, ROMAN_NUMERAL_NINE, ROMAN_NUMERAL_FOUR, NULL, true);
+}
+
+static void
+test_mongoc_saslprep_auth (void *ctx)
+{
+   _create_saslprep_users ();
+   _test_mongoc_scram_saslprep_auth (false);
+   _test_mongoc_scram_saslprep_auth (true);
+   _drop_saslprep_users ();
+}
+
 void
 test_scram_install (TestSuite *suite)
 {
@@ -420,5 +495,15 @@ test_scram_install (TestSuite *suite)
                       test_framework_skip_if_no_auth,
                       test_framework_skip_if_max_wire_version_less_than_6,
                       _skip_if_no_sha256,
+                      TestSuite_CheckLive);
+   TestSuite_AddFull (suite,
+                      "/scram/saslprep_auth",
+                      test_mongoc_saslprep_auth,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_no_auth,
+                      test_framework_skip_if_max_wire_version_less_than_6,
+                      _skip_if_no_sha256,
+                      skip_if_no_icu,
                       TestSuite_CheckLive);
 }
