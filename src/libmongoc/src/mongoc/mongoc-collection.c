@@ -973,7 +973,11 @@ mongoc_collection_count_with_opts (
  *
  *--------------------------------------------------------------------------
  */
-static void _make_aggregate_for_count (const mongoc_collection_t* coll, const bson_t* opts, bson_t* out) {
+static void
+_make_aggregate_for_count (const mongoc_collection_t *coll,
+                           const bson_t *opts,
+                           bson_t *out)
+{
    bson_iter_t iter;
    bson_t pipeline;
    bson_t group_stage;
@@ -983,7 +987,8 @@ static void _make_aggregate_for_count (const mongoc_collection_t* coll, const bs
    bool has_skip = false;
 
    bson_init (out);
-   bson_append_utf8 (out, "aggregate", 9, coll->collection, coll->collectionlen);
+   bson_append_utf8 (
+      out, "aggregate", 9, coll->collection, coll->collectionlen);
    bson_append_document_begin (out, "cursor", 6, &empty);
    bson_append_document_end (out, &empty);
    bson_append_array_begin (out, "pipeline", 8, &pipeline);
@@ -1005,7 +1010,7 @@ static void _make_aggregate_for_count (const mongoc_collection_t* coll, const bs
       bson_append_document_end (&pipeline, &skip_stage);
    }
    if (opts && bson_iter_init_find (&iter, opts, "limit")) {
-      const char* key = has_skip ? "2" : "1";
+      const char *key = has_skip ? "2" : "1";
       bson_t limit_stage;
       bson_append_document_begin (&pipeline, key, 1, &limit_stage);
       bson_append_value (&limit_stage, "$limit", 6, bson_iter_value (&iter));
@@ -1020,39 +1025,58 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
                                    const mongoc_read_prefs_t *read_prefs,
                                    const bson_t *opts,
                                    bson_t *reply,
-                                   bson_error_t *error) {
+                                   bson_error_t *error)
+{
    bson_t aggregate_cmd;
    bson_t aggregate_opts;
    bool ret;
-   const bson_t* result;
-   mongoc_cursor_t* cursor;
+   const bson_t *result;
+   mongoc_cursor_t *cursor;
+   int64_t count = -1;
+   bson_t reply_local;
+   bson_t *reply_ptr;
 
    BSON_ASSERT (coll);
    BSON_ASSERT (query);
 
+   reply_ptr = reply ? reply : &reply_local;
    _make_aggregate_for_count (coll, opts, &aggregate_cmd);
    bson_init (&aggregate_opts);
    if (opts) {
       bson_copy_to_excluding_noinit (opts, &aggregate_opts, "skip", "limit");
    }
 
-   ret = mongoc_collection_read_command_with_opts (coll, &aggregate_cmd, read_prefs, opts, reply, error);
+   ret = mongoc_collection_read_command_with_opts (
+      coll, &aggregate_cmd, read_prefs, opts, reply_ptr, error);
    bson_destroy (&aggregate_cmd);
-
    if (!ret) {
-      return -1;
+      goto done;
    }
 
-   /* cursor = mongoc_cursor_new_from_command_reply_with_opts (); */
+   cursor = mongoc_cursor_new_from_command_reply_with_opts (
+      coll->client, reply_ptr, opts);
+   BSON_ASSERT (mongoc_cursor_get_id (cursor) == 0);
+   ret = mongoc_cursor_next (cursor, &result);
+   mongoc_cursor_destroy (cursor);
+   if (!ret) {
+      goto done;
+   }
+
+done:
+   if (!reply) {
+      bson_destroy (&reply_local);
+   }
+   return count;
 }
 
 int64_t
-mongoc_collection_estimate_document_count (mongoc_collection_t *coll,
-                                   const mongoc_read_prefs_t *read_prefs,
-                                   const bson_t *opts,
-                                   bson_t *reply,
-                                   bson_error_t *error) {
-
+mongoc_collection_estimate_document_count (
+   mongoc_collection_t *coll,
+   const mongoc_read_prefs_t *read_prefs,
+   const bson_t *opts,
+   bson_t *reply,
+   bson_error_t *error)
+{
 }
 
 
@@ -3165,8 +3189,9 @@ retry:
       retry_server_stream =
          mongoc_cluster_stream_for_writes (cluster, &ignored_error);
 
-      if (retry_server_stream && retry_server_stream->sd->max_wire_version >=
-                                    WIRE_VERSION_RETRY_WRITES) {
+      if (retry_server_stream &&
+          retry_server_stream->sd->max_wire_version >=
+             WIRE_VERSION_RETRY_WRITES) {
          parts.assembled.server_stream = retry_server_stream;
          GOTO (retry);
       }
