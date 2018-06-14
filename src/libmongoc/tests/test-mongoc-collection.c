@@ -2420,7 +2420,7 @@ test_count_documents_live (void)
    count = mongoc_collection_count_documents (
       collection, tmp_bson ("{}"), NULL, NULL, NULL, &error);
 
-   ASSERT (count != -1);
+   ASSERT_OR_PRINT (count != -1, error);
 
    mongoc_collection_destroy (collection);
    mongoc_client_destroy (client);
