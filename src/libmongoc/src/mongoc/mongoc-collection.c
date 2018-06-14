@@ -893,8 +893,10 @@ mongoc_collection_count (mongoc_collection_t *collection,       /* IN */
    /* Server Selection Spec: "may-use-secondary" commands SHOULD take a read
     * preference argument and otherwise MUST use the default read preference
     * from client, database or collection configuration. */
+   BEGIN_IGNORE_DEPRECATIONS
    ret = mongoc_collection_count_with_opts (
       collection, flags, query, skip, limit, &opts, read_prefs, error);
+   END_IGNORE_DEPRECATIONS
 
    bson_destroy (&opts);
    return ret;
@@ -1088,7 +1090,7 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
    bson_t aggregate_opts;
    bool ret;
    const bson_t *result;
-   mongoc_cursor_t *cursor;
+   mongoc_cursor_t *cursor = NULL;
    int64_t count = -1;
    bson_t cmd_reply;
    bson_iter_t iter;
@@ -1122,7 +1124,6 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
       coll->client, &cmd_reply, opts);
    BSON_ASSERT (mongoc_cursor_get_id (cursor) == 0);
    ret = mongoc_cursor_next (cursor, &result);
-   mongoc_cursor_destroy (cursor);
    if (!ret) {
       GOTO (done);
    }
@@ -1133,6 +1134,9 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
    }
 
 done:
+   if (cursor) {
+      mongoc_cursor_destroy (cursor);
+   }
    RETURN (count);
 }
 
