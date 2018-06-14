@@ -1127,8 +1127,12 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
    BSON_ASSERT (mongoc_cursor_get_id (cursor) == 0);
    ret = mongoc_cursor_next (cursor, &result);
    if (!ret) {
-      mongoc_cursor_error (cursor, error);
-      GOTO (done);
+      if (mongoc_cursor_error (cursor, error)) {
+         GOTO (done);
+      } else {
+         count = 0;
+         GOTO (done);
+      }
    }
 
    if (bson_iter_init_find (&iter, result, "n") &&
