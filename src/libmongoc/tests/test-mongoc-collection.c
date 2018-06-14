@@ -655,8 +655,8 @@ test_insert_many (void)
 
    ASSERT_CMPINT32 (bson_lookup_int32 (&reply, "insertedCount"), ==, 10);
    bson_destroy (&reply);
-   count = mongoc_collection_count (
-      collection, MONGOC_QUERY_NONE, &q, 0, 0, NULL, &error);
+   count = mongoc_collection_count_documents (
+      collection, &q, NULL, NULL, NULL, &error);
    ASSERT (count == 5);
 
    for (i = 8; i < 10; i++) {
@@ -676,8 +676,8 @@ test_insert_many (void)
    ASSERT_CMPINT32 (bson_lookup_int32 (&reply, "insertedCount"), ==, 0);
    bson_destroy (&reply);
 
-   count = mongoc_collection_count (
-      collection, MONGOC_QUERY_NONE, &q, 0, 0, NULL, &error);
+   count = mongoc_collection_count_documents (
+      collection, &q, NULL, NULL, NULL, &error);
    ASSERT (count == 5);
 
    r = mongoc_collection_insert_many (collection,
@@ -691,8 +691,8 @@ test_insert_many (void)
    ASSERT_CMPINT32 (bson_lookup_int32 (&reply, "insertedCount"), ==, 2);
    bson_destroy (&reply);
 
-   count = mongoc_collection_count (
-      collection, MONGOC_QUERY_NONE, &q, 0, 0, NULL, &error);
+   count = mongoc_collection_count_documents (
+      collection, &q, NULL, NULL, NULL, &error);
    ASSERT (count == 6);
 
    /* test validate */
@@ -1023,8 +1023,8 @@ test_regex (void)
 
    BSON_APPEND_REGEX (&q, "hello", "^/wo", "i");
 
-   count = mongoc_collection_count (
-      collection, MONGOC_QUERY_NONE, &q, 0, 0, NULL, &error);
+   count = mongoc_collection_count_documents (
+      collection, &q, NULL, NULL, NULL, &error);
 
    ASSERT (count > 0);
    ASSERT_OR_PRINT (mongoc_collection_drop (collection, &error), error);
@@ -1079,8 +1079,8 @@ test_decimal128 (void *ctx)
    }
    ASSERT (r);
 
-   count = mongoc_collection_count (
-      collection, MONGOC_QUERY_NONE, &query, 0, 0, NULL, &error);
+   count = mongoc_collection_count_documents (
+      collection, &query, NULL, NULL, NULL, &error);
    ASSERT (count > 0);
 
    cursor = mongoc_collection_find (
@@ -2163,8 +2163,8 @@ _test_count_read_concern_live (bool supports_read_concern)
    mongoc_collection_drop (collection, &error);
 
    bson_init (&b);
-   count = mongoc_collection_count (
-      collection, MONGOC_QUERY_NONE, &b, 0, 0, NULL, &error);
+   count = mongoc_collection_count_documents (
+      collection, &b, NULL, NULL, NULL, &error);
    bson_destroy (&b);
    ASSERT_OR_PRINT (count == 0, error);
 
@@ -2174,8 +2174,8 @@ _test_count_read_concern_live (bool supports_read_concern)
    mongoc_collection_set_read_concern (collection, rc);
 
    bson_init (&b);
-   count = mongoc_collection_count (
-      collection, MONGOC_QUERY_NONE, &b, 0, 0, NULL, &error);
+   count = mongoc_collection_count_documents (
+      collection, &b, NULL, NULL, NULL, &error);
    bson_destroy (&b);
    ASSERT_OR_PRINT (count == 0, error);
    mongoc_read_concern_destroy (rc);
@@ -2186,8 +2186,8 @@ _test_count_read_concern_live (bool supports_read_concern)
    mongoc_collection_set_read_concern (collection, rc);
 
    bson_init (&b);
-   count = mongoc_collection_count (
-      collection, MONGOC_QUERY_NONE, &b, 0, 0, NULL, &error);
+   count = mongoc_collection_count_documents (
+      collection, &b, NULL, NULL, NULL, &error);
    bson_destroy (&b);
    if (supports_read_concern) {
       ASSERT_OR_PRINT (count == 0, error);
@@ -2205,8 +2205,8 @@ _test_count_read_concern_live (bool supports_read_concern)
    mongoc_collection_set_read_concern (collection, rc);
 
    bson_init (&b);
-   count = mongoc_collection_count (
-      collection, MONGOC_QUERY_NONE, &b, 0, 0, NULL, &error);
+   count = mongoc_collection_count_documents (
+      collection, &b, NULL, NULL, NULL, &error);
    bson_destroy (&b);
    if (supports_read_concern) {
       ASSERT_OR_PRINT (count == 0, error);
@@ -2386,9 +2386,11 @@ test_count_documents (void)
                                          &error);
 
    request = mock_server_receives_msg (
-      server, 0, tmp_bson ("{'aggregate': 'coll', 'pipeline': [{'$match': "
-                           "{'x': 1}}, {'$group': {'n': {'$sum': 1}}}, "
-                           "{'$skip': 1}, {'$limit': 2}]}"));
+      server,
+      0,
+      tmp_bson ("{'aggregate': 'coll', 'pipeline': [{'$match': "
+                "{'x': 1}}, {'$group': {'n': {'$sum': 1}}}, "
+                "{'$skip': 1}, {'$limit': 2}]}"));
    mock_server_replies_simple (request, server_reply);
    ASSERT_OR_PRINT (123 == future_get_int64_t (future), error);
    ASSERT_MATCH (&reply, server_reply);
@@ -4837,8 +4839,8 @@ _test_no_docs_match (mongoc_collection_t *coll, const char *selector)
    bson_error_t error;
    int64_t ret;
 
-   ret = mongoc_collection_count_with_opts (
-      coll, MONGOC_QUERY_NONE, tmp_bson (selector), 0, 0, NULL, NULL, &error);
+   ret = mongoc_collection_count_documents (
+      coll, tmp_bson (selector), NULL, NULL, NULL, &error);
    ASSERT_OR_PRINT (ret != -1, error);
    ASSERT_CMPINT64 (ret, ==, (int64_t) 0);
 }

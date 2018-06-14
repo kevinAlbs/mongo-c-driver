@@ -101,7 +101,9 @@ mongoc_collection_count (mongoc_collection_t *collection,
                          int64_t skip,
                          int64_t limit,
                          const mongoc_read_prefs_t *read_prefs,
-                         bson_error_t *error); /* TODO: deprecate */
+                         bson_error_t *error)
+   BSON_GNUC_DEPRECATED_FOR (mongoc_collection_count_documents or
+                             mongoc_collection_estimate_document_count);
 MONGOC_EXPORT (int64_t)
 mongoc_collection_count_with_opts (mongoc_collection_t *collection,
                                    mongoc_query_flags_t flags,
@@ -110,7 +112,9 @@ mongoc_collection_count_with_opts (mongoc_collection_t *collection,
                                    int64_t limit,
                                    const bson_t *opts,
                                    const mongoc_read_prefs_t *read_prefs,
-                                   bson_error_t *error); /* TODO: deprecate */
+                                   bson_error_t *error)
+   BSON_GNUC_DEPRECATED_FOR (mongoc_collection_count_documents or
+                             mongoc_collection_estimate_document_count);
 MONGOC_EXPORT (bool)
 mongoc_collection_drop (mongoc_collection_t *collection, bson_error_t *error);
 MONGOC_EXPORT (bool)
@@ -334,14 +338,14 @@ MONGOC_EXPORT (mongoc_change_stream_t *)
 mongoc_collection_watch (const mongoc_collection_t *coll,
                          const bson_t *pipeline,
                          const bson_t *opts);
-int64_t
+MONGOC_EXPORT (int64_t)
 mongoc_collection_count_documents (mongoc_collection_t *coll,
                                    const bson_t *query,
                                    const mongoc_read_prefs_t *read_prefs,
                                    const bson_t *opts,
                                    bson_t *reply,
                                    bson_error_t *error);
-int64_t
+MONGOC_EXPORT (int64_t)
 mongoc_collection_estimate_document_count (
    mongoc_collection_t *coll,
    const mongoc_read_prefs_t *read_prefs,
