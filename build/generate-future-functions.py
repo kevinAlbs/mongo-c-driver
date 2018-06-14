@@ -37,7 +37,7 @@ from jinja2 import Environment, FileSystemLoader  # Please "pip install jinja2".
 
 this_dir = dirname(__file__)
 template_dir = joinpath(this_dir, 'future_function_templates')
-mock_server_dir = normpath(joinpath(this_dir, '../tests/mock_server'))
+mock_server_dir = normpath(joinpath(this_dir, '../src/libmongoc/tests/mock_server'))
 
 # Add additional types here. Use typedefs for derived types so they can
 # be named with one symbol.
@@ -443,6 +443,23 @@ future_functions = [
                     [param("mongoc_collection_ptr", "coll"),
                      param("const_bson_ptr", "selector"),
                      param("const_bson_ptr", "replacement"),
+                     param("const_bson_ptr", "opts"),
+                     param("bson_ptr", "reply"),
+                     param("bson_error_ptr", "error")]),
+
+    future_function("int64_t",
+                    "mongoc_collection_count_documents",
+                    [param("mongoc_collection_ptr", "coll"),
+                     param("const_bson_ptr", "query"),
+                     param("const_mongoc_read_prefs_ptr", "read_prefs"),
+                     param("const_bson_ptr", "opts"),
+                     param("bson_ptr", "reply"),
+                     param("bson_error_ptr", "error")]),
+
+    future_function("int64_t",
+                    "mongoc_collection_estimate_document_count",
+                    [param("mongoc_collection_ptr", "coll"),
+                     param("const_mongoc_read_prefs_ptr", "read_prefs"),
                      param("const_bson_ptr", "opts"),
                      param("bson_ptr", "reply"),
                      param("bson_error_ptr", "error")]),

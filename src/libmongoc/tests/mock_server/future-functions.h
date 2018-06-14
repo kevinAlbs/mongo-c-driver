@@ -490,5 +490,28 @@ future_collection_replace_one (
 );
 
 
+future_t *
+future_collection_count_documents (
+
+   mongoc_collection_ptr coll,
+   const_bson_ptr query,
+   const_mongoc_read_prefs_ptr read_prefs,
+   const_bson_ptr opts,
+   bson_ptr reply,
+   bson_error_ptr error
+);
+
+
+future_t *
+future_collection_estimate_document_count (
+
+   mongoc_collection_ptr coll,
+   const_mongoc_read_prefs_ptr read_prefs,
+   const_bson_ptr opts,
+   bson_ptr reply,
+   bson_error_ptr error
+);
+
+
 
 #endif /* FUTURE_FUNCTIONS_H */

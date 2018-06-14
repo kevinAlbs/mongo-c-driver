@@ -973,7 +973,45 @@ mongoc_collection_estimate_document_count (
    bson_t *reply,
    bson_error_t *error)
 {
+   bson_iter_t iter;
+   int64_t ret = -1;
+   bool success;
+   bson_t reply_local;
+   bson_t *reply_ptr;
+   bson_t cmd = BSON_INITIALIZER;
 
+   ENTRY;
+
+   BSON_ASSERT (coll);
+
+   reply_ptr = reply ? reply : &reply_local;
+   bson_append_utf8 (&cmd, "count", 5, coll->collection, coll->collectionlen);
+
+   success =
+      _mongoc_client_command_with_opts (coll->client,
+                                        coll->db,
+                                        &cmd,
+                                        MONGOC_CMD_READ,
+                                        opts,
+                                        MONGOC_QUERY_NONE,
+                                        COALESCE (read_prefs, coll->read_prefs),
+                                        coll->read_concern,
+                                        coll->write_concern,
+                                        reply_ptr,
+                                        error);
+
+   if (success) {
+      if (bson_iter_init_find (&iter, reply_ptr, "n")) {
+         ret = bson_iter_as_int64 (&iter);
+      }
+   }
+
+   if (!reply) {
+      bson_destroy (&reply_local);
+   }
+   bson_destroy (&cmd);
+
+   RETURN (ret);
 }
 
 
@@ -988,11 +1026,13 @@ mongoc_collection_estimate_document_count (
  */
 static void
 _make_aggregate_for_count (const mongoc_collection_t *coll,
+                           const bson_t *query,
                            const bson_t *opts,
                            bson_t *out)
 {
    bson_iter_t iter;
    bson_t pipeline;
+   bson_t match_stage;
    bson_t group_stage;
    bson_t group_stage_doc;
    bson_t sum;
@@ -1005,11 +1045,14 @@ _make_aggregate_for_count (const mongoc_collection_t *coll,
    bson_append_document_begin (out, "cursor", 6, &empty);
    bson_append_document_end (out, &empty);
    bson_append_array_begin (out, "pipeline", 8, &pipeline);
-   bson_append_document_begin (&pipeline, "0", 1, &group_stage);
+   bson_append_document_begin (&pipeline, "0", 1, &match_stage);
+   bson_append_document (&match_stage, "$match", 6, query);
+   bson_append_document_end (&pipeline, &match_stage);
+   bson_append_document_begin (&pipeline, "1", 1, &group_stage);
    bson_append_document_begin (&group_stage, "$group", 6, &group_stage_doc);
    bson_append_null (&group_stage_doc, "_id", 3);
    bson_append_document_begin (&group_stage_doc, "n", 1, &sum);
-   bson_append_int32 (&sum, "sum", 3, 1);
+   bson_append_int32 (&sum, "$sum", 4, 1);
    bson_append_document_end (&group_stage_doc, &sum);
    bson_append_document_end (&group_stage, &group_stage_doc);
    bson_append_document_end (&pipeline, &group_stage);
@@ -1018,12 +1061,12 @@ _make_aggregate_for_count (const mongoc_collection_t *coll,
    if (opts && bson_iter_init_find (&iter, opts, "skip")) {
       bson_t skip_stage;
       has_skip = true;
-      bson_append_document_begin (&pipeline, "1", 1, &skip_stage);
+      bson_append_document_begin (&pipeline, "2", 1, &skip_stage);
       bson_append_value (&skip_stage, "$skip", 5, bson_iter_value (&iter));
       bson_append_document_end (&pipeline, &skip_stage);
    }
    if (opts && bson_iter_init_find (&iter, opts, "limit")) {
-      const char *key = has_skip ? "2" : "1";
+      const char *key = has_skip ? "3" : "2";
       bson_t limit_stage;
       bson_append_document_begin (&pipeline, key, 1, &limit_stage);
       bson_append_value (&limit_stage, "$limit", 6, bson_iter_value (&iter));
@@ -1031,6 +1074,7 @@ _make_aggregate_for_count (const mongoc_collection_t *coll,
    }
    bson_append_array_end (out, &pipeline);
 }
+
 
 int64_t
 mongoc_collection_count_documents (mongoc_collection_t *coll,
@@ -1046,45 +1090,50 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
    const bson_t *result;
    mongoc_cursor_t *cursor;
    int64_t count = -1;
-   bson_t reply_local;
-   bson_t *reply_ptr;
+   bson_t cmd_reply;
    bson_iter_t iter;
+
+   ENTRY;
 
    BSON_ASSERT (coll);
    BSON_ASSERT (query);
 
-   reply_ptr = reply ? reply : &reply_local;
-   _make_aggregate_for_count (coll, opts, &aggregate_cmd);
+   _make_aggregate_for_count (coll, query, opts, &aggregate_cmd);
    bson_init (&aggregate_opts);
    if (opts) {
-      bson_copy_to_excluding_noinit (opts, &aggregate_opts, "skip", "limit");
+      bson_copy_to_excluding_noinit (
+         opts, &aggregate_opts, "skip", "limit", NULL);
    }
 
    ret = mongoc_collection_read_command_with_opts (
-      coll, &aggregate_cmd, read_prefs, opts, reply_ptr, error);
+      coll, &aggregate_cmd, read_prefs, opts, &cmd_reply, error);
    bson_destroy (&aggregate_cmd);
    if (!ret) {
-      goto done;
+      _mongoc_bson_init_if_set (reply);
+      bson_destroy (&cmd_reply);
+      GOTO (done);
    }
 
+   if (reply) {
+      bson_copy_to (&cmd_reply, reply);
+   }
+   /* steals reply */
    cursor = mongoc_cursor_new_from_command_reply_with_opts (
-      coll->client, reply_ptr, opts);
+      coll->client, &cmd_reply, opts);
    BSON_ASSERT (mongoc_cursor_get_id (cursor) == 0);
    ret = mongoc_cursor_next (cursor, &result);
    mongoc_cursor_destroy (cursor);
    if (!ret) {
-      goto done;
+      GOTO (done);
    }
 
-   if (bson_iter_init_find (&iter, result, "n") && BSON_ITER_HOLDS_INT (&iter)) {
+   if (bson_iter_init_find (&iter, result, "n") &&
+       BSON_ITER_HOLDS_INT (&iter)) {
       count = bson_iter_as_int64 (&iter);
    }
 
 done:
-   if (!reply) {
-      bson_destroy (&reply_local);
-   }
-   return count;
+   RETURN (count);
 }
 
 /*
