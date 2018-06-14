@@ -964,6 +964,19 @@ mongoc_collection_count_with_opts (
    RETURN (ret);
 }
 
+
+int64_t
+mongoc_collection_estimate_document_count (
+   mongoc_collection_t *coll,
+   const mongoc_read_prefs_t *read_prefs,
+   const bson_t *opts,
+   bson_t *reply,
+   bson_error_t *error)
+{
+
+}
+
+
 /* --------------------------------------------------------------------------
  *
  * _make_aggregate_for_count --
@@ -1035,6 +1048,7 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
    int64_t count = -1;
    bson_t reply_local;
    bson_t *reply_ptr;
+   bson_iter_t iter;
 
    BSON_ASSERT (coll);
    BSON_ASSERT (query);
@@ -1062,23 +1076,16 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
       goto done;
    }
 
+   if (bson_iter_init_find (&iter, result, "n") && BSON_ITER_HOLDS_INT (&iter)) {
+      count = bson_iter_as_int64 (&iter);
+   }
+
 done:
    if (!reply) {
       bson_destroy (&reply_local);
    }
    return count;
 }
-
-int64_t
-mongoc_collection_estimate_document_count (
-   mongoc_collection_t *coll,
-   const mongoc_read_prefs_t *read_prefs,
-   const bson_t *opts,
-   bson_t *reply,
-   bson_error_t *error)
-{
-}
-
 
 /*
  *--------------------------------------------------------------------------

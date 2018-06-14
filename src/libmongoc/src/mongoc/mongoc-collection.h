@@ -101,7 +101,7 @@ mongoc_collection_count (mongoc_collection_t *collection,
                          int64_t skip,
                          int64_t limit,
                          const mongoc_read_prefs_t *read_prefs,
-                         bson_error_t *error);
+                         bson_error_t *error); /* TODO: deprecate */
 MONGOC_EXPORT (int64_t)
 mongoc_collection_count_with_opts (mongoc_collection_t *collection,
                                    mongoc_query_flags_t flags,
@@ -110,7 +110,7 @@ mongoc_collection_count_with_opts (mongoc_collection_t *collection,
                                    int64_t limit,
                                    const bson_t *opts,
                                    const mongoc_read_prefs_t *read_prefs,
-                                   bson_error_t *error);
+                                   bson_error_t *error); /* TODO: deprecate */
 MONGOC_EXPORT (bool)
 mongoc_collection_drop (mongoc_collection_t *collection, bson_error_t *error);
 MONGOC_EXPORT (bool)
