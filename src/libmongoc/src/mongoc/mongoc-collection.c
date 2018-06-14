@@ -1120,7 +1120,7 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
    if (reply) {
       bson_copy_to (&cmd_reply, reply);
    }
-   printf("got reply %s\n", bson_as_json(reply, NULL));
+   printf("got reply %s\n", bson_as_json(&cmd_reply, NULL));
    /* steals reply */
    cursor = mongoc_cursor_new_from_command_reply_with_opts (
       coll->client, &cmd_reply, opts);
