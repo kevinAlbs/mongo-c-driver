@@ -1113,18 +1113,21 @@ mongoc_collection_count_documents (mongoc_collection_t *coll,
    if (!ret) {
       _mongoc_bson_init_if_set (reply);
       bson_destroy (&cmd_reply);
+      printf("1\n");
       GOTO (done);
    }
 
    if (reply) {
       bson_copy_to (&cmd_reply, reply);
    }
+   printf("got reply %s\n", bson_as_json(reply, NULL));
    /* steals reply */
    cursor = mongoc_cursor_new_from_command_reply_with_opts (
       coll->client, &cmd_reply, opts);
    BSON_ASSERT (mongoc_cursor_get_id (cursor) == 0);
    ret = mongoc_cursor_next (cursor, &result);
    if (!ret) {
+      mongoc_cursor_error (cursor, error);
       GOTO (done);
    }
 
