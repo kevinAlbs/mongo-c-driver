@@ -253,13 +253,40 @@ _check_mechanism (bool pooled,
    mock_server_destroy (server);
 }
 
-/* don't use bson_error_t, because it has alignment restrictions making it
- * fail to pass-by-value on Windows. */
-typedef struct {
-   uint32_t domain;
-   uint32_t code;
-   char message[BSON_ERROR_BUFFER_SIZE];
+typedef enum {
+   NO_ERROR,
+   USER_NOT_FOUND_ERROR,
+   AUTH_ERROR,
+   NO_ICU_ERROR
 } test_error_t;
+
+void _check_error (const bson_error_t* error, test_error_t expected_error) {
+   int32_t domain = 0;
+   int32_t code = 0;
+   const char* message = "";
+
+   switch (expected_error) {
+   case NO_ERROR:
+      return;
+   case AUTH_ERROR:
+      domain = MONGOC_ERROR_CLIENT;
+      code = MONGOC_ERROR_CLIENT_AUTHENTICATE;
+      message = "Authentication failed";
+      break;
+   case USER_NOT_FOUND_ERROR:
+      domain = MONGOC_ERROR_CLIENT;
+      code = MONGOC_ERROR_CLIENT_AUTHENTICATE;
+      message = "Could not find user";
+      break;
+   case NO_ICU_ERROR:
+      domain = MONGOC_ERROR_SCRAM;
+      code = MONGOC_ERROR_SCRAM_PROTOCOL_ERROR;
+      message = "SCRAM Failure: ICU required to SASLPrep password";
+      break;
+   }
+
+   ASSERT_ERROR_CONTAINS ((*error), domain, code, message);
+}
 
 /* it auth is expected to succeed, expected_error is zero'd out. */
 static void
@@ -298,15 +325,13 @@ _try_auth (bool pooled,
                                        NULL /* read_prefs. */,
                                        &reply,
                                        &error);
-   if (!expected_error.code) {
-      ASSERT_OR_PRINT (res, error);
+
+   if (expected_error == NO_ERROR) {
+      ASSERT (res);
       ASSERT_MATCH (&reply, "{'db': 'admin', 'ok': 1}");
    } else {
       ASSERT (!res);
-      ASSERT_ERROR_CONTAINS (error,
-                             expected_error.domain,
-                             expected_error.code,
-                             expected_error.message);
+      _check_error (&error, expected_error);
    }
    bson_destroy (&reply);
    mongoc_uri_destroy (uri);
@@ -319,29 +344,6 @@ _try_auth (bool pooled,
    }
 }
 
-static test_error_t
-_make_error (uint32_t domain, uint32_t code, const char *msg)
-{
-   test_error_t error;
-   error.code = code;
-   error.domain = domain;
-   bson_strncpy (error.message, msg, sizeof (error.message));
-   return error;
-}
-
-#define NO_ERROR _make_error (0, 0, "")
-#define USER_NOT_FOUND_ERROR                      \
-   _make_error (MONGOC_ERROR_CLIENT,              \
-                MONGOC_ERROR_CLIENT_AUTHENTICATE, \
-                "Could not find user")
-#define AUTH_ERROR                                \
-   _make_error (MONGOC_ERROR_CLIENT,              \
-                MONGOC_ERROR_CLIENT_AUTHENTICATE, \
-                "Authentication failed")
-#define NO_ICU_ERROR                               \
-   _make_error (MONGOC_ERROR_SCRAM,                \
-                MONGOC_ERROR_SCRAM_PROTOCOL_ERROR, \
-                "SCRAM Failure: ICU required to SASLPrep password")
 
 static void
 _test_mongoc_scram_auth (bool pooled)
