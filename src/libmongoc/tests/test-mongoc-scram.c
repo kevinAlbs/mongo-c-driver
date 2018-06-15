@@ -253,6 +253,13 @@ _check_mechanism (bool pooled,
    mock_server_destroy (server);
 }
 
+/* don't use bson_error_t, because it has alignment restrictions making it
+ * fail to pass-by-value on Windows. */
+typedef struct {
+   uint32_t domain;
+   uint32_t code;
+   char message[BSON_ERROR_BUFFER_SIZE];
+} test_error_t;
 
 /* it auth is expected to succeed, expected_error is zero'd out. */
 static void
@@ -260,7 +267,7 @@ _try_auth (bool pooled,
            const char *user,
            const char *pwd,
            const char *mechanism,
-           bson_error_t expected_error)
+           test_error_t expected_error)
 {
    mongoc_uri_t *uri;
    mongoc_client_pool_t *client_pool = NULL;
@@ -312,10 +319,10 @@ _try_auth (bool pooled,
    }
 }
 
-static bson_error_t
+static test_error_t
 _make_error (uint32_t domain, uint32_t code, const char *msg)
 {
-   bson_error_t error;
+   test_error_t error;
    error.code = code;
    error.domain = domain;
    bson_strncpy (error.message, msg, sizeof (error.message));
