@@ -268,8 +268,6 @@ _check_error (const bson_error_t *error, test_error_t expected_error)
    const char *message = "";
 
    switch (expected_error) {
-   case MONGOC_TEST_NO_ERROR:
-      return;
    case MONGOC_TEST_AUTH_ERROR:
       domain = MONGOC_ERROR_CLIENT;
       code = MONGOC_ERROR_CLIENT_AUTHENTICATE;
@@ -285,6 +283,9 @@ _check_error (const bson_error_t *error, test_error_t expected_error)
       code = MONGOC_ERROR_SCRAM_PROTOCOL_ERROR;
       message = "SCRAM Failure: ICU required to SASLPrep password";
       break;
+   case MONGOC_TEST_NO_ERROR:
+   default:
+      return;
    }
 
    ASSERT_ERROR_CONTAINS ((*error), domain, code, message);
