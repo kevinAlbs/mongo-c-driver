@@ -254,31 +254,33 @@ _check_mechanism (bool pooled,
 }
 
 typedef enum {
-   NO_ERROR,
-   USER_NOT_FOUND_ERROR,
-   AUTH_ERROR,
-   NO_ICU_ERROR
+   MONGOC_TEST_NO_ERROR,
+   MONGOC_TEST_USER_NOT_FOUND_ERROR,
+   MONGOC_TEST_AUTH_ERROR,
+   MONGOC_TEST_NO_ICU_ERROR
 } test_error_t;
 
-void _check_error (const bson_error_t* error, test_error_t expected_error) {
+void
+_check_error (const bson_error_t *error, test_error_t expected_error)
+{
    int32_t domain = 0;
    int32_t code = 0;
-   const char* message = "";
+   const char *message = "";
 
    switch (expected_error) {
-   case NO_ERROR:
+   case MONGOC_TEST_NO_ERROR:
       return;
-   case AUTH_ERROR:
+   case MONGOC_TEST_AUTH_ERROR:
       domain = MONGOC_ERROR_CLIENT;
       code = MONGOC_ERROR_CLIENT_AUTHENTICATE;
       message = "Authentication failed";
       break;
-   case USER_NOT_FOUND_ERROR:
+   case MONGOC_TEST_USER_NOT_FOUND_ERROR:
       domain = MONGOC_ERROR_CLIENT;
       code = MONGOC_ERROR_CLIENT_AUTHENTICATE;
       message = "Could not find user";
       break;
-   case NO_ICU_ERROR:
+   case MONGOC_TEST_NO_ICU_ERROR:
       domain = MONGOC_ERROR_SCRAM;
       code = MONGOC_ERROR_SCRAM_PROTOCOL_ERROR;
       message = "SCRAM Failure: ICU required to SASLPrep password";
@@ -288,7 +290,7 @@ void _check_error (const bson_error_t* error, test_error_t expected_error) {
    ASSERT_ERROR_CONTAINS ((*error), domain, code, message);
 }
 
-/* it auth is expected to succeed, expected_error is zero'd out. */
+/* if auth is expected to succeed, expected_error is zero'd out. */
 static void
 _try_auth (bool pooled,
            const char *user,
@@ -326,7 +328,7 @@ _try_auth (bool pooled,
                                        &reply,
                                        &error);
 
-   if (expected_error == NO_ERROR) {
+   if (expected_error == MONGOC_TEST_NO_ERROR) {
       ASSERT (res);
       ASSERT_MATCH (&reply, "{'db': 'admin', 'ok': 1}");
    } else {
@@ -352,13 +354,14 @@ _test_mongoc_scram_auth (bool pooled)
    command requiring authentication for the following cases:
    - Explicitly specifying each mechanism the user supports.
    - Specifying no mechanism and relying on mechanism negotiation." */
-   _try_auth (pooled, "sha1", "sha1", NULL, NO_ERROR);
-   _try_auth (pooled, "sha1", "sha1", "SCRAM-SHA-1", NO_ERROR);
-   _try_auth (pooled, "sha256", "sha256", NULL, NO_ERROR);
-   _try_auth (pooled, "sha256", "sha256", "SCRAM-SHA-256", NO_ERROR);
-   _try_auth (pooled, "both", "both", NULL, NO_ERROR);
-   _try_auth (pooled, "both", "both", "SCRAM-SHA-1", NO_ERROR);
-   _try_auth (pooled, "both", "both", "SCRAM-SHA-256", NO_ERROR);
+   _try_auth (pooled, "sha1", "sha1", NULL, MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled, "sha1", "sha1", "SCRAM-SHA-1", MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled, "sha256", "sha256", NULL, MONGOC_TEST_NO_ERROR);
+   _try_auth (
+      pooled, "sha256", "sha256", "SCRAM-SHA-256", MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled, "both", "both", NULL, MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled, "both", "both", "SCRAM-SHA-1", MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled, "both", "both", "SCRAM-SHA-256", MONGOC_TEST_NO_ERROR);
 
    _check_mechanism (pooled, NULL, NULL, "SCRAM-SHA-1");
    _check_mechanism (pooled, NULL, "'SCRAM-SHA-1'", "SCRAM-SHA-1");
@@ -382,16 +385,17 @@ _test_mongoc_scram_auth (bool pooled)
                      "SCRAM-SHA-256");
 
    /* Test some failure auths. */
-   _try_auth (pooled, "sha1", "bad", NULL, AUTH_ERROR);
-   _try_auth (pooled, "sha256", "bad", NULL, AUTH_ERROR);
-   _try_auth (pooled, "both", "bad", NULL, AUTH_ERROR);
-   _try_auth (pooled, "sha1", "bad", "SCRAM-SHA-256", AUTH_ERROR);
-   _try_auth (pooled, "sha256", "bad", "SCRAM-SHA-1", AUTH_ERROR);
+   _try_auth (pooled, "sha1", "bad", NULL, MONGOC_TEST_AUTH_ERROR);
+   _try_auth (pooled, "sha256", "bad", NULL, MONGOC_TEST_AUTH_ERROR);
+   _try_auth (pooled, "both", "bad", NULL, MONGOC_TEST_AUTH_ERROR);
+   _try_auth (pooled, "sha1", "bad", "SCRAM-SHA-256", MONGOC_TEST_AUTH_ERROR);
+   _try_auth (pooled, "sha256", "bad", "SCRAM-SHA-1", MONGOC_TEST_AUTH_ERROR);
 
    /* Auth spec: "For a non-existent username, verify that not specifying a
     * mechanism when connecting fails with the same error type that would occur
     * with a correct username but incorrect password or mechanism." */
-   _try_auth (pooled, "unknown_user", "bad", NULL, USER_NOT_FOUND_ERROR);
+   _try_auth (
+      pooled, "unknown_user", "bad", NULL, MONGOC_TEST_USER_NOT_FOUND_ERROR);
 }
 
 /* test the auth tests described in the auth spec. */
@@ -495,10 +499,14 @@ _drop_saslprep_users ()
 static void
 _test_mongoc_scram_saslprep_auth (bool pooled)
 {
-   _try_auth (pooled, "IX", "IX", NULL, NO_ERROR);
-   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, NO_ERROR);
-   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, NO_ERROR);
-   _try_auth (pooled, ROMAN_NUMERAL_NINE, ROMAN_NUMERAL_FOUR, NULL, NO_ERROR);
+   _try_auth (pooled, "IX", "IX", NULL, MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled,
+              ROMAN_NUMERAL_NINE,
+              ROMAN_NUMERAL_FOUR,
+              NULL,
+              MONGOC_TEST_NO_ERROR);
 }
 
 
@@ -515,11 +523,14 @@ test_mongoc_saslprep_auth (void *ctx)
 static void
 _test_mongoc_scram_saslprep_auth_no_icu (bool pooled)
 {
-   _try_auth (pooled, "IX", "IX", NULL, NO_ERROR);
-   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, NO_ICU_ERROR);
-   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, NO_ERROR);
-   _try_auth (
-      pooled, ROMAN_NUMERAL_NINE, ROMAN_NUMERAL_FOUR, NULL, NO_ICU_ERROR);
+   _try_auth (pooled, "IX", "IX", NULL, MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, MONGOC_TEST_NO_ICU_ERROR);
+   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, MONGOC_TEST_NO_ERROR);
+   _try_auth (pooled,
+              ROMAN_NUMERAL_NINE,
+              ROMAN_NUMERAL_FOUR,
+              NULL,
+              MONGOC_TEST_NO_ICU_ERROR);
 }
 
 static void
