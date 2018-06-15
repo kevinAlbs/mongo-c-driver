@@ -891,6 +891,18 @@ count (mongoc_collection_t *collection,
    bson_value_t value;
 
    bson_lookup_doc (operation, "arguments.filter", &filter);
+   if (bson_has_field(operation, "arguments.skip")) {
+      bson_append_int64 (&opts, "skip", 4, bson_lookup_int32 (operation, "arguments.skip"));
+   }
+   if (bson_has_field(operation, "arguments.limit")) {
+      bson_append_int64 (&opts, "limit", 5, bson_lookup_int32 (operation, "arguments.limit"));
+   }
+   if (bson_has_field(operation, "arguments.collation")) {
+      bson_t collation;
+      bson_lookup_doc (operation, "arguments.collation", &collation);
+      bson_append_document (&opts, "collation", 9, &collation);
+      bson_destroy (&collation);
+   }
    append_session (session, &opts);
    r = mongoc_collection_count_with_opts (
       collection, MONGOC_QUERY_NONE, &filter, 0, 0, &opts, read_prefs, &error);
@@ -903,6 +915,89 @@ count (mongoc_collection_t *collection,
       value_init_from_doc (&value, &reply);
    }
 
+   check_result (test, operation, r > -1, &value, &error);
+
+   bson_value_destroy (&value);
+   bson_destroy (&reply);
+   bson_destroy (&opts);
+}
+
+
+static void
+count_documents (mongoc_collection_t *collection,
+       const bson_t *test,
+       const bson_t *operation,
+       mongoc_client_session_t *session,
+       const mongoc_read_prefs_t *read_prefs)
+{
+   bson_t filter;
+   bson_t reply = BSON_INITIALIZER;
+   bson_t opts = BSON_INITIALIZER;
+   bson_error_t error;
+   int64_t r;
+   bson_value_t value;
+
+   bson_lookup_doc (operation, "arguments.filter", &filter);
+   if (bson_has_field(operation, "arguments.skip")) {
+      bson_append_int64 (&opts, "skip", 4, bson_lookup_int32 (operation, "arguments.skip"));
+   }
+   if (bson_has_field(operation, "arguments.limit")) {
+      bson_append_int64 (&opts, "limit", 5, bson_lookup_int32 (operation, "arguments.limit"));
+   }
+   if (bson_has_field(operation, "arguments.collation")) {
+      bson_t collation;
+      bson_lookup_doc (operation, "arguments.collation", &collation);
+      bson_append_document (&opts, "collation", 9, &collation);
+      bson_destroy (&collation);
+   }
+
+   append_session (session, &opts);
+   r = mongoc_collection_count_documents (collection, &filter, &opts, read_prefs, NULL, &error);
+
+   if (r >= 0) {
+      value.value_type = BSON_TYPE_INT64;
+      value.value.v_int64 = r;
+   } else {
+      /* fake a reply for the test framework's sake */
+      value_init_from_doc (&value, &reply);
+   }
+   check_result (test, operation, r > -1, &value, &error);
+
+   bson_value_destroy (&value);
+   bson_destroy (&reply);
+   bson_destroy (&opts);
+}
+
+
+static void
+estimated_document_count (mongoc_collection_t *collection,
+                 const bson_t *test,
+                 const bson_t *operation,
+                 mongoc_client_session_t *session,
+                 const mongoc_read_prefs_t *read_prefs)
+{
+   bson_t reply = BSON_INITIALIZER;
+   bson_t opts = BSON_INITIALIZER;
+   bson_error_t error;
+   int64_t r;
+   bson_value_t value;
+
+   if (bson_has_field(operation, "arguments.skip")) {
+      bson_append_int64 (&opts, "skip", 4, bson_lookup_int32 (operation, "arguments.skip"));
+   }
+   if (bson_has_field(operation, "arguments.limit")) {
+      bson_append_int64 (&opts, "limit", 5, bson_lookup_int32 (operation, "arguments.limit"));
+   }
+   append_session (session, &opts);
+   r = mongoc_collection_estimated_document_count (collection, &opts, read_prefs, NULL, &error);
+
+   if (r >= 0) {
+      value.value_type = BSON_TYPE_INT64;
+      value.value.v_int64 = r;
+   } else {
+      /* fake a reply for the test framework's sake */
+      value_init_from_doc (&value, &reply);
+   }
    check_result (test, operation, r > -1, &value, &error);
 
    bson_value_destroy (&value);
@@ -1228,6 +1323,10 @@ json_test_operation (json_test_ctx_t *ctx,
       insert_many (collection, test, operation, session, wc);
    } else if (!strcmp (op_name, "count")) {
       count (collection, test, operation, session, read_prefs);
+   } else if (!strcmp (op_name, "estimatedDocumentCount")) {
+      estimated_document_count (collection, test, operation, session, read_prefs);
+   } else if (!strcmp (op_name, "countDocuments")) {
+      count_documents (collection, test, operation, session, read_prefs);
    } else if (!strcmp (op_name, "distinct")) {
       distinct (collection, test, operation, session, read_prefs);
    } else if (!strcmp (op_name, "find")) {
