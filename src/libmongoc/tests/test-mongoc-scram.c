@@ -312,14 +312,29 @@ _try_auth (bool pooled,
    }
 }
 
-static bson_error_t make_error (uint32_t code, uint32_t domain, const char* msg) {
-
+static bson_error_t
+_make_error (uint32_t domain, uint32_t code, const char *msg)
+{
+   bson_error_t error;
+   error.code = code;
+   error.domain = domain;
+   bson_strncpy (error.message, msg, sizeof (error.message));
+   return error;
 }
 
-#define NO_ERROR make_error (0, 0, "")
-#define USER_NOT_FOUND_ERROR make_error(MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "User not found")
-#define AUTH_ERROR make_error(MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "Authentication failed")
-#define NO_ICU_ERROR make_error(MONGOC_ERROR_SCRAM, MONGOC_ERROR_SCRAM_PROTOCOL_ERROR, "SCRAM Failure: ICU required to SASLPrep password")
+#define NO_ERROR _make_error (0, 0, "")
+#define USER_NOT_FOUND_ERROR                      \
+   _make_error (MONGOC_ERROR_CLIENT,              \
+                MONGOC_ERROR_CLIENT_AUTHENTICATE, \
+                "Could not find user")
+#define AUTH_ERROR                                \
+   _make_error (MONGOC_ERROR_CLIENT,              \
+                MONGOC_ERROR_CLIENT_AUTHENTICATE, \
+                "Authentication failed")
+#define NO_ICU_ERROR                               \
+   _make_error (MONGOC_ERROR_SCRAM,                \
+                MONGOC_ERROR_SCRAM_PROTOCOL_ERROR, \
+                "SCRAM Failure: ICU required to SASLPrep password")
 
 static void
 _test_mongoc_scram_auth (bool pooled)
@@ -410,12 +425,11 @@ static bool
 skip_if_no_icu (void)
 {
 #ifdef MONGOC_ENABLE_ICU
-   return NO_ERROR;
+   return true;
 #else
    return false;
 #endif
 }
-
 
 static bool
 skip_if_icu (void)
@@ -493,9 +507,10 @@ static void
 _test_mongoc_scram_saslprep_auth_no_icu (bool pooled)
 {
    _try_auth (pooled, "IX", "IX", NULL, NO_ERROR);
-   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, false);
-   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, false);
-   _try_auth (pooled, ROMAN_NUMERAL_NINE, ROMAN_NUMERAL_FOUR, NULL, false);
+   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, NO_ICU_ERROR);
+   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, NO_ERROR);
+   _try_auth (
+      pooled, ROMAN_NUMERAL_NINE, ROMAN_NUMERAL_FOUR, NULL, NO_ICU_ERROR);
 }
 
 static void
