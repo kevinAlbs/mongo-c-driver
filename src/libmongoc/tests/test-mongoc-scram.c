@@ -253,12 +253,14 @@ _check_mechanism (bool pooled,
    mock_server_destroy (server);
 }
 
+
+/* it auth is expected to succeed, expected_error is zero'd out. */
 static void
 _try_auth (bool pooled,
            const char *user,
            const char *pwd,
            const char *mechanism,
-           bool should_succeed)
+           bson_error_t expected_error)
 {
    mongoc_uri_t *uri;
    mongoc_client_pool_t *client_pool = NULL;
@@ -289,22 +291,15 @@ _try_auth (bool pooled,
                                        NULL /* read_prefs. */,
                                        &reply,
                                        &error);
-   if (should_succeed) {
+   if (!expected_error.code) {
       ASSERT_OR_PRINT (res, error);
       ASSERT_MATCH (&reply, "{'db': 'admin', 'ok': 1}");
    } else {
       ASSERT (!res);
-      if (0 == strcmp (user, "unknown_user")) {
-         ASSERT_ERROR_CONTAINS (error,
-                                MONGOC_ERROR_CLIENT,
-                                MONGOC_ERROR_CLIENT_AUTHENTICATE,
-                                "Could not find user");
-      } else {
-         ASSERT_ERROR_CONTAINS (error,
-                                MONGOC_ERROR_CLIENT,
-                                MONGOC_ERROR_CLIENT_AUTHENTICATE,
-                                "Authentication failed");
-      }
+      ASSERT_ERROR_CONTAINS (error,
+                             expected_error.domain,
+                             expected_error.code,
+                             expected_error.message);
    }
    bson_destroy (&reply);
    mongoc_uri_destroy (uri);
@@ -317,6 +312,15 @@ _try_auth (bool pooled,
    }
 }
 
+static bson_error_t make_error (uint32_t code, uint32_t domain, const char* msg) {
+
+}
+
+#define NO_ERROR make_error (0, 0, "")
+#define USER_NOT_FOUND_ERROR make_error(MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "User not found")
+#define AUTH_ERROR make_error(MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "Authentication failed")
+#define NO_ICU_ERROR make_error(MONGOC_ERROR_SCRAM, MONGOC_ERROR_SCRAM_PROTOCOL_ERROR, "SCRAM Failure: ICU required to SASLPrep password")
+
 static void
 _test_mongoc_scram_auth (bool pooled)
 {
@@ -324,13 +328,13 @@ _test_mongoc_scram_auth (bool pooled)
    command requiring authentication for the following cases:
    - Explicitly specifying each mechanism the user supports.
    - Specifying no mechanism and relying on mechanism negotiation." */
-   _try_auth (pooled, "sha1", "sha1", NULL, true);
-   _try_auth (pooled, "sha1", "sha1", "SCRAM-SHA-1", true);
-   _try_auth (pooled, "sha256", "sha256", NULL, true);
-   _try_auth (pooled, "sha256", "sha256", "SCRAM-SHA-256", true);
-   _try_auth (pooled, "both", "both", NULL, true);
-   _try_auth (pooled, "both", "both", "SCRAM-SHA-1", true);
-   _try_auth (pooled, "both", "both", "SCRAM-SHA-256", true);
+   _try_auth (pooled, "sha1", "sha1", NULL, NO_ERROR);
+   _try_auth (pooled, "sha1", "sha1", "SCRAM-SHA-1", NO_ERROR);
+   _try_auth (pooled, "sha256", "sha256", NULL, NO_ERROR);
+   _try_auth (pooled, "sha256", "sha256", "SCRAM-SHA-256", NO_ERROR);
+   _try_auth (pooled, "both", "both", NULL, NO_ERROR);
+   _try_auth (pooled, "both", "both", "SCRAM-SHA-1", NO_ERROR);
+   _try_auth (pooled, "both", "both", "SCRAM-SHA-256", NO_ERROR);
 
    _check_mechanism (pooled, NULL, NULL, "SCRAM-SHA-1");
    _check_mechanism (pooled, NULL, "'SCRAM-SHA-1'", "SCRAM-SHA-1");
@@ -354,16 +358,16 @@ _test_mongoc_scram_auth (bool pooled)
                      "SCRAM-SHA-256");
 
    /* Test some failure auths. */
-   _try_auth (pooled, "sha1", "bad", NULL, false);
-   _try_auth (pooled, "sha256", "bad", NULL, false);
-   _try_auth (pooled, "both", "bad", NULL, false);
-   _try_auth (pooled, "sha1", "bad", "SCRAM-SHA-256", false);
-   _try_auth (pooled, "sha256", "bad", "SCRAM-SHA-1", false);
+   _try_auth (pooled, "sha1", "bad", NULL, AUTH_ERROR);
+   _try_auth (pooled, "sha256", "bad", NULL, AUTH_ERROR);
+   _try_auth (pooled, "both", "bad", NULL, AUTH_ERROR);
+   _try_auth (pooled, "sha1", "bad", "SCRAM-SHA-256", AUTH_ERROR);
+   _try_auth (pooled, "sha256", "bad", "SCRAM-SHA-1", AUTH_ERROR);
 
    /* Auth spec: "For a non-existent username, verify that not specifying a
     * mechanism when connecting fails with the same error type that would occur
     * with a correct username but incorrect password or mechanism." */
-   _try_auth (pooled, "unknown_user", "bad", NULL, false);
+   _try_auth (pooled, "unknown_user", "bad", NULL, USER_NOT_FOUND_ERROR);
 }
 
 /* test the auth tests described in the auth spec. */
@@ -406,10 +410,17 @@ static bool
 skip_if_no_icu (void)
 {
 #ifdef MONGOC_ENABLE_ICU
-   return true;
+   return NO_ERROR;
 #else
    return false;
 #endif
+}
+
+
+static bool
+skip_if_icu (void)
+{
+   return !skip_if_no_icu ();
 }
 
 static void
@@ -461,11 +472,12 @@ _drop_saslprep_users ()
 static void
 _test_mongoc_scram_saslprep_auth (bool pooled)
 {
-   _try_auth (pooled, "IX", "IX", NULL, true);
-   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, true);
-   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, true);
-   _try_auth (pooled, ROMAN_NUMERAL_NINE, ROMAN_NUMERAL_FOUR, NULL, true);
+   _try_auth (pooled, "IX", "IX", NULL, NO_ERROR);
+   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, NO_ERROR);
+   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, NO_ERROR);
+   _try_auth (pooled, ROMAN_NUMERAL_NINE, ROMAN_NUMERAL_FOUR, NULL, NO_ERROR);
 }
+
 
 static void
 test_mongoc_saslprep_auth (void *ctx)
@@ -473,6 +485,25 @@ test_mongoc_saslprep_auth (void *ctx)
    _create_saslprep_users ();
    _test_mongoc_scram_saslprep_auth (false);
    _test_mongoc_scram_saslprep_auth (true);
+   _drop_saslprep_users ();
+}
+
+
+static void
+_test_mongoc_scram_saslprep_auth_no_icu (bool pooled)
+{
+   _try_auth (pooled, "IX", "IX", NULL, NO_ERROR);
+   _try_auth (pooled, "IX", ROMAN_NUMERAL_NINE, NULL, false);
+   _try_auth (pooled, ROMAN_NUMERAL_NINE, "IV", NULL, false);
+   _try_auth (pooled, ROMAN_NUMERAL_NINE, ROMAN_NUMERAL_FOUR, NULL, false);
+}
+
+static void
+test_mongoc_saslprep_auth_no_icu (void *ctx)
+{
+   _create_saslprep_users ();
+   _test_mongoc_scram_saslprep_auth_no_icu (false);
+   _test_mongoc_scram_saslprep_auth_no_icu (true);
    _drop_saslprep_users ();
 }
 
@@ -505,5 +536,15 @@ test_scram_install (TestSuite *suite)
                       test_framework_skip_if_max_wire_version_less_than_6,
                       _skip_if_no_sha256,
                       skip_if_no_icu,
+                      TestSuite_CheckLive);
+   TestSuite_AddFull (suite,
+                      "/scram/saslprep_auth_no_icu",
+                      test_mongoc_saslprep_auth_no_icu,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_no_auth,
+                      test_framework_skip_if_max_wire_version_less_than_6,
+                      _skip_if_no_sha256,
+                      skip_if_icu,
                       TestSuite_CheckLive);
 }
