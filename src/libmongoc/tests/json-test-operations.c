@@ -903,7 +903,6 @@ count (mongoc_collection_t *collection,
       bson_t collation;
       bson_lookup_doc (operation, "arguments.collation", &collation);
       bson_append_document (&opts, "collation", 9, &collation);
-      bson_destroy (&collation);
    }
    append_session (session, &opts);
    r = mongoc_collection_count_with_opts (
@@ -952,7 +951,6 @@ count_documents (mongoc_collection_t *collection,
       bson_t collation;
       bson_lookup_doc (operation, "arguments.collation", &collation);
       bson_append_document (&opts, "collation", 9, &collation);
-      bson_destroy (&collation);
    }
 
    append_session (session, &opts);
