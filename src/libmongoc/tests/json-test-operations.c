@@ -891,13 +891,15 @@ count (mongoc_collection_t *collection,
    bson_value_t value;
 
    bson_lookup_doc (operation, "arguments.filter", &filter);
-   if (bson_has_field(operation, "arguments.skip")) {
-      bson_append_int64 (&opts, "skip", 4, bson_lookup_int32 (operation, "arguments.skip"));
+   if (bson_has_field (operation, "arguments.skip")) {
+      bson_append_int64 (
+         &opts, "skip", 4, bson_lookup_int32 (operation, "arguments.skip"));
    }
-   if (bson_has_field(operation, "arguments.limit")) {
-      bson_append_int64 (&opts, "limit", 5, bson_lookup_int32 (operation, "arguments.limit"));
+   if (bson_has_field (operation, "arguments.limit")) {
+      bson_append_int64 (
+         &opts, "limit", 5, bson_lookup_int32 (operation, "arguments.limit"));
    }
-   if (bson_has_field(operation, "arguments.collation")) {
+   if (bson_has_field (operation, "arguments.collation")) {
       bson_t collation;
       bson_lookup_doc (operation, "arguments.collation", &collation);
       bson_append_document (&opts, "collation", 9, &collation);
@@ -925,10 +927,10 @@ count (mongoc_collection_t *collection,
 
 static void
 count_documents (mongoc_collection_t *collection,
-       const bson_t *test,
-       const bson_t *operation,
-       mongoc_client_session_t *session,
-       const mongoc_read_prefs_t *read_prefs)
+                 const bson_t *test,
+                 const bson_t *operation,
+                 mongoc_client_session_t *session,
+                 const mongoc_read_prefs_t *read_prefs)
 {
    bson_t filter;
    bson_t reply = BSON_INITIALIZER;
@@ -938,13 +940,15 @@ count_documents (mongoc_collection_t *collection,
    bson_value_t value;
 
    bson_lookup_doc (operation, "arguments.filter", &filter);
-   if (bson_has_field(operation, "arguments.skip")) {
-      bson_append_int64 (&opts, "skip", 4, bson_lookup_int32 (operation, "arguments.skip"));
+   if (bson_has_field (operation, "arguments.skip")) {
+      bson_append_int64 (
+         &opts, "skip", 4, bson_lookup_int32 (operation, "arguments.skip"));
    }
-   if (bson_has_field(operation, "arguments.limit")) {
-      bson_append_int64 (&opts, "limit", 5, bson_lookup_int32 (operation, "arguments.limit"));
+   if (bson_has_field (operation, "arguments.limit")) {
+      bson_append_int64 (
+         &opts, "limit", 5, bson_lookup_int32 (operation, "arguments.limit"));
    }
-   if (bson_has_field(operation, "arguments.collation")) {
+   if (bson_has_field (operation, "arguments.collation")) {
       bson_t collation;
       bson_lookup_doc (operation, "arguments.collation", &collation);
       bson_append_document (&opts, "collation", 9, &collation);
@@ -952,7 +956,8 @@ count_documents (mongoc_collection_t *collection,
    }
 
    append_session (session, &opts);
-   r = mongoc_collection_count_documents (collection, &filter, &opts, read_prefs, NULL, &error);
+   r = mongoc_collection_count_documents (
+      collection, &filter, &opts, read_prefs, NULL, &error);
 
    if (r >= 0) {
       value.value_type = BSON_TYPE_INT64;
@@ -971,10 +976,10 @@ count_documents (mongoc_collection_t *collection,
 
 static void
 estimated_document_count (mongoc_collection_t *collection,
-                 const bson_t *test,
-                 const bson_t *operation,
-                 mongoc_client_session_t *session,
-                 const mongoc_read_prefs_t *read_prefs)
+                          const bson_t *test,
+                          const bson_t *operation,
+                          mongoc_client_session_t *session,
+                          const mongoc_read_prefs_t *read_prefs)
 {
    bson_t reply = BSON_INITIALIZER;
    bson_t opts = BSON_INITIALIZER;
@@ -982,14 +987,17 @@ estimated_document_count (mongoc_collection_t *collection,
    int64_t r;
    bson_value_t value;
 
-   if (bson_has_field(operation, "arguments.skip")) {
-      bson_append_int64 (&opts, "skip", 4, bson_lookup_int32 (operation, "arguments.skip"));
+   if (bson_has_field (operation, "arguments.skip")) {
+      bson_append_int64 (
+         &opts, "skip", 4, bson_lookup_int32 (operation, "arguments.skip"));
    }
-   if (bson_has_field(operation, "arguments.limit")) {
-      bson_append_int64 (&opts, "limit", 5, bson_lookup_int32 (operation, "arguments.limit"));
+   if (bson_has_field (operation, "arguments.limit")) {
+      bson_append_int64 (
+         &opts, "limit", 5, bson_lookup_int32 (operation, "arguments.limit"));
    }
    append_session (session, &opts);
-   r = mongoc_collection_estimated_document_count (collection, &opts, read_prefs, NULL, &error);
+   r = mongoc_collection_estimated_document_count (
+      collection, &opts, read_prefs, NULL, &error);
 
    if (r >= 0) {
       value.value_type = BSON_TYPE_INT64;
@@ -1324,7 +1332,8 @@ json_test_operation (json_test_ctx_t *ctx,
    } else if (!strcmp (op_name, "count")) {
       count (collection, test, operation, session, read_prefs);
    } else if (!strcmp (op_name, "estimatedDocumentCount")) {
-      estimated_document_count (collection, test, operation, session, read_prefs);
+      estimated_document_count (
+         collection, test, operation, session, read_prefs);
    } else if (!strcmp (op_name, "countDocuments")) {
       count_documents (collection, test, operation, session, read_prefs);
    } else if (!strcmp (op_name, "distinct")) {
