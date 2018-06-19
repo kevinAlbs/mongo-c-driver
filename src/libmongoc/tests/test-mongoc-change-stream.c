@@ -1040,7 +1040,8 @@ test_change_stream_live_read_prefs (void *test_ctx)
 
    /* Change stream client will resume with another cursor. */
    ASSERT (!mongoc_change_stream_next (stream, &next_doc));
-   ASSERT (!mongoc_change_stream_error_document (stream, &err, &next_doc));
+   ASSERT_OR_PRINT (
+      !mongoc_change_stream_error_document (stream, &err, &next_doc), err);
 
    raw_cursor = stream->cursor;
    ASSERT (first_cursor_id != mongoc_cursor_get_id (raw_cursor));
@@ -1199,6 +1200,44 @@ test_change_stream_accepts_array (void *test_ctx)
    mongoc_client_destroy (client);
 }
 
+/* A simple test that passing 'startAtOperationTime' does not error. */
+void
+test_change_stream_start_at_operation_time (void *test_ctx)
+{
+   mongoc_client_t *client = test_framework_client_new ();
+   mongoc_collection_t *coll;
+   mongoc_change_stream_t *stream;
+   const bson_t *doc;
+   bson_t opts;
+   mongoc_client_session_t *session;
+   bson_error_t error;
+
+   session = mongoc_client_start_session (client, NULL, &error);
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   bson_init (&opts);
+   ASSERT_OR_PRINT (mongoc_client_session_append (session, &opts, &error),
+                    error);
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (coll, tmp_bson (NULL), &opts, NULL, &error),
+      error);
+   BSON_APPEND_TIMESTAMP (&opts,
+                          "startAtOperationTime",
+                          session->operation_timestamp,
+                          session->operation_increment);
+   stream =
+      mongoc_collection_watch (coll, tmp_bson ("{'pipeline': []}"), &opts);
+
+   (void) mongoc_change_stream_next (stream, &doc);
+   ASSERT_OR_PRINT (!mongoc_change_stream_error_document (stream, &error, NULL),
+                    error);
+
+   bson_destroy (&opts);
+   mongoc_change_stream_destroy (stream);
+   mongoc_client_session_destroy (session);
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+}
+
 void
 test_change_stream_install (TestSuite *suite)
 {
@@ -1273,4 +1312,10 @@ test_change_stream_install (TestSuite *suite)
                       test_framework_skip_if_not_rs_version_6);
    TestSuite_AddMockServerTest (
       suite, "/change_stream/getmore_errors", test_getmore_errors);
+   TestSuite_AddFull (suite,
+                      "/change_stream/start_at_operation_time",
+                      test_change_stream_start_at_operation_time,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_not_rs_version_7);
 }

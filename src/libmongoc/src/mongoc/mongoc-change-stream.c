@@ -92,13 +92,20 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
                      stream->coll->collectionlen);
    bson_append_array_begin (command, "pipeline", 8, &pipeline);
 
-   /* Append the $changeStream stage */
+   /* append the $changeStream stage. */
    bson_append_document_begin (&pipeline, "0", 1, &change_stream_stage);
    bson_append_document_begin (
       &change_stream_stage, "$changeStream", 13, &change_stream_doc);
    bson_concat (&change_stream_doc, &stream->full_document);
    if (!bson_empty (&stream->resume_token)) {
       bson_concat (&change_stream_doc, &stream->resume_token);
+   }
+   /* Change streams spec: "startAtOperationTime and resumeAfter are mutually
+    * exclusive; if both startAtOperationTime and resumeAfter are set, the
+    * server will return an error. Drivers MUST NOT throw a custom error, and
+    * MUST defer to the server error." */
+   if (!bson_empty (&stream->operation_time)) {
+      bson_concat (&change_stream_doc, &stream->operation_time);
    }
    bson_append_document_end (&change_stream_stage, &change_stream_doc);
    bson_append_document_end (&pipeline, &change_stream_stage);
@@ -113,8 +120,8 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
 
       BSON_ASSERT (bson_iter_recurse (&iter, &child_iter));
       while (bson_iter_next (&child_iter)) {
-         /* The user pipeline may consist of invalid stages or non-documents.
-          * Append anyway, and rely on the server error. */
+         /* the user pipeline may consist of invalid stages or non-documents.
+          * append anyway, and rely on the server error. */
          size_t keyLen =
             bson_uint32_to_string (key_int, &key_str, buf, sizeof (buf));
          bson_append_value (
@@ -132,10 +139,19 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
    }
    bson_append_document_end (command, &cursor_doc);
 }
-
-/* Construct and send the aggregate command and create the resulting cursor.
- * Returns false on error, and sets stream->err. On error, stream->cursor
- * remains NULL, otherwise it is created and must be destroyed. */
+/* --------------------------------------------------------------------------
+ *
+ * _make_cursor --
+ *
+ *       Construct and send the aggregate command and create the resulting
+ *       cursor. On error, stream->cursor remains NULL, otherwise it is
+ *       created and must be destroyed.
+ *
+ * Return:
+ *       Returns false on error and sets stream->err.
+ *
+ *--------------------------------------------------------------------------
+ */
 static bool
 _make_cursor (mongoc_change_stream_t *stream)
 {
@@ -200,7 +216,7 @@ _make_cursor (mongoc_change_stream_t *stream)
       goto cleanup;
    }
 
-   /* use inherited read preference and read concern of the collection */
+   /* use inherited read preference and read concern of the collection. */
    if (!mongoc_collection_read_command_with_opts (
           stream->coll, &command, NULL, &command_opts, &reply, &stream->err)) {
       bson_destroy (&stream->err_doc);
@@ -216,7 +232,7 @@ _make_cursor (mongoc_change_stream_t *stream)
                      MONGOC_CURSOR_AWAIT_DATA_LEN,
                      true);
 
-   /* maxTimeMS is only appended to getMores if these are set in cursor opts */
+   /* maxTimeMS is only appended to getMores if these are set in cursor opts. */
    if (stream->max_await_time_ms > 0) {
       bson_append_int64 (&getmore_opts,
                          MONGOC_CURSOR_MAX_AWAIT_TIME_MS,
@@ -231,7 +247,20 @@ _make_cursor (mongoc_change_stream_t *stream)
                          stream->batch_size);
    }
 
-   /* steals reply */
+   /* Change streams spec: "If neither startAtOperationTime nor resumeAfter are
+    * specified, and the max wire version is >= 7, and the initial aggregate
+    * command does not return a resumeToken (indicating no results), the
+    * ChangeStream MUST save the operationTime from the initial aggregate
+    * command when it returns." */
+   if (bson_empty (&stream->resume_token) &&
+       bson_empty (&stream->operation_time) && sd->max_wire_version >= 7 &&
+       bson_iter_init_find (&iter, &reply, "startAtOperationTime")) {
+      bson_append_value (&stream->operation_time,
+                         "startAtOperationTime",
+                         13,
+                         bson_iter_value (&iter));
+   }
+   /* steals reply. */
    stream->cursor = mongoc_cursor_new_from_command_reply_with_opts (
       stream->coll->client, &reply, &getmore_opts);
 
@@ -261,6 +290,7 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
    bson_init (&stream->full_document);
    bson_init (&stream->opts);
    bson_init (&stream->resume_token);
+   bson_init (&stream->operation_time);
    bson_init (&stream->err_doc);
 
    /*
@@ -271,7 +301,6 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
     * batchSize: Optional<Int32>, passed as agg option, {cursor: { batchSize: }}
     * standard command options like "sessionId", "maxTimeMS", or "collation"
     */
-
    if (opts) {
       bson_iter_t iter;
 
@@ -282,6 +311,10 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
 
       if (bson_iter_init_find (&iter, opts, "resumeAfter")) {
          SET_BSON_OR_ERR (&stream->resume_token, "resumeAfter");
+      }
+
+      if (bson_iter_init_find (&iter, opts, "startAtOperationTime")) {
+         SET_BSON_OR_ERR (&stream->operation_time, "startAtOperationTime");
       }
 
       if (bson_iter_init_find (&iter, opts, "batchSize")) {
@@ -295,9 +328,10 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
          stream->max_await_time_ms = bson_iter_as_int64 (&iter);
       }
 
-      /* save the remaining opts for mongoc_collection_read_command_with_opts */
+      /* save the other opts for mongoc_collection_read_command_with_opts. */
       bson_copy_to_excluding_noinit (opts,
                                      &stream->opts,
+                                     "startAtOperationTime",
                                      "fullDocument",
                                      "resumeAfter",
                                      "batchSize",
@@ -358,13 +392,13 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
       bool resumable = false;
 
       if (!mongoc_cursor_error_document (stream->cursor, &err, &err_doc)) {
-         /* No error occurred, just no documents left */
+         /* no error occurred, just no documents left. */
          goto end;
       }
 
       resumable = _is_resumable_error (err_doc);
       if (resumable) {
-         /* recreate the cursor */
+         /* recreate the cursor. */
          mongoc_cursor_destroy (stream->cursor);
          stream->cursor = NULL;
          if (!_make_cursor (stream)) {
@@ -374,7 +408,7 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
             resumable =
                !mongoc_cursor_error_document (stream->cursor, &err, &err_doc);
             if (resumable) {
-               /* Empty batch. */
+               /* empty batch. */
                goto end;
             }
          }
@@ -388,8 +422,8 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
       }
    }
 
-   /* We have received documents, either from the first call to next
-    * or after a resume. */
+   /* we have received documents, either from the first call to next or after a
+    * resume. */
    if (!bson_iter_init_find (&iter, *bson, "_id")) {
       bson_set_error (&stream->err,
                       MONGOC_ERROR_CURSOR,
@@ -399,10 +433,12 @@ mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
       goto end;
    }
 
-   /* Copy the resume token */
+   /* copy the resume token. */
    bson_reinit (&stream->resume_token);
    BSON_APPEND_VALUE (
       &stream->resume_token, "resumeAfter", bson_iter_value (&iter));
+   /* clear out the operation time, since we no longer need it to resume. */
+   bson_reinit (&stream->operation_time);
    ret = true;
 
 end:
@@ -411,7 +447,7 @@ end:
     * the pool immediately following a getMore operation that indicates that the
     * cursor has been exhausted." */
    if (stream->implicit_session) {
-      /* If creating the change stream cursor errored, it may be null. */
+      /* if creating the change stream cursor errored, it may be null. */
       if (!stream->cursor || stream->cursor->cursor_id == 0) {
          mongoc_client_session_destroy (stream->implicit_session);
          stream->implicit_session = NULL;
@@ -450,6 +486,7 @@ mongoc_change_stream_destroy (mongoc_change_stream_t *stream)
    bson_destroy (&stream->full_document);
    bson_destroy (&stream->opts);
    bson_destroy (&stream->resume_token);
+   bson_destroy (&stream->operation_time);
    bson_destroy (&stream->err_doc);
    if (stream->cursor) {
       mongoc_cursor_destroy (stream->cursor);

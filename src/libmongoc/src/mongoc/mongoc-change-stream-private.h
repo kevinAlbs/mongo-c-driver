@@ -26,7 +26,8 @@ struct _mongoc_change_stream_t {
    bson_t pipeline_to_append;
    bson_t full_document;
    bson_t opts;
-   bson_t resume_token; /* empty, or has resumeAfter: doc */
+   bson_t resume_token;   /* empty, or has resumeAfter: doc */
+   bson_t operation_time; /* empty, or has startAtOperationTime: ts */
 
    bson_error_t err;
    bson_t err_doc;
