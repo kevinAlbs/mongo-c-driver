@@ -88,8 +88,8 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
    bson_append_utf8 (command,
                      "aggregate",
                      9,
-                     stream->coll->collection,
-                     stream->coll->collectionlen);
+                     stream->coll, /* TODO: condition on stream type. */
+                     (int) strlen (stream->coll));
    bson_append_array_begin (command, "pipeline", 8, &pipeline);
 
    /* append the $changeStream stage. */
@@ -168,10 +168,8 @@ _make_cursor (mongoc_change_stream_t *stream)
    BSON_ASSERT (!stream->cursor);
    _make_command (stream, &command);
    bson_copy_to (&stream->opts, &command_opts);
-   sd = mongoc_client_select_server (stream->coll->client,
-                                     false /* for_writes */,
-                                     stream->coll->read_prefs,
-                                     &stream->err);
+   sd = mongoc_client_select_server (
+      stream->client, false /* for_writes */, stream->read_prefs, &stream->err);
    if (!sd) {
       goto cleanup;
    }
@@ -182,7 +180,7 @@ _make_cursor (mongoc_change_stream_t *stream)
 
    if (bson_iter_init_find (&iter, &command_opts, "sessionId")) {
       if (!_mongoc_client_session_from_iter (
-             stream->coll->client, &iter, &cs, &stream->err)) {
+             stream->client, &iter, &cs, &stream->err)) {
          goto cleanup;
       }
    } else if (stream->implicit_session) {
@@ -202,8 +200,7 @@ _make_cursor (mongoc_change_stream_t *stream)
       session_opts = mongoc_session_opts_new ();
       mongoc_session_opts_set_causal_consistency (session_opts, false);
       /* returns NULL if sessions aren't supported. ignore errors. */
-      cs =
-         mongoc_client_start_session (stream->coll->client, session_opts, NULL);
+      cs = mongoc_client_start_session (stream->client, session_opts, NULL);
       stream->implicit_session = cs;
       mongoc_session_opts_destroy (session_opts);
       if (cs &&
@@ -216,9 +213,19 @@ _make_cursor (mongoc_change_stream_t *stream)
       goto cleanup;
    }
 
-   /* use inherited read preference and read concern of the collection. */
-   if (!mongoc_collection_read_command_with_opts (
-          stream->coll, &command, NULL, &command_opts, &reply, &stream->err)) {
+
+   if (stream->read_concern) {
+      mongoc_read_concern_append (stream->read_concern, &command_opts);
+   }
+
+   /* likely because we aren't passing read prefs through */
+   if (!mongoc_client_command_with_opts (stream->client,
+                                         stream->db,
+                                         &command,
+                                         stream->read_prefs,
+                                         &command_opts,
+                                         &reply,
+                                         &stream->err)) {
       bson_destroy (&stream->err_doc);
       bson_copy_to (&reply, &stream->err_doc);
       bson_destroy (&reply);
@@ -262,7 +269,7 @@ _make_cursor (mongoc_change_stream_t *stream)
    }
    /* steals reply. */
    stream->cursor = mongoc_cursor_new_from_command_reply_with_opts (
-      stream->coll->client, &reply, &getmore_opts);
+      stream->client, &reply, &getmore_opts);
 
 cleanup:
    bson_destroy (&command);
@@ -271,21 +278,18 @@ cleanup:
    return stream->err.code == 0;
 }
 
-mongoc_change_stream_t *
-_mongoc_change_stream_new (const mongoc_collection_t *coll,
-                           const bson_t *pipeline,
-                           const bson_t *opts)
+/* TODO: comment */
+void
+_mongoc_change_stream_init (mongoc_change_stream_t *stream,
+                            const bson_t *pipeline,
+                            const bson_t *opts)
 {
    bool full_doc_set = false;
-   mongoc_change_stream_t *stream =
-      (mongoc_change_stream_t *) bson_malloc0 (sizeof (mongoc_change_stream_t));
 
-   BSON_ASSERT (coll);
    BSON_ASSERT (pipeline);
 
    stream->max_await_time_ms = -1;
    stream->batch_size = -1;
-   stream->coll = mongoc_collection_copy ((mongoc_collection_t *) coll);
    bson_init (&stream->pipeline_to_append);
    bson_init (&stream->full_document);
    bson_init (&stream->opts);
@@ -368,9 +372,28 @@ _mongoc_change_stream_new (const mongoc_collection_t *coll,
    if (stream->err.code == 0) {
       (void) _make_cursor (stream);
    }
+}
 
+mongoc_change_stream_t *
+_mongoc_change_stream_new_from_collection (const mongoc_collection_t *coll,
+                                           const bson_t *pipeline,
+                                           const bson_t *opts)
+{
+   mongoc_change_stream_t *stream;
+   BSON_ASSERT (coll);
+
+   stream =
+      (mongoc_change_stream_t *) bson_malloc0 (sizeof (mongoc_change_stream_t));
+   bson_strncpy (stream->db, coll->db, sizeof (stream->db));
+   bson_strncpy (stream->coll, coll->collection, sizeof (stream->coll));
+   stream->read_prefs = mongoc_read_prefs_copy (coll->read_prefs);
+   stream->read_concern = mongoc_read_concern_copy (coll->read_concern);
+   stream->client = coll->client;
+   stream->change_stream_type = MONGOC_CHANGE_STREAM_COLLECTION;
+   _mongoc_change_stream_init (stream, pipeline, opts);
    return stream;
 }
+
 
 bool
 mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
@@ -488,12 +511,10 @@ mongoc_change_stream_destroy (mongoc_change_stream_t *stream)
    bson_destroy (&stream->resume_token);
    bson_destroy (&stream->operation_time);
    bson_destroy (&stream->err_doc);
-   if (stream->cursor) {
-      mongoc_cursor_destroy (stream->cursor);
-   }
-   if (stream->implicit_session) {
-      mongoc_client_session_destroy (stream->implicit_session);
-   }
-   mongoc_collection_destroy (stream->coll);
+   mongoc_cursor_destroy (stream->cursor);
+   mongoc_client_session_destroy (stream->implicit_session);
+   mongoc_read_prefs_destroy (stream->read_prefs);
+   mongoc_read_concern_destroy (stream->read_concern);
+
    bson_free (stream);
 }

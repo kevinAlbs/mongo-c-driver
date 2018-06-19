@@ -22,6 +22,12 @@
 #include "mongoc-collection.h"
 #include "mongoc-cursor.h"
 
+typedef enum {
+   MONGOC_CHANGE_STREAM_COLLECTION,
+   MONGOC_CHANGE_STREAM_DATABASE,
+   MONGOC_CHANGE_STREAM_CLIENT
+} mongoc_change_stream_type_t;
+
 struct _mongoc_change_stream_t {
    bson_t pipeline_to_append;
    bson_t full_document;
@@ -33,7 +39,15 @@ struct _mongoc_change_stream_t {
    bson_t err_doc;
 
    mongoc_cursor_t *cursor;
-   mongoc_collection_t *coll;
+
+   mongoc_client_t *client; /* not owned here. */
+   mongoc_read_prefs_t *read_prefs;
+   mongoc_read_concern_t *read_concern;
+
+   mongoc_change_stream_type_t change_stream_type;
+   char db[140];
+   char coll[140];
+
    int64_t max_await_time_ms;
    int32_t batch_size;
 
@@ -41,8 +55,8 @@ struct _mongoc_change_stream_t {
 };
 
 mongoc_change_stream_t *
-_mongoc_change_stream_new (const mongoc_collection_t *coll,
-                           const bson_t *pipeline,
-                           const bson_t *opts);
+_mongoc_change_stream_new_from_collection (const mongoc_collection_t *coll,
+                                           const bson_t *pipeline,
+                                           const bson_t *opts);
 
 #endif /* MONGOC_CHANGE_STREAM_PRIVATE_H */
