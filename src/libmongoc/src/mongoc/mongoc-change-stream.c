@@ -179,6 +179,7 @@ _make_cursor (mongoc_change_stream_t *stream)
    bson_iter_t iter;
    mongoc_server_description_t *sd;
    uint32_t server_id;
+   int32_t max_wire_version = -1;
 
    BSON_ASSERT (stream);
    BSON_ASSERT (!stream->cursor);
@@ -192,6 +193,7 @@ _make_cursor (mongoc_change_stream_t *stream)
    server_id = mongoc_server_description_id (sd);
    bson_append_int32 (&command_opts, "serverId", 8, server_id);
    bson_append_int32 (&getmore_opts, "serverId", 8, server_id);
+   max_wire_version = sd->max_wire_version;
    mongoc_server_description_destroy (sd);
 
    if (bson_iter_init_find (&iter, &command_opts, "sessionId")) {
@@ -277,7 +279,7 @@ _make_cursor (mongoc_change_stream_t *stream)
     * ChangeStream MUST save the operationTime from the initial aggregate
     * command when it returns." */
    if (bson_empty (&stream->resume_token) &&
-       bson_empty (&stream->operation_time) && sd->max_wire_version >= 7 &&
+       bson_empty (&stream->operation_time) && max_wire_version >= 7 &&
        bson_iter_init_find (&iter, &reply, "startAtOperationTime")) {
       bson_append_value (&stream->operation_time,
                          "startAtOperationTime",
