@@ -40,7 +40,7 @@ struct _mongoc_change_stream_t {
 
    mongoc_cursor_t *cursor;
 
-   mongoc_client_t *client; /* not owned here. */
+   mongoc_client_t *client;
    mongoc_read_prefs_t *read_prefs;
    mongoc_read_concern_t *read_concern;
 
@@ -63,5 +63,10 @@ mongoc_change_stream_t *
 _mongoc_change_stream_new_from_database (const mongoc_database_t *db,
                                          const bson_t *pipeline,
                                          const bson_t *opts);
+
+mongoc_change_stream_t *
+_mongoc_change_stream_new_from_client (mongoc_client_t *client,
+                                       const bson_t *pipeline,
+                                       const bson_t *opts);
 
 #endif /* MONGOC_CHANGE_STREAM_PRIVATE_H */

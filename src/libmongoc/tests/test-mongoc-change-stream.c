@@ -1249,31 +1249,53 @@ test_change_stream_database_watch (void *test_ctx)
    const bson_t *doc;
    bson_t opts;
    bson_error_t error;
-   mongoc_write_concern_t *wc = mongoc_write_concern_new ();
 
-   db = mongoc_client_get_database (client, "changestream_db");
-   ASSERT_OR_PRINT (mongoc_database_drop (db, &error), error);
-   coll = mongoc_database_get_collection (db, "coll");
+   db = mongoc_client_get_database (client, "db");
    bson_init (&opts);
-   mongoc_write_concern_set_wmajority (wc, 30000);
-   mongoc_write_concern_append (wc, &opts);
 
-   stream = mongoc_database_watch (db, tmp_bson ("{'pipeline': []}"), NULL);
+   stream = mongoc_database_watch (db, tmp_bson ("{}"), NULL);
 
+   coll = mongoc_database_get_collection (db, "coll");
    ASSERT_OR_PRINT (
       mongoc_collection_insert_one (coll, tmp_bson (NULL), &opts, NULL, &error),
       error);
 
-   ASSERT (mongoc_change_stream_next (stream, &doc));
+   (void) mongoc_change_stream_next (stream, &doc);
    ASSERT_OR_PRINT (!mongoc_change_stream_error_document (stream, &error, NULL),
                     error);
 
-   ASSERT_MATCH (doc, "{ 'operationType': 'insert' }");
+   bson_destroy (&opts);
+   mongoc_change_stream_destroy (stream);
+   mongoc_database_destroy (db);
+   mongoc_client_destroy (client);
+}
+
+/* A simple test of client watch. */
+void
+test_change_stream_client_watch (void *test_ctx)
+{
+   mongoc_client_t *client = test_framework_client_new ();
+   mongoc_collection_t *coll;
+   mongoc_change_stream_t *stream;
+   const bson_t *doc;
+   bson_t opts;
+   bson_error_t error;
+
+   bson_init (&opts);
+
+   stream = mongoc_client_watch (client, tmp_bson ("{}"), NULL);
+
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (coll, tmp_bson (NULL), &opts, NULL, &error),
+      error);
+
+   (void) mongoc_change_stream_next (stream, &doc);
+   ASSERT_OR_PRINT (!mongoc_change_stream_error_document (stream, &error, NULL),
+                    error);
 
    bson_destroy (&opts);
    mongoc_change_stream_destroy (stream);
-   mongoc_collection_destroy (coll);
-   mongoc_database_destroy (db);
    mongoc_client_destroy (client);
 }
 
@@ -1359,6 +1381,12 @@ test_change_stream_install (TestSuite *suite)
                       test_framework_skip_if_not_rs_version_7);
    TestSuite_AddFull (suite,
                       "/change_stream/database",
+                      test_change_stream_database_watch,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_not_rs_version_7);
+   TestSuite_AddFull (suite,
+                      "/change_stream/client",
                       test_change_stream_database_watch,
                       NULL,
                       NULL,

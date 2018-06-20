@@ -16,11 +16,12 @@
 
 #include <bson.h>
 #include "mongoc-change-stream-private.h"
-#include "mongoc-error.h"
-#include "mongoc-cursor-private.h"
 #include "mongoc-collection-private.h"
+#include "mongoc-client-private.h"
 #include "mongoc-client-session-private.h"
+#include "mongoc-cursor-private.h"
 #include "mongoc-database-private.h"
+#include "mongoc-error.h"
 
 #define CHANGE_STREAM_ERR(_str)         \
    bson_set_error (&stream->err,        \
@@ -74,8 +75,15 @@ _is_resumable_error (const bson_t *reply)
       return true;
    }
 }
-/* Construct the aggregate command in cmd:
- * { aggregate: collname, pipeline: [], cursor: { batchSize: x } } */
+/* construct the aggregate command in cmd. looks like one of the following:
+ * for a collection change stream:
+ *   { aggregate: collname, pipeline: [], cursor: { batchSize: x } }
+ * for a database change stream:
+ *   { aggregate: 1, pipeline: [], cursor: { batchSize: x } }
+ * for a client change stream:
+ *   { aggregate: 1, pipeline: [{ allChangesForCluster: true }],
+ *     cursor: { batchSize: x } }
+ */
 static void
 _make_command (mongoc_change_stream_t *stream, bson_t *command)
 {
@@ -110,6 +118,10 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
    if (!bson_empty (&stream->operation_time)) {
       bson_concat (&change_stream_doc, &stream->operation_time);
    }
+
+   if (stream->change_stream_type == MONGOC_CHANGE_STREAM_CLIENT) {
+      bson_append_bool (&change_stream_doc, "allChangesForCluster", 20, true);
+   }
    bson_append_document_end (&change_stream_stage, &change_stream_doc);
    bson_append_document_end (&pipeline, &change_stream_stage);
 
@@ -142,6 +154,7 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
    }
    bson_append_document_end (command, &cursor_doc);
 }
+
 /* --------------------------------------------------------------------------
  *
  * _make_cursor --
@@ -151,7 +164,7 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
  *       created and must be destroyed.
  *
  * Return:
- *       Returns false on error and sets stream->err.
+ *       False on error and sets stream->err.
  *
  *--------------------------------------------------------------------------
  */
@@ -221,7 +234,8 @@ _make_cursor (mongoc_change_stream_t *stream)
       mongoc_read_concern_append (stream->read_concern, &command_opts);
    }
 
-   /* likely because we aren't passing read prefs through */
+   /* even though serverId has already been set, still pass the read prefs.
+    * they are necessary for OP_MSG if sending to a secondary. */
    if (!mongoc_client_command_with_opts (stream->client,
                                          stream->db,
                                          &command,
@@ -267,7 +281,7 @@ _make_cursor (mongoc_change_stream_t *stream)
        bson_iter_init_find (&iter, &reply, "startAtOperationTime")) {
       bson_append_value (&stream->operation_time,
                          "startAtOperationTime",
-                         13,
+                         20,
                          bson_iter_value (&iter));
    }
    /* steals reply. */
@@ -281,9 +295,18 @@ cleanup:
    return stream->err.code == 0;
 }
 
-/* TODO: comment */
+/* --------------------------------------------------------------------------
+ *
+ * _change_stream_init --
+ *
+ *       Called after @stream has the collection name, database name, read
+ *       preferences, and read concern set. Creates the change streams
+ *       cursor.
+ *
+ *--------------------------------------------------------------------------
+ */
 void
-_mongoc_change_stream_init (mongoc_change_stream_t *stream,
+_change_stream_init (mongoc_change_stream_t *stream,
                             const bson_t *pipeline,
                             const bson_t *opts)
 {
@@ -393,7 +416,7 @@ _mongoc_change_stream_new_from_collection (const mongoc_collection_t *coll,
    stream->read_concern = mongoc_read_concern_copy (coll->read_concern);
    stream->client = coll->client;
    stream->change_stream_type = MONGOC_CHANGE_STREAM_COLLECTION;
-   _mongoc_change_stream_init (stream, pipeline, opts);
+   _change_stream_init (stream, pipeline, opts);
    return stream;
 }
 
@@ -413,7 +436,27 @@ _mongoc_change_stream_new_from_database (const mongoc_database_t *db,
    stream->read_concern = mongoc_read_concern_copy (db->read_concern);
    stream->client = db->client;
    stream->change_stream_type = MONGOC_CHANGE_STREAM_DATABASE;
-   _mongoc_change_stream_init (stream, pipeline, opts);
+   _change_stream_init (stream, pipeline, opts);
+   return stream;
+}
+
+mongoc_change_stream_t *
+_mongoc_change_stream_new_from_client (mongoc_client_t *client,
+                                       const bson_t *pipeline,
+                                       const bson_t *opts)
+{
+   mongoc_change_stream_t *stream;
+   BSON_ASSERT (client);
+
+   stream =
+      (mongoc_change_stream_t *) bson_malloc0 (sizeof (mongoc_change_stream_t));
+   bson_strncpy (stream->db, "admin", sizeof (stream->db));
+   stream->coll[0] = '\0';
+   stream->read_prefs = mongoc_read_prefs_copy (client->read_prefs);
+   stream->read_concern = mongoc_read_concern_copy (client->read_concern);
+   stream->client = client;
+   stream->change_stream_type = MONGOC_CHANGE_STREAM_CLIENT;
+   _change_stream_init (stream, pipeline, opts);
    return stream;
 }
 
