@@ -59,4 +59,9 @@ _mongoc_change_stream_new_from_collection (const mongoc_collection_t *coll,
                                            const bson_t *pipeline,
                                            const bson_t *opts);
 
+mongoc_change_stream_t *
+_mongoc_change_stream_new_from_database (const mongoc_database_t *db,
+                                         const bson_t *pipeline,
+                                         const bson_t *opts);
+
 #endif /* MONGOC_CHANGE_STREAM_PRIVATE_H */

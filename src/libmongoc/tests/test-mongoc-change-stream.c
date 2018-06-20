@@ -1238,6 +1238,45 @@ test_change_stream_start_at_operation_time (void *test_ctx)
    mongoc_client_destroy (client);
 }
 
+/* A simple test of database watch. */
+void
+test_change_stream_database_watch (void *test_ctx)
+{
+   mongoc_client_t *client = test_framework_client_new ();
+   mongoc_database_t *db;
+   mongoc_collection_t *coll;
+   mongoc_change_stream_t *stream;
+   const bson_t *doc;
+   bson_t opts;
+   bson_error_t error;
+   mongoc_write_concern_t *wc = mongoc_write_concern_new ();
+
+   db = mongoc_client_get_database (client, "changestream_db");
+   ASSERT_OR_PRINT (mongoc_database_drop (db, &error), error);
+   coll = mongoc_database_get_collection (db, "coll");
+   bson_init (&opts);
+   mongoc_write_concern_set_wmajority (wc, 30000);
+   mongoc_write_concern_append (wc, &opts);
+
+   stream = mongoc_database_watch (db, tmp_bson ("{'pipeline': []}"), NULL);
+
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (coll, tmp_bson (NULL), &opts, NULL, &error),
+      error);
+
+   ASSERT (mongoc_change_stream_next (stream, &doc));
+   ASSERT_OR_PRINT (!mongoc_change_stream_error_document (stream, &error, NULL),
+                    error);
+
+   ASSERT_MATCH (doc, "{ 'operationType': 'insert' }");
+
+   bson_destroy (&opts);
+   mongoc_change_stream_destroy (stream);
+   mongoc_collection_destroy (coll);
+   mongoc_database_destroy (db);
+   mongoc_client_destroy (client);
+}
+
 void
 test_change_stream_install (TestSuite *suite)
 {
@@ -1315,6 +1354,12 @@ test_change_stream_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/change_stream/start_at_operation_time",
                       test_change_stream_start_at_operation_time,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_not_rs_version_7);
+   TestSuite_AddFull (suite,
+                      "/change_stream/database",
+                      test_change_stream_database_watch,
                       NULL,
                       NULL,
                       test_framework_skip_if_not_rs_version_7);

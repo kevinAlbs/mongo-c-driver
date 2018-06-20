@@ -20,6 +20,7 @@
 #include "mongoc-cursor-private.h"
 #include "mongoc-collection-private.h"
 #include "mongoc-client-session-private.h"
+#include "mongoc-database-private.h"
 
 #define CHANGE_STREAM_ERR(_str)         \
    bson_set_error (&stream->err,        \
@@ -85,11 +86,13 @@ _make_command (mongoc_change_stream_t *stream, bson_t *command)
    bson_t cursor_doc;
 
    bson_init (command);
-   bson_append_utf8 (command,
-                     "aggregate",
-                     9,
-                     stream->coll, /* TODO: condition on stream type. */
-                     (int) strlen (stream->coll));
+   if (stream->change_stream_type == MONGOC_CHANGE_STREAM_COLLECTION) {
+      bson_append_utf8 (
+         command, "aggregate", 9, stream->coll, (int) strlen (stream->coll));
+   } else {
+      bson_append_int32 (command, "aggregate", 9, 1);
+   }
+
    bson_append_array_begin (command, "pipeline", 8, &pipeline);
 
    /* append the $changeStream stage. */
@@ -394,6 +397,25 @@ _mongoc_change_stream_new_from_collection (const mongoc_collection_t *coll,
    return stream;
 }
 
+mongoc_change_stream_t *
+_mongoc_change_stream_new_from_database (const mongoc_database_t *db,
+                                         const bson_t *pipeline,
+                                         const bson_t *opts)
+{
+   mongoc_change_stream_t *stream;
+   BSON_ASSERT (db);
+
+   stream =
+      (mongoc_change_stream_t *) bson_malloc0 (sizeof (mongoc_change_stream_t));
+   bson_strncpy (stream->db, db->name, sizeof (stream->db));
+   stream->coll[0] = '\0';
+   stream->read_prefs = mongoc_read_prefs_copy (db->read_prefs);
+   stream->read_concern = mongoc_read_concern_copy (db->read_concern);
+   stream->client = db->client;
+   stream->change_stream_type = MONGOC_CHANGE_STREAM_DATABASE;
+   _mongoc_change_stream_init (stream, pipeline, opts);
+   return stream;
+}
 
 bool
 mongoc_change_stream_next (mongoc_change_stream_t *stream, const bson_t **bson)
