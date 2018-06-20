@@ -1267,6 +1267,7 @@ test_change_stream_database_watch (void *test_ctx)
    bson_destroy (&opts);
    mongoc_change_stream_destroy (stream);
    mongoc_database_destroy (db);
+   mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
 }
 
@@ -1296,6 +1297,7 @@ test_change_stream_client_watch (void *test_ctx)
 
    bson_destroy (&opts);
    mongoc_change_stream_destroy (stream);
+   mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
 }
 
