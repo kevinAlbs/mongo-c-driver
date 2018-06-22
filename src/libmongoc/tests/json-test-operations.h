@@ -56,6 +56,8 @@ typedef void (*json_test_operation_cb_t) (json_test_ctx_t *ctx,
                                           const bson_t *test,
                                           const bson_t *operation);
 
+typedef bool (*json_test_cb_t) (json_test_ctx_t *ctx, const bson_t *test);
+
 void
 json_test_operation (json_test_ctx_t *ctx,
                      const bson_t *test,
