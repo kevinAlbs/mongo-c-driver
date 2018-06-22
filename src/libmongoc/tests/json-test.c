@@ -673,6 +673,19 @@ check_test_version (const bson_t *test)
    char *padded;
    server_version_t test_version, server_version;
 
+   if (bson_has_field (test, "minServerVersion")) {
+      s = bson_lookup_utf8 (test, "minServerVersion");
+      test_version = test_framework_str_to_version (s);
+      server_version = test_framework_get_server_version ();
+      if (server_version < test_version) {
+         if (test_suite_debug_output ()) {
+            printf ("      SKIP, minServerVersion %s\n", s);
+            fflush (stdout);
+         }
+         return false;
+      }
+   }
+
    if (bson_has_field (test, "ignore_if_server_version_greater_than")) {
       s = bson_lookup_utf8 (test, "ignore_if_server_version_greater_than");
       /* s is like "3.0", don't skip if server is 3.0.x but skip 3.1+ */
