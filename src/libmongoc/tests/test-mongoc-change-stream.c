@@ -1339,6 +1339,10 @@ change_stream_spec_operation_cb (json_test_ctx_t *ctx,
    ctx->db = db;
    ctx->collection = coll;
    json_test_operation (ctx, test, operation, NULL);
+
+   mongoc_collection_destroy (coll);
+   mongoc_database_destroy (db);
+   mongoc_client_destroy (client);
 }
 
 static void
@@ -1437,9 +1441,8 @@ static void
 test_change_stream_spec_cb (bson_t *scenario)
 {
    json_test_config_t config = JSON_TEST_CONFIG_INIT;
-   change_stream_spec_ctx_t *ctx = (change_stream_spec_ctx_t *) bson_malloc0 (
-      sizeof (change_stream_spec_ctx_t));
-   config.ctx = ctx;
+   change_stream_spec_ctx_t ctx = {0};
+   config.ctx = &ctx;
    config.command_started_events_only = true;
    config.command_monitoring_allow_subset = true;
    config.before_test_cb = change_stream_spec_before_test_cb;
