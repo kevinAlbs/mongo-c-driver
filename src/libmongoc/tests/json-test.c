@@ -888,7 +888,6 @@ execute_test (const json_test_config_t *config,
    json_test_ctx_t ctx;
    uint32_t server_id;
    bson_error_t error;
-   bool should_continue;
 
    if (test_suite_debug_output ()) {
       const char *description = bson_lookup_utf8 (test, "description");
@@ -921,17 +920,13 @@ execute_test (const json_test_config_t *config,
       collection->client, config->command_started_events_only, &ctx);
 
    if (config->before_test_cb) {
-      should_continue = config->before_test_cb (&ctx, test);
-   } else {
-      should_continue = true;
+      config->before_test_cb (&ctx, test);
    }
 
-   if (should_continue) {
-      json_test_operations (&ctx, test);
-   }
+   json_test_operations (&ctx, test);
 
    if (config->after_test_cb) {
-      (void) config->after_test_cb (&ctx, test);
+      config->after_test_cb (&ctx, test);
    }
 
    json_test_ctx_end_sessions (&ctx);
@@ -944,7 +939,7 @@ execute_test (const json_test_config_t *config,
          &ctx.events, &expectations, config->command_monitoring_allow_subset);
       if (config->events_check_cb) {
          config->events_check_cb (&ctx.events);
-      };
+      }
    }
 
    if (bson_has_field (test, "outcome.collection")) {

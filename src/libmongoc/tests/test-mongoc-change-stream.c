@@ -1341,7 +1341,7 @@ change_stream_spec_operation_cb (json_test_ctx_t *ctx,
    json_test_operation (ctx, test, operation, NULL);
 }
 
-static bool
+static void
 change_stream_spec_before_test_cb (json_test_ctx_t *test_ctx,
                                    const bson_t *test)
 {
@@ -1368,11 +1368,9 @@ change_stream_spec_before_test_cb (json_test_ctx_t *test_ctx,
                        target,
                        bson_as_json (test, NULL));
    }
-
-   return !mongoc_change_stream_error_document (ctx->change_stream, NULL, NULL);
 }
 
-static bool
+static void
 change_stream_spec_after_test_cb (json_test_ctx_t *test_ctx, const bson_t *test)
 {
    change_stream_spec_ctx_t *ctx =
@@ -1392,15 +1390,15 @@ change_stream_spec_after_test_cb (json_test_ctx_t *test_ctx, const bson_t *test)
       if (bson_has_field (test, "result.success")) {
          bson_t expected_docs;
          bson_iter_t expected_iter;
+         bson_t all_changes = BSON_INITIALIZER;
+         int i = 0;
+         const bson_t *doc;
+
          bson_lookup_doc (test, "result.success", &expected_docs);
          bson_iter_init (&expected_iter, &expected_docs);
 
          /* iterate over the change stream, and verify that the document exists.
           */
-         bson_t all_changes = BSON_INITIALIZER;
-         int i = 0;
-         const bson_t *doc;
-
          while (mongoc_change_stream_next (ctx->change_stream, &doc)) {
             char *key = bson_strdup_printf ("%d", i);
             i++;
@@ -1433,7 +1431,6 @@ change_stream_spec_after_test_cb (json_test_ctx_t *test_ctx, const bson_t *test)
    /* call a "test ended" callback */
    /* or easier, just destroy the change stream here. */
    mongoc_change_stream_destroy (ctx->change_stream);
-   return true;
 }
 
 static void
@@ -1674,7 +1671,6 @@ test_change_stream_install (TestSuite *suite)
                       NULL,
                       test_framework_skip_if_not_rs_version_7,
                       _skip_if_no_change_stream_updates);
-
    TestSuite_AddMockServerTest (
       suite, "/change_stream/resume_with_first_doc", test_resume_cases);
 
