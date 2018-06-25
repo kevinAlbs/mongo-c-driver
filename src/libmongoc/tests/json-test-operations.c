@@ -1449,7 +1449,6 @@ json_test_operations (json_test_ctx_t *ctx, const bson_t *test)
       one_operation (ctx, test, &operation);
    } else {
       bson_lookup_doc (test, "operations", &operations);
-      ASSERT_CMPUINT32 (bson_count_keys (&operations), >, (uint32_t) 0);
       BSON_ASSERT (bson_iter_init (&iter, &operations));
       while (bson_iter_next (&iter)) {
          bson_iter_bson (&iter, &operation);
