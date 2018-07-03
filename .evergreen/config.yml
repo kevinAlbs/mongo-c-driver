@@ -848,6 +848,41 @@ tasks:
               DEBUG=ON CC='${CC}' MARCH='${MARCH}' ENABLE_SHM_COUNTERS=OFF sh .evergreen/compile.sh
         - func: "upload build"
 
+    - name: debug-compile-asan-clang-nosasl-nossl
+      tags: ["debug-compile", "asan", "special"]
+      commands:
+        - command: shell.exec
+          type: test
+          params:
+            working_dir: "mongoc"
+            script: |
+              export EXTRA_CONFIGURE_FLAGS="-DENABLE_EXTRA_ALIGNMENT=OFF"
+              PATH=/usr/lib/llvm-3.8/bin:$PATH DEBUG=on CC='clang-3.8' CXX='clang++-3.8' MARCH='${MARCH}' CHECK_LOG=ON CFLAGS='-fsanitize=address' CXXFLAGS="$CFLAGS" SNAPPY=OFF SSL=OFF SASL=OFF sh .evergreen/compile.sh
+
+    - name: debug-compile-asan-clang-nosasl-openssl
+      tags: ["debug-compile", "asan", "special"]
+      commands:
+        - command: shell.exec
+          type: test
+          params:
+            working_dir: "mongoc"
+            script: |
+              export EXTRA_CONFIGURE_FLAGS="-DENABLE_EXTRA_ALIGNMENT=OFF"
+              PATH=/usr/lib/llvm-3.8/bin:$PATH DEBUG=on CC='clang-3.8' CXX='clang++-3.8' MARCH='${MARCH}' CHECK_LOG=ON CFLAGS='-fsanitize=address' CXXFLAGS="$CFLAGS" SNAPPY=OFF SSL=OPENSSL SASL=OFF sh .evergreen/compile.sh
+
+    - name: debug-compile-asan-clang-memcheck
+      tags: ["debug-compile", "asan", "special"]
+      commands:
+        - command: shell.exec
+          type: test
+          params:
+            working_dir: "mongoc"
+            script: |
+              export EXTRA_CONFIGURE_FLAGS="-DENABLE_EXTRA_ALIGNMENT=OFF"
+              PATH=/usr/lib/llvm-3.8/bin:$PATH DEBUG=on CC='clang-3.8' CXX='clang++-3.8' MARCH='${MARCH}' CHECK_LOG=ON CFLAGS='-fsanitize=address' CXXFLAGS="$CFLAGS" SNAPPY=OFF SSL=OPENSSL SASL=OFF sh .evergreen/compile.sh
+
+
+
     - name: debug-compile-sanitizer-address-clang
       commands:
         - command: shell.exec
@@ -2126,6 +2161,671 @@ tasks:
         - func: "run mock server tests"
           vars:
             VALGRIND: "on"
+            AUTH: "noauth"
+            SSL: "ssl"
+            URI: ""
+
+    - name: test-asan-latest-server-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "latest"
+            TOPOLOGY: "server"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-4.0-server-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "4.0"
+            TOPOLOGY: "server"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.6-server-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.6"
+            TOPOLOGY: "server"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.4-server-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.4"
+            TOPOLOGY: "server"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.2-server-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.2"
+            TOPOLOGY: "server"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.0-server-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.0"
+            TOPOLOGY: "server"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-latest-replica-set-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "latest"
+            TOPOLOGY: "replica_set"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-4.0-replica-set-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "4.0"
+            TOPOLOGY: "replica_set"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.4-replica-set-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.4"
+            TOPOLOGY: "replica_set"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.2-replica-set-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.2"
+            TOPOLOGY: "replica_set"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.0-replica-set-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.0"
+            TOPOLOGY: "replica_set"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-latest-sharded-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "latest"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-4.0-sharded-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "4.0"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.6-sharded-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.6"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.4-sharded-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.4"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.2-sharded-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.2"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-3.0-sharded-noauth-nosasl-nossl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-nossl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-nossl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.0"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "noauth"
+            SSL: "nossl"
+        - func: "run tests"
+          vars:
+            AUTH: "noauth"
+            SSL: "nossl"
+            URI: ""
+
+    - name: test-asan-latest-server-auth-nosasl-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "latest"
+            TOPOLOGY: "server"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-4.0-server-auth-nosasl-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "4.0"
+            TOPOLOGY: "server"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-3.6-server-auth-nosasl-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.6"
+            TOPOLOGY: "server"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-3.4-server-auth-nosasl-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.4"
+            TOPOLOGY: "server"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-3.2-server-auth-nosasl-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.2"
+            TOPOLOGY: "server"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-3.0-server-auth-nosasl-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.0"
+            TOPOLOGY: "server"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-latest-sharded-auth-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "latest"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-4.0-sharded-auth-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "4.0"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-3.6-sharded-auth-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.6"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-3.4-sharded-auth-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.4"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-3.2-sharded-auth-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.2"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-3.0-sharded-auth-openssl
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-nosasl-openssl"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-nosasl-openssl"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "3.0"
+            TOPOLOGY: "sharded_cluster"
+            AUTH: "auth"
+            SSL: "openssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "openssl"
+            URI: ""
+
+    - name: test-asan-memcheck-server
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-memcheck"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-memcheck"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "latest"
+            TOPOLOGY: "server"
+            AUTH: "auth"
+            SSL: "ssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "ssl"
+            URI: ""
+
+    - name: test-asan-memcheck-replica-set
+      tags: ["test-asan"]
+      exec_timeout_secs: 3600
+      depends_on:
+        - name: "debug-compile-asan-clang-memcheck"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-memcheck"
+        - func: "bootstrap mongo-orchestration"
+          vars:
+            VERSION: "latest"
+            TOPOLOGY: "replica_set"
+            AUTH: "auth"
+            SSL: "ssl"
+        - func: "run tests"
+          vars:
+            AUTH: "auth"
+            SSL: "ssl"
+            URI: ""
+
+    - name: test-asan-memcheck-mock-server
+      tags: ["test-asan"]
+      depends_on:
+        - name: "debug-compile-asan-clang-memcheck"
+      commands:
+        - func: "fetch build"
+          vars:
+            BUILD_NAME: "debug-compile-asan-clang-memcheck"
+        - func: "run mock server tests"
+          vars:
             AUTH: "noauth"
             SSL: "ssl"
             URI: ""
@@ -8332,7 +9032,7 @@ buildvariants:
   display_name: "Valgrind Tests (Ubuntu 14.04)"
   expansions:
     CC: "gcc"
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   run_on:
     - ubuntu1404-build
   tasks:
@@ -8340,6 +9040,17 @@ buildvariants:
     - ".debug-compile !.sspi .nossl !.sasl"
     - ".debug-compile .special .valgrind .bson"
     - ".test-valgrind"
+
+- name: asan-ubuntu
+  display_name: "ASAN Tests (Ubuntu 14.04)"
+  expansions:
+    CC: "clang"
+  batchtime: 1440 # 1 day
+  run_on:
+    - ubuntu1404-build
+  tasks:
+    - ".debug-compile .asan"
+    - ".test-asan"
 
 - name: ios-102-debug
   display_name: "iOS 10.2 DEBUG"
