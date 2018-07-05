@@ -2286,6 +2286,39 @@ test_bson_regex_lengths (void)
 }
 
 void
+test_bson_empty_binary (void)
+{
+   /* bson_malloc returns NULL when attempting to alloc a size 0 object. Instead
+    * allocate a size 1 object so we get a real address. */
+   uint8_t* data = bson_malloc(1);
+   char* as_json;
+   bson_t test;
+   const bson_value_t* value;
+   bson_value_t copy;
+   bson_iter_t iter;
+
+   data[0] = 0xAB;
+   BSON_ASSERT (bson_malloc(0) == NULL);
+   bson_init (&test);
+   bson_append_binary (&test, "test", 4, BSON_SUBTYPE_BINARY, data, 0);
+
+   as_json = bson_as_json (&test, NULL);
+   printf ("%s\n", as_json);
+   bson_free (as_json);
+
+   bson_iter_init_find (&iter, &test, "test");
+   value = bson_iter_value (&iter);
+   bson_value_copy (value, &copy);
+   memcpy(NULL, data, 0);
+
+   bson_value_destroy (&copy);
+
+
+   bson_destroy (&test);
+   bson_free (data);
+}
+
+void
 test_bson_install (TestSuite *suite)
 {
    TestSuite_Add (suite, "/bson/new", test_bson_new);
@@ -2372,4 +2405,5 @@ test_bson_install (TestSuite *suite)
    TestSuite_Add (suite, "/bson/binary_subtype_2", test_bson_subtype_2);
    TestSuite_Add (suite, "/bson/regex_length", test_bson_regex_lengths);
    TestSuite_Add (suite, "/util/next_power_of_two", test_next_power_of_two);
+   TestSuite_Add (suite, "/bson/empty_binary", test_bson_empty_binary);
 }

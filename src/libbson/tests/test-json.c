@@ -2878,23 +2878,6 @@ test_bson_as_json_multi_object (void)
    TEST_JSON_PRODUCES_MULTIPLE ("[],[{'a': 1}]", 1, NULL);
 }
 
-static void
-test_bson_empty_binary (void) {
-   bson_t ex;
-   bson_iter_t iter;
-   bson_error_t err;
-
-   char* json = "{\"a\": {\"$binary\": {\"base64\": \"\", \"subType\": \"00\"}}}";
-   bson_init_from_json (&ex, json, strlen(json), &err);
-   uint8_t arr[5];
-   bson_append_binary (&ex, "b", 1, BSON_SUBTYPE_BINARY, arr /* data */, 0);
-   bson_iter_init_find (&iter, &ex, "a");
-   printf("%s\n", bson_as_canonical_extended_json (&ex, NULL));
-   const bson_value_t* value = bson_iter_value(&iter);
-   bson_append_value (&ex, "hmm", 3, value);
-   printf("%s\n", bson_as_json (&ex, NULL));
-}
-
 void
 test_json_install (TestSuite *suite)
 {
@@ -3016,6 +2999,4 @@ test_json_install (TestSuite *suite)
       suite, "/bson/json/read/null_in_str", test_bson_json_null_in_str);
    TestSuite_Add (
       suite, "/bson/as_json/multi_object", test_bson_as_json_multi_object);
-   TestSuite_Add (
-      suite, "/bson/empty_binary", test_bson_empty_binary);
 }
