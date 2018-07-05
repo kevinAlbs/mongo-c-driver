@@ -2309,7 +2309,6 @@ test_bson_empty_binary (void)
    bson_iter_init_find (&iter, &test, "test");
    value = bson_iter_value (&iter);
    bson_value_copy (value, &copy);
-   memcpy(NULL, data, 0);
 
    bson_value_destroy (&copy);
 
