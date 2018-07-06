@@ -4,6 +4,7 @@
 int
 main ()
 {
+   int exit_code = EXIT_FAILURE;
    const char *uri_string;
    mongoc_uri_t *uri = NULL;
    bson_error_t error;
@@ -17,6 +18,7 @@ main ()
    bson_iter_t iter;
    const bson_t *doc;
    bson_value_t cached_operation_time = {0}, cached_resume_token = {0};
+   int i;
 
    mongoc_init ();
    uri_string = "mongodb://"
@@ -33,7 +35,9 @@ main ()
    }
 
    client = mongoc_client_new_from_uri (uri);
-   mongoc_uri_destroy (uri);
+   if (!client) {
+      goto cleanup;
+   }
 
    /* send a { ping: 1 } command, use the operationTime from the reply. */
    BSON_APPEND_INT64 (&cmd, "ping", 1);
@@ -55,14 +59,17 @@ main ()
    coll = mongoc_client_get_collection (client, "db", "coll");
    stream = mongoc_collection_watch (coll, &pipeline, &opts);
 
-   /* loop forever, returning changes as they come in. */
-   while (true) {
+   /* loops and returns changes as they come in. If no changes are found after
+    * 10 attempts in a row, then exit the loop. */
+   for (i = 0; i < 10; i++) {
       int resume_count = 0;
 
       printf ("listening for changes on db.coll:\n");
       while (mongoc_change_stream_next (stream, &doc)) {
          char *as_json;
 
+         /* a change was found, reset the outer loop. */
+         i = 0;
          as_json = bson_as_canonical_extended_json (doc, NULL);
          printf ("change received: %s\n", as_json);
          bson_free (as_json);
@@ -102,7 +109,10 @@ main ()
       }
    }
 
+   exit_code = EXIT_SUCCESS;
+
 cleanup:
+   mongoc_uri_destroy (uri);
    bson_destroy (&cmd);
    bson_destroy (&pipeline);
    bson_destroy (&opts);
@@ -117,5 +127,5 @@ cleanup:
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
    mongoc_cleanup ();
-   return EXIT_FAILURE;
+   return exit_code;
 }
