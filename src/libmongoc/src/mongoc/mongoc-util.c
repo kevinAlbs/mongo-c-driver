@@ -20,6 +20,9 @@
 
 #include <string.h>
 
+#define BSON_INSIDE
+#include "bson-md5-private.h"
+#undef BSON_INSIDE
 #include "mongoc-util-private.h"
 #include "mongoc-client.h"
 #include "mongoc-client-session-private.h"
@@ -63,13 +66,13 @@ char *
 _mongoc_hex_md5 (const char *input)
 {
    uint8_t digest[16];
-   bson_md5_t md5;
+   _bson_md5_t md5;
    char digest_str[33];
    int i;
 
-   bson_md5_init (&md5);
-   bson_md5_append (&md5, (const uint8_t *) input, (uint32_t) strlen (input));
-   bson_md5_finish (&md5, digest);
+   _bson_md5_init (&md5);
+   _bson_md5_append (&md5, (const uint8_t *) input, (uint32_t) strlen (input));
+   _bson_md5_finish (&md5, digest);
 
    for (i = 0; i < sizeof digest; i++) {
       bson_snprintf (&digest_str[i * 2], 3, "%02x", digest[i]);

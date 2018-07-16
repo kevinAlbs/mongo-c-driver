@@ -61,6 +61,7 @@
 #include <string.h>
 
 #include "bson-md5.h"
+#include "bson-md5-private.h"
 
 
 #undef BYTE_ORDER /* 1 = big-endian, -1 = little-endian, 0 = unknown */
@@ -138,7 +139,7 @@
 
 
 static void
-bson_md5_process (bson_md5_t *md5, const uint8_t *data)
+bson_md5_process (_bson_md5_t *md5, const uint8_t *data)
 {
    uint32_t a = md5->abcd[0];
    uint32_t b = md5->abcd[1];
@@ -328,7 +329,7 @@ bson_md5_process (bson_md5_t *md5, const uint8_t *data)
 }
 
 void
-bson_md5_init (bson_md5_t *pms)
+_bson_md5_init (_bson_md5_t *pms)
 {
    pms->count[0] = pms->count[1] = 0;
    pms->abcd[0] = 0x67452301;
@@ -338,7 +339,13 @@ bson_md5_init (bson_md5_t *pms)
 }
 
 void
-bson_md5_append (bson_md5_t *pms, const uint8_t *data, uint32_t nbytes)
+bson_md5_init (bson_md5_t *pms)
+{
+   _bson_md5_init ((_bson_md5_t *) pms);
+}
+
+void
+_bson_md5_append (_bson_md5_t *pms, const uint8_t *data, uint32_t nbytes)
 {
    const uint8_t *p = data;
    int left = nbytes;
@@ -376,7 +383,13 @@ bson_md5_append (bson_md5_t *pms, const uint8_t *data, uint32_t nbytes)
 }
 
 void
-bson_md5_finish (bson_md5_t *pms, uint8_t digest[16])
+bson_md5_append (bson_md5_t *pms, const uint8_t *data, uint32_t nbytes)
+{
+   _bson_md5_append ((_bson_md5_t *) pms, data, nbytes);
+}
+
+void
+_bson_md5_finish (_bson_md5_t *pms, uint8_t digest[16])
 {
    static const uint8_t pad[64] = {
       0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -389,9 +402,15 @@ bson_md5_finish (bson_md5_t *pms, uint8_t digest[16])
    for (i = 0; i < 8; ++i)
       data[i] = (uint8_t) (pms->count[i >> 2] >> ((i & 3) << 3));
    /* Pad to 56 bytes mod 64. */
-   bson_md5_append (pms, pad, ((55 - (pms->count[0] >> 3)) & 63) + 1);
+   _bson_md5_append (pms, pad, ((55 - (pms->count[0] >> 3)) & 63) + 1);
    /* Append the length. */
-   bson_md5_append (pms, data, sizeof (data));
+   _bson_md5_append (pms, data, sizeof (data));
    for (i = 0; i < 16; ++i)
       digest[i] = (uint8_t) (pms->abcd[i >> 2] >> ((i & 3) << 3));
+}
+
+void
+bson_md5_finish (bson_md5_t *pms, uint8_t digest[16])
+{
+   _bson_md5_finish ((_bson_md5_t *) pms, digest);
 }
