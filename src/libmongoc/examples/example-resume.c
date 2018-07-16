@@ -39,6 +39,7 @@ main ()
       goto cleanup;
    }
 
+
    /* send a { ping: 1 } command, use the operationTime from the reply. */
    BSON_APPEND_INT64 (&cmd, "ping", 1);
    if (!mongoc_client_command_simple (
