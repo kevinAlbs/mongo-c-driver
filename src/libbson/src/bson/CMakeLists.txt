@@ -13,6 +13,7 @@ set (src_libbson_src_bson_DIST_hs
    bson-keys.h
    bson-macros.h
    bson-md5.h
+   bson-md5-private.h
    bson-memory.h
    bson-oid.h
    bson-reader.h
