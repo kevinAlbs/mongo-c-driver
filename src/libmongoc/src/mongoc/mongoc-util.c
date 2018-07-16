@@ -66,7 +66,7 @@ char *
 _mongoc_hex_md5 (const char *input)
 {
    uint8_t digest[16];
-   _bson_md5_t md5;
+   bson_md5_t md5;
    char digest_str[33];
    int i;
 

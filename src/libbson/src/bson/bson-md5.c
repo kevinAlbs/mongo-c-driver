@@ -139,7 +139,7 @@
 
 
 static void
-bson_md5_process (_bson_md5_t *md5, const uint8_t *data)
+bson_md5_process (bson_md5_t *md5, const uint8_t *data)
 {
    uint32_t a = md5->abcd[0];
    uint32_t b = md5->abcd[1];
@@ -329,7 +329,7 @@ bson_md5_process (_bson_md5_t *md5, const uint8_t *data)
 }
 
 void
-_bson_md5_init (_bson_md5_t *pms)
+_bson_md5_init (bson_md5_t *pms)
 {
    pms->count[0] = pms->count[1] = 0;
    pms->abcd[0] = 0x67452301;
@@ -341,11 +341,11 @@ _bson_md5_init (_bson_md5_t *pms)
 void
 bson_md5_init (bson_md5_t *pms)
 {
-   _bson_md5_init ((_bson_md5_t *) pms);
+   _bson_md5_init (pms);
 }
 
 void
-_bson_md5_append (_bson_md5_t *pms, const uint8_t *data, uint32_t nbytes)
+_bson_md5_append (bson_md5_t *pms, const uint8_t *data, uint32_t nbytes)
 {
    const uint8_t *p = data;
    int left = nbytes;
@@ -385,11 +385,11 @@ _bson_md5_append (_bson_md5_t *pms, const uint8_t *data, uint32_t nbytes)
 void
 bson_md5_append (bson_md5_t *pms, const uint8_t *data, uint32_t nbytes)
 {
-   _bson_md5_append ((_bson_md5_t *) pms, data, nbytes);
+   _bson_md5_append (pms, data, nbytes);
 }
 
 void
-_bson_md5_finish (_bson_md5_t *pms, uint8_t digest[16])
+_bson_md5_finish (bson_md5_t *pms, uint8_t digest[16])
 {
    static const uint8_t pad[64] = {
       0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -412,5 +412,5 @@ _bson_md5_finish (_bson_md5_t *pms, uint8_t digest[16])
 void
 bson_md5_finish (bson_md5_t *pms, uint8_t digest[16])
 {
-   _bson_md5_finish ((_bson_md5_t *) pms, digest);
+   _bson_md5_finish (pms, digest);
 }

@@ -23,25 +23,18 @@
 #endif
 
 
+#include "bson-md5.h"
 #include "bson-endian.h"
 
 
 BSON_BEGIN_DECLS
 
-typedef struct {
-   uint32_t count[2]; /* message length in bits, lsw first */
-   uint32_t abcd[4];  /* digest buffer */
-   uint8_t buf[64];   /* accumulate block */
-} _bson_md5_t;
-
 void
-_bson_md5_init (_bson_md5_t *pms);
+_bson_md5_init (bson_md5_t *pms);
 void
-_bson_md5_append (_bson_md5_t *pms,
-                 const uint8_t *data,
-                 uint32_t nbytes);
+_bson_md5_append (bson_md5_t *pms, const uint8_t *data, uint32_t nbytes);
 void
-_bson_md5_finish (_bson_md5_t *pms, uint8_t digest[16]);
+_bson_md5_finish (bson_md5_t *pms, uint8_t digest[16]);
 
 
 BSON_END_DECLS
