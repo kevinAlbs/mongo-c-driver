@@ -6,8 +6,11 @@
  * This behavior allows to user to exit example-resume, and restart it later
  * without missing any change events.
  */
-
+#ifdef WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 #include <mongoc.h>
 
 static const char *RESUME_TOKEN_PATH = "resume-token.json";
@@ -30,8 +33,13 @@ _save_resume_token (const bson_t *doc)
    resume_token = bson_iter_value (&iter);
    /* store the resume token in a document, { resumeAfter: <resume token> }
     * which we can later append easily. */
+#ifdef WIN32
+   file_stream = mongoc_stream_file_new_for_path (
+      RESUME_TOKEN_PATH, O_CREAT | O_TRUNC | O_WRONLY, _S_IWRITE | _S_IREAD);
+#else
    file_stream = mongoc_stream_file_new_for_path (
       RESUME_TOKEN_PATH, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+#endif
    if (!file_stream) {
       fprintf (stderr, "failed to open %s for writing\n", RESUME_TOKEN_PATH);
       return false;
@@ -69,10 +77,16 @@ _load_resume_token (bson_t *opts)
    bson_json_reader_t *reader;
    bson_t doc;
 
-   if (-1 == access (RESUME_TOKEN_PATH, R_OK)) {
-      /* skip, no file. */
+   /* if the file does not exist, skip. */
+#ifdef WIN32
+   if (-1 == _access (RESUME_TOKEN_PATH, 4)) {
       return true;
    }
+#else
+   if (-1 == access (RESUME_TOKEN_PATH, R_OK)) {
+      return true;
+   }
+#endif
    reader = bson_json_reader_new_from_file (RESUME_TOKEN_PATH, &error);
    if (!reader) {
       fprintf (stderr,
