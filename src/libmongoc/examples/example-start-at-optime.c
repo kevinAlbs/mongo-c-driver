@@ -59,22 +59,24 @@ main ()
          goto cleanup;
       }
       if (i == 0) {
-         /* cache the first operation time in the reply. */
+         /* cache the operation time in the first reply. */
          if (bson_iter_init_find (&iter, &reply, "operationTime")) {
             bson_value_copy (bson_iter_value (&iter), &cached_operation_time);
          } else {
             fprintf (stderr, "reply does not contain operationTime.");
+            bson_destroy (&reply);
             goto cleanup;
          }
       }
       bson_destroy (&reply);
    }
 
-   /* start a change stream at the returned operationTime. */
+   /* start a change stream at the first returned operationTime. */
    BSON_APPEND_VALUE (&opts, "startAtOperationTime", &cached_operation_time);
    stream = mongoc_collection_watch (coll, &pipeline, &opts);
 
-   /* loops and returns changes as they come in. */
+   /* since the change stream started at the operation time of the first
+    * insert, the five inserts should be returned. */
    printf ("listening for changes on db.coll:\n");
    while (mongoc_change_stream_next (stream, &doc)) {
       char *as_json;
