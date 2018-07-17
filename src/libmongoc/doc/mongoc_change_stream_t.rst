@@ -36,7 +36,7 @@ Additionally, change streams can start returning changes at an operation time by
 
 ``startAtOperationTime`` and ``resumeAfter`` are mutually exclusive options. Setting them both will result in a server error.
 
-The following example implements custom resuming logic, starting a change stream at the operation time from a command response, and attempting to resume up to ten times on error.
+The following example implements custom resuming logic, persisting the resume token in a file.
 
 .. literalinclude:: ../examples/example-resume.c
    :language: c
