@@ -20,9 +20,7 @@
 
 #include <string.h>
 
-#define BSON_INSIDE
-#include "bson-md5-private.h"
-#undef BSON_INSIDE
+#include "common-md5-private.h"
 #include "mongoc-util-private.h"
 #include "mongoc-client.h"
 #include "mongoc-client-session-private.h"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 MongoDB, Inc.
+ * Copyright 2018-present MongoDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,12 @@
 #define BSON_MD5_PRIVATE_H
 
 
-#if !defined(BSON_INSIDE) && !defined(BSON_COMPILATION)
-#error "Only <bson.h> can be included directly."
+#if !defined(MONGOC_COMPILATION) && !defined(BSON_COMPILATION) && \
+   !defined(BSON_INSIDE)
+#error "Only <mongoc.h> or <bson.h> can be included directly."
 #endif
 
-
-#include "bson-md5.h"
-#include "bson-endian.h"
-
+#include "bson.h"
 
 BSON_BEGIN_DECLS
 
@@ -36,8 +34,6 @@ _bson_md5_append (bson_md5_t *pms, const uint8_t *data, uint32_t nbytes);
 void
 _bson_md5_finish (bson_md5_t *pms, uint8_t digest[16]);
 
-
 BSON_END_DECLS
-
 
 #endif /* BSON_MD5_PRIVATE_H */
