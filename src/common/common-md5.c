@@ -58,7 +58,6 @@
 
 #include <string.h>
 
-#include "bson-compat.h"
 #include "common-md5-private.h"
 
 #undef BYTE_ORDER /* 1 = big-endian, -1 = little-endian, 0 = unknown */
