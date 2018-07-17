@@ -1,4 +1,4 @@
-/* an example of starting a change stream with startAtOperationTime. */
+/* An example of starting a change stream with startAtOperationTime. */
 #include <mongoc.h>
 
 int
@@ -40,9 +40,18 @@ main ()
    coll = mongoc_client_get_collection (client, "db", "coll");
    for (i = 0; i < 5; i++) {
       bson_t reply;
-      bson_t* insert_cmd = BCON_NEW ("insert", "coll", "documents", "[", "{", "x", BCON_INT64 (i), "}", "]");
+      bson_t *insert_cmd = BCON_NEW ("insert",
+                                     "coll",
+                                     "documents",
+                                     "[",
+                                     "{",
+                                     "x",
+                                     BCON_INT64 (i),
+                                     "}",
+                                     "]");
 
-      r = mongoc_collection_write_command_with_opts(coll, insert_cmd, NULL, &reply, &error);
+      r = mongoc_collection_write_command_with_opts (
+         coll, insert_cmd, NULL, &reply, &error);
       bson_destroy (insert_cmd);
       if (!r) {
          bson_destroy (&reply);
@@ -63,7 +72,6 @@ main ()
 
    /* start a change stream at the returned operationTime. */
    BSON_APPEND_VALUE (&opts, "startAtOperationTime", &cached_operation_time);
-   coll = mongoc_client_get_collection (client, "db", "coll");
    stream = mongoc_collection_watch (coll, &pipeline, &opts);
 
    /* loops and returns changes as they come in. */

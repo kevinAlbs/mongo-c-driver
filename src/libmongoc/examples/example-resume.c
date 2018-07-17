@@ -1,5 +1,103 @@
-/* an example implementation of custom resume logic in a change stream. */
+/* An example implementation of custom resume logic in a change stream.
+ * example-resume starts a client-wide change stream and persists the resume
+ * token in a file "resume-token.json". On restart, if "resume-token.json"
+ * exists, the change stream starts watching after the persisted resume token.
+ *
+ * This behavior allows to user to exit example-resume, and restart it later
+ * without missing any change events.
+ */
+
+#include <unistd.h>
 #include <mongoc.h>
+
+static const char *RESUME_TOKEN_PATH = "resume-token.json";
+
+static bool
+_save_resume_token (const bson_t *doc)
+{
+   bson_iter_t iter;
+   bson_t resume_token_doc;
+   mongoc_stream_t *file_stream;
+   char *as_json = NULL;
+   size_t as_json_len;
+   ssize_t r, n_written;
+   const bson_value_t *resume_token;
+
+   if (!bson_iter_init_find (&iter, doc, "_id")) {
+      fprintf (stderr, "reply does not contain operationTime.");
+      return false;
+   }
+   resume_token = bson_iter_value (&iter);
+   /* store the resume token in a document, { resumeAfter: <resume token> }
+    * which we can later append easily. */
+   file_stream = mongoc_stream_file_new_for_path (
+      RESUME_TOKEN_PATH, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+   if (!file_stream) {
+      fprintf (stderr, "failed to open %s for writing\n", RESUME_TOKEN_PATH);
+      return false;
+   }
+   bson_init (&resume_token_doc);
+   BSON_APPEND_VALUE (&resume_token_doc, "resumeAfter", resume_token);
+   as_json = bson_as_canonical_extended_json (&resume_token_doc, &as_json_len);
+   bson_destroy (&resume_token_doc);
+   n_written = 0;
+   while (n_written < as_json_len) {
+      r = mongoc_stream_write (file_stream,
+                               (void *) (as_json + n_written),
+                               as_json_len - n_written,
+                               0);
+      if (r == -1) {
+         fprintf (stderr, "failed to write to %s\n", RESUME_TOKEN_PATH);
+         bson_free (as_json);
+         mongoc_stream_close (file_stream);
+         mongoc_stream_destroy (file_stream);
+         return false;
+      }
+      n_written += r;
+   }
+
+   bson_free (as_json);
+   mongoc_stream_close (file_stream);
+   mongoc_stream_destroy (file_stream);
+   return true;
+}
+
+bool
+_load_resume_token (bson_t *opts)
+{
+   bson_error_t error;
+   bson_json_reader_t *reader;
+   bson_t doc;
+
+   if (-1 == access (RESUME_TOKEN_PATH, R_OK)) {
+      /* skip, no file. */
+      return true;
+   }
+   reader = bson_json_reader_new_from_file (RESUME_TOKEN_PATH, &error);
+   if (!reader) {
+      fprintf (stderr,
+               "failed to open %s for reading: %s\n",
+               RESUME_TOKEN_PATH,
+               error.message);
+      return false;
+   }
+
+   bson_init (&doc);
+   if (-1 == bson_json_reader_read (reader, &doc, &error)) {
+      fprintf (stderr, "failed to read doc from %s\n", RESUME_TOKEN_PATH);
+      bson_destroy (&doc);
+      bson_json_reader_destroy (reader);
+      return false;
+   }
+
+   printf ("found cached resume token in %s, resuming change stream.\n",
+           RESUME_TOKEN_PATH);
+
+   bson_concat (opts, &doc);
+   bson_destroy (&doc);
+   bson_json_reader_destroy (reader);
+   return true;
+}
 
 int
 main ()
@@ -9,16 +107,13 @@ main ()
    mongoc_uri_t *uri = NULL;
    bson_error_t error;
    mongoc_client_t *client = NULL;
-   mongoc_collection_t *coll = NULL;
    bson_t pipeline = BSON_INITIALIZER;
    bson_t opts = BSON_INITIALIZER;
    mongoc_change_stream_t *stream = NULL;
-   bson_t cmd = BSON_INITIALIZER;
-   bson_t reply;
-   bson_iter_t iter;
    const bson_t *doc;
-   bson_value_t cached_operation_time = {0}, cached_resume_token = {0};
-   int i;
+
+   const int max_time = 30; /* max amount of time, in seconds, that
+                               mongoc_change_stream_next can block. */
 
    mongoc_init ();
    uri_string = "mongodb://localhost:27017/db?replicaSet=rs0";
@@ -37,74 +132,22 @@ main ()
       goto cleanup;
    }
 
-
-   /* send a { ping: 1 } command, use the operationTime from the reply. */
-   BSON_APPEND_INT64 (&cmd, "ping", 1);
-   if (!mongoc_client_command_simple (
-          client, "admin", &cmd, NULL, &reply, &error)) {
-      fprintf (stderr, "failed to ping: %s\n", error.message);
+   if (!_load_resume_token (&opts)) {
       goto cleanup;
    }
+   BSON_APPEND_INT64 (&opts, "maxAwaitTimeMS", max_time * 1000);
 
-   if (bson_iter_init_find (&iter, &reply, "operationTime")) {
-      bson_value_copy (bson_iter_value (&iter), &cached_operation_time);
-   } else {
-      fprintf (stderr, "reply does not contain operationTime.");
-      goto cleanup;
-   }
+   printf ("listening for changes on the client (max %d seconds).\n", max_time);
+   stream = mongoc_client_watch (client, &pipeline, &opts);
 
-   /* start a change stream at the returned operationTime. */
-   BSON_APPEND_VALUE (&opts, "startAtOperationTime", &cached_operation_time);
-   coll = mongoc_client_get_collection (client, "db", "coll");
-   stream = mongoc_collection_watch (coll, &pipeline, &opts);
+   while (mongoc_change_stream_next (stream, &doc)) {
+      char *as_json;
 
-   /* loops and returns changes as they come in. If no changes are found after
-    * 10 attempts in a row, then exit the loop. */
-   for (i = 0; i < 10; i++) {
-      int resume_count = 0;
-
-      printf ("listening for changes on db.coll:\n");
-      while (mongoc_change_stream_next (stream, &doc)) {
-         char *as_json;
-
-         /* a change was found, reset the outer loop. */
-         i = 0;
-         as_json = bson_as_canonical_extended_json (doc, NULL);
-         printf ("change received: %s\n", as_json);
-         bson_free (as_json);
-         BSON_ASSERT (bson_iter_init_find (&iter, doc, "_id"));
-         if (cached_resume_token.value_type) {
-            bson_value_destroy (&cached_resume_token);
-         }
-         bson_value_copy (bson_iter_value (&iter), &cached_resume_token);
-      }
-
-      if (mongoc_change_stream_error_document (stream, &error, NULL)) {
-         /* on error, try resuming. if we don't have a resume token yet (i.e.
-          * we did not receive a document yet, then use the same operation time
-          * that we started with. */
-         printf ("attempting to resume due to error: %s\n", error.message);
-         for (resume_count = 0; resume_count < 10; ++resume_count) {
-            mongoc_change_stream_destroy (stream);
-            bson_reinit (&opts);
-            if (cached_resume_token.value_type) {
-               printf ("resuming with resume token.\n");
-               BSON_APPEND_VALUE (&opts, "resumeAfter", &cached_resume_token);
-            } else {
-               printf ("resuming with operation time.\n");
-               BSON_APPEND_VALUE (
-                  &opts, "startAtOperationTime", &cached_operation_time);
-            }
-            stream = mongoc_collection_watch (coll, &pipeline, &opts);
-            if (!mongoc_change_stream_error_document (stream, &error, NULL)) {
-               break;
-            }
-         }
-      }
-
-      if (resume_count == 10) {
-         fprintf (stderr, "exceeded number of resume attempts\n");
-         break;
+      as_json = bson_as_canonical_extended_json (doc, NULL);
+      printf ("change received: %s\n", as_json);
+      bson_free (as_json);
+      if (!_save_resume_token (doc)) {
+         goto cleanup;
       }
    }
 
@@ -112,18 +155,9 @@ main ()
 
 cleanup:
    mongoc_uri_destroy (uri);
-   bson_destroy (&cmd);
    bson_destroy (&pipeline);
    bson_destroy (&opts);
-   bson_destroy (&reply);
-   if (cached_operation_time.value_type) {
-      bson_value_destroy (&cached_operation_time);
-   }
-   if (cached_resume_token.value_type) {
-      bson_value_destroy (&cached_resume_token);
-   }
    mongoc_change_stream_destroy (stream);
-   mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
    mongoc_cleanup ();
    return exit_code;
