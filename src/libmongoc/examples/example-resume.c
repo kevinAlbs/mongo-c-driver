@@ -1,4 +1,4 @@
-/* shows an example implementation of custom resume logic in a change stream. */
+/* an example implementation of custom resume logic in a change stream. */
 #include <mongoc.h>
 
 int
@@ -21,9 +21,7 @@ main ()
    int i;
 
    mongoc_init ();
-   uri_string = "mongodb://"
-                "localhost:27017,localhost:27018,localhost:27019"
-                "/db?replicaSet=rs0";
+   uri_string = "mongodb://localhost:27017/db?replicaSet=rs0";
    uri = mongoc_uri_new_with_error (uri_string, &error);
    if (!uri) {
       fprintf (stderr,

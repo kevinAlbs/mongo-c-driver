@@ -1,4 +1,4 @@
-/* shows an example implementation of custom resume logic in a change stream. */
+/* an example of starting a change stream with startAtOperationTime. */
 #include <mongoc.h>
 
 int
@@ -20,7 +20,7 @@ main ()
    bool r;
 
    mongoc_init ();
-   uri_string = "mongodb://localhost/db?replicaSet=rs0";
+   uri_string = "mongodb://localhost:27017/db?replicaSet=rs0";
    uri = mongoc_uri_new_with_error (uri_string, &error);
    if (!uri) {
       fprintf (stderr,
