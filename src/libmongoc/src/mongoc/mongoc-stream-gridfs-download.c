@@ -21,7 +21,7 @@
 #include "mongoc-stream-private.h"
 
 #undef MONGOC_LOG_DOMAIN
-#define MONGOC_LOG_DOMAIN "stream-gridfs-upload"
+#define MONGOC_LOG_DOMAIN "stream-gridfs-download"
 
 static void
 _mongoc_download_stream_gridfs_destroy (mongoc_stream_t *stream)
@@ -89,7 +89,7 @@ _mongoc_download_stream_gridfs_readv (mongoc_stream_t *stream,
 
    /* timeout_msec is unused by mongoc_gridfs_bucket_file_readv */
    ret = _mongoc_gridfs_bucket_file_readv (
-      gridfs->file, iov, iovcnt, min_bytes, 0);
+      gridfs->file, iov, iovcnt, min_bytes, timeout_msec);
 
    mongoc_counter_streams_ingress_add (ret);
 
