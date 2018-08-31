@@ -56,6 +56,8 @@ main (int argc, char *argv[])
       printf ("Error downloading file to stream: %s\n", error.message);
       return EXIT_FAILURE;
    }
+   mongoc_stream_close (file_stream);
+   mongoc_stream_destroy (file_stream);
 
    /* 4. List what files are available in GridFS. */
    bson_init (&filter);

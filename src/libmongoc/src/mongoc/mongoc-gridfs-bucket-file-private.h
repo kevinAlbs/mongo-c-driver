@@ -27,9 +27,7 @@
 
 BSON_BEGIN_DECLS
 
-typedef struct _mongoc_gridfs_bucket_file_t mongoc_gridfs_bucket_file_t;
-
-struct _mongoc_gridfs_bucket_file_t {
+typedef struct {
    /* corresponding bucket */
    mongoc_gridfs_bucket_t *bucket;
 
@@ -55,20 +53,17 @@ struct _mongoc_gridfs_bucket_file_t {
 
    /* Error */
    bson_error_t err;
-};
+} mongoc_gridfs_bucket_file_t;
 
 ssize_t
 _mongoc_gridfs_bucket_file_writev (mongoc_gridfs_bucket_file_t *file,
                                    const mongoc_iovec_t *iov,
-                                   size_t iovcnt,
-                                   uint32_t timeout_msec);
+                                   size_t iovcnt);
 
 ssize_t
 _mongoc_gridfs_bucket_file_readv (mongoc_gridfs_bucket_file_t *file,
                                   mongoc_iovec_t *iov,
-                                  size_t iovcnt,
-                                  size_t min_bytes,
-                                  uint32_t timeout_msec);
+                                  size_t iovcnt);
 
 bool
 _mongoc_gridfs_bucket_file_save (mongoc_gridfs_bucket_file_t *file);

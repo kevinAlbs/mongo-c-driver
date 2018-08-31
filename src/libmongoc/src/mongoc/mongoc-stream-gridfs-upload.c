@@ -86,8 +86,8 @@ _mongoc_upload_stream_gridfs_writev (mongoc_stream_t *stream,
    BSON_ASSERT (iov);
    BSON_ASSERT (iovcnt);
 
-   /* timeout_msec is unused by mongoc_gridfs_bucket_file_writev */
-   ret = _mongoc_gridfs_bucket_file_writev (gridfs->file, iov, iovcnt, 0);
+   (void) timeout_msec; /* unused. */
+   ret = _mongoc_gridfs_bucket_file_writev (gridfs->file, iov, iovcnt);
 
    if (!ret) {
       RETURN (ret);

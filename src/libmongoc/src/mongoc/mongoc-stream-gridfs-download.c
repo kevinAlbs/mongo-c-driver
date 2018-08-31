@@ -87,9 +87,11 @@ _mongoc_download_stream_gridfs_readv (mongoc_stream_t *stream,
    BSON_ASSERT (iov);
    BSON_ASSERT (iovcnt);
 
+   (void) min_bytes;    /* unused. */
+   (void) timeout_msec; /* unused. */
+
    /* timeout_msec is unused by mongoc_gridfs_bucket_file_readv */
-   ret = _mongoc_gridfs_bucket_file_readv (
-      gridfs->file, iov, iovcnt, min_bytes, timeout_msec);
+   ret = _mongoc_gridfs_bucket_file_readv (gridfs->file, iov, iovcnt);
 
    mongoc_counter_streams_ingress_add (ret);
 
