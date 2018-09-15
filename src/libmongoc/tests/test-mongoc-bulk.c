@@ -4505,9 +4505,9 @@ test_bulk_no_client (void)
    bson_destroy (&reply);
 }
 
-
+/* test that { bypassDocumentValidation: bool } is prohibited in bson opts. */
 static void
-test_bulk_bypass_document_validation (void)
+test_bulk_bypass_document_validation_prohibited (void)
 {
    mongoc_client_t *client;
    mongoc_collection_t *collection;
@@ -4547,6 +4547,56 @@ test_bulk_bypass_document_validation (void)
 
    mongoc_bulk_operation_destroy (bulk);
    mongoc_collection_destroy (collection);
+   mongoc_client_destroy (client);
+}
+
+/* check that bypassing document validation works. */
+static void
+test_bulk_bypass_document_validation (void *ctx)
+{
+   mongoc_client_t *client;
+   mongoc_database_t *db;
+   char *coll_name;
+   mongoc_collection_t *coll;
+   bson_error_t err;
+   mongoc_bulk_operation_t *bulk;
+   bool r;
+
+   client = test_framework_client_new ();
+   mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
+   db = mongoc_client_get_database (client, "db");
+   /* create a collection with a validator. */
+   coll_name = gen_collection_name ("bypass");
+   coll = mongoc_database_create_collection (
+      db,
+      coll_name,
+      tmp_bson ("{ 'validator': { 'x': { '$ne': 123 } } }"),
+      &err);
+   bson_free (coll_name);
+   ASSERT_OR_PRINT (coll, err);
+
+   /* insert an invalid document with bulk to prove the validator works. */
+   bulk = mongoc_collection_create_bulk_operation_with_opts (coll, NULL);
+   r = mongoc_bulk_operation_insert_with_opts (
+      bulk, tmp_bson ("{'x': 123 }"), NULL, &err);
+   ASSERT_OR_PRINT (r, err);
+   BSON_ASSERT (!mongoc_bulk_operation_execute (bulk, NULL, &err));
+   ASSERT_ERROR_CONTAINS (
+      err, MONGOC_ERROR_SERVER, 121, "Document failed validation");
+   mongoc_bulk_operation_destroy (bulk);
+
+   /* do the same steps, but bypassing document validation. */
+   bulk = mongoc_collection_create_bulk_operation_with_opts (coll, NULL);
+   mongoc_bulk_operation_set_bypass_document_validation (bulk, true);
+   r = mongoc_bulk_operation_insert_with_opts (
+      bulk, tmp_bson ("{'x': 123 }"), NULL, &err);
+   ASSERT_OR_PRINT (r, err);
+   BSON_ASSERT (mongoc_bulk_operation_execute (bulk, NULL, &err));
+   BSON_ASSERT (mongoc_collection_drop (coll, &err));
+   mongoc_bulk_operation_destroy (bulk);
+
+   mongoc_collection_destroy (coll);
+   mongoc_database_destroy (db);
    mongoc_client_destroy (client);
 }
 
@@ -4851,6 +4901,13 @@ test_bulk_install (TestSuite *suite)
                   test_bulk_update_one_error_message);
    TestSuite_Add (suite, "/BulkOperation/opts/parse", test_bulk_opts_parse);
    TestSuite_Add (suite, "/BulkOperation/no_client", test_bulk_no_client);
-   TestSuite_AddLive (
-      suite, "/BulkOperation/bypass", test_bulk_bypass_document_validation);
+   TestSuite_AddLive (suite,
+                      "/BulkOperation/bypass_prohibited",
+                      test_bulk_bypass_document_validation_prohibited);
+   TestSuite_AddFull (suite,
+                      "/BulkOperation/bypass",
+                      test_bulk_bypass_document_validation,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_max_wire_version_less_than_4);
 }
