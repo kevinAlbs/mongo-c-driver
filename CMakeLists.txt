@@ -348,7 +348,3 @@ set (UNINSTALL_PROG_DIR "${CMAKE_INSTALL_DATADIR}/mongo-c-driver")
 # This needs to be last (after all other add_subdirectory calls) to ensure that
 # the generated uninstall program is complete and correct
 add_subdirectory (generate_uninstall)
-
-add_custom_target (uninstall
-   COMMAND "${UNINSTALL_PROG_DIR}/${UNINSTALL_PROG}"
-)
