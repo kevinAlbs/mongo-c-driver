@@ -1633,9 +1633,9 @@ tasks:
               cmd.exe /c .\\.evergreen\\install-uninstall-check-windows.cmd
 
     - name: install-uninstall-check
-      depends_on:
-        - name: "make-release-archive"
-          variant: releng
+#      depends_on:
+#        - name: "make-release-archive"
+#          variant: releng
       commands:
         - command: shell.exec
           type: test

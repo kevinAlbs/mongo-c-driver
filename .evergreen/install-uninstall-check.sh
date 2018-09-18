@@ -38,7 +38,9 @@ rm -rf $INSTALL_DIR
 mkdir -p $INSTALL_DIR
 
 cd $BUILD_DIR
-$TAR xf ../../mongoc.tar.gz -C . --strip-components=1
+# $TAR xf ../../mongoc.tar.gz -C . --strip-components=1
+# TEMP: because we can't reliably depend on make-release-archive
+git clone --depth=1 git@github.com:mongodb/mongo-c-driver.git .
 
 if [ "$BSON_ONLY" ]; then
   BSON_ONLY_OPTION="-DENABLE_MONGOC=OFF"
