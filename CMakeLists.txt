@@ -341,7 +341,7 @@ if (WIN32)
 else ()
    set (UNINSTALL_PROG "uninstall.sh")
 endif ()
-set (UNINSTALL_PROG_DIR "${CMAKE_INSTALL_FULL_DATADIR}/mongo-c-driver")
+set (UNINSTALL_PROG_DIR "${CMAKE_INSTALL_DATADIR}/mongo-c-driver")
 
 # Create uninstall program and associated uninstall target
 #
