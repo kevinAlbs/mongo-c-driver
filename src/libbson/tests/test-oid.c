@@ -17,6 +17,8 @@
 
 #include <bson/bson.h>
 #define BSON_INSIDE
+#include "bson/bson-iso8601-private.h"
+#include "bson/bson-context-private.h"
 #include "common-thread-private.h"
 #undef BSON_INSIDE
 
@@ -262,18 +264,49 @@ test_bson_oid_init_sequence_with_tid (void)
 #endif
 
 
+static char *
+get_time_as_string (const bson_oid_t *oid)
+{
+   bson_string_t *str = bson_string_new (NULL);
+   int64_t time_ms = (int64_t) bson_oid_get_time_t (oid) * 1000;
+   _bson_iso8601_date_format (time_ms, str);
+   return bson_string_free (str, false);
+}
+
+
 static void
 test_bson_oid_get_time_t (void)
 {
    bson_context_t *context;
    bson_oid_t oid;
    uint32_t start = (uint32_t) time (NULL);
+   char *str;
 
    context = bson_context_new (BSON_CONTEXT_NONE);
    bson_oid_init (&oid, context);
    ASSERT_CMPUINT32 ((uint32_t) bson_oid_get_time_t (&oid), >=, start);
    ASSERT_CMPUINT32 (
       (uint32_t) bson_oid_get_time_t (&oid), <=, (uint32_t) time (NULL));
+
+   bson_oid_init_from_string (&oid, "000000000000000000000000");
+   str = get_time_as_string (&oid);
+   ASSERT_CMPSTR (str, "1970-01-01T00:00:00Z");
+   bson_free (str);
+
+   bson_oid_init_from_string (&oid, "7FFFFFFF0000000000000000");
+   str = get_time_as_string (&oid);
+   ASSERT_CMPSTR (str, "2038-01-19T03:14:07Z");
+   bson_free (str);
+
+   bson_oid_init_from_string (&oid, "800000000000000000000000");
+   str = get_time_as_string (&oid);
+   ASSERT_CMPSTR (str, "2038-01-19T03:14:08Z");
+   bson_free (str);
+
+   bson_oid_init_from_string (&oid, "FFFFFFFF0000000000000000");
+   str = get_time_as_string (&oid);
+   ASSERT_CMPSTR (str, "2106-02-07T06:28:15Z");
+   bson_free (str);
 
    bson_context_destroy (context);
 }
@@ -328,6 +361,27 @@ test_bson_oid_init_with_threads (void)
    }
 }
 
+
+static void
+test_bson_oid_counter_overflow (void)
+{
+   bson_oid_t oid;
+   char str[25];
+   bson_context_t *ctx = bson_context_new (BSON_CONTEXT_NONE);
+   ctx->seq32 = 0xFFFFFFFF;
+
+   bson_oid_init (&oid, ctx);
+   bson_oid_to_string (&oid, str);
+   /* check that the counter portion of the string is FFFFFF" */
+   ASSERT_CMPSTR (str + (24 - 6), "ffffff");
+   bson_oid_init (&oid, ctx);
+   /* the next oid should have overflowed the counter. */
+   bson_oid_to_string (&oid, str);
+   ASSERT_CMPSTR (str + (24 - 6), "000000");
+   bson_context_destroy (ctx);
+}
+
+
 void
 test_oid_install (TestSuite *suite)
 {
@@ -350,4 +404,6 @@ test_oid_install (TestSuite *suite)
    TestSuite_Add (suite, "/bson/oid/compare", test_bson_oid_compare);
    TestSuite_Add (suite, "/bson/oid/copy", test_bson_oid_copy);
    TestSuite_Add (suite, "/bson/oid/get_time_t", test_bson_oid_get_time_t);
+   TestSuite_Add (
+      suite, "/bson/oid/counter_overflow", test_bson_oid_counter_overflow);
 }

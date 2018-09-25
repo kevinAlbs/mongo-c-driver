@@ -34,7 +34,10 @@ Synopsis
 Description
 -----------
 
-The :symbol:`bson_context_t` structure is context for generation of BSON Object IDs. This context allows for specialized overriding of how ObjectIDs are generated based on the applications requirements. For example, disabling of PID caching can be configured if the application cannot detect when a call to ``fork()`` has occurred.
+The :symbol:`bson_context_t` structure is context for generation of BSON Object
+IDs. This context allows for specialized overriding of how ObjectIDs are
+generated based on the applications requirements. Most flags no longer have
+any effect. Only the ``BSON_CONTEXT_THREAD_SAFE`` flag is still used.
 
 .. only:: html
 
@@ -66,8 +69,7 @@ Example
      bson_oid_init (&oid, NULL);
 
      /* specify a local context for additional control */
-     ctx = bson_context_new (BSON_CONTEXT_DISABLE_PID_CACHE |
-                             BSON_CONTEXT_THREAD_SAFE);
+     ctx = bson_context_new (BSON_CONTEXT_THREAD_SAFE);
      bson_oid_init (&oid, ctx);
 
      bson_context_destroy (ctx);

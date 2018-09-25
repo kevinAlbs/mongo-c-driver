@@ -34,12 +34,16 @@ struct _bson_context_t {
    uint8_t fnv[3];
    int32_t seq32;
    int64_t seq64;
+   uint8_t rand[5];
 
    void (*oid_get_host) (bson_context_t *context, bson_oid_t *oid);
    void (*oid_get_pid) (bson_context_t *context, bson_oid_t *oid);
    void (*oid_get_seq32) (bson_context_t *context, bson_oid_t *oid);
    void (*oid_get_seq64) (bson_context_t *context, bson_oid_t *oid);
 };
+
+void
+_bson_context_get_oid_rand (bson_context_t *context, bson_oid_t *oid);
 
 
 BSON_END_DECLS

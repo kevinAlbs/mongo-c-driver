@@ -312,16 +312,69 @@ _bson_context_get_oid_seq64_threadsafe (bson_context_t *context, /* IN */
    memcpy (&oid->bytes[4], &seq, sizeof (seq));
 }
 
+/*
+ *--------------------------------------------------------------------------
+ *
+ * _bson_context_get_oid_rand --
+ *
+ *       Sets the process specific five byte random sequence in an oid.
+ *
+ * Returns:
+ *       None.
+ *
+ * Side effects:
+ *       @oid is modified.
+ *
+ *--------------------------------------------------------------------------
+ */
+void
+_bson_context_get_oid_rand (bson_context_t *context, bson_oid_t *oid)
+{
+   BSON_ASSERT (context);
+   BSON_ASSERT (oid);
+
+   memcpy (&oid->bytes[4], &context->rand, sizeof (context->rand));
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * _get_rand --
+ *
+ *       Gets a random four byte integer. Callers that will use the "rand"
+ *       function must call "srand" prior.
+ *
+ * Returns:
+ *       A random int32_t.
+ *
+ *--------------------------------------------------------------------------
+ */
+static int32_t
+_get_rand (unsigned int *pseed)
+{
+   int32_t result = 0;
+#ifndef BSON_HAVE_RAND_R
+   /* ms's runtime is multithreaded by default, so no rand_r */
+   /* no rand_r on android either */
+   result = rand ();
+#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__DragonFly__) || \
+   defined(__OpenBSD__)
+   arc4random_buf (&result, sizeof (result));
+#else
+   result = rand_r (pseed);
+#endif
+   return result;
+}
+
 
 static void
 _bson_context_init (bson_context_t *context,    /* IN */
                     bson_context_flags_t flags) /* IN */
 {
    struct timeval tv;
-   uint16_t pid;
    unsigned int seed[3];
    unsigned int real_seed;
-   bson_oid_t oid;
+   int64_t rand_bytes;
 
    context->flags = (int) flags;
    context->oid_get_host = _bson_context_get_oid_host_cached;
@@ -344,18 +397,16 @@ _bson_context_init (bson_context_t *context,    /* IN */
    real_seed = seed[0] ^ seed[1] ^ seed[2];
 
 #ifndef BSON_HAVE_RAND_R
-   /* ms's runtime is multithreaded by default, so no rand_r */
-   /* no rand_r on android either */
    srand (real_seed);
-   context->seq32 = rand () & 0x007FFFF0;
-#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__DragonFly__) || \
-   defined(__OpenBSD__)
-   arc4random_buf (&context->seq32, sizeof (context->seq32));
-   context->seq32 &= 0x007FFFF0;
-#else
-   context->seq32 = rand_r (&real_seed) & 0x007FFFF0;
 #endif
 
+   context->seq32 = _get_rand (&real_seed) & 0x007FFFF0;
+   rand_bytes = _get_rand (&real_seed);
+   rand_bytes <<= 32;
+   rand_bytes |= _get_rand (&real_seed);
+   /* Copy five random bytes, endianness does not matter. */
+   memcpy (&context->rand, (char *) &rand_bytes, sizeof (context->rand));
+   
    if ((flags & BSON_CONTEXT_DISABLE_HOST_CACHE)) {
       context->oid_get_host = _bson_context_get_oid_host;
    } else {
