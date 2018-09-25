@@ -44,15 +44,6 @@
  */
 static bson_context_t gContextDefault;
 
-
-#ifdef BSON_HAVE_SYSCALL_TID
-static long
-bson_gettid (void)
-{
-   return syscall (SYS_gettid);
-}
-#endif
-
 static BSON_INLINE uint16_t
 _bson_getpid (void)
 {

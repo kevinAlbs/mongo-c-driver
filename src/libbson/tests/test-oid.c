@@ -268,7 +268,15 @@ static char *
 get_time_as_string (const bson_oid_t *oid)
 {
    bson_string_t *str = bson_string_new (NULL);
-   int64_t time_ms = (int64_t) bson_oid_get_time_t (oid) * 1000;
+   uint32_t time;
+   int64_t time_ms;
+
+   /* don't use bson_oid_get_time_t, because 32 bit systems may represent
+    * time_t as a 32 bit signed integer. */
+   memcpy (&time, oid, sizeof (time));
+   time = BSON_UINT32_FROM_BE (time);
+
+   time_ms = (int64_t) time * 1000;
    _bson_iso8601_date_format (time_ms, str);
    return bson_string_free (str, false);
 }
@@ -298,15 +306,29 @@ test_bson_oid_get_time_t (void)
    ASSERT_CMPSTR (str, "2038-01-19T03:14:07Z");
    bson_free (str);
 
-   bson_oid_init_from_string (&oid, "800000000000000000000000");
-   str = get_time_as_string (&oid);
-   ASSERT_CMPSTR (str, "2038-01-19T03:14:08Z");
-   bson_free (str);
+   /* if time_t is a signed int32, then a negative value may be interpreted
+    * as a negative date. */
+   if (sizeof (time_t) == 8) {
+      bson_oid_init_from_string (&oid, "800000000000000000000000");
+      str = get_time_as_string (&oid);
+      ASSERT_CMPSTR (str, "2038-01-19T03:14:08Z");
+      bson_free (str);
 
-   bson_oid_init_from_string (&oid, "FFFFFFFF0000000000000000");
-   str = get_time_as_string (&oid);
-   ASSERT_CMPSTR (str, "2106-02-07T06:28:15Z");
-   bson_free (str);
+      bson_oid_init_from_string (&oid, "FFFFFFFF0000000000000000");
+      str = get_time_as_string (&oid);
+      ASSERT_CMPSTR (str, "2106-02-07T06:28:15Z");
+      bson_free (str);
+   } else {
+      bson_oid_init_from_string (&oid, "800000000000000000000000");
+      str = get_time_as_string (&oid);
+      ASSERT_CMPSTR (str, "1901-12-13T20:45:52Z");
+      bson_free (str);
+
+      bson_oid_init_from_string (&oid, "FFFFFFFF0000000000000000");
+      str = get_time_as_string (&oid);
+      ASSERT_CMPSTR (str, "2106-02-07T06:28:15Z");
+      bson_free (str);
+   }
 
    bson_context_destroy (context);
 }
