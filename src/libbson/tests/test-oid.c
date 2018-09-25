@@ -368,7 +368,7 @@ test_bson_oid_counter_overflow (void)
    bson_oid_t oid;
    char str[25];
    bson_context_t *ctx = bson_context_new (BSON_CONTEXT_NONE);
-   ctx->seq32 = 0xFFFFFFFF;
+   ctx->seq32 = 0xFFFFFF;
 
    bson_oid_init (&oid, ctx);
    bson_oid_to_string (&oid, str);

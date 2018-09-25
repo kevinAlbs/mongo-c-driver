@@ -26,7 +26,6 @@
 #include "bson/bson-clock.h"
 #include "bson/bson-context.h"
 #include "bson/bson-context-private.h"
-#include "bson/bson-fnv-private.h"
 #include "bson/bson-memory.h"
 #include "common-thread-private.h"
 
@@ -54,75 +53,6 @@ bson_gettid (void)
 }
 #endif
 
-
-/*
- *--------------------------------------------------------------------------
- *
- * _bson_context_get_oid_host --
- *
- *       Retrieves a 3 byte hash of the hostname and assigns those bytes
- *       to the host portion of oid.
- *
- * Returns:
- *       None.
- *
- * Side effects:
- *       @oid is modified.
- *
- *--------------------------------------------------------------------------
- */
-
-static void
-_bson_context_get_oid_host (bson_context_t *context, /* IN */
-                            bson_oid_t *oid)         /* OUT */
-{
-   uint8_t *bytes = (uint8_t *) oid;
-   uint32_t fnv1a_hash;
-   char hostname[HOST_NAME_MAX];
-
-   BSON_ASSERT (context);
-   BSON_ASSERT (oid);
-
-   gethostname (hostname, sizeof hostname);
-   hostname[HOST_NAME_MAX - 1] = '\0';
-
-   fnv1a_hash = _mongoc_fnv_24a_str (hostname);
-
-   bytes[4] = (uint8_t) ((fnv1a_hash >> (0 * 8)) & 0xff);
-   bytes[5] = (uint8_t) ((fnv1a_hash >> (1 * 8)) & 0xff);
-   bytes[6] = (uint8_t) ((fnv1a_hash >> (2 * 8)) & 0xff);
-}
-
-
-/*
- *--------------------------------------------------------------------------
- *
- * _bson_context_get_oid_host_cached --
- *
- *       Fetch the cached copy of the 3 byte hash of the hostname
- *
- * Returns:
- *       None.
- *
- * Side effects:
- *       @oid is modified.
- *
- *--------------------------------------------------------------------------
- */
-
-static void
-_bson_context_get_oid_host_cached (bson_context_t *context, /* IN */
-                                   bson_oid_t *oid)         /* OUT */
-{
-   BSON_ASSERT (context);
-   BSON_ASSERT (oid);
-
-   oid->bytes[4] = context->fnv[0];
-   oid->bytes[5] = context->fnv[1];
-   oid->bytes[6] = context->fnv[2];
-}
-
-
 static BSON_INLINE uint16_t
 _bson_getpid (void)
 {
@@ -138,69 +68,6 @@ _bson_getpid (void)
 
    return pid;
 }
-
-
-/*
- *--------------------------------------------------------------------------
- *
- * _bson_context_get_oid_pid --
- *
- *       Initialize the pid field of @oid.
- *
- *       The pid field is 2 bytes, big-endian for memcmp().
- *
- * Returns:
- *       None.
- *
- * Side effects:
- *       @oid is modified.
- *
- *--------------------------------------------------------------------------
- */
-
-static void
-_bson_context_get_oid_pid (bson_context_t *context, /* IN */
-                           bson_oid_t *oid)         /* OUT */
-{
-   uint16_t pid = _bson_getpid ();
-   uint8_t *bytes = (uint8_t *) &pid;
-
-   BSON_ASSERT (context);
-   BSON_ASSERT (oid);
-
-   pid = BSON_UINT16_TO_BE (pid);
-
-   oid->bytes[7] = bytes[0];
-   oid->bytes[8] = bytes[1];
-}
-
-
-/*
- *--------------------------------------------------------------------------
- *
- * _bson_context_get_oid_pid_cached --
- *
- *       Fetch the cached copy of the current pid.
- *       This helps avoid multiple calls to getpid() which is slower
- *       on some systems.
- *
- * Returns:
- *       None.
- *
- * Side effects:
- *       @oid is modified.
- *
- *--------------------------------------------------------------------------
- */
-
-static void
-_bson_context_get_oid_pid_cached (bson_context_t *context, /* IN */
-                                  bson_oid_t *oid)         /* OUT */
-{
-   oid->bytes[7] = context->pidbe[0];
-   oid->bytes[8] = context->pidbe[1];
-}
-
 
 /*
  *--------------------------------------------------------------------------
@@ -377,8 +244,6 @@ _bson_context_init (bson_context_t *context,    /* IN */
    int64_t rand_bytes;
 
    context->flags = (int) flags;
-   context->oid_get_host = _bson_context_get_oid_host_cached;
-   context->oid_get_pid = _bson_context_get_oid_pid_cached;
    context->oid_get_seq32 = _bson_context_get_oid_seq32;
    context->oid_get_seq64 = _bson_context_get_oid_seq64;
 
@@ -406,38 +271,10 @@ _bson_context_init (bson_context_t *context,    /* IN */
    rand_bytes |= _get_rand (&real_seed);
    /* Copy five random bytes, endianness does not matter. */
    memcpy (&context->rand, (char *) &rand_bytes, sizeof (context->rand));
-   
-   if ((flags & BSON_CONTEXT_DISABLE_HOST_CACHE)) {
-      context->oid_get_host = _bson_context_get_oid_host;
-   } else {
-      _bson_context_get_oid_host (context, &oid);
-      context->fnv[0] = oid.bytes[4];
-      context->fnv[1] = oid.bytes[5];
-      context->fnv[2] = oid.bytes[6];
-   }
 
    if ((flags & BSON_CONTEXT_THREAD_SAFE)) {
       context->oid_get_seq32 = _bson_context_get_oid_seq32_threadsafe;
       context->oid_get_seq64 = _bson_context_get_oid_seq64_threadsafe;
-   }
-
-   if ((flags & BSON_CONTEXT_DISABLE_PID_CACHE)) {
-      context->oid_get_pid = _bson_context_get_oid_pid;
-   } else {
-#ifdef BSON_HAVE_SYSCALL_TID
-      if ((flags & BSON_CONTEXT_USE_TASK_ID)) {
-         uint16_t tid;
-
-         /* This call is always successful */
-         tid = (uint16_t) bson_gettid ();
-         pid = BSON_UINT16_TO_BE (tid);
-      } else
-#endif
-      {
-         pid = BSON_UINT16_TO_BE (_bson_getpid ());
-      }
-
-      memcpy (&context->pidbe[0], &pid, 2);
    }
 }
 
