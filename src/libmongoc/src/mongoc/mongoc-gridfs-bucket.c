@@ -112,7 +112,7 @@ mongoc_gridfs_bucket_new (mongoc_database_t *db,
          } else if (strcmp (key, "chunkSizeBytes") == 0) {
             int64_t chunk_size_int64 = bson_iter_as_int64 (&iter);
             if (chunk_size_int64 > INT32_MAX || chunk_size_int64 < INT32_MIN) {
-               MONGOC_WARNING ("Chunk size %lld exceeds int32 bounds",
+               MONGOC_WARNING ("Chunk size %" PRId64 " exceeds int32 bounds",
                                chunk_size_int64);
             } else {
                chunk_size = (int32_t) (chunk_size_int64);
@@ -205,7 +205,7 @@ mongoc_gridfs_bucket_open_upload_stream_with_id (mongoc_gridfs_bucket_t *bucket,
          if (strcmp (key, "chunkSizeBytes") == 0) {
             int64_t chunk_size_int64 = bson_iter_as_int64 (&iter);
             if (chunk_size_int64 > INT32_MAX || chunk_size_int64 < INT32_MIN) {
-               MONGOC_WARNING ("Chunk size %lld exceeds int32 bounds",
+               MONGOC_WARNING ("Chunk size % " PRId64 " exceeds int32 bounds",
                                chunk_size_int64);
             } else {
                chunk_size = (int32_t) (chunk_size_int64);
