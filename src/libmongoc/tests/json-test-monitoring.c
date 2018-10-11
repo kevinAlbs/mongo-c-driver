@@ -79,12 +79,27 @@ lsids_match (const bson_t *a, const bson_t *b)
    return match_bson_with_ctx (a, b, false, &ctx);
 }
 
+typedef struct {
+   int64_t cursor_id;
+} apm_match_visitor_ctx_t;
 
-match_action_t apm_match_visitor (void* visitor_ctx, match_ctx_t* ctx, const char* key, bson_value_t* val, bson_value_t* pattern) {
+/* TODO: move this into the command monitoring tests.
+ * Allow multiple visitors.
+ * Copy common visitors into test-conveniences.
+ * Refactor transactions, change streams, and other spec tests
+ * Document: "whenever you need some custom match functionality, specify
+ * a visitor function and use match_bson_with_ctx.
+ */
+match_action_t apm_match_visitor (match_ctx_t* ctx, bson_iter_t* pattern_iter, bson_iter_t* doc_iter) {
+   const char* key = bson_iter_key(pattern_iter);
+   apm_match_visitor_ctx_t* visitor_ctx = (apm_match_visitor_ctx_t*) ctx->visitor_ctx;
+
+#define SHOULD_EXIST do { if (!doc_iter) { match_err (ctx, "expected %s", key); return MATCH_ACTION_ABORT; } } while(0)
+
    if (!strcmp (key, "ok")) {
       int64_t actual;
       int64_t expected;
-      if (!val) {
+      if (!doc_iter) {
          match_err (ctx, "field 'ok' missing from actual document");
          return MATCH_ACTION_ABORT;
       }
@@ -94,12 +109,61 @@ match_action_t apm_match_visitor (void* visitor_ctx, match_ctx_t* ctx, const cha
        * values as doubles. Server 'ok' values of integers MUST be converted
        * to doubles for comparison with the expected values."
        */
-      actual = bson_value_as_int64 (val);
-      expected = bson_value_as_int64 (pattern);
+      actual = bson_iter_as_int64 (doc_iter);
+      expected = bson_iter_as_int64 (pattern_iter);
 
       if (actual != expected) {
          match_err (ctx, "'ok' expected to be %" PRId64 " but got %" PRId64, expected, actual);
       }
+   } else if (!strcmp (key, "errmsg")) {
+      /* "errmsg values of "" MUST assert that the value is not empty" */
+      const char* errmsg = bson_iter_utf8 (pattern_iter, NULL);
+
+      if (strcmp(errmsg, "") == 0) {
+         if (!doc_iter || bson_iter_type (doc_iter) != BSON_TYPE_UTF8 ||
+             strlen (bson_iter_utf8 (doc_iter, NULL)) == 0) {
+            match_err (ctx, "expected non-empty 'errmsg'");
+            return MATCH_ACTION_ABORT;
+         }
+         return MATCH_ACTION_SKIP;
+      }
+   } else if (!strcmp (key, "id") && ends_with (ctx->path, "cursor")) {
+      /* store find/aggregate reply's cursor id, replace with 42 or 0 */
+      if (bson_iter_int64 (pattern_iter) != fake_cursor_id (doc_iter)) {
+        match_err (ctx, "cursor mismatch");
+        return MATCH_ACTION_ABORT;
+      }
+      visitor_ctx->cursor_id = bson_iter_int64 (doc_iter);
+   } else if (ends_with (ctx->path, "cursors") || ends_with (ctx->path, "cursorsUnknown")) {
+      /* payload of a killCursors command-started event:
+       *    {killCursors: "test", cursors: [12345]}
+       * or killCursors command-succeeded event:
+       *    {ok: 1, cursorsUnknown: [12345]}
+       */
+      if (bson_iter_int64 (pattern_iter) == 42) {
+         /* Just verify the cursors field exists in the actual doc. */
+         SHOULD_EXIST;
+      } else {
+         return MATCH_ACTION_CONTINUE;
+      }
+   } else if (!strcmp (key, "getMore")) {
+      /* "When encountering a cursor or getMore value of "42" in a test, the
+       * driver MUST assert that the values are equal to each other and
+       * greater than zero."
+       */
+      SHOULD_EXIST;
+      if (visitor_ctx->cursor_id == 0) {
+         visitor_ctx->cursor_id = bson_iter_int64 (doc_iter);
+      } else {
+         if (visitor_ctx->cursor_id != bson_iter_int64 (doc_iter)) {
+            match_err (ctx, "cursor returned in getMore (%" PRId64 ") does not match previously seen (%" PRId64 ")", bson_iter_int64(doc_iter), visitor_ctx->cursor_id);
+            return MATCH_ACTION_ABORT;
+         }
+      }
+   } else if (!strcmp (key, "code")) {
+      /* "code values of 42 MUST assert that the value is present and
+       * greater than zero" */
+      SHOULD_EXIST;
    }
    return MATCH_ACTION_CONTINUE;
 }
@@ -136,42 +200,7 @@ convert_message_for_test (json_test_ctx_t *ctx,
 
    while (bson_iter_next (&iter)) {
       key = bson_iter_key (&iter);
-
-      if (!strcmp (key, "errmsg")) {
-
-         errmsg = bson_iter_utf8 (&iter, NULL);
-         ASSERT_CMPSIZE_T (strlen (errmsg), >, (size_t) 0);
-         BSON_APPEND_UTF8 (dst, key, "");
-
-      } else if (!strcmp (key, "id") && ends_with (path, "cursor")) {
-         /* store find/aggregate reply's cursor id, replace with 42 or 0 */
-         ctx->cursor_id = bson_iter_int64 (&iter);
-         BSON_APPEND_INT64 (dst, key, fake_cursor_id (&iter));
-
-      } else if (ends_with (path, "cursors") ||
-                 ends_with (path, "cursorsUnknown")) {
-         /* payload of a killCursors command-started event:
-          *    {killCursors: "test", cursors: [12345]}
-          * or killCursors command-succeeded event:
-          *    {ok: 1, cursorsUnknown: [12345]}
-          * */
-         ASSERT_CMPINT64 (bson_iter_as_int64 (&iter), >, (int64_t) 0);
-         BSON_APPEND_INT64 (dst, key, 42);
-
-      } else if (!strcmp (key, "getMore")) {
-         /* "When encountering a cursor or getMore value of "42" in a test, the
-          * driver MUST assert that the values are equal to each other and
-          * greater than zero."
-          */
-         if (ctx->cursor_id == 0) {
-            ctx->cursor_id = bson_iter_int64 (&iter);
-         } else {
-            ASSERT_CMPINT64 (ctx->cursor_id, ==, bson_iter_int64 (&iter));
-         }
-
-         BSON_APPEND_INT64 (dst, key, fake_cursor_id (&iter));
-
-      } else if (!strcmp (key, "lsid") && BSON_ITER_HOLDS_DOCUMENT (&iter)) {
+      if (!strcmp (key, "lsid") && BSON_ITER_HOLDS_DOCUMENT (&iter)) {
          /* Transactions tests: "Each command-started event in "expectations"
           * includes an lsid with the value "session0" or "session1". Tests MUST
           * assert that the command's actual lsid matches the id of the correct
@@ -182,6 +211,14 @@ convert_message_for_test (json_test_ctx_t *ctx,
          } else if (lsids_match (&ctx->lsids[1], &lsid)) {
             BSON_APPEND_UTF8 (dst, key, "session1");
          }
+
+      } else if (!strcmp (key, "afterClusterTime") &&
+                 BSON_ITER_HOLDS_TIMESTAMP (&iter) && path &&
+                 !strcmp (path, "readConcern")) {
+         /* Transactions tests: "A readConcern.afterClusterTime value of 42 in
+          * a command-started event is a fake cluster time. Drivers MUST assert
+          * that the actual command includes an afterClusterTime." */
+         BSON_APPEND_INT32 (dst, key, 42);
 
       } else if (BSON_ITER_HOLDS_DOCUMENT (&iter)) {
          if (path) {
@@ -445,6 +482,7 @@ check_json_apm_events (const bson_t *events,
    match_ctx_t ctx = {0};
    uint32_t expected_keys;
    uint32_t actual_keys;
+   apm_match_visitor_ctx_t visitor_ctx = {0};
 
    /* Old mongod returns a double for "count", newer returns int32.
     * Ignore this and other insignificant type differences. */
@@ -453,6 +491,8 @@ check_json_apm_events (const bson_t *events,
    ctx.errmsg = errmsg;
    ctx.errmsg_len = sizeof errmsg;
    ctx.allow_placeholders = true;
+   ctx.visitor_fn = apm_match_visitor;
+   ctx.visitor_ctx = (void*)&visitor_ctx;
 
    if (!allow_subset) {
       expected_keys = bson_count_keys (expectations);

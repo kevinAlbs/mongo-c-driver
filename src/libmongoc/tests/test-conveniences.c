@@ -549,7 +549,7 @@ static bool
 is_empty_doc_or_array (const bson_value_t *value);
 
 static bool
-find (bson_value_t *value,
+find (bson_iter_t *iter,
       const bson_t *doc,
       const char *key,
       bool is_command,
@@ -737,6 +737,8 @@ derive (match_ctx_t *ctx, match_ctx_t *derived, const char *key)
    }
    derived->retain_dots_in_keys = ctx->retain_dots_in_keys;
    derived->allow_placeholders = ctx->allow_placeholders;
+   derived->visitor_ctx = ctx->visitor_ctx;
+   derived->visitor_fn = ctx->visitor_fn;
 }
 
 
@@ -783,6 +785,7 @@ match_bson_with_ctx (const bson_t *doc,
    bool exists;
    bool empty;
    bool found = false;
+   bson_iter_t doc_iter;
    bson_value_t doc_value;
    match_ctx_t derived;
 
@@ -803,7 +806,10 @@ match_bson_with_ctx (const bson_t *doc,
       key = bson_iter_key (&pattern_iter);
       value = bson_iter_value (&pattern_iter);
       found = find (
-         &doc_value, doc, key, is_command, is_first, ctx->retain_dots_in_keys);
+         &doc_iter, doc, key, is_command, is_first, ctx->retain_dots_in_keys);
+      if (found) {
+         bson_value_copy (bson_iter_value (&doc_iter), &doc_value);
+      }
 
       /* is value {"$exists": true} or {"$exists": false} ? */
       is_exists_operator = get_exists_operator (value, &exists);
@@ -813,11 +819,15 @@ match_bson_with_ctx (const bson_t *doc,
 
       derive (ctx, &derived, key);
 
-      if (ctx->allow_placeholders &&
-          strcmp(key, "errmsg") == 0 &&
-          strcmp(bson_iter_utf8 (&pattern_iter, NULL), "") == 0) {
-
+      if (ctx->visitor_fn) {
+         match_action_t action = ctx->visitor_fn(ctx, &pattern_iter, found ? &doc_iter : NULL);
+         if (action == MATCH_ACTION_ABORT) {
+            goto fail;
+         } else if (action == MATCH_ACTION_SKIP) {
+            goto next;
+         }
       }
+
       if (value->value_type == BSON_TYPE_NULL && found) {
          /* pattern has "key": null, and "key" is in doc */
          if (doc_value.value_type != BSON_TYPE_NULL) {
@@ -841,6 +851,7 @@ match_bson_with_ctx (const bson_t *doc,
          goto fail;
       }
 
+next:
       is_first = false;
       if (found) {
          bson_value_destroy (&doc_value);
@@ -868,13 +879,13 @@ fail:
  *       Whether the key was found.
  *
  * Side effects:
- *       Copies the found value into "value".
+ *       Copies the found value into "iter_out".
  *
  *--------------------------------------------------------------------------
  */
 
 static bool
-find (bson_value_t *value,
+find (bson_iter_t *iter_out,
       const bson_t *doc,
       const char *key,
       bool is_command,
@@ -891,7 +902,7 @@ find (bson_value_t *value,
          return false;
       }
 
-      bson_value_copy (bson_iter_value (&descendent), value);
+      memcpy (iter_out, &descendent, sizeof(bson_iter_t));
       return true;
    } else if (is_command && is_first) {
       if (!bson_iter_find_case (&iter, key)) {
@@ -901,7 +912,7 @@ find (bson_value_t *value,
       return false;
    }
 
-   bson_value_copy (bson_iter_value (&iter), value);
+   memcpy (iter_out, &iter, sizeof(bson_iter_t));
    return true;
 }
 

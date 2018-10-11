@@ -104,9 +104,12 @@ char *
 single_quotes_to_double (const char *str);
 
 typedef enum {MATCH_ACTION_SKIP, MATCH_ACTION_ABORT, MATCH_ACTION_CONTINUE } match_action_t;
-typedef match_action_t (*match_visitor_fn)(void* ctx, const char* key, bson_value_t* val, bson_value_t* pattern);
 
-typedef struct {
+struct _match_ctx_t;
+/* doc_iter may be null if the pattern field is not found. */
+typedef match_action_t (*match_visitor_fn)(struct _match_ctx_t* ctx, bson_iter_t* pattern_iter, bson_iter_t* doc_iter);
+
+typedef struct _match_ctx_t {
    char *errmsg;
    size_t errmsg_len;
    bool strict_numeric_types;
