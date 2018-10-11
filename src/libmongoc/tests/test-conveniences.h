@@ -103,6 +103,9 @@ bson_init_from_value (bson_t *b, const bson_value_t *v);
 char *
 single_quotes_to_double (const char *str);
 
+typedef enum {MATCH_ACTION_SKIP, MATCH_ACTION_ABORT, MATCH_ACTION_CONTINUE } match_action_t;
+typedef match_action_t (*match_visitor_fn)(void* ctx, const char* key, bson_value_t* val, bson_value_t* pattern);
+
 typedef struct {
    char *errmsg;
    size_t errmsg_len;
@@ -114,6 +117,8 @@ typedef struct {
     * comparing 42 to anything is ok. */
    bool allow_placeholders;
    char path[1000];
+   match_visitor_fn visitor_fn;
+   void* visitor_ctx;
 } match_ctx_t;
 
 bool
@@ -168,5 +173,8 @@ assert_no_duplicate_keys (const bson_t *doc);
 
 void
 match_in_array (const bson_t *doc, const bson_t *array, match_ctx_t *ctx);
+
+void
+match_err (match_ctx_t *ctx, const char *fmt, ...);
 
 #endif /* TEST_CONVENIENCES_H */

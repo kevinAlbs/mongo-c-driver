@@ -80,6 +80,31 @@ lsids_match (const bson_t *a, const bson_t *b)
 }
 
 
+match_action_t apm_match_visitor (void* visitor_ctx, match_ctx_t* ctx, const char* key, bson_value_t* val, bson_value_t* pattern) {
+   if (!strcmp (key, "ok")) {
+      int64_t actual;
+      int64_t expected;
+      if (!val) {
+         match_err (ctx, "field 'ok' missing from actual document");
+         return MATCH_ACTION_ABORT;
+      }
+
+      /* "The server is inconsistent on whether the ok values returned are
+       * integers or doubles so for simplicity the tests specify all expected
+       * values as doubles. Server 'ok' values of integers MUST be converted
+       * to doubles for comparison with the expected values."
+       */
+      actual = bson_value_as_int64 (val);
+      expected = bson_value_as_int64 (pattern);
+
+      if (actual != expected) {
+         match_err (ctx, "'ok' expected to be %" PRId64 " but got %" PRId64, expected, actual);
+      }
+   }
+   return MATCH_ACTION_CONTINUE;
+}
+
+
 /* Convert "ok" values to doubles, cursor ids and error codes to 42, and
  * error messages to "". See README at
  * github.com/mongodb/specifications/tree/master/source/command-monitoring/tests
@@ -112,16 +137,8 @@ convert_message_for_test (json_test_ctx_t *ctx,
    while (bson_iter_next (&iter)) {
       key = bson_iter_key (&iter);
 
-      if (!strcmp (key, "ok")) {
-         /* "The server is inconsistent on whether the ok values returned are
-          * integers or doubles so for simplicity the tests specify all expected
-          * values as doubles. Server 'ok' values of integers MUST be converted
-          * to doubles for comparison with the expected values."
-          */
-         BSON_APPEND_DOUBLE (dst, key, (double) bson_iter_as_int64 (&iter));
+      if (!strcmp (key, "errmsg")) {
 
-      } else if (!strcmp (key, "errmsg")) {
-         /* "errmsg values of "" MUST assert that the value is not empty" */
          errmsg = bson_iter_utf8 (&iter, NULL);
          ASSERT_CMPSIZE_T (strlen (errmsg), >, (size_t) 0);
          BSON_APPEND_UTF8 (dst, key, "");
@@ -154,12 +171,6 @@ convert_message_for_test (json_test_ctx_t *ctx,
 
          BSON_APPEND_INT64 (dst, key, fake_cursor_id (&iter));
 
-      } else if (!strcmp (key, "code")) {
-         /* "code values of 42 MUST assert that the value is present and
-          * greater than zero" */
-         ASSERT_CMPINT64 (bson_iter_as_int64 (&iter), >, (int64_t) 0);
-         BSON_APPEND_INT32 (dst, key, 42);
-
       } else if (!strcmp (key, "lsid") && BSON_ITER_HOLDS_DOCUMENT (&iter)) {
          /* Transactions tests: "Each command-started event in "expectations"
           * includes an lsid with the value "session0" or "session1". Tests MUST
@@ -171,14 +182,6 @@ convert_message_for_test (json_test_ctx_t *ctx,
          } else if (lsids_match (&ctx->lsids[1], &lsid)) {
             BSON_APPEND_UTF8 (dst, key, "session1");
          }
-
-      } else if (!strcmp (key, "afterClusterTime") &&
-                 BSON_ITER_HOLDS_TIMESTAMP (&iter) && path &&
-                 !strcmp (path, "readConcern")) {
-         /* Transactions tests: "A readConcern.afterClusterTime value of 42 in
-          * a command-started event is a fake cluster time. Drivers MUST assert
-          * that the actual command includes an afterClusterTime." */
-         BSON_APPEND_INT32 (dst, key, 42);
 
       } else if (BSON_ITER_HOLDS_DOCUMENT (&iter)) {
          if (path) {
@@ -449,6 +452,7 @@ check_json_apm_events (const bson_t *events,
    ctx.retain_dots_in_keys = true;
    ctx.errmsg = errmsg;
    ctx.errmsg_len = sizeof errmsg;
+   ctx.allow_placeholders = true;
 
    if (!allow_subset) {
       expected_keys = bson_count_keys (expectations);

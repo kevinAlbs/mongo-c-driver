@@ -32,6 +32,8 @@
 
 #ifdef BSON_HAVE_STRINGS_H
 #include <strings.h>
+#include <bson/bson-types.h>
+
 #endif
 
 
@@ -691,7 +693,7 @@ match_bson (const bson_t *doc, const bson_t *pattern, bool is_command)
 
 
 MONGOC_PRINTF_FORMAT (2, 3)
-static void
+void
 match_err (match_ctx_t *ctx, const char *fmt, ...)
 {
    va_list args;
@@ -811,6 +813,11 @@ match_bson_with_ctx (const bson_t *doc,
 
       derive (ctx, &derived, key);
 
+      if (ctx->allow_placeholders &&
+          strcmp(key, "errmsg") == 0 &&
+          strcmp(bson_iter_utf8 (&pattern_iter, NULL), "") == 0) {
+
+      }
       if (value->value_type == BSON_TYPE_NULL && found) {
          /* pattern has "key": null, and "key" is in doc */
          if (doc_value.value_type != BSON_TYPE_NULL) {
@@ -1088,7 +1095,7 @@ match_bson_value (const bson_value_t *doc,
    bool ret;
 
    if (ctx && ctx->allow_placeholders) {
-      /* The change streams spec tests use the value 42 as a placeholder. */
+      /* Spec tests may use the value 42 as a placeholder. */
       bool is_placeholder = false;
       if (is_number_type (pattern->value_type) &&
           bson_value_as_int64 (pattern) == 42) {
