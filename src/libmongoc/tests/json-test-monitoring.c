@@ -41,30 +41,6 @@
 #include <strings.h>
 #endif
 
-/* replace a real cursor id with what JSON tests expect: 42 for a live cursor,
- * 0 for a dead one */
-static int64_t
-fake_cursor_id (const bson_iter_t *iter)
-{
-   return bson_iter_as_int64 (iter) ? 42 : 0;
-}
-
-
-static bool
-ends_with (const char *s, const char *suffix)
-{
-   size_t s_len;
-   size_t suffix_len;
-
-   if (!s) {
-      return false;
-   }
-
-   s_len = strlen (s);
-   suffix_len = strlen (suffix);
-   return s_len >= suffix_len && !strcmp (s + s_len - suffix_len, suffix);
-}
-
 /* test that an event's "host" field is set to a reasonable value */
 static void
 assert_host_in_uri (const mongoc_host_list_t *host, const mongoc_uri_t *uri)

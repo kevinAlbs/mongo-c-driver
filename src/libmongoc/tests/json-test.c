@@ -1056,7 +1056,7 @@ set_uri_opts_from_bson (mongoc_uri_t *uri, const bson_t *opts)
  * run_json_general_test --
  *
  *      Run a JSON test scenario from the CRUD, Command Monitoring,
- *      Retryable Writes, or Transactions Spec.
+ *      Retryable Writes, Change Stream, or Transactions Spec.
  *
  *      Call json_test_config_cleanup on @config after the last call
  *      to run_json_general_test.
