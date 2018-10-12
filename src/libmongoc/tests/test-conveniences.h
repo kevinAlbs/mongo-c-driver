@@ -103,11 +103,18 @@ bson_init_from_value (bson_t *b, const bson_value_t *v);
 char *
 single_quotes_to_double (const char *str);
 
-typedef enum {MATCH_ACTION_SKIP, MATCH_ACTION_ABORT, MATCH_ACTION_CONTINUE } match_action_t;
+/* match_action_t determines if default check for a field is overridden. */
+typedef enum {
+   MATCH_ACTION_SKIP,    /* do not use the default check. */
+   MATCH_ACTION_ABORT,   /* an error occurred, stop checking. */
+   MATCH_ACTION_CONTINUE /* use the default check. */
+} match_action_t;
 
 struct _match_ctx_t;
 /* doc_iter may be null if the pattern field is not found. */
-typedef match_action_t (*match_visitor_fn)(struct _match_ctx_t* ctx, bson_iter_t* pattern_iter, bson_iter_t* doc_iter);
+typedef match_action_t (*match_visitor_fn) (struct _match_ctx_t *ctx,
+                                            bson_iter_t *pattern_iter,
+                                            bson_iter_t *doc_iter);
 
 typedef struct _match_ctx_t {
    char *errmsg;
@@ -120,8 +127,10 @@ typedef struct _match_ctx_t {
     * comparing 42 to anything is ok. */
    bool allow_placeholders;
    char path[1000];
+   /* if visitor_fn is not NULL, this is called on for every key in the pattern.
+    * The returned match_action_t can override the default match behavior. */
    match_visitor_fn visitor_fn;
-   void* visitor_ctx;
+   void *visitor_ctx;
 } match_ctx_t;
 
 bool

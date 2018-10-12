@@ -32,8 +32,6 @@
 
 #ifdef BSON_HAVE_STRINGS_H
 #include <strings.h>
-#include <bson/bson-types.h>
-
 #endif
 
 
@@ -759,6 +757,9 @@ derive (match_ctx_t *ctx, match_ctx_t *derived, const char *key)
  *
  *       The first key matches case-insensitively if is_command.
  *
+ *       An optional match visitor (match_visitor_fn and match_visitor_ctx)
+ *       can be set in ctx to provide custom matching behavior.
+ *
  *       A NULL doc or NULL pattern means "{}".
  *
  * Returns:
@@ -820,7 +821,8 @@ match_bson_with_ctx (const bson_t *doc,
       derive (ctx, &derived, key);
 
       if (ctx->visitor_fn) {
-         match_action_t action = ctx->visitor_fn(ctx, &pattern_iter, found ? &doc_iter : NULL);
+         match_action_t action =
+            ctx->visitor_fn (ctx, &pattern_iter, found ? &doc_iter : NULL);
          if (action == MATCH_ACTION_ABORT) {
             goto fail;
          } else if (action == MATCH_ACTION_SKIP) {
@@ -851,7 +853,7 @@ match_bson_with_ctx (const bson_t *doc,
          goto fail;
       }
 
-next:
+   next:
       is_first = false;
       if (found) {
          bson_value_destroy (&doc_value);
@@ -902,7 +904,7 @@ find (bson_iter_t *iter_out,
          return false;
       }
 
-      memcpy (iter_out, &descendent, sizeof(bson_iter_t));
+      memcpy (iter_out, &descendent, sizeof (bson_iter_t));
       return true;
    } else if (is_command && is_first) {
       if (!bson_iter_find_case (&iter, key)) {
@@ -912,7 +914,7 @@ find (bson_iter_t *iter_out,
       return false;
    }
 
-   memcpy (iter_out, &iter, sizeof(bson_iter_t));
+   memcpy (iter_out, &iter, sizeof (bson_iter_t));
    return true;
 }
 
@@ -1106,7 +1108,7 @@ match_bson_value (const bson_value_t *doc,
    bool ret;
 
    if (ctx && ctx->allow_placeholders) {
-      /* Spec tests may use the value 42 as a placeholder. */
+      /* The change streams spec tests use the value 42 as a placeholder. */
       bool is_placeholder = false;
       if (is_number_type (pattern->value_type) &&
           bson_value_as_int64 (pattern) == 42) {

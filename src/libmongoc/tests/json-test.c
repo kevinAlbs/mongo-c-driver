@@ -917,8 +917,7 @@ execute_test (const json_test_config_t *config,
    }
 
    json_test_ctx_init (&ctx, test, client, db, collection, config);
-   set_apm_callbacks (
-      collection->client, config->command_started_events_only, &ctx);
+   set_apm_callbacks (&ctx, collection->client);
 
    if (config->before_test_cb) {
       config->before_test_cb (&ctx, test);
@@ -936,8 +935,7 @@ execute_test (const json_test_config_t *config,
       bson_t expectations;
 
       bson_lookup_doc (test, "expectations", &expectations);
-      check_json_apm_events (
-         &ctx.events, &expectations, config->command_monitoring_allow_subset);
+      check_json_apm_events (&ctx, &ctx.events, &expectations);
       if (config->events_check_cb) {
          config->events_check_cb (&ctx.events);
       }
