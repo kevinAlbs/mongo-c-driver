@@ -638,7 +638,8 @@ match_json (const bson_t *doc,
 
    ctx.errmsg = errmsg;
    ctx.errmsg_len = sizeof errmsg;
-   matches = match_bson_with_ctx (doc, pattern, is_command, &ctx);
+   ctx.is_command = is_command;
+   matches = match_bson_with_ctx (doc, pattern, &ctx);
 
    if (!matches) {
       fprintf (stderr,
@@ -686,7 +687,8 @@ match_bson (const bson_t *doc, const bson_t *pattern, bool is_command)
    match_ctx_t ctx = {0};
 
    ctx.strict_numeric_types = true;
-   return match_bson_with_ctx (doc, pattern, is_command, &ctx);
+   ctx.is_command = is_command;
+   return match_bson_with_ctx (doc, pattern, &ctx);
 }
 
 
@@ -733,6 +735,7 @@ derive (match_ctx_t *ctx, match_ctx_t *derived, const char *key)
    } else {
       bson_snprintf (derived->path, sizeof derived->path, "%s", key);
    }
+   bson_strncpy (derived->command, ctx->command, sizeof (ctx->command));
    derived->retain_dots_in_keys = ctx->retain_dots_in_keys;
    derived->allow_placeholders = ctx->allow_placeholders;
    derived->visitor_ctx = ctx->visitor_ctx;
@@ -755,7 +758,7 @@ derive (match_ctx_t *ctx, match_ctx_t *derived, const char *key)
  *       The only special pattern syntaxes are "field": {"$exists": true/false}
  *       and "field": {"$empty": true/false}.
  *
- *       The first key matches case-insensitively if is_command.
+ *       The first key matches case-insensitively if ctx->case_insensitive_cmd.
  *
  *       An optional match visitor (match_visitor_fn and match_visitor_ctx)
  *       can be set in ctx to provide custom matching behavior.
@@ -772,10 +775,7 @@ derive (match_ctx_t *ctx, match_ctx_t *derived, const char *key)
  */
 
 bool
-match_bson_with_ctx (const bson_t *doc,
-                     const bson_t *pattern,
-                     bool is_command,
-                     match_ctx_t *ctx)
+match_bson_with_ctx (const bson_t *doc, const bson_t *pattern, match_ctx_t *ctx)
 {
    bson_iter_t pattern_iter;
    const char *key;
@@ -806,10 +806,18 @@ match_bson_with_ctx (const bson_t *doc,
    while (bson_iter_next (&pattern_iter)) {
       key = bson_iter_key (&pattern_iter);
       value = bson_iter_value (&pattern_iter);
-      found = find (
-         &doc_iter, doc, key, is_command, is_first, ctx->retain_dots_in_keys);
+      found = find (&doc_iter,
+                    doc,
+                    key,
+                    ctx->is_command,
+                    is_first,
+                    ctx->retain_dots_in_keys);
       if (found) {
          bson_value_copy (bson_iter_value (&doc_iter), &doc_value);
+      }
+
+      if (ctx->is_command && is_first) {
+         bson_strncpy (ctx->command, key, sizeof (ctx->command));
       }
 
       /* is value {"$exists": true} or {"$exists": false} ? */
@@ -1163,7 +1171,7 @@ match_bson_value (const bson_value_t *doc,
       if (doc->value_type == BSON_TYPE_ARRAY) {
          ret = match_bson_arrays (&subdoc, &pattern_subdoc, ctx);
       } else {
-         ret = match_bson_with_ctx (&subdoc, &pattern_subdoc, false, ctx);
+         ret = match_bson_with_ctx (&subdoc, &pattern_subdoc, ctx);
       }
 
       bson_destroy (&subdoc);
@@ -1466,12 +1474,13 @@ match_in_array (const bson_t *doc, const bson_t *array, match_ctx_t *ctx)
       ASSERT (BSON_ITER_HOLDS_DOCUMENT (&array_iter));
       bson_iter_bson (&array_iter, &array_elem);
 
-      if (match_bson_with_ctx (&array_elem, doc, false, ctx)) {
+      if (match_bson_with_ctx (&array_elem, doc, ctx)) {
          found = true;
       }
 
       bson_destroy (&array_elem);
    }
+
    if (!found) {
       test_error ("could not match: %s\n\n"
                   "in array:\n%s\n\n",

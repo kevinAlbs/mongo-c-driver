@@ -126,11 +126,17 @@ typedef struct _match_ctx_t {
    /* if allow_placeholders is true, treats 42 and "42" as placeholders. I.e.
     * comparing 42 to anything is ok. */
    bool allow_placeholders;
+   /* path is the breadcrumb trail of keys separated by dots. */
    char path[1000];
    /* if visitor_fn is not NULL, this is called on for every key in the pattern.
     * The returned match_action_t can override the default match behavior. */
    match_visitor_fn visitor_fn;
    void *visitor_ctx;
+   /* if is_command is true, then compare the first key case insensitively. */
+   bool is_command;
+   /* if is_command is true, (or was true for a parent context), command is set
+    * to the first key of the top level document key. */
+   char command[64];
 } match_ctx_t;
 
 bool
@@ -147,7 +153,6 @@ match_bson_value (const bson_value_t *doc,
 bool
 match_bson_with_ctx (const bson_t *doc,
                      const bson_t *pattern,
-                     bool is_command,
                      match_ctx_t *ctx);
 
 bool

@@ -189,7 +189,6 @@ void
 set_apm_callbacks (json_test_ctx_t *ctx, mongoc_client_t *client)
 {
    mongoc_apm_callbacks_t *callbacks;
-   ctx->verbose = true;
 
    callbacks = mongoc_apm_callbacks_new ();
    mongoc_apm_set_command_started_cb (callbacks, started_cb);
@@ -214,7 +213,7 @@ lsids_match (const bson_t *a, const bson_t *b)
    ctx.errmsg = errmsg;
    ctx.errmsg_len = sizeof (errmsg);
 
-   return match_bson_with_ctx (a, b, false, &ctx);
+   return match_bson_with_ctx (a, b, &ctx);
 }
 
 
@@ -233,7 +232,7 @@ apm_match_visitor (match_ctx_t *ctx,
          return MATCH_ACTION_ABORT;           \
       }                                       \
    } while (0)
-#define IS_COMMAND(cmd) (!strcmp (ctx->path, "") && !strcmp (key, cmd))
+#define IS_COMMAND(cmd) (ctx->is_command && !strcmp (key, cmd))
 
    if (IS_COMMAND ("find") || IS_COMMAND ("aggregate")) {
       /* New query. Next server reply or getMore will set cursor_id. */
@@ -308,8 +307,6 @@ apm_match_visitor (match_ctx_t *ctx,
    /* tests expect "multi: false" and "upsert: false" explicitly;
    * we don't send them. fix when path is like "updates.0", "updates.1", ... */
    if (strstr (ctx->path, "updates.")) {
-      if (!strcmp (key, "upsert")) {
-      }
       if (!strcmp (key, "multi") && !bson_iter_bool (pattern_iter)) {
          return MATCH_ACTION_SKIP;
       }
@@ -319,7 +316,7 @@ apm_match_visitor (match_ctx_t *ctx,
    }
 
    /* transaction tests expect "new: false" explicitly; we don't send it */
-   if (!strcmp (key, "new")) {
+   if (!strcmp (ctx->command, "findAndModify") && !strcmp (key, "new")) {
       return MATCH_ACTION_SKIP;
    }
 
@@ -362,8 +359,8 @@ check_json_apm_events (json_test_ctx_t *ctx,
                        const bson_t *events,
                        const bson_t *expectations)
 {
-   uint32_t expected_keys;
-   uint32_t actual_keys;
+   bson_iter_t expectations_iter;
+   bson_iter_t events_iter;
    bool allow_subset;
    match_ctx_t match_ctx;
    char errmsg[1000] = {0};
@@ -377,40 +374,33 @@ check_json_apm_events (json_test_ctx_t *ctx,
    match_ctx.allow_placeholders = true;
    match_ctx.visitor_fn = apm_match_visitor;
    match_ctx.visitor_ctx = (void *) ctx;
+   match_ctx.is_command = true;
 
-   expected_keys = bson_count_keys (expectations);
-   actual_keys = bson_count_keys (events);
    allow_subset = ctx->config->command_monitoring_allow_subset;
 
-   if (!allow_subset) {
-      if (expected_keys != actual_keys) {
-         test_error ("command monitoring test failed expectations:\n\n"
-                     "%s\n\n"
-                     "events:\n%s\n\n"
-                     "expected %" PRIu32 " events, got %" PRIu32,
-                     bson_as_canonical_extended_json (expectations, NULL),
-                     bson_as_canonical_extended_json (events, NULL),
-                     expected_keys,
-                     actual_keys);
-      }
+   BSON_ASSERT (bson_iter_init (&expectations_iter, expectations));
+   BSON_ASSERT (bson_iter_init (&events_iter, events));
 
-      if (!match_bson_with_ctx (events, expectations, false, &match_ctx)) {
-         test_error ("command monitoring test failed expectations:\n\n"
-                     "%s\n\n"
-                     "events:\n%s\n\n%s",
-                     bson_as_canonical_extended_json (expectations, NULL),
-                     bson_as_canonical_extended_json (events, NULL),
-                     match_ctx.errmsg);
-      }
-   } else {
-      bson_iter_t expectations_iter;
-      BSON_ASSERT (bson_iter_init (&expectations_iter, expectations));
-
-      while (bson_iter_next (&expectations_iter)) {
-         bson_t expectation;
-         bson_iter_bson (&expectations_iter, &expectation);
+   while (bson_iter_next (&expectations_iter)) {
+      bson_t expectation;
+      bson_iter_bson (&expectations_iter, &expectation);
+      if (allow_subset) {
          match_in_array (&expectation, events, &match_ctx);
-         bson_destroy (&expectation);
+      } else {
+         bson_t event;
+         bson_iter_next (&events_iter);
+         bson_iter_bson (&events_iter, &event);
+         if (!match_bson_with_ctx (&event, &expectation, &match_ctx)) {
+            test_error ("could not match APM event\n"
+                        "\texpected: %s\n\n"
+                        "\tactual  : %s\n\n"
+                        "\terror   : %s\n\n",
+                        bson_as_canonical_extended_json (&event, NULL),
+                        bson_as_canonical_extended_json (&expectation, NULL),
+                        match_ctx.errmsg);
+         }
+         bson_destroy (&event);
       }
+      bson_destroy (&expectation);
    }
 }
