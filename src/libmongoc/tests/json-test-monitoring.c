@@ -232,13 +232,29 @@ lsids_match (const bson_t *a, const bson_t *b)
 }
 
 
+typedef struct {
+   char *command_name;
+   int64_t cursor_id;
+   bson_t lsids[2];
+} apm_match_visitor_ctx_t;
+
+
+void
+apm_match_visitor_ctx_reset (apm_match_visitor_ctx_t *ctx)
+{
+   bson_free (ctx->command_name);
+   ctx->command_name = NULL;
+}
+
+
 static match_action_t
 apm_match_visitor (match_ctx_t *ctx,
                    bson_iter_t *pattern_iter,
                    bson_iter_t *doc_iter)
 {
    const char *key = bson_iter_key (pattern_iter);
-   json_test_ctx_t *test_ctx = (json_test_ctx_t *) ctx->visitor_ctx;
+   apm_match_visitor_ctx_t *visitor_ctx =
+      (apm_match_visitor_ctx_t *) ctx->visitor_ctx;
 
 #define SHOULD_EXIST                          \
    do {                                       \
@@ -247,14 +263,17 @@ apm_match_visitor (match_ctx_t *ctx,
          return MATCH_ACTION_ABORT;           \
       }                                       \
    } while (0)
-#define IS_COMMAND(cmd) \
-   (!strcmp (ctx->path, "") && ctx->is_command && !strcmp (key, cmd))
+#define IS_COMMAND(cmd) (ends_with (ctx->path, "command") && !strcmp (key, cmd))
+
+   if (ends_with (ctx->path, "command") && !visitor_ctx->command_name) {
+      visitor_ctx->command_name = bson_strdup (bson_iter_key (doc_iter));
+   }
 
    if (IS_COMMAND ("find") || IS_COMMAND ("aggregate")) {
       /* New query. Next server reply or getMore will set cursor_id. */
-      test_ctx->cursor_id = 0;
+      visitor_ctx->cursor_id = 0;
    } else if (!strcmp (key, "id") && ends_with (ctx->path, "cursor")) {
-      test_ctx->cursor_id = bson_iter_as_int64 (doc_iter);
+      visitor_ctx->cursor_id = bson_iter_as_int64 (doc_iter);
    } else if (!strcmp (key, "errmsg")) {
       /* "errmsg values of "" MUST assert that the value is not empty" */
       const char *errmsg = bson_iter_utf8 (pattern_iter, NULL);
@@ -273,15 +292,15 @@ apm_match_visitor (match_ctx_t *ctx,
        * greater than zero."
        */
       SHOULD_EXIST;
-      if (test_ctx->cursor_id == 0) {
-         test_ctx->cursor_id = bson_iter_as_int64 (doc_iter);
+      if (visitor_ctx->cursor_id == 0) {
+         visitor_ctx->cursor_id = bson_iter_as_int64 (doc_iter);
       } else {
-         if (test_ctx->cursor_id != bson_iter_as_int64 (doc_iter)) {
+         if (visitor_ctx->cursor_id != bson_iter_as_int64 (doc_iter)) {
             match_err (ctx,
                        "cursor returned in getMore (%" PRId64
                        ") does not match previously seen (%" PRId64 ")",
                        bson_iter_as_int64 (doc_iter),
-                       test_ctx->cursor_id);
+                       visitor_ctx->cursor_id);
             return MATCH_ACTION_ABORT;
          }
       }
@@ -298,12 +317,12 @@ apm_match_visitor (match_ctx_t *ctx,
        * assert that the command's actual lsid matches the id of the correct
        * ClientSession named session0 or session1." */
       if (!strcmp (session_name, "session0") &&
-          !lsids_match (&test_ctx->lsids[0], &lsid)) {
+          !lsids_match (&visitor_ctx->lsids[0], &lsid)) {
          fail = true;
       }
 
       if (!strcmp (session_name, "session1") &&
-          !lsids_match (&test_ctx->lsids[1], &lsid)) {
+          !lsids_match (&visitor_ctx->lsids[1], &lsid)) {
          fail = true;
       }
 
@@ -327,95 +346,14 @@ apm_match_visitor (match_ctx_t *ctx,
       if (!strcmp (key, "upsert") && !bson_iter_bool (pattern_iter)) {
          return MATCH_ACTION_SKIP;
       }
-   } else if (!strcmp (ctx->command, "findAndModify") && !strcmp (key, "new")) {
+   } else if (visitor_ctx->command_name &&
+              !strcmp (visitor_ctx->command_name, "findAndModify") &&
+              !strcmp (key, "new")) {
       /* transaction tests expect "new: false" explicitly; we don't send it */
       return MATCH_ACTION_SKIP;
    }
 
    return MATCH_ACTION_CONTINUE;
-}
-
-
-typedef struct {
-   int64_t operation_id;
-   bson_t *command;
-   bson_t *reply;
-   char *command_name;
-   char *database_name;
-   char *type;
-} apm_event_t;
-
-
-static apm_event_t
-apm_event_from_bson (const bson_t *bson)
-{
-   apm_event_t event = {0};
-   bson_iter_t iter;
-
-   bson_iter_init (&iter, bson);
-   bson_iter_next (&iter);
-   event.type = bson_strdup (bson_iter_key (&iter));
-   bson_iter_recurse (&iter, &iter);
-   while (bson_iter_next (&iter)) {
-      if (!strcmp (bson_iter_key (&iter), "operation_id")) {
-         event.operation_id = bson_iter_as_int64 (&iter);
-      } else if (!strcmp (bson_iter_key (&iter), "database_name")) {
-         event.database_name = bson_strdup (bson_iter_utf8 (&iter, NULL));
-      } else if (!strcmp (bson_iter_key (&iter), "command_name")) {
-         event.command_name = bson_strdup (bson_iter_utf8 (&iter, NULL));
-      } else if (!strcmp (bson_iter_key (&iter), "reply")) {
-         bson_t subdoc;
-         bson_iter_bson (&iter, &subdoc);
-         event.reply = bson_copy (&subdoc);
-      } else if (!strcmp (bson_iter_key (&iter), "command")) {
-         bson_t subdoc;
-         bson_iter_bson (&iter, &subdoc);
-         event.command = bson_copy (&subdoc);
-      }
-   }
-
-   return event;
-}
-
-
-static bool
-match_apm_event (const bson_t *actual_bson,
-                 const bson_t *expected_bson,
-                 match_ctx_t *match_ctx)
-{
-   apm_event_t actual = apm_event_from_bson (actual_bson);
-   apm_event_t expected = apm_event_from_bson (expected_bson);
-
-#define CHECK_STRING(field)                                               \
-   do {                                                                   \
-      if (expected.field && strcmp (actual.field, expected.field) != 0) { \
-         match_err (match_ctx,                                            \
-                    "got " #field " %s, expected %s\n",                   \
-                    actual.field,                                         \
-                    expected.field);                                      \
-         return false;                                                    \
-      }                                                                   \
-   } while (0)
-
-   CHECK_STRING (type);
-   CHECK_STRING (command_name);
-   CHECK_STRING (database_name);
-
-   if (expected.operation_id && actual.operation_id != expected.operation_id) {
-      match_err (match_ctx,
-                 "got operation_id %" PRId64 ", expected %" PRId64 "\n",
-                 actual.operation_id,
-                 expected.operation_id);
-      return false;
-   }
-
-   match_ctx->is_command = true;
-   if (!match_bson_with_ctx (actual.command, expected.command, match_ctx)) {
-      return false;
-   }
-   match_ctx->is_command = false;
-
-   return match_bson_with_ctx (actual.reply, expected.reply, match_ctx);
 }
 
 
@@ -456,8 +394,13 @@ check_json_apm_events (json_test_ctx_t *ctx, const bson_t *expectations)
    bson_iter_t events_iter;
    bool allow_subset;
    match_ctx_t match_ctx;
+   apm_match_visitor_ctx_t apm_match_visitor_ctx = {0};
    int i;
    char errmsg[1000] = {0};
+
+   for (i = 0; i < 2; i++) {
+      bson_copy_to (&ctx->lsids[i], &apm_match_visitor_ctx.lsids[i]);
+   }
 
    /* Old mongod returns a double for "count", newer returns int32.
     * Ignore this and other insignificant type differences. */
@@ -467,7 +410,7 @@ check_json_apm_events (json_test_ctx_t *ctx, const bson_t *expectations)
    match_ctx.errmsg_len = sizeof errmsg;
    match_ctx.allow_placeholders = true;
    match_ctx.visitor_fn = apm_match_visitor;
-   match_ctx.visitor_ctx = (void *) ctx;
+   match_ctx.visitor_ctx = (void *) &apm_match_visitor_ctx;
 
    allow_subset = ctx->config->command_monitoring_allow_subset;
 
@@ -481,12 +424,16 @@ check_json_apm_events (json_test_ctx_t *ctx, const bson_t *expectations)
 
       for (; i < ctx->n_events; i++) {
          bson_t event;
+         bool matched;
 
          bson_iter_next (&events_iter);
          bson_iter_bson (&events_iter, &event);
 
-         if (match_apm_event (&event, &expectation, &match_ctx)) {
-            bson_destroy (&event);
+         matched = match_bson_with_ctx (&event, &expectation, &match_ctx);
+         apm_match_visitor_ctx_reset (&apm_match_visitor_ctx);
+         bson_destroy (&event);
+
+         if (matched) {
             break;
          }
 
@@ -499,18 +446,21 @@ check_json_apm_events (json_test_ctx_t *ctx, const bson_t *expectations)
                         bson_as_canonical_extended_json (&expectation, NULL),
                         match_ctx.errmsg);
          }
-         bson_destroy (&event);
       }
       bson_destroy (&expectation);
    }
 }
 
+
+/* Test that apm_match_visitor must verifies the cursor id returned in a getMore
+ * is the same cursor id returned in a find reply. */
 void
 test_apm_matching (void)
 {
-   json_test_ctx_t test_ctx = {0};
+   apm_match_visitor_ctx_t match_visitor_ctx = {0};
    char errmsg[1000] = {0};
    match_ctx_t match_ctx = {0};
+
    const char *e1 = "{"
                     "  'command_succeeded_event': {"
                     "    'command_name': 'find',"
@@ -528,14 +478,15 @@ test_apm_matching (void)
    match_ctx.errmsg = errmsg;
    match_ctx.errmsg_len = sizeof errmsg;
    match_ctx.visitor_fn = apm_match_visitor;
-   match_ctx.visitor_ctx = (void *) &test_ctx;
+   match_ctx.visitor_ctx = (void *) &match_visitor_ctx;
 
-   /* match_apm_event must verify the cursor id returned in a getMore is the
-    * same cursor id returned in a find reply. */
-   BSON_ASSERT (match_apm_event (tmp_bson (e1), tmp_bson (e1), &match_ctx));
-   BSON_ASSERT (!match_apm_event (tmp_bson (e2), tmp_bson (e2), &match_ctx));
+   BSON_ASSERT (match_bson_with_ctx (tmp_bson (e1), tmp_bson (e1), &match_ctx));
+   BSON_ASSERT (
+      !match_bson_with_ctx (tmp_bson (e2), tmp_bson (e2), &match_ctx));
    ASSERT_CONTAINS (match_ctx.errmsg, "cursor returned in getMore");
+   apm_match_visitor_ctx_reset (&match_visitor_ctx);
 }
+
 
 void
 test_apm_install (TestSuite *suite)

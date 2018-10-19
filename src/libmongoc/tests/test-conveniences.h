@@ -134,9 +134,6 @@ typedef struct _match_ctx_t {
    void *visitor_ctx;
    /* if is_command is true, then compare the first key case insensitively. */
    bool is_command;
-   /* if is_command is true, (or was true for a parent context), command is set
-    * to the first key of the top level document key. */
-   char command[64];
 } match_ctx_t;
 
 bool

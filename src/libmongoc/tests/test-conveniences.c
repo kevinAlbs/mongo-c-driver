@@ -735,7 +735,6 @@ derive (match_ctx_t *ctx, match_ctx_t *derived, const char *key)
    } else {
       bson_snprintf (derived->path, sizeof derived->path, "%s", key);
    }
-   bson_strncpy (derived->command, ctx->command, sizeof (ctx->command));
    derived->retain_dots_in_keys = ctx->retain_dots_in_keys;
    derived->allow_placeholders = ctx->allow_placeholders;
    derived->visitor_ctx = ctx->visitor_ctx;
@@ -814,10 +813,6 @@ match_bson_with_ctx (const bson_t *doc, const bson_t *pattern, match_ctx_t *ctx)
                     ctx->retain_dots_in_keys);
       if (found) {
          bson_value_copy (bson_iter_value (&doc_iter), &doc_value);
-      }
-
-      if (ctx->is_command && is_first) {
-         bson_strncpy (ctx->command, key, sizeof (ctx->command));
       }
 
       /* is value {"$exists": true} or {"$exists": false} ? */
