@@ -935,7 +935,7 @@ execute_test (const json_test_config_t *config,
       bson_t expectations;
 
       bson_lookup_doc (test, "expectations", &expectations);
-      check_json_apm_events (&ctx, &ctx.events, &expectations);
+      check_json_apm_events (&ctx, &expectations);
       if (config->events_check_cb) {
          config->events_check_cb (&ctx.events);
       }
