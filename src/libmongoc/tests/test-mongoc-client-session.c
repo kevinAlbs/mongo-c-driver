@@ -2050,6 +2050,7 @@ _test_bulk (session_test_t *test, mongoc_bulk_operation_t *bulk)
 }
 
 
+
 /* test the standard mongoc_collection_create_bulk_operation_with_opts */
 static void
 test_bulk (session_test_t *test)

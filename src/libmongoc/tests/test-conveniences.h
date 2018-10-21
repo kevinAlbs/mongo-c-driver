@@ -126,7 +126,7 @@ typedef struct _match_ctx_t {
    /* if allow_placeholders is true, treats 42 and "42" as placeholders. I.e.
     * comparing 42 to anything is ok. */
    bool allow_placeholders;
-   /* path is the breadcrumb trail of keys separated by dots. */
+   /* path is the dot separated breadcrumb trail of keys. */
    char path[1000];
    /* if visitor_fn is not NULL, this is called on for every key in the pattern.
     * The returned match_action_t can override the default match behavior. */

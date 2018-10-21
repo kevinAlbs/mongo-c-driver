@@ -757,7 +757,7 @@ derive (match_ctx_t *ctx, match_ctx_t *derived, const char *key)
  *       The only special pattern syntaxes are "field": {"$exists": true/false}
  *       and "field": {"$empty": true/false}.
  *
- *       The first key matches case-insensitively if ctx->case_insensitive_cmd.
+ *       The first key matches case-insensitively if ctx->is_command.
  *
  *       An optional match visitor (match_visitor_fn and match_visitor_ctx)
  *       can be set in ctx to provide custom matching behavior.
@@ -784,7 +784,7 @@ match_bson_with_ctx (const bson_t *doc, const bson_t *pattern, match_ctx_t *ctx)
    bool is_empty_operator;
    bool exists;
    bool empty;
-   bool found = false;
+   bool found;
    bson_iter_t doc_iter;
    bson_value_t doc_value;
    match_ctx_t derived;
@@ -1475,7 +1475,6 @@ match_in_array (const bson_t *doc, const bson_t *array, match_ctx_t *ctx)
 
       bson_destroy (&array_elem);
    }
-
    if (!found) {
       test_error ("could not match: %s\n\n"
                   "in array:\n%s\n\n",
