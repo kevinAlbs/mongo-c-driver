@@ -293,16 +293,17 @@ apm_match_visitor (match_ctx_t *ctx,
        */
       SHOULD_EXIST;
       if (visitor_ctx->cursor_id == 0) {
+         /* A cursor id may not have been set in the visitor context if the spec
+          * test only checked command started events. Set the cursor_id now, so
+          * it can at least verify subsequent getMores use with the same id. */
          visitor_ctx->cursor_id = bson_iter_as_int64 (doc_iter);
-      } else {
-         if (visitor_ctx->cursor_id != bson_iter_as_int64 (doc_iter)) {
-            match_err (ctx,
-                       "cursor returned in getMore (%" PRId64
-                       ") does not match previously seen (%" PRId64 ")",
-                       bson_iter_as_int64 (doc_iter),
-                       visitor_ctx->cursor_id);
-            return MATCH_ACTION_ABORT;
-         }
+      } else if (visitor_ctx->cursor_id != bson_iter_as_int64 (doc_iter)) {
+         match_err (ctx,
+                    "cursor requested in getMore (%" PRId64
+                    ") does not match previously seen (%" PRId64 ")",
+                    bson_iter_as_int64 (doc_iter),
+                    visitor_ctx->cursor_id);
+         return MATCH_ACTION_ABORT;
       }
    } else if (!strcmp (key, "lsid")) {
       const char *session_name = bson_iter_utf8 (pattern_iter, NULL);
@@ -452,7 +453,7 @@ check_json_apm_events (json_test_ctx_t *ctx, const bson_t *expectations)
 }
 
 
-/* Test that apm_match_visitor must verifies the cursor id returned in a getMore
+/* Test that apm_match_visitor verifies the cursor id requested in a getMore
  * is the same cursor id returned in a find reply. */
 void
 test_apm_matching (void)
@@ -483,7 +484,7 @@ test_apm_matching (void)
    BSON_ASSERT (match_bson_with_ctx (tmp_bson (e1), tmp_bson (e1), &match_ctx));
    BSON_ASSERT (
       !match_bson_with_ctx (tmp_bson (e2), tmp_bson (e2), &match_ctx));
-   ASSERT_CONTAINS (match_ctx.errmsg, "cursor returned in getMore");
+   ASSERT_CONTAINS (match_ctx.errmsg, "cursor requested in getMore");
    apm_match_visitor_ctx_reset (&match_visitor_ctx);
 }
 
