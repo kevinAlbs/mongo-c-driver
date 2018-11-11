@@ -64,6 +64,7 @@ BSON_BEGIN_DECLS
 /* first version to support retryable writes  */
 #define WIRE_VERSION_RETRY_WRITES 6
 
+struct _mongoc_crypt_t;
 
 struct _mongoc_client_t {
    mongoc_uri_t *uri;
@@ -93,6 +94,8 @@ struct _mongoc_client_t {
    /* mongoc_client_session_t's in use, to look up lsids and clusterTimes */
    mongoc_set_t *client_sessions;
    unsigned int csid_rand_seed;
+
+   struct _mongoc_crypt_t *encryption;
 };
 
 

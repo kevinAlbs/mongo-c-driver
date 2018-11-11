@@ -716,7 +716,8 @@ mongoc_uri_option_is_bool (const char *key)
           !strcasecmp (key, MONGOC_URI_SLAVEOK) ||
           !strcasecmp (key, MONGOC_URI_SSL) ||
           !strcasecmp (key, MONGOC_URI_SSLALLOWINVALIDCERTIFICATES) ||
-          !strcasecmp (key, MONGOC_URI_SSLALLOWINVALIDHOSTNAMES);
+          !strcasecmp (key, MONGOC_URI_SSLALLOWINVALIDHOSTNAMES) ||
+          !strcasecmp (key, "encryption"); /* TODO: constify */
 }
 
 bool

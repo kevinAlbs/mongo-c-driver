@@ -401,6 +401,7 @@ set (SOURCES ${SOURCES}
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-collection.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-compression.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-counters.c
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-crypt.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cursor-array.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cursor.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cursor-cmd.c
@@ -746,6 +747,7 @@ set (test-libmongoc-sources
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-command-monitoring.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-counters.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-crud.c
+   ${PROJECT_SOURCE_DIR}/tests/test-mongoc-crypt.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-cursor.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-database.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-error.c
