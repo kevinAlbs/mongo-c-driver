@@ -23,14 +23,17 @@ typedef struct _mongoc_crypt_t {
    mongoc_client_t *mongocrypt_client;
 } mongoc_crypt_t;
 
+
 /* TODO: use a new error code. */
-#define SET_CRYPT_ERR(...) bson_set_error (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_NOT_READY, __VA_ARGS__)
+#define SET_CRYPT_ERR(...) \
+   bson_set_error (        \
+      error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_NOT_READY, __VA_ARGS__)
+
 
 static void
 _spawn_mongocryptd (void)
 {
-/* oddly, starting mongocryptd --daemonize in context of libmongoc will start
- * multiple instances. */
+/* oddly, starting mongocryptd in libmongoc starts multiple instances. */
 #ifdef SPAWN_BUG_FIXED
    pid_t pid = fork ();
    printf ("initializing mongocryptd\n");
@@ -56,9 +59,10 @@ mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *error)
    mongoc_client_t *mongocrypt_client;
    _spawn_mongocryptd ();
    client->encryption = bson_malloc0 (sizeof (mongoc_crypt_t));
-   mongocrypt_client = mongoc_client_new ("mongodb://%2Ftmp%2Fmongocryptd.sock");
+   mongocrypt_client =
+      mongoc_client_new ("mongodb://%2Ftmp%2Fmongocryptd.sock");
    if (!mongocrypt_client) {
-      SET_CRYPT_ERR("Unable to create client to mongocryptd");
+      SET_CRYPT_ERR ("Unable to create client to mongocryptd");
       return false;
    }
    client->encryption->mongocrypt_client = mongocrypt_client;
@@ -66,7 +70,9 @@ mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *error)
 }
 
 
-static void _make_marking_cmd (const bson_t* data, bson_t* cmd) {
+static void
+_make_marking_cmd (const bson_t *data, bson_t *cmd)
+{
    bson_t child;
 
    bson_init (cmd);
@@ -79,64 +85,113 @@ static void _make_marking_cmd (const bson_t* data, bson_t* cmd) {
 }
 
 
-static bool _replace_markings_recurse (bson_iter_t iter, bson_t* out) {
+static bool
+_append_encrypted (const uint8_t *data,
+                   uint32_t data_len,
+                   bson_t *out,
+                   const char *key,
+                   uint32_t keylen,
+                   bson_error_t *error)
+{
+   bson_t *marking;
+   bson_iter_t marking_iter;
+   bool ret = false;
+   const bson_value_t *value_to_encrypt;
+
+   marking = bson_new_from_data (data, data_len);
+   printf ("marking=%s\n", bson_as_json (marking, NULL));
+   if (!bson_iter_init_find (&marking_iter, marking, "k")) {
+      SET_CRYPT_ERR ("invalid marking, no 'k'");
+      goto cleanup;
+   }
+   if (!bson_iter_init_find (&marking_iter, marking, "v")) {
+      SET_CRYPT_ERR ("invalid marking, no 'v'");
+      goto cleanup;
+   }
+
+   value_to_encrypt = bson_iter_value (&marking_iter);
+   /* TODO: actually do encryption. */
+   bson_append_value (out, key, keylen, value_to_encrypt);
+
+cleanup:
+   bson_destroy (marking);
+   return ret;
+}
+
+
+static bool
+_replace_markings_recurse (bson_iter_t iter, bson_t *out, bson_error_t *error)
+{
    while (bson_iter_next (&iter)) {
-      printf("key=%s\n", bson_iter_key(&iter));
-      if (BSON_ITER_HOLDS_BINARY(&iter)) {
+      printf ("key=%s\n", bson_iter_key (&iter));
+      if (BSON_ITER_HOLDS_BINARY (&iter)) {
          bson_subtype_t subtype;
-         uint32_t binary_len;
-         const uint8_t* data;
-         bson_iter_binary (&iter, &subtype, &binary_len, &data);
+         uint32_t data_len;
+         const uint8_t *data;
+
+         bson_iter_binary (&iter, &subtype, &data_len, &data);
          if (subtype == BSON_SUBTYPE_ENCRYPTED) {
-            /* */
-            bson_append_utf8(out, bson_iter_key(&iter), bson_iter_key_len(&iter), "ENCRYPTED", -1);
+            _append_encrypted (data,
+                               data_len,
+                               out,
+                               bson_iter_key (&iter),
+                               bson_iter_key_len (&iter),
+                               error);
             continue;
          }
+         /* otherwise, fall through. copy over like a normal value. */
       }
 
-      if (BSON_ITER_HOLDS_ARRAY(&iter)) {
+      if (BSON_ITER_HOLDS_ARRAY (&iter)) {
          bson_iter_t child_iter;
          bson_t child_out;
          bool ret;
 
          bson_iter_recurse (&iter, &child_iter);
-         bson_append_array_begin (out, bson_iter_key(&iter), bson_iter_key_len(&iter), &child_out);
-         ret = _replace_markings_recurse (child_iter, &child_out);
+         bson_append_array_begin (
+            out, bson_iter_key (&iter), bson_iter_key_len (&iter), &child_out);
+         ret = _replace_markings_recurse (child_iter, &child_out, error);
          bson_append_array_end (out, &child_out);
          if (!ret) {
             return false;
          }
-      } else if (BSON_ITER_HOLDS_DOCUMENT(&iter)) {
+      } else if (BSON_ITER_HOLDS_DOCUMENT (&iter)) {
          bson_iter_t child_iter;
          bson_t child_out;
          bool ret;
 
          bson_iter_recurse (&iter, &child_iter);
-         bson_append_document_begin (out, bson_iter_key(&iter), bson_iter_key_len(&iter), &child_out);
-         ret = _replace_markings_recurse (child_iter, &child_out);
+         bson_append_document_begin (
+            out, bson_iter_key (&iter), bson_iter_key_len (&iter), &child_out);
+         ret = _replace_markings_recurse (child_iter, &child_out, error);
          bson_append_document_end (out, &child_out);
          if (!ret) {
             return false;
          }
       } else {
-         bson_append_value (out, bson_iter_key(&iter), bson_iter_key_len (&iter), bson_iter_value (&iter));
+         bson_append_value (out,
+                            bson_iter_key (&iter),
+                            bson_iter_key_len (&iter),
+                            bson_iter_value (&iter));
       }
    }
    return true;
 }
 
 
-static bool _replace_markings (const bson_t* reply, bson_t* out, bson_error_t* error) {
+static bool
+_replace_markings (const bson_t *reply, bson_t *out, bson_error_t *error)
+{
    bson_iter_t iter;
 
    BSON_ASSERT (bson_iter_init_find (&iter, reply, "ok"));
    if (!bson_iter_as_bool (&iter)) {
-      SET_CRYPT_ERR("markFields returned ok:0");
+      SET_CRYPT_ERR ("markFields returned ok:0");
       return false;
    }
 
    if (!bson_iter_init_find (&iter, reply, "data")) {
-      SET_CRYPT_ERR("markFields returned ok:0");
+      SET_CRYPT_ERR ("markFields returned ok:0");
       return false;
    }
    /* recurse into array. */
@@ -144,7 +199,7 @@ static bool _replace_markings (const bson_t* reply, bson_t* out, bson_error_t* e
    bson_iter_next (&iter);
    /* recurse into first document. */
    bson_iter_recurse (&iter, &iter);
-   _replace_markings_recurse (iter, out);
+   _replace_markings_recurse (iter, out, error);
    return true;
 }
 
@@ -168,18 +223,17 @@ mongoc_crypt_encrypt (mongoc_client_t *client,
 
    _make_marking_cmd (data, &cmd);
    if (!mongoc_client_command_simple (client->encryption->mongocrypt_client,
-                                 "admin",
-                                 &cmd,
-                                 NULL /* read prefs */,
-                                 &reply,
-                                 error)) {
+                                      "admin",
+                                      &cmd,
+                                      NULL /* read prefs */,
+                                      &reply,
+                                      error)) {
       goto cleanup;
    }
 
    printf ("sent %s, got %s\n",
            bson_as_json (&cmd, NULL),
            bson_as_json (&reply, NULL));
-   /* TODO: walk through BSON, and encrypt anything that was marked. */
 
    if (!_replace_markings (&reply, out, error)) {
       goto cleanup;
