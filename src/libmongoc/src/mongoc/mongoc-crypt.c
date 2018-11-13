@@ -19,6 +19,8 @@
 #include "mongoc/mongoc-error.h"
 #include "mongoc/mongoc-client-private.h"
 
+#include <openssl/evp.h>
+
 typedef struct _mongoc_crypt_t {
    mongoc_client_t *mongocrypt_client;
 } mongoc_crypt_t;
@@ -84,37 +86,176 @@ _make_marking_cmd (const bson_t *data, bson_t *cmd)
    bson_append_document_end (cmd, &child);
 }
 
+//#ifdef MONGOC_ENABLE_SSL_OPENSSL
+static bool
+_encrypt_openssl (const uint8_t *iv,
+                  const uint8_t *key,
+                  const uint8_t *data,
+                  uint32_t data_len,
+                  uint8_t **out,
+                  uint32_t *out_len,
+                  bson_error_t *error)
+{
+   const EVP_CIPHER *cipher;
+   EVP_CIPHER_CTX ctx;
+   bool ret = false;
+   int r;
+   uint8_t *encrypted = NULL;
+   int block_size, bytes_written, encrypted_len = 0;
+
+   EVP_CIPHER_CTX_init (&ctx);
+   cipher = EVP_aes_256_cbc_hmac_sha256 ();
+   block_size = EVP_CIPHER_block_size (cipher);
+   BSON_ASSERT (EVP_CIPHER_iv_length (cipher) == 16);
+   BSON_ASSERT (block_size == 16);
+   BSON_ASSERT (EVP_CIPHER_key_length (cipher) == 32);
+   r = EVP_EncryptInit_ex (&ctx, cipher, NULL /* engine */, key, iv);
+   if (!r) {
+      /* TODO: use ERR_get_error or similar to get OpenSSL error message? */
+      SET_CRYPT_ERR ("failed to initialize cipher");
+      goto cleanup;
+   }
+
+   /* From `man EVP_EncryptInit`: "as a result the amount of data written may be
+    * anything from zero bytes to (inl + cipher_block_size - 1)" and for
+    * finalize: "should have sufficient space for one block */
+   encrypted = bson_malloc0 (data_len + (block_size - 1) + block_size);
+   r = EVP_EncryptUpdate (&ctx, encrypted, &bytes_written, data, data_len);
+   if (!r) {
+      SET_CRYPT_ERR ("failed to encrypt");
+      goto cleanup;
+   }
+
+   encrypted_len += bytes_written;
+   r = EVP_EncryptFinal_ex (&ctx, encrypted + bytes_written, &bytes_written);
+   if (!r) {
+      SET_CRYPT_ERR ("failed to finalize\n");
+      goto cleanup;
+   }
+
+   encrypted_len += bytes_written;
+   *out = encrypted;
+   *out_len = (uint32_t) encrypted_len;
+   encrypted = NULL;
+   ret = true;
+cleanup:
+   EVP_CIPHER_CTX_cleanup (&ctx);
+   bson_free (encrypted);
+   return ret;
+}
+
+static void
+_decrypt_openssl (const uint8_t *iv,
+                  const uint8_t *key,
+                  uint32_t keylen,
+                  const uint8_t *data,
+                  uint32_t datalen,
+                  bson_error_t *error)
+{
+}
+//#endif
+
+uint8_t *
+get_key (const char *key_id)
+{
+   uint8_t *phony = bson_malloc0 (32);
+   int i;
+
+   /* TODO: implement. verify length */
+   for (i = 0; i < 32; i++)
+      phony[i] = (uint8_t) i;
+   return phony;
+}
 
 static bool
 _append_encrypted (const uint8_t *data,
                    uint32_t data_len,
                    bson_t *out,
-                   const char *key,
-                   uint32_t keylen,
+                   const char *field,
+                   uint32_t field_len,
                    bson_error_t *error)
 {
    bson_t *marking;
    bson_iter_t marking_iter;
    bool ret = false;
-   const bson_value_t *value_to_encrypt;
+   /* will hold { 'k': <key id>, 'iv': <iv>, 'e': <encrypted data> } */
+   bson_t encrypted_w_metadata = BSON_INITIALIZER;
+   /* will hold { 'e': <encrypted data> } */
+   bson_t to_encrypt = BSON_INITIALIZER;
+   uint8_t *encrypted;
+   uint32_t encrypted_len;
+   const char *key_id;
+   uint32_t key_id_len;
+   uint8_t *key = NULL;
+   const uint8_t *iv = NULL;
+   uint32_t iv_len;
 
    marking = bson_new_from_data (data, data_len);
    printf ("marking=%s\n", bson_as_json (marking, NULL));
    if (!bson_iter_init_find (&marking_iter, marking, "k")) {
       SET_CRYPT_ERR ("invalid marking, no 'k'");
       goto cleanup;
+   } else if (!BSON_ITER_HOLDS_UTF8 (&marking_iter)) {
+      SET_CRYPT_ERR ("invalid marking, no 'k' is not utf8");
+      goto cleanup;
    }
-   if (!bson_iter_init_find (&marking_iter, marking, "v")) {
-      SET_CRYPT_ERR ("invalid marking, no 'v'");
+   key_id = bson_iter_utf8 (&marking_iter, &key_id_len);
+   key = get_key (key_id);
+
+
+   if (!bson_iter_init_find (&marking_iter, marking, "iv")) {
+      SET_CRYPT_ERR ("invalid marking, no 'iv'");
+      goto cleanup;
+   } else if (!BSON_ITER_HOLDS_BINARY (&marking_iter)) {
+      SET_CRYPT_ERR ("invalid marking, 'iv' is not binary");
+      goto cleanup;
+   }
+   bson_iter_binary (&marking_iter, NULL, &iv_len, &iv);
+   if (iv_len != 16) {
+      SET_CRYPT_ERR ("iv must be 16 bytes");
       goto cleanup;
    }
 
-   value_to_encrypt = bson_iter_value (&marking_iter);
-   /* TODO: actually do encryption. */
-   bson_append_value (out, key, keylen, value_to_encrypt);
+   if (!bson_iter_init_find (&marking_iter, marking, "v")) {
+      SET_CRYPT_ERR ("invalid marking, no 'v'");
+      goto cleanup;
+   } else {
+      bson_append_value (&to_encrypt, "v", 1, bson_iter_value (&marking_iter));
+   }
+
+   if (!_encrypt_openssl (iv,
+                          key,
+                          bson_get_data (&to_encrypt),
+                          to_encrypt.len,
+                          &encrypted,
+                          &encrypted_len,
+                          error)) {
+      goto cleanup;
+   }
+
+   /* append { 'k': <key id>, 'iv': <iv>, 'e': <encrypted { v: <val> } > } */
+   bson_append_utf8 (&encrypted_w_metadata, "k", 1, key_id, key_id_len);
+   bson_append_binary (
+      &encrypted_w_metadata, "iv", 2, BSON_SUBTYPE_BINARY, iv, iv_len);
+   bson_append_binary (&encrypted_w_metadata,
+                       "e",
+                       1,
+                       BSON_SUBTYPE_BINARY,
+                       encrypted,
+                       encrypted_len);
+   bson_append_binary (out,
+                       field,
+                       field_len,
+                       BSON_SUBTYPE_ENCRYPTED,
+                       bson_get_data (&encrypted_w_metadata),
+                       encrypted_w_metadata.len);
 
 cleanup:
    bson_destroy (marking);
+   bson_free (key);
+   bson_destroy (&to_encrypt);
+   bson_free (encrypted);
+   bson_destroy (&encrypted_w_metadata);
    return ret;
 }
 
@@ -123,7 +264,6 @@ static bool
 _replace_markings_recurse (bson_iter_t iter, bson_t *out, bson_error_t *error)
 {
    while (bson_iter_next (&iter)) {
-      printf ("key=%s\n", bson_iter_key (&iter));
       if (BSON_ITER_HOLDS_BINARY (&iter)) {
          bson_subtype_t subtype;
          uint32_t data_len;

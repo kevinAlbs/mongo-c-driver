@@ -11,5 +11,20 @@ The current encryption is simplified to take one document at a time.
 
 The "marking" is a BSON encoding of the document
 ```
-{ "k": <int64>, "v": <bson value> }
+{ 
+  "k": <utf8>, /* key id */
+  "iv": <binary>,
+  "v": <bson value>
+}
 ```
+
+Documents are encrypted with unencrypted metadata and an encrypted value e
+```
+{
+  "k": <utf8>, /* key id */
+  "iv": <binary>,
+  "e": <binary subtype 0, representing encryption of { "v": <value> }>
+}
+```
+
+The bytes representing this BSON are stored as a binary subtype 6.
