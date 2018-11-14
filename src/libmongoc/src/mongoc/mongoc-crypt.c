@@ -88,7 +88,7 @@ _make_marking_cmd (const bson_t *data, bson_t *cmd)
 
 //#ifdef MONGOC_ENABLE_SSL_OPENSSL
 static bool
-_encrypt_openssl (const uint8_t *iv,
+_openssl_encrypt (const uint8_t *iv,
                   const uint8_t *key,
                   const uint8_t *data,
                   uint32_t data_len,
@@ -144,14 +144,61 @@ cleanup:
    return ret;
 }
 
-static void
-_decrypt_openssl (const uint8_t *iv,
+static bool
+_openssl_decrypt (const uint8_t *iv,
                   const uint8_t *key,
-                  uint32_t keylen,
                   const uint8_t *data,
-                  uint32_t datalen,
+                  uint32_t data_len,
+                  uint8_t **out,
+                  uint32_t *out_len,
                   bson_error_t *error)
 {
+   const EVP_CIPHER *cipher;
+   EVP_CIPHER_CTX ctx;
+   bool ret = false;
+   int r;
+   uint8_t *decrypted = NULL;
+   int block_size, bytes_written, decrypted_len = 0;
+
+   EVP_CIPHER_CTX_init (&ctx);
+   cipher = EVP_aes_256_cbc_hmac_sha256 ();
+   block_size = EVP_CIPHER_block_size (cipher);
+   BSON_ASSERT (EVP_CIPHER_iv_length (cipher) == 16);
+   BSON_ASSERT (block_size == 16);
+   BSON_ASSERT (EVP_CIPHER_key_length (cipher) == 32);
+   r = EVP_DecryptInit_ex (&ctx, cipher, NULL /* engine */, key, iv);
+   if (!r) {
+      /* TODO: use ERR_get_error or similar to get OpenSSL error message? */
+      SET_CRYPT_ERR ("failed to initialize cipher");
+      goto cleanup;
+   }
+
+   /* " EVP_DecryptUpdate() should have sufficient room for (inl +
+     * cipher_block_size) bytes" */
+   /* decrypted length <= decrypted_len. */
+   decrypted = bson_malloc0 (data_len + block_size);
+   r = EVP_DecryptUpdate (&ctx, decrypted, &bytes_written, data, data_len);
+   if (!r) {
+      SET_CRYPT_ERR ("failed to decrypt");
+      goto cleanup;
+   }
+
+   decrypted_len += bytes_written;
+   r = EVP_DecryptFinal_ex (&ctx, decrypted + bytes_written, &bytes_written);
+   if (!r) {
+      SET_CRYPT_ERR ("failed to finalize\n");
+      goto cleanup;
+   }
+
+   decrypted_len += bytes_written;
+   *out = decrypted;
+   *out_len = (uint32_t) decrypted_len;
+   decrypted = NULL;
+   ret = true;
+cleanup:
+   EVP_CIPHER_CTX_cleanup (&ctx);
+   bson_free (decrypted);
+   return ret;
 }
 //#endif
 
@@ -223,7 +270,7 @@ _append_encrypted (const uint8_t *data,
       bson_append_value (&to_encrypt, "v", 1, bson_iter_value (&marking_iter));
    }
 
-   if (!_encrypt_openssl (iv,
+   if (!_openssl_encrypt (iv,
                           key,
                           bson_get_data (&to_encrypt),
                           to_encrypt.len,
@@ -250,6 +297,8 @@ _append_encrypted (const uint8_t *data,
                        bson_get_data (&encrypted_w_metadata),
                        encrypted_w_metadata.len);
 
+   ret = true;
+
 cleanup:
    bson_destroy (marking);
    bson_free (key);
@@ -259,9 +308,99 @@ cleanup:
    return ret;
 }
 
-
 static bool
-_replace_markings_recurse (bson_iter_t iter, bson_t *out, bson_error_t *error)
+_append_decrypted (const uint8_t *data,
+                   uint32_t data_len,
+                   bson_t *out,
+                   const char *field,
+                   uint32_t field_len,
+                   bson_error_t *error)
+{
+   bson_t *encrypted_w_metadata;
+   bson_iter_t iter;
+   const char *key_id;
+   uint32_t key_id_len;
+   uint8_t *key = NULL;
+   const uint8_t *iv = NULL;
+   uint32_t iv_len;
+   const uint8_t *encrypted;
+   uint32_t encrypted_len;
+   uint8_t *decrypted = NULL;
+   uint32_t decrypted_len;
+   bson_subtype_t subtype;
+   bool ret = false;
+
+   encrypted_w_metadata = bson_new_from_data (data, data_len);
+
+   if (!bson_iter_init_find (&iter, encrypted_w_metadata, "k")) {
+      SET_CRYPT_ERR ("invalid encrypted data, no 'k'");
+      goto cleanup;
+   } else if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
+      SET_CRYPT_ERR ("invalid encrypted data, no 'k' is not utf8");
+      goto cleanup;
+   }
+   key_id = bson_iter_utf8 (&iter, &key_id_len);
+   key = get_key (key_id);
+
+   if (!bson_iter_init_find (&iter, encrypted_w_metadata, "iv")) {
+      SET_CRYPT_ERR ("invalid encrypted data, no 'iv'");
+      goto cleanup;
+   } else if (!BSON_ITER_HOLDS_BINARY (&iter)) {
+      SET_CRYPT_ERR ("invalid encrypted data, 'iv' is not binary");
+      goto cleanup;
+   }
+   bson_iter_binary (&iter, NULL, &iv_len, &iv);
+
+   if (!bson_iter_init_find (&iter, encrypted_w_metadata, "e")) {
+      SET_CRYPT_ERR ("invalid encrypted data, no 'e'");
+      goto cleanup;
+   } else if (!BSON_ITER_HOLDS_BINARY (&iter)) {
+      SET_CRYPT_ERR ("invalid encrypted data, 'e' does not contain binary");
+      goto cleanup;
+   }
+   bson_iter_binary (&iter, &subtype, &encrypted_len, &encrypted);
+   if (subtype != BSON_SUBTYPE_ENCRYPTED) {
+      SET_CRYPT_ERR (
+         "invalid encrypted data, 'e' does not contain encrypted binary");
+      goto cleanup;
+   }
+
+   if (!_openssl_decrypt (iv,
+                          key,
+                          encrypted,
+                          encrypted_len,
+                          &decrypted,
+                          &decrypted_len,
+                          error)) {
+      goto cleanup;
+   } else {
+      bson_t *wrapped; /* { 'v': <the value> } */
+      bson_iter_t wrapped_iter;
+      wrapped = bson_new_from_data (decrypted, decrypted_len);
+      if (!bson_iter_init_find (&wrapped_iter, wrapped, "v")) {
+         SET_CRYPT_ERR ("invalid encrypted data, missing 'v' field");
+         goto cleanup;
+      }
+      bson_append_value (
+         out, field, field_len, bson_iter_value (&wrapped_iter));
+   }
+
+   ret = true;
+
+cleanup:
+   bson_destroy (encrypted_w_metadata);
+   bson_free (decrypted);
+   return ret;
+}
+
+typedef enum { MARKING_TO_ENCRYPTED, ENCRYPTED_TO_PLAIN } transform_t;
+
+/* TODO: document. */
+static bool
+_copy_and_transform (bson_iter_t iter,
+                     bson_t *out,
+                     bson_error_t *error,
+                     transform_t transform)
 {
    while (bson_iter_next (&iter)) {
       if (BSON_ITER_HOLDS_BINARY (&iter)) {
@@ -271,12 +410,21 @@ _replace_markings_recurse (bson_iter_t iter, bson_t *out, bson_error_t *error)
 
          bson_iter_binary (&iter, &subtype, &data_len, &data);
          if (subtype == BSON_SUBTYPE_ENCRYPTED) {
-            _append_encrypted (data,
-                               data_len,
-                               out,
-                               bson_iter_key (&iter),
-                               bson_iter_key_len (&iter),
-                               error);
+            if (transform == MARKING_TO_ENCRYPTED) {
+               _append_encrypted (data,
+                                  data_len,
+                                  out,
+                                  bson_iter_key (&iter),
+                                  bson_iter_key_len (&iter),
+                                  error);
+            } else {
+               _append_decrypted (data,
+                                  data_len,
+                                  out,
+                                  bson_iter_key (&iter),
+                                  bson_iter_key_len (&iter),
+                                  error);
+            }
             continue;
          }
          /* otherwise, fall through. copy over like a normal value. */
@@ -290,7 +438,7 @@ _replace_markings_recurse (bson_iter_t iter, bson_t *out, bson_error_t *error)
          bson_iter_recurse (&iter, &child_iter);
          bson_append_array_begin (
             out, bson_iter_key (&iter), bson_iter_key_len (&iter), &child_out);
-         ret = _replace_markings_recurse (child_iter, &child_out, error);
+         ret = _copy_and_transform (child_iter, &child_out, error, transform);
          bson_append_array_end (out, &child_out);
          if (!ret) {
             return false;
@@ -303,7 +451,7 @@ _replace_markings_recurse (bson_iter_t iter, bson_t *out, bson_error_t *error)
          bson_iter_recurse (&iter, &child_iter);
          bson_append_document_begin (
             out, bson_iter_key (&iter), bson_iter_key_len (&iter), &child_out);
-         ret = _replace_markings_recurse (child_iter, &child_out, error);
+         ret = _copy_and_transform (child_iter, &child_out, error, transform);
          bson_append_document_end (out, &child_out);
          if (!ret) {
             return false;
@@ -339,7 +487,7 @@ _replace_markings (const bson_t *reply, bson_t *out, bson_error_t *error)
    bson_iter_next (&iter);
    /* recurse into first document. */
    bson_iter_recurse (&iter, &iter);
-   _replace_markings_recurse (iter, out, error);
+   _copy_and_transform (iter, out, error, MARKING_TO_ENCRYPTED);
    return true;
 }
 
@@ -384,4 +532,23 @@ cleanup:
    bson_destroy (&cmd);
    bson_destroy (&reply);
    return ret;
+}
+
+bool
+mongoc_crypt_decrypt (mongoc_client_t *client,
+                      const bson_t *data,
+                      bson_t *out,
+                      bson_error_t *error)
+{
+   bson_iter_t iter;
+   bson_iter_init (&iter, data);
+
+   if (!client->encryption) {
+      return true;
+   }
+   bson_init (out);
+   if (!_copy_and_transform (iter, out, error, ENCRYPTED_TO_PLAIN)) {
+      return false;
+   }
+   return true;
 }
