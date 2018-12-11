@@ -18,6 +18,7 @@
 #include "mongoc/mongoc-crypt-private.h"
 #include "mongoc/mongoc-error.h"
 #include "mongoc/mongoc-client-private.h"
+#include "mongoc/mongoc-opts-private.h"
 
 #include <openssl/evp.h>
 
@@ -551,4 +552,62 @@ mongoc_crypt_decrypt (mongoc_client_t *client,
       return false;
    }
    return true;
+}
+
+/*
+ * Returns NULL if the collection has no known encrypted fields.
+ * Initializes schema regardless.
+ */
+bool
+_mongoc_client_get_schema (mongoc_client_t *client,
+                           const char *ns,
+                           bson_t *schema)
+{
+   /* TODO: do remote fetching and use JSONSchema cache. */
+   bson_iter_t array_iter;
+   bson_iter_init (&array_iter, &client->opts.clientSideEncryption.schemas);
+   const uint8_t *data;
+   uint32_t len;
+
+   while (bson_iter_next (&array_iter)) {
+      bson_iter_t doc_iter;
+      bson_iter_recurse (&array_iter, &doc_iter);
+      if (!bson_iter_find (&doc_iter, "ns")) {
+         continue;
+      }
+
+      if (0 != strcmp (bson_iter_utf8 (&doc_iter, NULL), ns)) {
+         continue;
+      }
+
+      bson_iter_recurse (&array_iter, &doc_iter);
+      if (!bson_iter_find (&doc_iter, "schema")) {
+         continue;
+      }
+
+      bson_iter_document (&doc_iter, &len, &data);
+      bson_init_static (schema, data, len);
+      return true;
+   }
+
+   bson_init (schema);
+   return false;
+}
+
+mongoc_client_t *
+mongoc_client_new_with_opts (mongoc_uri_t *uri,
+                             bson_t *opts,
+                             bson_error_t *error)
+{
+   mongoc_client_t *client;
+
+   client = mongoc_client_new_from_uri (uri);
+   if (!client)
+      return NULL;
+
+   if (!_mongoc_client_opts_parse (NULL, opts, &client->opts, error)) {
+      _mongoc_client_opts_cleanup (&client->opts);
+      return NULL;
+   }
+   return client;
 }

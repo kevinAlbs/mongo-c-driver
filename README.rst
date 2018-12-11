@@ -2,6 +2,10 @@
 mongo-c-driver
 ==============
 
+This branch includes experimental support for client-side field level encryption.
+
+See `CRYPT_README.md <./CRYPT_README.md>` for more info.
+
 About
 =====
 

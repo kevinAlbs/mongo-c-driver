@@ -1605,7 +1605,7 @@ _mongoc_gridfs_bucket_upload_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "chunkSizeBytes")) {
-         if (!_mongoc_convert_int32_t (
+         if (!_mongoc_convert_int32_positive (
                client,
                &iter,
                &mongoc_gridfs_bucket_upload_opts->chunkSizeBytes,
@@ -1645,4 +1645,222 @@ _mongoc_gridfs_bucket_upload_opts_cleanup (mongoc_gridfs_bucket_upload_opts_t *m
 {
    bson_destroy (&mongoc_gridfs_bucket_upload_opts->metadata);
    bson_destroy (&mongoc_gridfs_bucket_upload_opts->extra);
+}
+
+bool
+_mongoc_client_side_encryption_opts_parse (
+   mongoc_client_t *client,
+   const bson_t *opts,
+   mongoc_client_side_encryption_opts_t *mongoc_client_side_encryption_opts,
+   bson_error_t *error)
+{
+   bson_iter_t iter;
+
+   bson_init (&mongoc_client_side_encryption_opts->schemas);
+   mongoc_client_side_encryption_opts->awsRegion = "";
+   mongoc_client_side_encryption_opts->awsSecretAccessKey = "";
+   mongoc_client_side_encryption_opts->awsAccessKeyId = "";
+   mongoc_client_side_encryption_opts->mongocryptdURI = "";
+   mongoc_client_side_encryption_opts->useRemoteSchemas = false;
+   bson_init (&mongoc_client_side_encryption_opts->extra);
+
+   if (!opts) {
+      return true;
+   }
+
+   if (!bson_iter_init (&iter, opts)) {
+      bson_set_error (error,
+                      MONGOC_ERROR_BSON,
+                      MONGOC_ERROR_BSON_INVALID,
+                      "Invalid 'opts' parameter.");
+      return false;
+   }
+
+   while (bson_iter_next (&iter)) {
+      if (!strcmp (bson_iter_key (&iter), "schemas")) {
+         if (!_mongoc_convert_document (
+               client,
+               &iter,
+               &mongoc_client_side_encryption_opts->schemas,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "awsRegion")) {
+         if (!_mongoc_convert_utf8 (
+               client,
+               &iter,
+               &mongoc_client_side_encryption_opts->awsRegion,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "awsSecretAccessKey")) {
+         if (!_mongoc_convert_utf8 (
+               client,
+               &iter,
+               &mongoc_client_side_encryption_opts->awsSecretAccessKey,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "awsAccessKeyId")) {
+         if (!_mongoc_convert_utf8 (
+               client,
+               &iter,
+               &mongoc_client_side_encryption_opts->awsAccessKeyId,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "mongocryptdURI")) {
+         if (!_mongoc_convert_utf8 (
+               client,
+               &iter,
+               &mongoc_client_side_encryption_opts->mongocryptdURI,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "useRemoteSchemas")) {
+         if (!_mongoc_convert_bool (
+               client,
+               &iter,
+               &mongoc_client_side_encryption_opts->useRemoteSchemas,
+               error)) {
+            return false;
+         }
+      }
+      else {
+         /* unrecognized values are copied to "extra" */
+         if (!BSON_APPEND_VALUE (
+               &mongoc_client_side_encryption_opts->extra,
+               bson_iter_key (&iter),
+               bson_iter_value (&iter))) {
+            bson_set_error (error,
+                            MONGOC_ERROR_BSON,
+                            MONGOC_ERROR_BSON_INVALID,
+                            "Invalid 'opts' parameter.");
+            return false;
+         }
+      }
+   }
+
+   return true;
+}
+
+void
+_mongoc_client_side_encryption_opts_cleanup (mongoc_client_side_encryption_opts_t *mongoc_client_side_encryption_opts)
+{
+   bson_destroy (&mongoc_client_side_encryption_opts->schemas);
+   bson_destroy (&mongoc_client_side_encryption_opts->extra);
+}
+
+bool
+_mongoc_client_opts_parse (
+   mongoc_client_t *client,
+   const bson_t *opts,
+   mongoc_client_opts_t *mongoc_client_opts,
+   bson_error_t *error)
+{
+   bson_iter_t iter;
+
+   bson_init (&mongoc_client_opts->clientSideEncryption.schemas);
+   mongoc_client_opts->clientSideEncryption.awsRegion = "";
+   mongoc_client_opts->clientSideEncryption.awsSecretAccessKey = "";
+   mongoc_client_opts->clientSideEncryption.awsAccessKeyId = "";
+   mongoc_client_opts->clientSideEncryption.mongocryptdURI = "";
+   mongoc_client_opts->clientSideEncryption.useRemoteSchemas = false;
+   bson_init (&mongoc_client_opts->extra);
+
+   if (!opts) {
+      return true;
+   }
+
+   if (!bson_iter_init (&iter, opts)) {
+      bson_set_error (error,
+                      MONGOC_ERROR_BSON,
+                      MONGOC_ERROR_BSON_INVALID,
+                      "Invalid 'opts' parameter.");
+      return false;
+   }
+
+   while (bson_iter_next (&iter)) {
+      if (!strcmp (bson_iter_key (&iter), "schemas")) {
+         if (!_mongoc_convert_document (
+               client,
+               &iter,
+               &mongoc_client_opts->clientSideEncryption.schemas,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "awsRegion")) {
+         if (!_mongoc_convert_utf8 (
+               client,
+               &iter,
+               &mongoc_client_opts->clientSideEncryption.awsRegion,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "awsSecretAccessKey")) {
+         if (!_mongoc_convert_utf8 (
+               client,
+               &iter,
+               &mongoc_client_opts->clientSideEncryption.awsSecretAccessKey,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "awsAccessKeyId")) {
+         if (!_mongoc_convert_utf8 (
+               client,
+               &iter,
+               &mongoc_client_opts->clientSideEncryption.awsAccessKeyId,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "mongocryptdURI")) {
+         if (!_mongoc_convert_utf8 (
+               client,
+               &iter,
+               &mongoc_client_opts->clientSideEncryption.mongocryptdURI,
+               error)) {
+            return false;
+         }
+      }
+      else if (!strcmp (bson_iter_key (&iter), "useRemoteSchemas")) {
+         if (!_mongoc_convert_bool (
+               client,
+               &iter,
+               &mongoc_client_opts->clientSideEncryption.useRemoteSchemas,
+               error)) {
+            return false;
+         }
+      }
+      else {
+         /* unrecognized values are copied to "extra" */
+         if (!BSON_APPEND_VALUE (
+               &mongoc_client_opts->extra,
+               bson_iter_key (&iter),
+               bson_iter_value (&iter))) {
+            bson_set_error (error,
+                            MONGOC_ERROR_BSON,
+                            MONGOC_ERROR_BSON_INVALID,
+                            "Invalid 'opts' parameter.");
+            return false;
+         }
+      }
+   }
+
+   return true;
+}
+
+void
+_mongoc_client_opts_cleanup (mongoc_client_opts_t *mongoc_client_opts)
+{
+   bson_destroy (&mongoc_client_opts->clientSideEncryption.schemas);
+   bson_destroy (&mongoc_client_opts->extra);
 }

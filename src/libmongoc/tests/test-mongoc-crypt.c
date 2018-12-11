@@ -41,6 +41,47 @@ test_encryption (void)
    printf ("encrypted data: %s\n", bson_as_json (&encrypted, NULL));
 }
 
+
+void
+test_encryption_with_schema (void)
+{
+   bson_error_t error;
+   bson_json_reader_t *reader;
+   bson_t schemas = BSON_INITIALIZER;
+   bson_t opts = BSON_INITIALIZER;
+   mongoc_uri_t *uri;
+   mongoc_client_t *client;
+   int status;
+
+   reader = bson_json_reader_new_from_file ("./build/example.schemas", &error);
+   ASSERT_OR_PRINT (reader, error);
+
+   status = bson_json_reader_read (reader, &schemas, &error);
+   ASSERT_OR_PRINT (status == 1, error);
+
+   BSON_APPEND_DOCUMENT (&opts, "schemas", &schemas);
+   uri = mongoc_uri_new_with_error ("mongodb://localhost:27017/", &error);
+   ASSERT_OR_PRINT (uri, error);
+
+   client = mongoc_client_new_with_opts (uri, &opts, &error);
+   ASSERT_OR_PRINT (client, error);
+
+   do {
+      bson_t schema_returned;
+      BSON_ASSERT (
+         _mongoc_client_get_schema (client, "test.crypt", &schema_returned));
+      printf ("schema is: %s\n", bson_as_json (&schema_returned, NULL));
+
+   } while (0);
+
+   bson_destroy (&schemas);
+   bson_destroy (&opts);
+   mongoc_client_destroy (client);
+   mongoc_uri_destroy (uri);
+   bson_json_reader_destroy (reader);
+}
+
+
 #include <openssl/evp.h>
 
 void
@@ -129,4 +170,5 @@ test_crypt_install (TestSuite *suite)
 {
    TestSuite_AddLive (suite, "/crypt", test_encryption);
    TestSuite_AddLive (suite, "/openssl", test_openssl);
+   TestSuite_AddLive (suite, "/crypt/with_schema", test_encryption_with_schema);
 }

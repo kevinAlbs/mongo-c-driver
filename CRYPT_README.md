@@ -1,4 +1,27 @@
-This branch of mongo-c-driver includes experimental support for client side field-level encryption.
+Welcome to the experimental field-level encryption branch. Good luck.
+
+## Setting up
+Run:
+```
+$ mongo ./build/setup-crypt-example.js
+```
+This creates a simple key vault with some example keys and a collection named test.crypt, that has a JSONSchema with an encrypted 'ssn' field.
+
+Then, start the mockupcryptd process.
+```
+$ ./build/start-mongocryptd.sh
+```
+
+(TODO) Then, test out encryption!
+```
+$ mkdir cmake-build && cd cmake-build
+$ cmake -DENABLE_SSL=OPENSSL -DENABLE_CRYPT_TRACING=ON ../
+$ make -j8 example-crypt
+$ ./src/libmongoc/example-crypt
+Inserting { "name": "Todd Davis", "ssn": "457-55-5642" }
+CRYPT_TRACE: encrypted collection detected
+```
+## Field-Level Encryption Support
 
 Currently, encryption is enabled with a URI parameter:
 

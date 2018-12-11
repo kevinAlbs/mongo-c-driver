@@ -155,6 +155,21 @@ typedef struct _mongoc_gridfs_bucket_upload_opts_t {
    bson_t extra;
 } mongoc_gridfs_bucket_upload_opts_t;
 
+typedef struct _mongoc_client_side_encryption_opts_t {
+   bson_t schemas;
+   const char *awsRegion;
+   const char *awsSecretAccessKey;
+   const char *awsAccessKeyId;
+   const char *mongocryptdURI;
+   bool useRemoteSchemas;
+   bson_t extra;
+} mongoc_client_side_encryption_opts_t;
+
+typedef struct _mongoc_client_opts_t {
+   mongoc_client_side_encryption_opts_t clientSideEncryption;
+   bson_t extra;
+} mongoc_client_opts_t;
+
 bool
 _mongoc_insert_one_opts_parse (
    mongoc_client_t *client,
@@ -334,5 +349,25 @@ _mongoc_gridfs_bucket_upload_opts_parse (
 
 void
 _mongoc_gridfs_bucket_upload_opts_cleanup (mongoc_gridfs_bucket_upload_opts_t *mongoc_gridfs_bucket_upload_opts);
+
+bool
+_mongoc_client_side_encryption_opts_parse (
+   mongoc_client_t *client,
+   const bson_t *opts,
+   mongoc_client_side_encryption_opts_t *mongoc_client_side_encryption_opts,
+   bson_error_t *error);
+
+void
+_mongoc_client_side_encryption_opts_cleanup (mongoc_client_side_encryption_opts_t *mongoc_client_side_encryption_opts);
+
+bool
+_mongoc_client_opts_parse (
+   mongoc_client_t *client,
+   const bson_t *opts,
+   mongoc_client_opts_t *mongoc_client_opts,
+   bson_error_t *error);
+
+void
+_mongoc_client_opts_cleanup (mongoc_client_opts_t *mongoc_client_opts);
 
 #endif /* MONGOC_OPTS_H */

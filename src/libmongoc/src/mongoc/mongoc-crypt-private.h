@@ -34,4 +34,14 @@ bool mongoc_crypt_encrypt(mongoc_client_t* client, const bson_t* data, bson_t*
 out, bson_error_t* error);
 bool mongoc_crypt_cleanup(mongoc_client_t* client);
  */
+
+mongoc_client_t *
+mongoc_client_new_with_opts (mongoc_uri_t *uri,
+                             bson_t *opts,
+                             bson_error_t *error);
+bool
+_mongoc_client_get_schema (mongoc_client_t *client,
+                           const char *ns,
+                           bson_t *bson);
+
 #endif // MONGO_C_DRIVER_MONGOC_CRYPT_PRIVATE_H

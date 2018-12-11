@@ -1,0 +1,8 @@
+``opts`` may be NULL or a BSON document with additional command options:
+
+* ``schemas``: TODO
+* ``awsRegion``: TODO
+* ``awsSecretAccessKey``: TODO
+* ``awsAccessKeyId``: TODO
+* ``mongocryptdURI``: TODO
+* ``useRemoteSchemas``: TODO
