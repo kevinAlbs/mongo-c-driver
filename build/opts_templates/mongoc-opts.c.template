@@ -68,7 +68,7 @@ _{{ struct_name }}_parse (
 {% set the_name = info.get('field', opt_name) %}
 {% set the_converter = info.get('convert', '_mongoc_convert_' + info['type'] ) %}
       {% if loop.index > 1 %}else {% endif %}if (!strcmp (bson_iter_key (&iter), "{{ opt_name }}")) {
-{% if the_converter == '_mongoc_convert_write_concern' %}
+
          if (!{{ the_converter }} (
                client,
                &iter,
@@ -77,16 +77,10 @@ _{{ struct_name }}_parse (
             return false;
          }
 
+{% if the_converter == '_mongoc_convert_write_concern' %}
          {{ struct_name }}->{{ path_to(struct_type, "write_concern_owned") }} = true;
-{% else %}
-         if (!{{ the_converter }} (
-               client,
-               &iter,
-               &{{ struct_name }}->{{ path }},
-               error)) {
-            return false;
-         }
 {% endif %}
+
       }
 {% endfor %}
       else {

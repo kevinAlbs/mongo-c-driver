@@ -299,10 +299,6 @@ opts_structs = OrderedDict([
         ('awsAccessKeyId', {'type': 'utf8', 'help': 'TODO'}),
         ('mongocryptdURI', {'type': 'utf8', 'help': 'TODO'}),
         ('useRemoteSchemas', {'type': 'bool', 'help': 'TODO'})
-    ])),
-
-    ('mongoc_client_opts_t', Struct([
-        ('clientSideEncryption', { 'type': 'mongoc_client_side_encryption_opts_t' } )
     ]))
 ])
 header_comment = """/**************************************************

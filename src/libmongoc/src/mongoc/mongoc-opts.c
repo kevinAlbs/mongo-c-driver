@@ -44,6 +44,7 @@ _mongoc_insert_one_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -53,8 +54,10 @@ _mongoc_insert_one_opts_parse (
          }
 
          mongoc_insert_one_opts->crud.write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -62,8 +65,11 @@ _mongoc_insert_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -71,8 +77,11 @@ _mongoc_insert_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "bypassDocumentValidation")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -80,6 +89,8 @@ _mongoc_insert_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -139,6 +150,7 @@ _mongoc_insert_many_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -148,8 +160,10 @@ _mongoc_insert_many_opts_parse (
          }
 
          mongoc_insert_many_opts->crud.write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -157,8 +171,11 @@ _mongoc_insert_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -166,8 +183,11 @@ _mongoc_insert_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "ordered")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -175,8 +195,11 @@ _mongoc_insert_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "bypassDocumentValidation")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -184,6 +207,8 @@ _mongoc_insert_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -242,6 +267,7 @@ _mongoc_delete_one_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -251,8 +277,10 @@ _mongoc_delete_one_opts_parse (
          }
 
          mongoc_delete_one_opts->crud.write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -260,8 +288,11 @@ _mongoc_delete_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -269,8 +300,11 @@ _mongoc_delete_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -278,6 +312,8 @@ _mongoc_delete_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -337,6 +373,7 @@ _mongoc_delete_many_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -346,8 +383,10 @@ _mongoc_delete_many_opts_parse (
          }
 
          mongoc_delete_many_opts->crud.write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -355,8 +394,11 @@ _mongoc_delete_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -364,8 +406,11 @@ _mongoc_delete_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -373,6 +418,8 @@ _mongoc_delete_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -435,6 +482,7 @@ _mongoc_update_one_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -444,8 +492,10 @@ _mongoc_update_one_opts_parse (
          }
 
          mongoc_update_one_opts->update.crud.write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -453,8 +503,11 @@ _mongoc_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -462,8 +515,11 @@ _mongoc_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "bypassDocumentValidation")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -471,8 +527,11 @@ _mongoc_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -480,8 +539,11 @@ _mongoc_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "upsert")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -489,8 +551,11 @@ _mongoc_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "arrayFilters")) {
+
          if (!_mongoc_convert_array (
                client,
                &iter,
@@ -498,6 +563,8 @@ _mongoc_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -561,6 +628,7 @@ _mongoc_update_many_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -570,8 +638,10 @@ _mongoc_update_many_opts_parse (
          }
 
          mongoc_update_many_opts->update.crud.write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -579,8 +649,11 @@ _mongoc_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -588,8 +661,11 @@ _mongoc_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "bypassDocumentValidation")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -597,8 +673,11 @@ _mongoc_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -606,8 +685,11 @@ _mongoc_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "upsert")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -615,8 +697,11 @@ _mongoc_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "arrayFilters")) {
+
          if (!_mongoc_convert_array (
                client,
                &iter,
@@ -624,6 +709,8 @@ _mongoc_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -686,6 +773,7 @@ _mongoc_replace_one_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -695,8 +783,10 @@ _mongoc_replace_one_opts_parse (
          }
 
          mongoc_replace_one_opts->update.crud.write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -704,8 +794,11 @@ _mongoc_replace_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -713,8 +806,11 @@ _mongoc_replace_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "bypassDocumentValidation")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -722,8 +818,11 @@ _mongoc_replace_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -731,8 +830,11 @@ _mongoc_replace_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "upsert")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -740,6 +842,8 @@ _mongoc_replace_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -798,6 +902,7 @@ _mongoc_bulk_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -807,8 +912,10 @@ _mongoc_bulk_opts_parse (
          }
 
          mongoc_bulk_opts->write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "ordered")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -816,8 +923,11 @@ _mongoc_bulk_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -825,6 +935,8 @@ _mongoc_bulk_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          bson_set_error (error,
@@ -874,6 +986,7 @@ _mongoc_bulk_insert_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -881,6 +994,8 @@ _mongoc_bulk_insert_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          bson_set_error (error,
@@ -931,6 +1046,7 @@ _mongoc_bulk_update_one_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -938,8 +1054,11 @@ _mongoc_bulk_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -947,8 +1066,11 @@ _mongoc_bulk_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "upsert")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -956,8 +1078,11 @@ _mongoc_bulk_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "multi")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -965,8 +1090,11 @@ _mongoc_bulk_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "arrayFilters")) {
+
          if (!_mongoc_convert_array (
                client,
                &iter,
@@ -974,6 +1102,8 @@ _mongoc_bulk_update_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          bson_set_error (error,
@@ -1026,6 +1156,7 @@ _mongoc_bulk_update_many_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -1033,8 +1164,11 @@ _mongoc_bulk_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -1042,8 +1176,11 @@ _mongoc_bulk_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "upsert")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -1051,8 +1188,11 @@ _mongoc_bulk_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "multi")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -1060,8 +1200,11 @@ _mongoc_bulk_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "arrayFilters")) {
+
          if (!_mongoc_convert_array (
                client,
                &iter,
@@ -1069,6 +1212,8 @@ _mongoc_bulk_update_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          bson_set_error (error,
@@ -1120,6 +1265,7 @@ _mongoc_bulk_replace_one_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "validate")) {
+
          if (!_mongoc_convert_validate_flags (
                client,
                &iter,
@@ -1127,8 +1273,11 @@ _mongoc_bulk_replace_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -1136,8 +1285,11 @@ _mongoc_bulk_replace_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "upsert")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -1145,8 +1297,11 @@ _mongoc_bulk_replace_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "multi")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -1154,6 +1309,8 @@ _mongoc_bulk_replace_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          bson_set_error (error,
@@ -1202,6 +1359,7 @@ _mongoc_bulk_remove_one_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -1209,8 +1367,11 @@ _mongoc_bulk_remove_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "limit")) {
+
          if (!_mongoc_convert_int32_t (
                client,
                &iter,
@@ -1218,6 +1379,8 @@ _mongoc_bulk_remove_one_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          bson_set_error (error,
@@ -1266,6 +1429,7 @@ _mongoc_bulk_remove_many_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -1273,8 +1437,11 @@ _mongoc_bulk_remove_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "limit")) {
+
          if (!_mongoc_convert_int32_t (
                client,
                &iter,
@@ -1282,6 +1449,8 @@ _mongoc_bulk_remove_many_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          bson_set_error (error,
@@ -1331,6 +1500,7 @@ _mongoc_create_index_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -1340,8 +1510,10 @@ _mongoc_create_index_opts_parse (
          }
 
          mongoc_create_index_opts->write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -1349,6 +1521,8 @@ _mongoc_create_index_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -1408,6 +1582,7 @@ _mongoc_read_write_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "readConcern")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -1415,8 +1590,11 @@ _mongoc_read_write_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -1426,8 +1604,10 @@ _mongoc_read_write_opts_parse (
          }
 
          mongoc_read_write_opts->write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "sessionId")) {
+
          if (!_mongoc_convert_session_id (
                client,
                &iter,
@@ -1435,8 +1615,11 @@ _mongoc_read_write_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "collation")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -1444,8 +1627,11 @@ _mongoc_read_write_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "serverId")) {
+
          if (!_mongoc_convert_server_id (
                client,
                &iter,
@@ -1453,6 +1639,8 @@ _mongoc_read_write_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -1513,6 +1701,7 @@ _mongoc_gridfs_bucket_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "bucketName")) {
+
          if (!_mongoc_convert_utf8 (
                client,
                &iter,
@@ -1520,8 +1709,11 @@ _mongoc_gridfs_bucket_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "chunkSizeBytes")) {
+
          if (!_mongoc_convert_int32_positive (
                client,
                &iter,
@@ -1529,8 +1721,11 @@ _mongoc_gridfs_bucket_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "writeConcern")) {
+
          if (!_mongoc_convert_write_concern (
                client,
                &iter,
@@ -1540,8 +1735,10 @@ _mongoc_gridfs_bucket_opts_parse (
          }
 
          mongoc_gridfs_bucket_opts->write_concern_owned = true;
+
       }
       else if (!strcmp (bson_iter_key (&iter), "readConcern")) {
+
          if (!_mongoc_convert_read_concern (
                client,
                &iter,
@@ -1549,6 +1746,8 @@ _mongoc_gridfs_bucket_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -1605,6 +1804,7 @@ _mongoc_gridfs_bucket_upload_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "chunkSizeBytes")) {
+
          if (!_mongoc_convert_int32_positive (
                client,
                &iter,
@@ -1612,8 +1812,11 @@ _mongoc_gridfs_bucket_upload_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "metadata")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -1621,6 +1824,8 @@ _mongoc_gridfs_bucket_upload_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -1678,6 +1883,7 @@ _mongoc_client_side_encryption_opts_parse (
 
    while (bson_iter_next (&iter)) {
       if (!strcmp (bson_iter_key (&iter), "schemas")) {
+
          if (!_mongoc_convert_document (
                client,
                &iter,
@@ -1685,8 +1891,11 @@ _mongoc_client_side_encryption_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "awsRegion")) {
+
          if (!_mongoc_convert_utf8 (
                client,
                &iter,
@@ -1694,8 +1903,11 @@ _mongoc_client_side_encryption_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "awsSecretAccessKey")) {
+
          if (!_mongoc_convert_utf8 (
                client,
                &iter,
@@ -1703,8 +1915,11 @@ _mongoc_client_side_encryption_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "awsAccessKeyId")) {
+
          if (!_mongoc_convert_utf8 (
                client,
                &iter,
@@ -1712,8 +1927,11 @@ _mongoc_client_side_encryption_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "mongocryptdURI")) {
+
          if (!_mongoc_convert_utf8 (
                client,
                &iter,
@@ -1721,8 +1939,11 @@ _mongoc_client_side_encryption_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else if (!strcmp (bson_iter_key (&iter), "useRemoteSchemas")) {
+
          if (!_mongoc_convert_bool (
                client,
                &iter,
@@ -1730,6 +1951,8 @@ _mongoc_client_side_encryption_opts_parse (
                error)) {
             return false;
          }
+
+
       }
       else {
          /* unrecognized values are copied to "extra" */
@@ -1754,113 +1977,4 @@ _mongoc_client_side_encryption_opts_cleanup (mongoc_client_side_encryption_opts_
 {
    bson_destroy (&mongoc_client_side_encryption_opts->schemas);
    bson_destroy (&mongoc_client_side_encryption_opts->extra);
-}
-
-bool
-_mongoc_client_opts_parse (
-   mongoc_client_t *client,
-   const bson_t *opts,
-   mongoc_client_opts_t *mongoc_client_opts,
-   bson_error_t *error)
-{
-   bson_iter_t iter;
-
-   bson_init (&mongoc_client_opts->clientSideEncryption.schemas);
-   mongoc_client_opts->clientSideEncryption.awsRegion = "";
-   mongoc_client_opts->clientSideEncryption.awsSecretAccessKey = "";
-   mongoc_client_opts->clientSideEncryption.awsAccessKeyId = "";
-   mongoc_client_opts->clientSideEncryption.mongocryptdURI = "";
-   mongoc_client_opts->clientSideEncryption.useRemoteSchemas = false;
-   bson_init (&mongoc_client_opts->extra);
-
-   if (!opts) {
-      return true;
-   }
-
-   if (!bson_iter_init (&iter, opts)) {
-      bson_set_error (error,
-                      MONGOC_ERROR_BSON,
-                      MONGOC_ERROR_BSON_INVALID,
-                      "Invalid 'opts' parameter.");
-      return false;
-   }
-
-   while (bson_iter_next (&iter)) {
-      if (!strcmp (bson_iter_key (&iter), "schemas")) {
-         if (!_mongoc_convert_document (
-               client,
-               &iter,
-               &mongoc_client_opts->clientSideEncryption.schemas,
-               error)) {
-            return false;
-         }
-      }
-      else if (!strcmp (bson_iter_key (&iter), "awsRegion")) {
-         if (!_mongoc_convert_utf8 (
-               client,
-               &iter,
-               &mongoc_client_opts->clientSideEncryption.awsRegion,
-               error)) {
-            return false;
-         }
-      }
-      else if (!strcmp (bson_iter_key (&iter), "awsSecretAccessKey")) {
-         if (!_mongoc_convert_utf8 (
-               client,
-               &iter,
-               &mongoc_client_opts->clientSideEncryption.awsSecretAccessKey,
-               error)) {
-            return false;
-         }
-      }
-      else if (!strcmp (bson_iter_key (&iter), "awsAccessKeyId")) {
-         if (!_mongoc_convert_utf8 (
-               client,
-               &iter,
-               &mongoc_client_opts->clientSideEncryption.awsAccessKeyId,
-               error)) {
-            return false;
-         }
-      }
-      else if (!strcmp (bson_iter_key (&iter), "mongocryptdURI")) {
-         if (!_mongoc_convert_utf8 (
-               client,
-               &iter,
-               &mongoc_client_opts->clientSideEncryption.mongocryptdURI,
-               error)) {
-            return false;
-         }
-      }
-      else if (!strcmp (bson_iter_key (&iter), "useRemoteSchemas")) {
-         if (!_mongoc_convert_bool (
-               client,
-               &iter,
-               &mongoc_client_opts->clientSideEncryption.useRemoteSchemas,
-               error)) {
-            return false;
-         }
-      }
-      else {
-         /* unrecognized values are copied to "extra" */
-         if (!BSON_APPEND_VALUE (
-               &mongoc_client_opts->extra,
-               bson_iter_key (&iter),
-               bson_iter_value (&iter))) {
-            bson_set_error (error,
-                            MONGOC_ERROR_BSON,
-                            MONGOC_ERROR_BSON_INVALID,
-                            "Invalid 'opts' parameter.");
-            return false;
-         }
-      }
-   }
-
-   return true;
-}
-
-void
-_mongoc_client_opts_cleanup (mongoc_client_opts_t *mongoc_client_opts)
-{
-   bson_destroy (&mongoc_client_opts->clientSideEncryption.schemas);
-   bson_destroy (&mongoc_client_opts->extra);
 }

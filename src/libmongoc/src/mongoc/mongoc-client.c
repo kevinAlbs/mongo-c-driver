@@ -38,7 +38,6 @@
 #include "mongoc/mongoc-client-private.h"
 #include "mongoc/mongoc-collection-private.h"
 #include "mongoc/mongoc-counters-private.h"
-#include "mongoc/mongoc-crypt-private.h"
 #include "mongoc/mongoc-database-private.h"
 #include "mongoc/mongoc-gridfs-private.h"
 #include "mongoc/mongoc-error.h"
@@ -998,7 +997,6 @@ _mongoc_client_new_from_uri (mongoc_topology_t *topology)
    const mongoc_read_concern_t *read_concern;
    const mongoc_write_concern_t *write_concern;
    const char *appname;
-   bool encryption_enabled;
 
    BSON_ASSERT (topology);
 
@@ -1049,17 +1047,6 @@ _mongoc_client_new_from_uri (mongoc_topology_t *topology)
 #endif
 
    mongoc_counter_clients_active_inc ();
-
-   encryption_enabled =
-      mongoc_uri_get_option_as_bool (client->uri, "encryption", false);
-   if (encryption_enabled) {
-      bson_error_t error;
-      if (!mongoc_client_crypt_init (client, &error)) {
-         MONGOC_ERROR ("Could not enable encryption: %s", error.message);
-         mongoc_client_destroy (client);
-         return NULL;
-      }
-   }
 
    return client;
 }

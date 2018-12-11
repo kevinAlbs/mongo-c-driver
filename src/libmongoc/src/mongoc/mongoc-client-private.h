@@ -65,7 +65,7 @@ BSON_BEGIN_DECLS
 #define WIRE_VERSION_RETRY_WRITES 6
 
 struct _mongoc_crypt_t;
-struct _mongoc_client_opts_t;
+struct _mongoc_client_side_encryption_opts_t;
 
 struct _mongoc_client_t {
    mongoc_uri_t *uri;
@@ -97,7 +97,7 @@ struct _mongoc_client_t {
    unsigned int csid_rand_seed;
 
    struct _mongoc_crypt_t *encryption;
-   struct _mongoc_client_opts_t opts;
+   struct _mongoc_client_side_encryption_opts_t encryption_opts;
 };
 
 

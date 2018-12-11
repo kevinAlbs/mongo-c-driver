@@ -7,12 +7,14 @@ $ mongo ./build/setup-crypt-example.js
 ```
 This creates a simple key vault with some example keys and a collection named test.crypt, that has a JSONSchema with an encrypted 'ssn' field.
 
-Then, start the mockupcryptd process.
+Start the mockupcryptd process. See [installation instructions here](https://github.com/mongodb-labs/mockupcryptd).
 ```
-$ ./build/start-mongocryptd.sh
+$ mockupcryptd
+Listening with domain socket /tmp/mongocryptd.sock
+URI is mongodb://%2Ftmp%2Fmongocryptd.sock
 ```
 
-(TODO) Then, test out encryption!
+(TODO) Test out encryption!
 ```
 $ mkdir cmake-build && cd cmake-build
 $ cmake -DENABLE_SSL=OPENSSL -DENABLE_CRYPT_TRACING=ON ../

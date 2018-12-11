@@ -48,10 +48,14 @@ test_encryption_with_schema (void)
    bson_error_t error;
    bson_json_reader_t *reader;
    bson_t schemas = BSON_INITIALIZER;
-   bson_t opts = BSON_INITIALIZER;
+   bson_t client_opts = BSON_INITIALIZER;
+   bson_t encryption_opts;
    mongoc_uri_t *uri;
    mongoc_client_t *client;
+   mongoc_collection_t* coll;
    int status;
+   bson_t encrypted;
+   bool ret;
 
    reader = bson_json_reader_new_from_file ("./build/example.schemas", &error);
    ASSERT_OR_PRINT (reader, error);
@@ -59,23 +63,27 @@ test_encryption_with_schema (void)
    status = bson_json_reader_read (reader, &schemas, &error);
    ASSERT_OR_PRINT (status == 1, error);
 
-   BSON_APPEND_DOCUMENT (&opts, "schemas", &schemas);
+   BSON_APPEND_DOCUMENT_BEGIN(&client_opts, "clientSideEncryption", &encryption_opts);
+   BSON_APPEND_DOCUMENT (&encryption_opts, "schemas", &schemas);
+   bson_append_document_end (&client_opts, &encryption_opts);
    uri = mongoc_uri_new_with_error ("mongodb://localhost:27017/", &error);
    ASSERT_OR_PRINT (uri, error);
 
-   client = mongoc_client_new_with_opts (uri, &opts, &error);
+   client = mongoc_client_new_with_opts (uri, &client_opts, &error);
    ASSERT_OR_PRINT (client, error);
 
-   do {
-      bson_t schema_returned;
-      BSON_ASSERT (
-         _mongoc_client_get_schema (client, "test.crypt", &schema_returned));
-      printf ("schema is: %s\n", bson_as_json (&schema_returned, NULL));
+   coll = mongoc_client_get_collection(client, "test", "crypt");
+   ret = mongoc_crypt_encrypt (
+      coll,
+      tmp_bson ("{'name': 'Todd Davis', 'ssn': '457-55-5642'}"),
+      &encrypted,
+      &error);
 
-   } while (0);
+   ASSERT_OR_PRINT (ret, error);
 
    bson_destroy (&schemas);
-   bson_destroy (&opts);
+   bson_destroy (&client_opts);
+   mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
    mongoc_uri_destroy (uri);
    bson_json_reader_destroy (reader);

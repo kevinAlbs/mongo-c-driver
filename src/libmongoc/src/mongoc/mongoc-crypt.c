@@ -18,6 +18,7 @@
 #include "mongoc/mongoc-crypt-private.h"
 #include "mongoc/mongoc-error.h"
 #include "mongoc/mongoc-client-private.h"
+#include "mongoc/mongoc-collection-private.h"
 #include "mongoc/mongoc-opts-private.h"
 
 #include <openssl/evp.h>
@@ -55,7 +56,7 @@ _spawn_mongocryptd (void)
 
 
 bool
-mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *error)
+_mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *error)
 {
    /* store AWS credentials, init structures in client, store schema
     * somewhere. */
@@ -70,21 +71,6 @@ mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *error)
    }
    client->encryption->mongocrypt_client = mongocrypt_client;
    return true;
-}
-
-
-static void
-_make_marking_cmd (const bson_t *data, bson_t *cmd)
-{
-   bson_t child;
-
-   bson_init (cmd);
-   BSON_APPEND_INT64 (cmd, "markFields", 1);
-   BSON_APPEND_ARRAY_BEGIN (cmd, "data", &child);
-   BSON_APPEND_DOCUMENT (&child, "0", data);
-   bson_append_array_end (cmd, &child);
-   BSON_APPEND_DOCUMENT_BEGIN (cmd, "schema", &child);
-   bson_append_document_end (cmd, &child);
 }
 
 //#ifdef MONGOC_ENABLE_SSL_OPENSSL
@@ -492,25 +478,41 @@ _replace_markings (const bson_t *reply, bson_t *out, bson_error_t *error)
    return true;
 }
 
+static void
+_make_marking_cmd (const bson_t *data, const bson_t* schema, bson_t *cmd)
+{
+   bson_t child;
+
+   bson_init (cmd);
+   BSON_APPEND_INT64 (cmd, "markFields", 1);
+   BSON_APPEND_ARRAY_BEGIN (cmd, "data", &child);
+   BSON_APPEND_DOCUMENT (&child, "0", data);
+   bson_append_array_end (cmd, &child);
+   BSON_APPEND_DOCUMENT (cmd, "schema", schema);
+}
 
 bool
-mongoc_crypt_encrypt (mongoc_client_t *client,
+mongoc_crypt_encrypt (mongoc_collection_t *coll,
                       const bson_t *data,
                       bson_t *out,
                       bson_error_t *error)
 {
-   bson_t cmd, reply;
-
+   mongoc_client_t* client;
+   bson_t cmd, schema, reply;
    bool ret;
-   ret = false;
 
+   ret = false;
+   client = coll->client;
    bson_init (out);
 
-   if (!client->encryption) {
-      return true;
+   /* TODO: maybe this function shouldn't check if encryption is necessary? */
+   if (!_mongoc_client_get_schema (client, coll->ns, &schema)) {
+      /* collection does not have encrypted fields. */
+      goto cleanup;
    }
 
-   _make_marking_cmd (data, &cmd);
+   _make_marking_cmd (data, &schema, &cmd);
+   bson_destroy (&schema);
    if (!mongoc_client_command_simple (client->encryption->mongocrypt_client,
                                       "admin",
                                       &cmd,
@@ -554,8 +556,9 @@ mongoc_crypt_decrypt (mongoc_client_t *client,
    return true;
 }
 
+
 /*
- * Returns NULL if the collection has no known encrypted fields.
+ * Returns false if the collection has no known encrypted fields.
  * Initializes schema regardless.
  */
 bool
@@ -565,7 +568,7 @@ _mongoc_client_get_schema (mongoc_client_t *client,
 {
    /* TODO: do remote fetching and use JSONSchema cache. */
    bson_iter_t array_iter;
-   bson_iter_init (&array_iter, &client->opts.clientSideEncryption.schemas);
+   bson_iter_init (&array_iter, &client->encryption_opts.schemas);
    const uint8_t *data;
    uint32_t len;
 
@@ -594,20 +597,47 @@ _mongoc_client_get_schema (mongoc_client_t *client,
    return false;
 }
 
+
 mongoc_client_t *
 mongoc_client_new_with_opts (mongoc_uri_t *uri,
                              bson_t *opts,
                              bson_error_t *error)
 {
    mongoc_client_t *client;
+   bson_iter_t iter;
 
    client = mongoc_client_new_from_uri (uri);
    if (!client)
       return NULL;
 
-   if (!_mongoc_client_opts_parse (NULL, opts, &client->opts, error)) {
-      _mongoc_client_opts_cleanup (&client->opts);
-      return NULL;
+
+   /* TODO: generate-opts.py only supports top-level options. I can't nest
+    * a Struct within a Struct in generate-opts.py and have it validate
+    * recursively. Consider changing. */
+   if (opts && bson_iter_init_find (&iter, opts, "clientSideEncryption")) {
+      const uint8_t* data;
+      uint32_t len;
+      bson_t nested_opts;
+
+      if (!BSON_ITER_HOLDS_DOCUMENT (&iter)) {
+         bson_set_error (error,
+                         MONGOC_ERROR_BSON,
+                         MONGOC_ERROR_BSON_INVALID,
+                         "clientSideEncryption must be a document.");
+      }
+      if (!_mongoc_client_crypt_init (client, error)) {
+         mongoc_client_destroy (client);
+         return NULL;
+      }
+
+      bson_iter_document (&iter, &len, &data);
+      bson_init_static(&nested_opts, data, len);
+
+      if (!_mongoc_client_side_encryption_opts_parse (NULL, &nested_opts, &client->encryption_opts, error)) {
+         _mongoc_client_side_encryption_opts_cleanup (&client->encryption_opts);
+         return NULL;
+      }
    }
+
    return client;
 }

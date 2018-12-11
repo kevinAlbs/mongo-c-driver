@@ -25,7 +25,7 @@
 bool
 mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *err);
 bool
-mongoc_crypt_encrypt (mongoc_client_t *client,
+mongoc_crypt_encrypt (mongoc_collection_t* coll,
                       const bson_t *data,
                       bson_t *out,
                       bson_error_t *error);
