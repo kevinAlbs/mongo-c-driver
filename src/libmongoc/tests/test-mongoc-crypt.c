@@ -81,6 +81,10 @@ test_encryption_with_schema (void)
 
    ASSERT_OR_PRINT (ret, error);
 
+   printf("encrypted data=%s\n", bson_as_json(&encrypted, NULL));
+
+   printf("error=%s\n", error.message);
+
    bson_destroy (&schemas);
    bson_destroy (&client_opts);
    mongoc_collection_destroy (coll);

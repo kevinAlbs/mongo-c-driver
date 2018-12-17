@@ -89,6 +89,12 @@ _openssl_encrypt (const uint8_t *iv,
    int r;
    uint8_t *encrypted = NULL;
    int block_size, bytes_written, encrypted_len = 0;
+   int i;
+
+   printf("key:");
+   for (i = 0; i < 32; i++) printf("%02x \n", key[i]);
+   printf("iv:");
+   for (i = 0; i < 16; i++) printf("%02x \n", iv[i]);
 
    EVP_CIPHER_CTX_init (&ctx);
    cipher = EVP_aes_256_cbc_hmac_sha256 ();
@@ -109,6 +115,10 @@ _openssl_encrypt (const uint8_t *iv,
    encrypted = bson_malloc0 (data_len + (block_size - 1) + block_size);
    r = EVP_EncryptUpdate (&ctx, encrypted, &bytes_written, data, data_len);
    if (!r) {
+      unsigned long err = ERR_get_error();
+      char buf[123];
+      printf("err=%ld\n", err);
+      //printf("Error=%s\n", ERR_error_string(err, buf));
       SET_CRYPT_ERR ("failed to encrypt");
       goto cleanup;
    }
@@ -189,20 +199,66 @@ cleanup:
 }
 //#endif
 
-uint8_t *
-get_key (const char *key_id)
+/* iter can either point to a UUID or a string */
+bool
+_get_key (mongoc_client_t* client, bson_iter_t* iter, const uint8_t** key_id, uint32_t* key_id_len, const uint8_t** key)
 {
-   uint8_t *phony = bson_malloc0 (32);
-   int i;
+   mongoc_collection_t* datakey_coll;
+   mongoc_cursor_t* cursor;
+   bson_t filter;
+   const bson_t* doc;
+   bson_subtype_t subtype;
+   bool ret = false;
 
-   /* TODO: implement. verify length */
-   for (i = 0; i < 32; i++)
-      phony[i] = (uint8_t) i;
-   return phony;
+   datakey_coll = mongoc_client_get_collection (client, "admin", "datakeys");
+   bson_init(&filter);
+   if (BSON_ITER_HOLDS_BINARY (iter)) {
+      /* pymongo decodes a UUID then re-encodes it as a UUID legacy (3) */
+//      bson_iter_binary (iter, &subtype, key_id_len, key_id);
+//      bson_append_binary (&filter, "_id", 3, BSON_SUBTYPE_UUID, *key_id, *key_id_len);
+         bson_append_iter (&filter, "_id", 3, iter);
+   } else if (BSON_ITER_HOLDS_UTF8 (iter)) {
+      bson_append_iter (&filter, "keyAltName", 10, iter);
+   } else {
+      /* TODO: error. */
+   }
+
+   printf("trying to find key with filter: %s\n", bson_as_json(&filter, NULL));
+   cursor = mongoc_collection_find_with_opts (datakey_coll, &filter, NULL, NULL);
+   bson_destroy(&filter);
+   if (mongoc_cursor_next (cursor, &doc)) {
+      bson_iter_t key_iter;
+
+      printf("got key: %s\n", bson_as_json(doc, NULL));
+
+      if (bson_iter_init_find (&key_iter, doc, "_id") && BSON_ITER_HOLDS_BINARY (&key_iter)) {
+         bson_iter_binary (&key_iter, &subtype, key_id_len, key_id);
+      } else {
+         /* TODO: error. */
+      }
+
+      if (bson_iter_init_find (&key_iter, doc, "keyMaterial") && BSON_ITER_HOLDS_BINARY (&key_iter)) {
+         uint32_t key_len;
+
+         bson_iter_binary (&key_iter, &subtype, &key_len, key);
+         if (key_len != 32) {
+            /* TODO: error */
+            fprintf(stderr, "keylength is not 32\n");
+         }
+         ret = true;
+      } else {
+         /* TODO: error. */
+      }
+   } else {
+      /* TODO: error. */
+   }
+   mongoc_cursor_destroy (cursor);
+   return ret;
 }
 
 static bool
-_append_encrypted (const uint8_t *data,
+_append_encrypted (mongoc_client_t* client,
+                   const uint8_t *data,
                    uint32_t data_len,
                    bson_t *out,
                    const char *field,
@@ -212,15 +268,15 @@ _append_encrypted (const uint8_t *data,
    bson_t *marking;
    bson_iter_t marking_iter;
    bool ret = false;
-   /* will hold { 'k': <key id>, 'iv': <iv>, 'e': <encrypted data> } */
+   /* will hold { 'k': <key id>, 'i': <iv>, 'e': <encrypted data> } */
    bson_t encrypted_w_metadata = BSON_INITIALIZER;
    /* will hold { 'e': <encrypted data> } */
    bson_t to_encrypt = BSON_INITIALIZER;
-   uint8_t *encrypted;
+   uint8_t *encrypted = NULL;
    uint32_t encrypted_len;
-   const char *key_id;
+   const uint8_t *key_id;
    uint32_t key_id_len;
-   uint8_t *key = NULL;
+   const uint8_t *key = NULL;
    const uint8_t *iv = NULL;
    uint32_t iv_len;
 
@@ -229,19 +285,22 @@ _append_encrypted (const uint8_t *data,
    if (!bson_iter_init_find (&marking_iter, marking, "k")) {
       SET_CRYPT_ERR ("invalid marking, no 'k'");
       goto cleanup;
-   } else if (!BSON_ITER_HOLDS_UTF8 (&marking_iter)) {
+   } else if (!BSON_ITER_HOLDS_UTF8 (&marking_iter) && !BSON_ITER_HOLDS_BINARY(&marking_iter)) {
       SET_CRYPT_ERR ("invalid marking, no 'k' is not utf8");
       goto cleanup;
    }
-   key_id = bson_iter_utf8 (&marking_iter, &key_id_len);
-   key = get_key (key_id);
 
+   printf("getting key from iter\n");
+   if (!_get_key (client, &marking_iter, &key_id, &key_id_len, &key)) {
+      SET_CRYPT_ERR("could not get key\n");
+      goto cleanup;
+   }
 
-   if (!bson_iter_init_find (&marking_iter, marking, "iv")) {
-      SET_CRYPT_ERR ("invalid marking, no 'iv'");
+   if (!bson_iter_init_find (&marking_iter, marking, "i")) {
+      SET_CRYPT_ERR ("'i' not part of marking. C driver does not support generating iv yet. (TODO)");
       goto cleanup;
    } else if (!BSON_ITER_HOLDS_BINARY (&marking_iter)) {
-      SET_CRYPT_ERR ("invalid marking, 'iv' is not binary");
+      SET_CRYPT_ERR ("invalid marking, 'i' is not binary");
       goto cleanup;
    }
    bson_iter_binary (&marking_iter, NULL, &iv_len, &iv);
@@ -257,6 +316,8 @@ _append_encrypted (const uint8_t *data,
       bson_append_value (&to_encrypt, "v", 1, bson_iter_value (&marking_iter));
    }
 
+   /* TODO: 'a' and 'u' */
+
    if (!_openssl_encrypt (iv,
                           key,
                           bson_get_data (&to_encrypt),
@@ -268,7 +329,7 @@ _append_encrypted (const uint8_t *data,
    }
 
    /* append { 'k': <key id>, 'iv': <iv>, 'e': <encrypted { v: <val> } > } */
-   bson_append_utf8 (&encrypted_w_metadata, "k", 1, key_id, key_id_len);
+   bson_append_binary (&encrypted_w_metadata, "k", 1, BSON_SUBTYPE_UUID, key_id, key_id_len);
    bson_append_binary (
       &encrypted_w_metadata, "iv", 2, BSON_SUBTYPE_BINARY, iv, iv_len);
    bson_append_binary (&encrypted_w_metadata,
@@ -288,7 +349,6 @@ _append_encrypted (const uint8_t *data,
 
 cleanup:
    bson_destroy (marking);
-   bson_free (key);
    bson_destroy (&to_encrypt);
    bson_free (encrypted);
    bson_destroy (&encrypted_w_metadata);
@@ -296,7 +356,7 @@ cleanup:
 }
 
 static bool
-_append_decrypted (const uint8_t *data,
+_append_decrypted (mongoc_client_t* client, const uint8_t *data,
                    uint32_t data_len,
                    bson_t *out,
                    const char *field,
@@ -305,9 +365,9 @@ _append_decrypted (const uint8_t *data,
 {
    bson_t *encrypted_w_metadata;
    bson_iter_t iter;
-   const char *key_id;
+   const uint8_t *key_id;
    uint32_t key_id_len;
-   uint8_t *key = NULL;
+   const uint8_t *key = NULL;
    const uint8_t *iv = NULL;
    uint32_t iv_len;
    const uint8_t *encrypted;
@@ -326,8 +386,11 @@ _append_decrypted (const uint8_t *data,
       SET_CRYPT_ERR ("invalid encrypted data, no 'k' is not utf8");
       goto cleanup;
    }
-   key_id = bson_iter_utf8 (&iter, &key_id_len);
-   key = get_key (key_id);
+
+   if (!_get_key (client, &iter, &key_id, &key_id_len, &key)) {
+      SET_CRYPT_ERR ("could not get key");
+      goto cleanup;
+   }
 
    if (!bson_iter_init_find (&iter, encrypted_w_metadata, "iv")) {
       SET_CRYPT_ERR ("invalid encrypted data, no 'iv'");
@@ -384,7 +447,7 @@ typedef enum { MARKING_TO_ENCRYPTED, ENCRYPTED_TO_PLAIN } transform_t;
 
 /* TODO: document. */
 static bool
-_copy_and_transform (bson_iter_t iter,
+_copy_and_transform (mongoc_client_t* client, bson_iter_t iter,
                      bson_t *out,
                      bson_error_t *error,
                      transform_t transform)
@@ -398,14 +461,14 @@ _copy_and_transform (bson_iter_t iter,
          bson_iter_binary (&iter, &subtype, &data_len, &data);
          if (subtype == BSON_SUBTYPE_ENCRYPTED) {
             if (transform == MARKING_TO_ENCRYPTED) {
-               _append_encrypted (data,
+               _append_encrypted (client, data,
                                   data_len,
                                   out,
                                   bson_iter_key (&iter),
                                   bson_iter_key_len (&iter),
                                   error);
             } else {
-               _append_decrypted (data,
+               _append_decrypted (client, data,
                                   data_len,
                                   out,
                                   bson_iter_key (&iter),
@@ -425,7 +488,7 @@ _copy_and_transform (bson_iter_t iter,
          bson_iter_recurse (&iter, &child_iter);
          bson_append_array_begin (
             out, bson_iter_key (&iter), bson_iter_key_len (&iter), &child_out);
-         ret = _copy_and_transform (child_iter, &child_out, error, transform);
+         ret = _copy_and_transform (client, child_iter, &child_out, error, transform);
          bson_append_array_end (out, &child_out);
          if (!ret) {
             return false;
@@ -438,7 +501,7 @@ _copy_and_transform (bson_iter_t iter,
          bson_iter_recurse (&iter, &child_iter);
          bson_append_document_begin (
             out, bson_iter_key (&iter), bson_iter_key_len (&iter), &child_out);
-         ret = _copy_and_transform (child_iter, &child_out, error, transform);
+         ret = _copy_and_transform (client, child_iter, &child_out, error, transform);
          bson_append_document_end (out, &child_out);
          if (!ret) {
             return false;
@@ -455,7 +518,7 @@ _copy_and_transform (bson_iter_t iter,
 
 
 static bool
-_replace_markings (const bson_t *reply, bson_t *out, bson_error_t *error)
+_replace_markings (mongoc_client_t* client, const bson_t *reply, bson_t *out, bson_error_t *error)
 {
    bson_iter_t iter;
 
@@ -474,7 +537,7 @@ _replace_markings (const bson_t *reply, bson_t *out, bson_error_t *error)
    bson_iter_next (&iter);
    /* recurse into first document. */
    bson_iter_recurse (&iter, &iter);
-   _copy_and_transform (iter, out, error, MARKING_TO_ENCRYPTED);
+   _copy_and_transform (client, iter, out, error, MARKING_TO_ENCRYPTED);
    return true;
 }
 
@@ -522,11 +585,11 @@ mongoc_crypt_encrypt (mongoc_collection_t *coll,
       goto cleanup;
    }
 
-   printf ("sent %s, got %s\n",
+   printf ("sent %s\ngot %s\n",
            bson_as_json (&cmd, NULL),
            bson_as_json (&reply, NULL));
 
-   if (!_replace_markings (&reply, out, error)) {
+   if (!_replace_markings (client, &reply, out, error)) {
       goto cleanup;
    }
 
@@ -550,7 +613,7 @@ mongoc_crypt_decrypt (mongoc_client_t *client,
       return true;
    }
    bson_init (out);
-   if (!_copy_and_transform (iter, out, error, ENCRYPTED_TO_PLAIN)) {
+   if (!_copy_and_transform (client, iter, out, error, ENCRYPTED_TO_PLAIN)) {
       return false;
    }
    return true;

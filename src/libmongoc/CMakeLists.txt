@@ -539,6 +539,7 @@ if (NOT ENABLE_SSL STREQUAL OFF)
          ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-openssl.c
       )
       set (SSL_LIBRARIES ${OPENSSL_LIBRARIES})
+      message("OpenSSL include dir=${OPENSSL_INCLUDE_DIR}")
       include_directories (${OPENSSL_INCLUDE_DIR})
       if (WIN32)
          set (SSL_LIBRARIES ${SSL_LIBRARIES} crypt32.lib)

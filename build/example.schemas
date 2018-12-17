@@ -3,22 +3,27 @@
    "ns": "test.crypt",
    "schema": {
       "bsonType": "object",
-      "properties": [
-         {
+      "properties": {
             "ssn": {
                "encrypt": {
                   "type": "string",
-                  "algorithm": "Randomized",
+                  "algorithm": "Deterministic",
                   "keyId": {
                      "$binary": {
                         "base64": "1+niXaxyRL6AB6xRzUp/Ew==",
-                        "subType": "03"
+                        "subType": "04"
                      }
-                  }
+                  },
+                  "iv": {
+                     "$binary": {
+                        "base64": "YWFhYWFhYWFhYWFhYWFhYQ==",
+                        "subType": "00"
+                     }
+                  },
+                  "keyVaultURI": "mongodb://localhost:27017/admin"
                }
             }
-         }
-      ]
+      }
    }
 }
 ]
