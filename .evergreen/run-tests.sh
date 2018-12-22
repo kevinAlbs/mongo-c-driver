@@ -82,9 +82,9 @@ case "$OS" in
 
       if [ "$VALGRIND" = "on" ]; then
          . $DIR/valgrind.sh
-         run_valgrind ./src/libmongoc/test-libmongoc --no-fork -l /WriteConcern/* $TEST_ARGS
+         run_valgrind ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS
       else
-         ./src/libmongoc/test-libmongoc --no-fork -l /WriteConcern/* $TEST_ARGS
+         ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS
       fi
 
       ;;

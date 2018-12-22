@@ -522,11 +522,6 @@ test_write_concern_unacknowledged (void)
    bson_t reply;
    bson_t opts;
    const bson_t **docs;
-   uint8_t bytes[4] = { 0, 0, 0, 1 };
-   uint32_t* as_int = (uint32_t*) bytes;
-
-   printf("bytes is represented as: %" PRIu32 "\n", *as_int);
-
 
    client = test_framework_client_new ();
    wc = mongoc_write_concern_new ();
@@ -550,6 +545,7 @@ test_write_concern_unacknowledged (void)
    ASSERT_OR_PRINT (r, error);
    ASSERT_MATCH (&reply, "{'insertedCount': 2}");
 
+   bson_destroy (&reply);
    mongoc_collection_destroy (coll);
    mongoc_write_concern_destroy (wc);
    mongoc_client_destroy (client);
