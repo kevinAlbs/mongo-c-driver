@@ -510,6 +510,45 @@ test_write_concern_prohibited (void)
    _test_write_concern_wire_version (false);
 }
 
+/* Test that CDRIVER-2902 has been fixed. */
+static void
+test_write_concern_unacknowledged (void)
+{
+   mongoc_client_t *client;
+   mongoc_write_concern_t *wc;
+   mongoc_collection_t *coll;
+   bson_error_t error;
+   bool r;
+   bson_t reply;
+   bson_t opts;
+   const bson_t **docs;
+
+   client = test_framework_client_new ();
+   wc = mongoc_write_concern_new ();
+   mongoc_write_concern_set_w (wc, MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
+   coll = mongoc_client_get_collection (client, "db", "coll");
+
+   bson_init (&opts);
+   mongoc_write_concern_append (wc, &opts);
+   r = mongoc_collection_insert_one (
+      coll, tmp_bson ("{}"), &opts, &reply, &error);
+   ASSERT_OR_PRINT (r, error);
+   ASSERT (bson_empty (&reply));
+   bson_reinit (&reply);
+   bson_destroy (&opts);
+
+   docs = bson_malloc0 (sizeof (bson_t *) * 2);
+   docs[0] = tmp_bson ("{}");
+   docs[1] = tmp_bson ("{}");
+   r = mongoc_collection_insert_many (coll, docs, 2, NULL, &reply, &error);
+   bson_free (docs);
+   ASSERT_OR_PRINT (r, error);
+   ASSERT_MATCH (&reply, "{'insertedCount': 2}");
+
+   mongoc_collection_destroy (coll);
+   mongoc_write_concern_destroy (wc);
+   mongoc_client_destroy (client);
+}
 
 void
 test_write_concern_install (TestSuite *suite)
@@ -536,4 +575,6 @@ test_write_concern_install (TestSuite *suite)
       suite, "/WriteConcern/allowed", test_write_concern_allowed);
    TestSuite_AddMockServerTest (
       suite, "/WriteConcern/prohibited", test_write_concern_prohibited);
+   TestSuite_AddLive (
+      suite, "/WriteConcern/unacknowledged", test_write_concern_unacknowledged);
 }
