@@ -522,6 +522,11 @@ test_write_concern_unacknowledged (void)
    bson_t reply;
    bson_t opts;
    const bson_t **docs;
+   uint8_t bytes[4] = { 0, 0, 0, 1 };
+   uint32_t* as_int = (uint32_t*) bytes;
+
+   printf("bytes is represented as: %" PRIu32 "\n", *as_int);
+
 
    client = test_framework_client_new ();
    wc = mongoc_write_concern_new ();
