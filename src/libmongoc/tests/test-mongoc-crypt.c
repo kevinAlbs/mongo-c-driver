@@ -24,27 +24,6 @@
 #include "openssl/evp.h"
 
 void
-test_encryption (void)
-{
-   mongoc_client_t *client;
-   mongoc_uri_t *uri;
-   bson_t encrypted;
-   bson_error_t error;
-
-   uri = test_framework_get_uri ();
-   mongoc_uri_set_option_as_bool (uri, "encryption", true);
-   client = mongoc_client_new_from_uri (uri);
-   if (!mongoc_crypt_encrypt (
-          client,
-          tmp_bson ("{'a': 1, 'encryptMe': 2, 'b': { 'encryptMe': 3 }}"),
-          &encrypted,
-          &error))
-      printf ("error: %s\n", error.message);
-   printf ("encrypted data: %s\n", bson_as_json (&encrypted, NULL));
-}
-
-
-void
 test_encryption_with_schema (void)
 {
    bson_error_t error;
@@ -56,7 +35,7 @@ test_encryption_with_schema (void)
    mongoc_client_t *client;
    mongoc_collection_t* coll;
    int status;
-   bson_t encrypted;
+   bson_t encrypted, decrypted;
    bool ret;
 
    reader = bson_json_reader_new_from_file ("./build/example.schemas", &error);
@@ -84,8 +63,13 @@ test_encryption_with_schema (void)
    ASSERT_OR_PRINT (ret, error);
 
    printf("encrypted data=%s\n", bson_as_json(&encrypted, NULL));
-
    printf("error=%s\n", error.message);
+
+   /* And now decrypt it back. */
+   ret = mongoc_crypt_decrypt (client, &encrypted, &decrypted, &error);
+   printf("decrypted data=%s\n", bson_as_json(&decrypted, NULL));
+
+   ASSERT_OR_PRINT (ret, error);
 
    bson_destroy (&schemas);
    bson_destroy (&client_opts);
@@ -93,6 +77,7 @@ test_encryption_with_schema (void)
    mongoc_client_destroy (client);
    mongoc_uri_destroy (uri);
    bson_json_reader_destroy (reader);
+   //getchar();
 }
 
 void
@@ -179,7 +164,6 @@ test_openssl (void)
 void
 test_crypt_install (TestSuite *suite)
 {
-   TestSuite_AddLive (suite, "/crypt", test_encryption);
    TestSuite_AddLive (suite, "/openssl", test_openssl);
-   TestSuite_AddLive (suite, "/crypt/with_schema", test_encryption_with_schema);
+   TestSuite_AddLive (suite, "/crypt", test_encryption_with_schema);
 }

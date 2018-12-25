@@ -378,12 +378,13 @@ _append_decrypted (mongoc_client_t* client, const uint8_t *data,
    bool ret = false;
 
    encrypted_w_metadata = bson_new_from_data (data, data_len);
+   printf("decrypting value for field: %s\n", bson_as_json(encrypted_w_metadata, NULL));
 
    if (!bson_iter_init_find (&iter, encrypted_w_metadata, "k")) {
       SET_CRYPT_ERR ("invalid encrypted data, no 'k'");
       goto cleanup;
-   } else if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
-      SET_CRYPT_ERR ("invalid encrypted data, no 'k' is not utf8");
+   } else if (!BSON_ITER_HOLDS_BINARY (&iter)) {
+      SET_CRYPT_ERR ("invalid encrypted data, no 'k' is not binary");
       goto cleanup;
    }
 
@@ -409,9 +410,9 @@ _append_decrypted (mongoc_client_t* client, const uint8_t *data,
       goto cleanup;
    }
    bson_iter_binary (&iter, &subtype, &encrypted_len, &encrypted);
-   if (subtype != BSON_SUBTYPE_ENCRYPTED) {
+   if (subtype != BSON_SUBTYPE_BINARY) {
       SET_CRYPT_ERR (
-         "invalid encrypted data, 'e' does not contain encrypted binary");
+         "invalid encrypted data, 'e' does not contain binary");
       goto cleanup;
    }
 
@@ -422,6 +423,7 @@ _append_decrypted (mongoc_client_t* client, const uint8_t *data,
                           &decrypted,
                           &decrypted_len,
                           error)) {
+      printf("failed to decrypt\n");
       goto cleanup;
    } else {
       bson_t *wrapped; /* { 'v': <the value> } */
@@ -461,19 +463,19 @@ _copy_and_transform (mongoc_client_t* client, bson_iter_t iter,
          bson_iter_binary (&iter, &subtype, &data_len, &data);
          if (subtype == BSON_SUBTYPE_ENCRYPTED) {
             if (transform == MARKING_TO_ENCRYPTED) {
-               _append_encrypted (client, data,
+               if (!_append_encrypted (client, data,
                                   data_len,
                                   out,
                                   bson_iter_key (&iter),
                                   bson_iter_key_len (&iter),
-                                  error);
+                                  error)) return false;
             } else {
-               _append_decrypted (client, data,
+               if (!_append_decrypted (client, data,
                                   data_len,
                                   out,
                                   bson_iter_key (&iter),
                                   bson_iter_key_len (&iter),
-                                  error);
+                                  error)) return false;
             }
             continue;
          }
@@ -607,7 +609,9 @@ mongoc_crypt_decrypt (mongoc_client_t *client,
                       bson_error_t *error)
 {
    bson_iter_t iter;
+
    bson_iter_init (&iter, data);
+   bson_init (out);
 
    if (!client->encryption) {
       return true;

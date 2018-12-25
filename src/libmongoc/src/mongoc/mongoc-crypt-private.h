@@ -24,8 +24,15 @@
 
 bool
 mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *err);
+/* TODO: change to take a handle + schema */
 bool
 mongoc_crypt_encrypt (mongoc_collection_t* coll,
+                      const bson_t *data,
+                      bson_t *out,
+                      bson_error_t *error);
+
+bool
+mongoc_crypt_decrypt (mongoc_client_t *client,
                       const bson_t *data,
                       bson_t *out,
                       bson_error_t *error);
