@@ -21,7 +21,7 @@
 #include "mongoc/mongoc-collection-private.h"
 #include "mongoc/mongoc-opts-private.h"
 
-#include <openssl/evp.h>
+#include "openssl/evp.h"
 
 typedef struct _mongoc_crypt_t {
    mongoc_client_t *mongocrypt_client;

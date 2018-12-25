@@ -21,6 +21,8 @@
 #include "test-libmongoc.h"
 #include "mongoc/mongoc-crypt-private.h"
 
+#include "openssl/evp.h"
+
 void
 test_encryption (void)
 {
@@ -92,9 +94,6 @@ test_encryption_with_schema (void)
    mongoc_uri_destroy (uri);
    bson_json_reader_destroy (reader);
 }
-
-
-#include <openssl/evp.h>
 
 void
 test_openssl (void)
