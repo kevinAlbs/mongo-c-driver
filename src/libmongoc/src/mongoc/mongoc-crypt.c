@@ -296,11 +296,11 @@ _append_encrypted (mongoc_client_t* client,
       goto cleanup;
    }
 
-   if (!bson_iter_init_find (&marking_iter, marking, "i")) {
-      SET_CRYPT_ERR ("'i' not part of marking. C driver does not support generating iv yet. (TODO)");
+   if (!bson_iter_init_find (&marking_iter, marking, "iv")) {
+      SET_CRYPT_ERR ("'iv' not part of marking. C driver does not support generating iv yet. (TODO)");
       goto cleanup;
    } else if (!BSON_ITER_HOLDS_BINARY (&marking_iter)) {
-      SET_CRYPT_ERR ("invalid marking, 'i' is not binary");
+      SET_CRYPT_ERR ("invalid marking, 'iv' is not binary");
       goto cleanup;
    }
    bson_iter_binary (&marking_iter, NULL, &iv_len, &iv);

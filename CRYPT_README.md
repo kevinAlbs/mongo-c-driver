@@ -37,18 +37,22 @@ The current encryption is simplified to take one document at a time.
 The "marking" is a BSON encoding of the document
 ```
 { 
-  "k": <utf8>, /* key id */
+  "v": <BSON value>,
+  "k": <UUID|utf8>, /* key id */
   "iv": <binary>,
-  "v": <bson value>
+  "a": <utf8>,
+  "u": <utf8>
 }
 ```
 
 Documents are encrypted with unencrypted metadata and an encrypted value e
 ```
 {
-  "k": <utf8>, /* key id */
+  "e": <binary subtype 0, representing encryption of { "v": <value> }>,
+  "k": <UUID>, /* key id */
   "iv": <binary>,
-  "e": <binary subtype 0, representing encryption of { "v": <value> }>
+  "a": <utf8>,
+  "u": <utf8>
 }
 ```
 
