@@ -28,6 +28,10 @@
    bson_set_error (        \
       error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_NOT_READY, __VA_ARGS__)
 
+typedef struct _mongoc_crypt_t {
+   mongoc_client_t *mongocrypt_client;
+} mongoc_crypt_t;
+
 /* It's annoying passing around multiple values for bson binary values. */
 typedef struct {
    const uint8_t *data;

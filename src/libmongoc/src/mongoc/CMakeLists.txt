@@ -20,7 +20,6 @@ set (src_libmongoc_src_mongoc_DIST_hs
    mongoc-client.h
    mongoc-client-pool.h
    mongoc-collection.h
-   mongoc-crypt.c
    mongoc-cursor.h
    mongoc-database.h
    mongoc-error.h
@@ -177,6 +176,7 @@ set (src_libmongoc_src_mongoc_DIST_cs
    mongoc-compression.c
    mongoc-counters.c
    mongoc-crypt.c
+   mongoc-crypt-parsing.c
    mongoc-cursor.c
    mongoc-cursor-legacy.c
    mongoc-cursor-array.c

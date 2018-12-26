@@ -17,15 +17,30 @@
 #include "mongoc/mongoc.h"
 #include "mongoc/mongoc-crypt-private.h"
 
-void mongoc_crypt_bson_iter_binary(bson_iter_t* iter, mongoc_crypt_binary_t* out) {
-   bson_iter_binary(iter, &out->subtype, &out->len, &out->data);
-}
-void mongoc_crypt_bson_append_binary(bson_t* bson, const char* key, uint32_t key_len, mongoc_crypt_binary_t* in) {
-    bson_append_binary(bson, key, key_len, in->subtype, in->data, in->len);
+/* TODO: actually make this code consistent. */
+void
+mongoc_crypt_bson_iter_binary (bson_iter_t *iter, mongoc_crypt_binary_t *out)
+{
+   bson_iter_binary (iter, &out->subtype, &out->len, &out->data);
 }
 
+
+void
+mongoc_crypt_bson_append_binary (bson_t *bson,
+                                 const char *key,
+                                 uint32_t key_len,
+                                 mongoc_crypt_binary_t *in)
+{
+   bson_append_binary (bson, key, key_len, in->subtype, in->data, in->len);
+}
+
+
 /* out should be zeroed */
-bool _mongoc_crypt_marking_parse (const bson_t* bson, mongoc_crypt_marking_t* out, bson_error_t* error) {
+bool
+_mongoc_crypt_marking_parse (const bson_t *bson,
+                             mongoc_crypt_marking_t *out,
+                             bson_error_t *error)
+{
    bson_iter_t iter;
    bool ret = false;
 
@@ -34,9 +49,9 @@ bool _mongoc_crypt_marking_parse (const bson_t* bson, mongoc_crypt_marking_t* ou
       goto cleanup;
    } else if (BSON_ITER_HOLDS_UTF8 (&iter)) {
       out->key_alt_name = bson_iter_utf8 (&iter, NULL);
-   } else if (!BSON_ITER_HOLDS_BINARY(&iter)) {
+   } else if (BSON_ITER_HOLDS_BINARY (&iter)) {
       mongoc_crypt_bson_iter_binary (&iter, &out->key_id);
-      if (out->key_id->subtype != BSON_SUBTYPE_UUID) {
+      if (out->key_id.subtype != BSON_SUBTYPE_UUID) {
          SET_CRYPT_ERR ("key id must be a UUID");
          goto cleanup;
       }
@@ -46,7 +61,8 @@ bool _mongoc_crypt_marking_parse (const bson_t* bson, mongoc_crypt_marking_t* ou
    }
 
    if (!bson_iter_init_find (&iter, bson, "iv")) {
-      SET_CRYPT_ERR ("'iv' not part of marking. C driver does not support generating iv yet. (TODO)");
+      SET_CRYPT_ERR ("'iv' not part of marking. C driver does not support "
+                     "generating iv yet. (TODO)");
       goto cleanup;
    } else if (!BSON_ITER_HOLDS_BINARY (&iter)) {
       SET_CRYPT_ERR ("invalid marking, 'iv' is not binary");
@@ -54,7 +70,7 @@ bool _mongoc_crypt_marking_parse (const bson_t* bson, mongoc_crypt_marking_t* ou
    }
    mongoc_crypt_bson_iter_binary (&iter, &out->iv);
 
-   if (out->iv->len != 16) {
+   if (out->iv.len != 16) {
       SET_CRYPT_ERR ("iv must be 16 bytes");
       goto cleanup;
    }
@@ -73,16 +89,21 @@ cleanup:
    return ret;
 }
 
-bool _mongoc_crypt_encrypted_parse (const bson_t* bson, mongoc_crypt_encrypted_t* out, bson_error_t* error) {
-       bson_iter_t iter;
+
+bool
+_mongoc_crypt_encrypted_parse (const bson_t *bson,
+                               mongoc_crypt_encrypted_t *out,
+                               bson_error_t *error)
+{
+   bson_iter_t iter;
    bool ret = false;
 
    if (!bson_iter_init_find (&iter, bson, "k")) {
       SET_CRYPT_ERR ("invalid marking, no 'k'");
       goto cleanup;
-   } else if (!BSON_ITER_HOLDS_BINARY(&iter)) {
+   } else if (BSON_ITER_HOLDS_BINARY (&iter)) {
       mongoc_crypt_bson_iter_binary (&iter, &out->key_id);
-      if (out->key_id->subtype != BSON_SUBTYPE_UUID) {
+      if (out->key_id.subtype != BSON_SUBTYPE_UUID) {
          SET_CRYPT_ERR ("key id must be a UUID");
          goto cleanup;
       }
@@ -92,7 +113,8 @@ bool _mongoc_crypt_encrypted_parse (const bson_t* bson, mongoc_crypt_encrypted_t
    }
 
    if (!bson_iter_init_find (&iter, bson, "iv")) {
-      SET_CRYPT_ERR ("'iv' not part of marking. C driver does not support generating iv yet. (TODO)");
+      SET_CRYPT_ERR ("'iv' not part of marking. C driver does not support "
+                     "generating iv yet. (TODO)");
       goto cleanup;
    } else if (!BSON_ITER_HOLDS_BINARY (&iter)) {
       SET_CRYPT_ERR ("invalid marking, 'iv' is not binary");
@@ -100,7 +122,7 @@ bool _mongoc_crypt_encrypted_parse (const bson_t* bson, mongoc_crypt_encrypted_t
    }
    mongoc_crypt_bson_iter_binary (&iter, &out->iv);
 
-   if (out->iv->len != 16) {
+   if (out->iv.len != 16) {
       SET_CRYPT_ERR ("iv must be 16 bytes");
       goto cleanup;
    }
@@ -109,7 +131,7 @@ bool _mongoc_crypt_encrypted_parse (const bson_t* bson, mongoc_crypt_encrypted_t
       SET_CRYPT_ERR ("invalid marking, no 'e'");
       goto cleanup;
    } else {
-      mongoc_crypt_bson_iter_binary(&iter, &out->e);
+      mongoc_crypt_bson_iter_binary (&iter, &out->e);
    }
 
    ret = true;
@@ -117,16 +139,21 @@ cleanup:
    return ret;
 }
 
-bool _mongoc_crypt_key_parse (const bson_t* bson, mongoc_crypt_key_t* out, bson_error_t* error) {
-    bson_iter_t iter;
-    bool ret = false;
+
+bool
+_mongoc_crypt_key_parse (const bson_t *bson,
+                         mongoc_crypt_key_t *out,
+                         bson_error_t *error)
+{
+   bson_iter_t iter;
+   bool ret = false;
 
    if (!bson_iter_init_find (&iter, bson, "_id")) {
       SET_CRYPT_ERR ("invalid key, no '_id'");
       goto cleanup;
-   } else if (!BSON_ITER_HOLDS_BINARY(&iter)) {
+   } else if (BSON_ITER_HOLDS_BINARY (&iter)) {
       mongoc_crypt_bson_iter_binary (&iter, &out->id);
-      if (out->id->subtype != BSON_SUBTYPE_UUID) {
+      if (out->id.subtype != BSON_SUBTYPE_UUID) {
          SET_CRYPT_ERR ("key id must be a UUID");
          goto cleanup;
       }
@@ -138,14 +165,14 @@ bool _mongoc_crypt_key_parse (const bson_t* bson, mongoc_crypt_key_t* out, bson_
    if (!bson_iter_init_find (&iter, bson, "keyMaterial")) {
       SET_CRYPT_ERR ("invalid key, no 'keyMaterial'");
       goto cleanup;
-   } else if (!BSON_ITER_HOLDS_BINARY(&iter)) {
-      mongoc_crypt_bson_iter_binary (&iter, &out->id);
-      if (out->id->subtype != BSON_SUBTYPE_BINARY) {
-         SET_CRYPT_ERR ("key id must be a binary");
+   } else if (BSON_ITER_HOLDS_BINARY (&iter)) {
+      mongoc_crypt_bson_iter_binary (&iter, &out->key_material);
+      if (out->key_material.subtype != BSON_SUBTYPE_BINARY) {
+         SET_CRYPT_ERR ("key material must be a binary");
          goto cleanup;
       }
    } else {
-      SET_CRYPT_ERR ("invalid key, no 'k' is not binary");
+      SET_CRYPT_ERR ("invalid key material is not binary");
       goto cleanup;
    }
 
