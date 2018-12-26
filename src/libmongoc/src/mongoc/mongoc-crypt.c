@@ -242,15 +242,10 @@ cleanup:
 
 bool
 _mongoc_crypt_get_key_by_uuid (mongoc_client_t *client,
-                               bson_iter_t *iter,
                                mongoc_crypt_binary_t *key_id,
                                mongoc_crypt_key_t *out,
                                bson_error_t *error)
 {
-   if (!BSON_ITER_HOLDS_BINARY (iter)) {
-      SET_CRYPT_ERR ("Invalid key specification, must be UUID");
-      return false;
-   }
    return _mongoc_crypt_get_key (client, key_id, NULL, out, error);
 }
 
@@ -322,92 +317,48 @@ cleanup:
 
 static bool
 _append_decrypted (mongoc_client_t *client,
-                   const uint8_t *data,
-                   uint32_t data_len,
+                   mongoc_crypt_encrypted_t* encrypted,
                    bson_t *out,
                    const char *field,
                    uint32_t field_len,
                    bson_error_t *error)
 {
-   bson_t *encrypted_w_metadata;
    bson_iter_t iter;
-   const uint8_t *key_id;
-   uint32_t key_id_len;
-   const uint8_t *key = NULL;
-   const uint8_t *iv = NULL;
-   uint32_t iv_len;
-   const uint8_t *encrypted;
-   uint32_t encrypted_len;
-   uint8_t *decrypted = NULL;
-   uint32_t decrypted_len;
+   mongoc_crypt_binary_t key = {0};
+   mongoc_crypt_binary_t decrypted = {0};
    bson_subtype_t subtype;
    bool ret = false;
 
-   encrypted_w_metadata = bson_new_from_data (data, data_len);
-   printf ("decrypting value for field: %s\n",
-           bson_as_json (encrypted_w_metadata, NULL));
-
-   if (!bson_iter_init_find (&iter, encrypted_w_metadata, "k")) {
-      SET_CRYPT_ERR ("invalid encrypted data, no 'k'");
-      goto cleanup;
-   } else if (!BSON_ITER_HOLDS_BINARY (&iter)) {
-      SET_CRYPT_ERR ("invalid encrypted data, no 'k' is not binary");
-      goto cleanup;
+   if (!_mongoc_crypt_get_key_by_uuid (client, &encrypted->key_id, &key, error)) {
+      return ret;
    }
 
-   if (!_get_key (client, &iter, &key_id, &key_id_len, &key)) {
-      SET_CRYPT_ERR ("could not get key");
-      goto cleanup;
-   }
-
-   if (!bson_iter_init_find (&iter, encrypted_w_metadata, "iv")) {
-      SET_CRYPT_ERR ("invalid encrypted data, no 'iv'");
-      goto cleanup;
-   } else if (!BSON_ITER_HOLDS_BINARY (&iter)) {
-      SET_CRYPT_ERR ("invalid encrypted data, 'iv' is not binary");
-      goto cleanup;
-   }
-   bson_iter_binary (&iter, NULL, &iv_len, &iv);
-
-   if (!bson_iter_init_find (&iter, encrypted_w_metadata, "e")) {
-      SET_CRYPT_ERR ("invalid encrypted data, no 'e'");
-      goto cleanup;
-   } else if (!BSON_ITER_HOLDS_BINARY (&iter)) {
-      SET_CRYPT_ERR ("invalid encrypted data, 'e' does not contain binary");
-      goto cleanup;
-   }
-   bson_iter_binary (&iter, &subtype, &encrypted_len, &encrypted);
-   if (subtype != BSON_SUBTYPE_BINARY) {
-      SET_CRYPT_ERR ("invalid encrypted data, 'e' does not contain binary");
-      goto cleanup;
-   }
-
-   if (!_openssl_decrypt (iv,
-                          key,
-                          encrypted,
-                          encrypted_len,
-                          &decrypted,
-                          &decrypted_len,
+   if (!_openssl_decrypt (encrypted->iv.data,
+                          key.data,
+                          encrypted->e.data,
+                          encrypted->e.len,
+                          &decrypted.data,
+                          &decrypted.len,
                           error)) {
       printf ("failed to decrypt\n");
       goto cleanup;
    } else {
-      bson_t *wrapped; /* { 'v': <the value> } */
+      bson_t wrapped; /* { 'v': <the value> } */
       bson_iter_t wrapped_iter;
-      wrapped = bson_new_from_data (decrypted, decrypted_len);
-      if (!bson_iter_init_find (&wrapped_iter, wrapped, "v")) {
+      bson_init_static (&wrapped, &decrypted.data, &decrypted.len);
+      if (!bson_iter_init_find (&wrapped_iter, &wrapped, "v")) {
+         bson_destroy (&wrapped);
          SET_CRYPT_ERR ("invalid encrypted data, missing 'v' field");
          goto cleanup;
       }
       bson_append_value (
          out, field, field_len, bson_iter_value (&wrapped_iter));
+      bson_destroy (&wrapped);
    }
 
    ret = true;
 
 cleanup:
-   bson_destroy (encrypted_w_metadata);
-   bson_free (decrypted);
    return ret;
 }
 
@@ -423,29 +374,30 @@ _copy_and_transform (mongoc_client_t *client,
 {
    while (bson_iter_next (&iter)) {
       if (BSON_ITER_HOLDS_BINARY (&iter)) {
-         bson_subtype_t subtype;
-         uint32_t data_len;
-         const uint8_t *data;
-
-         bson_iter_binary (&iter, &subtype, &data_len, &data);
-         if (subtype == BSON_SUBTYPE_ENCRYPTED) {
+         mongoc_crypt_binary_t value;
+         bson_t as_bson;
+         mongoc_crypt_bson_iter_binary (&iter, &value);
+         bson_init_static (&as_bson, value.data, value.len);
+         if (value.subtype == BSON_SUBTYPE_ENCRYPTED) {
             if (transform == MARKING_TO_ENCRYPTED) {
                mongoc_crypt_marking_t marking = {0};
-               if (!_mongoc_crypt_marking_parse (
-                      client, &iter, &marking, error)) {
+               if (!_mongoc_crypt_marking_parse (&as_bson, &marking, error)) {
                   return false;
                }
                if (!_append_encrypted (client,
-                                       marking,
+                                       &marking,
                                        out,
                                        bson_iter_key (&iter),
                                        bson_iter_key_len (&iter),
                                        error))
                   return false;
             } else {
+               mongoc_crypt_encrypted_t encrypted = {0};
+               if (!_mongoc_crypt_encrypted_parse (&as_bson, &encrypted, error)) {
+                  return false;
+               }
                if (!_append_decrypted (client,
-                                       data,
-                                       data_len,
+                                       &encrypted,
                                        out,
                                        bson_iter_key (&iter),
                                        bson_iter_key_len (&iter),

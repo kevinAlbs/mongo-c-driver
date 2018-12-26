@@ -51,6 +51,7 @@ typedef struct {
    const char *key_alt_name;
 } mongoc_crypt_marking_t;
 
+/* consider renaming to encrypted_w_metadata? */
 typedef struct {
    mongoc_crypt_binary_t e;
    mongoc_crypt_binary_t iv;
