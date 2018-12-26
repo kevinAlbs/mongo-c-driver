@@ -21,12 +21,65 @@
 
 #include "bson/bson.h"
 #include "mongoc/mongoc-client.h"
+#include "mongoc/mongoc-error.h"
+
+/* TODO: use a new error code. */
+#define SET_CRYPT_ERR(...) \
+   bson_set_error (        \
+      error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_NOT_READY, __VA_ARGS__)
+
+/* It's annoying passing around multiple values for bson binary values. */
+typedef struct {
+   const uint8_t *data;
+   bson_subtype_t subtype;
+   uint32_t len;
+} mongoc_crypt_binary_t;
+
+void
+mongoc_crypt_bson_iter_binary (bson_iter_t *iter, mongoc_crypt_binary_t *out);
+void
+mongoc_crypt_bson_append_binary (bson_t *bson,
+                                 const char *key,
+                                 uint32_t key_len,
+                                 mongoc_crypt_binary_t *in);
+
+typedef struct {
+   const bson_value_t *v;
+   mongoc_crypt_binary_t iv;
+   /* one of the following is zeroed, and the other is set. */
+   mongoc_crypt_binary_t key_id;
+   const char *key_alt_name;
+} mongoc_crypt_marking_t;
+
+typedef struct {
+   mongoc_crypt_binary_t e;
+   mongoc_crypt_binary_t iv;
+   mongoc_crypt_binary_t key_id;
+} mongoc_crypt_encrypted_t;
+
+typedef struct {
+   mongoc_crypt_binary_t id;
+   mongoc_crypt_binary_t key_material;
+} mongoc_crypt_key_t;
+
+bool
+_mongoc_crypt_marking_parse (const bson_t *bson,
+                             mongoc_crypt_marking_t *out,
+                             bson_error_t *error);
+bool
+_mongoc_crypt_encrypted_parse (const bson_t *bson,
+                               mongoc_crypt_encrypted_t *out,
+                               bson_error_t *error);
+bool
+_mongoc_crypt_key_parse (const bson_t *bson,
+                         mongoc_crypt_key_t *out,
+                         bson_error_t *error);
 
 bool
 mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *err);
 /* TODO: change to take a handle + schema */
 bool
-mongoc_crypt_encrypt (mongoc_collection_t* coll,
+mongoc_crypt_encrypt (mongoc_collection_t *coll,
                       const bson_t *data,
                       bson_t *out,
                       bson_error_t *error);
