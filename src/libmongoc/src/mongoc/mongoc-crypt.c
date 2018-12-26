@@ -21,17 +21,33 @@
 #include "mongoc/mongoc-collection-private.h"
 #include "mongoc/mongoc-opts-private.h"
 
+
+const char *
+tmp_json (const bson_t *bson)
+{
+   static char storage[1024];
+   char *json;
+
+   memset (storage, 0, 1024);
+   json = bson_as_json (bson, NULL);
+   bson_snprintf (storage, sizeof (storage), "%s", json);
+   bson_free (json);
+   return (const char *) storage;
+}
+
 static void
 _spawn_mongocryptd (void)
 {
 /* oddly, starting mongocryptd in libmongoc starts multiple instances. */
 #ifdef SPAWN_BUG_FIXED
    pid_t pid = fork ();
-   printf ("initializing mongocryptd\n");
+
+   CRYPT_ENTRY;
+   CRYPT_TRACE ("spawning mongocryptd\n");
    if (pid == 0) {
       int ret;
       /* child */
-      printf ("child starting mongocryptd\n");
+      CRYPT_TRACE ("child starting mongocryptd\n");
       ret = execlp ("mongocryptd", "mongocryptd", (char *) NULL);
       if (ret == -1) {
          MONGOC_ERROR ("child process unable to exec mongocryptd");
@@ -41,17 +57,19 @@ _spawn_mongocryptd (void)
 #endif
 }
 
-mongoc_crypt_t*
+
+mongoc_crypt_t *
 _mongoc_crypt_new (mongoc_client_t *client, bson_error_t *error)
 {
    /* store AWS credentials, init structures in client, store schema
     * somewhere. */
-   mongoc_crypt_t* crypt;
+   mongoc_crypt_t *crypt;
 
+   CRYPT_ENTRY;
    _spawn_mongocryptd ();
    crypt = bson_malloc0 (sizeof (mongoc_crypt_t));
-
-   crypt->mongocryptd_client = mongoc_client_new ("mongodb://%2Ftmp%2Fmongocryptd.sock");
+   crypt->mongocryptd_client =
+      mongoc_client_new ("mongodb://%2Ftmp%2Fmongocryptd.sock");
    if (!crypt->mongocryptd_client) {
       SET_CRYPT_ERR ("Unable to create client to mongocryptd");
       return crypt;
@@ -66,9 +84,11 @@ _mongoc_crypt_new (mongoc_client_t *client, bson_error_t *error)
    return crypt;
 }
 
+
 void
 _mongoc_crypt_destroy (mongoc_crypt_t *crypt)
 {
+   CRYPT_ENTRY;
    if (!crypt) {
       return;
    }
@@ -77,16 +97,16 @@ _mongoc_crypt_destroy (mongoc_crypt_t *crypt)
    bson_free (crypt);
 }
 
+
 /*
  * _get_key
- * iter can either refer to a UUID or a string
 */
-bool
-_mongoc_crypt_get_key (mongoc_crypt_t *crypt,
-                       mongoc_crypt_binary_t *key_id,
-                       const char *key_alt_name,
-                       mongoc_crypt_key_t *out,
-                       bson_error_t *error)
+static bool
+_get_key (mongoc_crypt_t *crypt,
+          mongoc_crypt_binary_t *key_id,
+          const char *key_alt_name,
+          mongoc_crypt_key_t *out,
+          bson_error_t *error)
 {
    mongoc_collection_t *datakey_coll;
    mongoc_cursor_t *cursor;
@@ -94,6 +114,7 @@ _mongoc_crypt_get_key (mongoc_crypt_t *crypt,
    const bson_t *doc;
    bool ret = false;
 
+   CRYPT_ENTRY;
    datakey_coll = mongoc_client_get_collection (
       crypt->keyvault_client, "admin", "datakeys");
    bson_init (&filter);
@@ -108,8 +129,7 @@ _mongoc_crypt_get_key (mongoc_crypt_t *crypt,
       return ret;
    }
 
-   printf ("trying to find key with filter: %s\n",
-           bson_as_json (&filter, NULL));
+   CRYPT_TRACE ("finding key by filter: %s", tmp_json (&filter));
    cursor =
       mongoc_collection_find_with_opts (datakey_coll, &filter, NULL, NULL);
    bson_destroy (&filter);
@@ -119,10 +139,11 @@ _mongoc_crypt_get_key (mongoc_crypt_t *crypt,
       goto cleanup;
    }
 
-   printf ("got key: %s\n", bson_as_json (doc, NULL));
+   CRYPT_TRACE ("got key: %s\n", tmp_json (doc));
    if (!_mongoc_crypt_key_parse (doc, out, error)) {
       goto cleanup;
    }
+   CRYPT_TRACE ("parsed key");
 
    ret = true;
 
@@ -132,14 +153,16 @@ cleanup:
    return ret;
 }
 
-bool
-_mongoc_crypt_get_key_by_uuid (mongoc_crypt_t *crypt,
-                               mongoc_crypt_binary_t *key_id,
-                               mongoc_crypt_key_t *out,
-                               bson_error_t *error)
+static bool
+_get_key_by_uuid (mongoc_crypt_t *crypt,
+                  mongoc_crypt_binary_t *key_id,
+                  mongoc_crypt_key_t *out,
+                  bson_error_t *error)
 {
-   return _mongoc_crypt_get_key (crypt, key_id, NULL, out, error);
+   CRYPT_ENTRY;
+   return _get_key (crypt, key_id, NULL, out, error);
 }
+
 
 static bool
 _append_encrypted (mongoc_crypt_t *crypt,
@@ -158,15 +181,14 @@ _append_encrypted (mongoc_crypt_t *crypt,
    uint32_t encrypted_len;
    mongoc_crypt_key_t key = {0};
 
-   printf ("getting key from iter\n");
-   if (!_mongoc_crypt_get_key (
+   CRYPT_ENTRY;
+   if (!_get_key (
           crypt, &marking->key_id, marking->key_alt_name, &key, error)) {
       SET_CRYPT_ERR ("could not get key");
       goto cleanup;
    }
 
-   bson_append_value (&to_encrypt, "v", 1, marking->v);
-
+   bson_append_iter (&to_encrypt, "v", 1, &marking->v_iter);
    /* TODO: 'a' and 'u' */
 
    if (!_mongoc_crypt_do_encryption (marking->iv.data,
@@ -178,6 +200,8 @@ _append_encrypted (mongoc_crypt_t *crypt,
                                      error)) {
       goto cleanup;
    }
+
+   CRYPT_TRACE ("did encryption");
 
    /* append { 'k': <key id>, 'iv': <iv>, 'e': <encrypted { v: <val> } > } */
    mongoc_crypt_bson_append_binary (
@@ -206,6 +230,7 @@ cleanup:
    return ret;
 }
 
+
 static bool
 _append_decrypted (mongoc_crypt_t *crypt,
                    mongoc_crypt_encrypted_t *encrypted,
@@ -219,8 +244,8 @@ _append_decrypted (mongoc_crypt_t *crypt,
    uint32_t decrypted_len;
    bool ret = false;
 
-   if (!_mongoc_crypt_get_key_by_uuid (
-          crypt, &encrypted->key_id, &key, error)) {
+   CRYPT_ENTRY;
+   if (!_get_key_by_uuid (crypt, &encrypted->key_id, &key, error)) {
       return ret;
    }
 
@@ -231,7 +256,6 @@ _append_decrypted (mongoc_crypt_t *crypt,
                                      &decrypted,
                                      &decrypted_len,
                                      error)) {
-      printf ("failed to decrypt\n");
       goto cleanup;
    } else {
       bson_t wrapped; /* { 'v': <the value> } */
@@ -256,7 +280,6 @@ cleanup:
 
 typedef enum { MARKING_TO_ENCRYPTED, ENCRYPTED_TO_PLAIN } transform_t;
 
-/* TODO: document. */
 static bool
 _copy_and_transform (mongoc_crypt_t *crypt,
                      bson_iter_t iter,
@@ -264,6 +287,7 @@ _copy_and_transform (mongoc_crypt_t *crypt,
                      bson_error_t *error,
                      transform_t transform)
 {
+   CRYPT_ENTRY;
    while (bson_iter_next (&iter)) {
       if (BSON_ITER_HOLDS_BINARY (&iter)) {
          mongoc_crypt_binary_t value;
@@ -271,7 +295,7 @@ _copy_and_transform (mongoc_crypt_t *crypt,
 
          mongoc_crypt_bson_iter_binary (&iter, &value);
          bson_init_static (&as_bson, value.data, value.len);
-         printf ("binary as doc: %s\n", bson_as_json (&as_bson, NULL));
+         CRYPT_TRACE ("found FLE binary: %s", tmp_json (&as_bson));
          if (value.subtype == BSON_SUBTYPE_ENCRYPTED) {
             if (transform == MARKING_TO_ENCRYPTED) {
                mongoc_crypt_marking_t marking = {0};
@@ -353,6 +377,7 @@ _replace_markings (mongoc_crypt_t *crypt,
 {
    bson_iter_t iter;
 
+   CRYPT_ENTRY;
    BSON_ASSERT (bson_iter_init_find (&iter, reply, "ok"));
    if (!bson_iter_as_bool (&iter)) {
       SET_CRYPT_ERR ("markFields returned ok:0");
@@ -368,7 +393,9 @@ _replace_markings (mongoc_crypt_t *crypt,
    bson_iter_next (&iter);
    /* recurse into first document. */
    bson_iter_recurse (&iter, &iter);
-   _copy_and_transform (crypt, iter, out, error, MARKING_TO_ENCRYPTED);
+   if (!_copy_and_transform (crypt, iter, out, error, MARKING_TO_ENCRYPTED)) {
+      return false;
+   }
    return true;
 }
 
@@ -396,9 +423,9 @@ mongoc_crypt_encrypt (mongoc_crypt_t *crypt,
    bson_t cmd, reply;
    bool ret;
 
+   CRYPT_ENTRY;
    ret = false;
    bson_init (out);
-
    _make_marking_cmd (doc, schema, &cmd);
    if (!mongoc_client_command_simple (crypt->mongocryptd_client,
                                       "admin",
@@ -409,9 +436,8 @@ mongoc_crypt_encrypt (mongoc_crypt_t *crypt,
       goto cleanup;
    }
 
-   printf ("sent %s\ngot %s\n",
-           bson_as_json (&cmd, NULL),
-           bson_as_json (&reply, NULL));
+   CRYPT_TRACE ("sent marking cmd: %s", tmp_json (&cmd));
+   CRYPT_TRACE ("got back: %s", tmp_json (&reply));
 
    if (!_replace_markings (crypt, &reply, out, error)) {
       goto cleanup;
@@ -432,6 +458,7 @@ mongoc_crypt_decrypt (mongoc_crypt_t *crypt,
 {
    bson_iter_t iter;
 
+   CRYPT_ENTRY;
    bson_iter_init (&iter, doc);
    bson_init (out);
    if (!_copy_and_transform (crypt, iter, out, error, ENCRYPTED_TO_PLAIN)) {

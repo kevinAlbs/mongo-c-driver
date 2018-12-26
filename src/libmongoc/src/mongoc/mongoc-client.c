@@ -1092,12 +1092,12 @@ mongoc_client_destroy (mongoc_client_t *client)
       _mongoc_ssl_opts_cleanup (&client->ssl_opts);
 #endif
 
-      bson_free (client);
-
       if (client->crypt) {
          _mongoc_client_side_encryption_opts_cleanup (&client->encryption_opts);
          _mongoc_crypt_destroy (client->crypt);
       }
+
+      bson_free (client);
 
       mongoc_counter_clients_active_dec ();
       mongoc_counter_clients_disposed_inc ();

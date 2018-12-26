@@ -23,7 +23,9 @@
 #include "mongoc/mongoc-opts-private.h"
 
 /* TODO: remove - this is for CLion's stupidity */
+#ifndef MONGOC_ENABLE_SSL_OPENSSL
 #define MONGOC_ENABLE_SSL_OPENSSL
+#endif
 
 #ifdef MONGOC_ENABLE_SSL_OPENSSL
 #include "openssl/evp.h"
@@ -44,6 +46,7 @@ _openssl_encrypt (const uint8_t *iv,
    uint8_t *encrypted = NULL;
    int block_size, bytes_written, encrypted_len = 0;
 
+   CRYPT_ENTRY;
    EVP_CIPHER_CTX_init (&ctx);
    cipher = EVP_aes_256_cbc_hmac_sha256 ();
    block_size = EVP_CIPHER_block_size (cipher);
@@ -101,6 +104,7 @@ _openssl_decrypt (const uint8_t *iv,
    uint8_t *decrypted = NULL;
    int block_size, bytes_written, decrypted_len = 0;
 
+   CRYPT_ENTRY;
    EVP_CIPHER_CTX_init (&ctx);
    cipher = EVP_aes_256_cbc_hmac_sha256 ();
    block_size = EVP_CIPHER_block_size (cipher);
@@ -145,17 +149,21 @@ cleanup:
 
 bool
 _mongoc_crypt_do_encryption (const uint8_t *iv,
-                  const uint8_t *key,
-                  const uint8_t *data,
-                  uint32_t data_len,
-                  uint8_t **out,
-                  uint32_t *out_len,
-                  bson_error_t *error) {
+                             const uint8_t *key,
+                             const uint8_t *data,
+                             uint32_t data_len,
+                             uint8_t **out,
+                             uint32_t *out_len,
+                             bson_error_t *error)
+{
+   CRYPT_ENTRY;
+
 #ifdef MONGOC_ENABLE_SSL_OPENSSL
-   return _openssl_encrypt(iv, key, data, data_len, out, out_len, error);
-#endif
+   return _openssl_encrypt (iv, key, data, data_len, out, out_len, error);
+#else
    SET_CRYPT_ERR ("not configured with any supported crypto library");
    return false;
+#endif
 }
 
 bool
@@ -165,10 +173,13 @@ _mongoc_crypt_do_decryption (const uint8_t *iv,
                              uint32_t data_len,
                              uint8_t **out,
                              uint32_t *out_len,
-                             bson_error_t *error) {
+                             bson_error_t *error)
+{
+   CRYPT_ENTRY;
 #ifdef MONGOC_ENABLE_SSL_OPENSSL
-   return _openssl_decrypt(iv, key, data, data_len, out, out_len, error);
-#endif
+   return _openssl_decrypt (iv, key, data, data_len, out, out_len, error);
+#else
    SET_CRYPT_ERR ("not configured with any supported crypto library");
    return false;
+#endif
 }

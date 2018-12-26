@@ -79,7 +79,7 @@ _mongoc_crypt_marking_parse (const bson_t *bson,
       SET_CRYPT_ERR ("invalid marking, no 'v'");
       goto cleanup;
    } else {
-      out->v = bson_iter_value (&iter);
+      memcpy (&out->v_iter, &iter, sizeof (bson_iter_t));
    }
 
    /* TODO: parse "a" and "u" */

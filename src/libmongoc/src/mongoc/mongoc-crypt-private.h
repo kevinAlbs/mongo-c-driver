@@ -28,6 +28,29 @@
    bson_set_error (        \
       error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_NOT_READY, __VA_ARGS__)
 
+#define MONGOC_CRYPT_TRACE
+
+#ifdef MONGOC_CRYPT_TRACE
+#define CRYPT_TRACE(...)                              \
+   do {                                               \
+      printf ("[CRYPT %s:%d] ", BSON_FUNC, __LINE__); \
+      printf (__VA_ARGS__);                           \
+      printf ("\n");                                  \
+   } while (0)
+
+#define CRYPT_ENTRY                                          \
+   do {                                                      \
+      printf ("[CRYPT entry] %s:%d\n", BSON_FUNC, __LINE__); \
+   } while (0)
+
+#else
+#define TRACE(msg, ...)
+#define ENTRY
+#endif
+
+const char *
+tmp_json (const bson_t *bson);
+
 typedef struct _mongoc_crypt_t {
    mongoc_client_t *keyvault_client; /* initially only one supported, later we
                                         detect changes. */
@@ -50,7 +73,7 @@ mongoc_crypt_bson_append_binary (bson_t *bson,
                                  mongoc_crypt_binary_t *in);
 
 typedef struct {
-   const bson_value_t *v;
+   bson_iter_t v_iter;
    mongoc_crypt_binary_t iv;
    /* one of the following is zeroed, and the other is set. */
    mongoc_crypt_binary_t key_id;
