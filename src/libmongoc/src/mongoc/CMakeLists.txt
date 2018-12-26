@@ -176,6 +176,7 @@ set (src_libmongoc_src_mongoc_DIST_cs
    mongoc-compression.c
    mongoc-counters.c
    mongoc-crypt.c
+   mongoc-crypt-crypto.c
    mongoc-crypt-parsing.c
    mongoc-cursor.c
    mongoc-cursor-legacy.c

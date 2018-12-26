@@ -29,7 +29,9 @@
       error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_NOT_READY, __VA_ARGS__)
 
 typedef struct _mongoc_crypt_t {
-   mongoc_client_t *mongocrypt_client;
+   mongoc_client_t *keyvault_client; /* initially only one supported, later we
+                                        detect changes. */
+   mongoc_client_t *mongocryptd_client;
 } mongoc_crypt_t;
 
 /* It's annoying passing around multiple values for bson binary values. */
@@ -80,25 +82,19 @@ _mongoc_crypt_key_parse (const bson_t *bson,
                          mongoc_crypt_key_t *out,
                          bson_error_t *error);
 
-bool
-mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *err);
 /* TODO: change to take a handle + schema */
 bool
-mongoc_crypt_encrypt (mongoc_collection_t *coll,
-                      const bson_t *data,
+mongoc_crypt_encrypt (mongoc_crypt_t *crypt,
+                      const bson_t *schema,
+                      const bson_t *doc,
                       bson_t *out,
                       bson_error_t *error);
 
 bool
-mongoc_crypt_decrypt (mongoc_client_t *client,
-                      const bson_t *data,
+mongoc_crypt_decrypt (mongoc_crypt_t *crypt,
+                      const bson_t *doc,
                       bson_t *out,
                       bson_error_t *error);
-/*
-bool mongoc_crypt_encrypt(mongoc_client_t* client, const bson_t* data, bson_t*
-out, bson_error_t* error);
-bool mongoc_crypt_cleanup(mongoc_client_t* client);
- */
 
 mongoc_client_t *
 mongoc_client_new_with_opts (mongoc_uri_t *uri,
@@ -108,5 +104,24 @@ bool
 _mongoc_client_get_schema (mongoc_client_t *client,
                            const char *ns,
                            bson_t *bson);
+
+bool
+_mongoc_crypt_do_encryption (const uint8_t *iv,
+                             const uint8_t *key,
+                             const uint8_t *data,
+                             uint32_t data_len,
+                             uint8_t **out,
+                             uint32_t *out_len,
+                             bson_error_t *error);
+
+
+bool
+_mongoc_crypt_do_decryption (const uint8_t *iv,
+                             const uint8_t *key,
+                             const uint8_t *data,
+                             uint32_t data_len,
+                             uint8_t **out,
+                             uint32_t *out_len,
+                             bson_error_t *error);
 
 #endif // MONGO_C_DRIVER_MONGOC_CRYPT_PRIVATE_H

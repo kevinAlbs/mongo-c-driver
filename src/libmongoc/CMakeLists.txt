@@ -402,6 +402,7 @@ set (SOURCES ${SOURCES}
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-compression.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-counters.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-crypt.c
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-crypt-crypto.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-crypt-parsing.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cursor-array.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cursor.c

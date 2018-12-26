@@ -20,6 +20,7 @@
 #include "test-conveniences.h"
 #include "test-libmongoc.h"
 #include "mongoc/mongoc-crypt-private.h"
+#include "mongoc/mongoc-collection-private.h"
 
 #include "openssl/evp.h"
 
@@ -31,9 +32,10 @@ test_encryption_with_schema (void)
    bson_t schemas = BSON_INITIALIZER;
    bson_t client_opts = BSON_INITIALIZER;
    bson_t encryption_opts;
+   bson_t schema;
    mongoc_uri_t *uri;
    mongoc_client_t *client;
-   mongoc_collection_t* coll;
+   mongoc_collection_t *coll;
    int status;
    bson_t encrypted, decrypted;
    bool ret;
@@ -44,7 +46,8 @@ test_encryption_with_schema (void)
    status = bson_json_reader_read (reader, &schemas, &error);
    ASSERT_OR_PRINT (status == 1, error);
 
-   BSON_APPEND_DOCUMENT_BEGIN(&client_opts, "clientSideEncryption", &encryption_opts);
+   BSON_APPEND_DOCUMENT_BEGIN (
+      &client_opts, "clientSideEncryption", &encryption_opts);
    BSON_APPEND_DOCUMENT (&encryption_opts, "schemas", &schemas);
    bson_append_document_end (&client_opts, &encryption_opts);
    uri = mongoc_uri_new_with_error ("mongodb://localhost:27017/", &error);
@@ -53,31 +56,34 @@ test_encryption_with_schema (void)
    client = mongoc_client_new_with_opts (uri, &client_opts, &error);
    ASSERT_OR_PRINT (client, error);
 
-   coll = mongoc_client_get_collection(client, "test", "crypt");
+   coll = mongoc_client_get_collection (client, "test", "crypt");
+   BSON_ASSERT (_mongoc_client_get_schema (client, coll->ns, &schema));
+
    ret = mongoc_crypt_encrypt (
-      coll,
+      client->crypt,
+      &schema,
       tmp_bson ("{'name': 'Todd Davis', 'ssn': '457-55-5642'}"),
       &encrypted,
       &error);
 
    ASSERT_OR_PRINT (ret, error);
 
-   printf("encrypted data=%s\n", bson_as_json(&encrypted, NULL));
-   printf("error=%s\n", error.message);
+   printf ("encrypted data=%s\n", bson_as_json (&encrypted, NULL));
+   printf ("error=%s\n", error.message);
 
    /* And now decrypt it back. */
-   ret = mongoc_crypt_decrypt (client, &encrypted, &decrypted, &error);
-   printf("decrypted data=%s\n", bson_as_json(&decrypted, NULL));
+   ret = mongoc_crypt_decrypt (client->crypt, &encrypted, &decrypted, &error);
+   printf ("decrypted data=%s\n", bson_as_json (&decrypted, NULL));
 
    ASSERT_OR_PRINT (ret, error);
 
+   bson_destroy (&schema);
    bson_destroy (&schemas);
    bson_destroy (&client_opts);
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
    mongoc_uri_destroy (uri);
    bson_json_reader_destroy (reader);
-   //getchar();
 }
 
 void

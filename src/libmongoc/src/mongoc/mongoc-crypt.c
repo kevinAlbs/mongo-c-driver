@@ -21,8 +21,6 @@
 #include "mongoc/mongoc-collection-private.h"
 #include "mongoc/mongoc-opts-private.h"
 
-#include "openssl/evp.h"
-
 static void
 _spawn_mongocryptd (void)
 {
@@ -43,148 +41,47 @@ _spawn_mongocryptd (void)
 #endif
 }
 
-
 bool
 _mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *error)
 {
    /* store AWS credentials, init structures in client, store schema
     * somewhere. */
-   mongoc_client_t *mongocrypt_client;
+   mongoc_client_t *mongocrypt_client, *keyvault_client;
+   mongoc_uri_t *copied_uri;
+
    _spawn_mongocryptd ();
-   client->encryption = bson_malloc0 (sizeof (mongoc_crypt_t));
+   client->crypt = bson_malloc0 (sizeof (mongoc_crypt_t));
    mongocrypt_client =
       mongoc_client_new ("mongodb://%2Ftmp%2Fmongocryptd.sock");
    if (!mongocrypt_client) {
       SET_CRYPT_ERR ("Unable to create client to mongocryptd");
       return false;
    }
-   client->encryption->mongocrypt_client = mongocrypt_client;
+   client->crypt->mongocryptd_client = mongocrypt_client;
+
+   /* TODO: use 'u' from schema to get key vault clients. Note no opts here. */
+   client->crypt->keyvault_client =
+      mongoc_client_new_from_uri (mongoc_client_get_uri (client));
    return true;
 }
 
-//#ifdef MONGOC_ENABLE_SSL_OPENSSL
-static bool
-_openssl_encrypt (const uint8_t *iv,
-                  const uint8_t *key,
-                  const uint8_t *data,
-                  uint32_t data_len,
-                  uint8_t **out,
-                  uint32_t *out_len,
-                  bson_error_t *error)
+void
+_mongoc_client_crypt_destroy (mongoc_client_t *client)
 {
-   const EVP_CIPHER *cipher;
-   EVP_CIPHER_CTX ctx;
-   bool ret = false;
-   int r;
-   uint8_t *encrypted = NULL;
-   int block_size, bytes_written, encrypted_len = 0;
-   int i;
-
-   EVP_CIPHER_CTX_init (&ctx);
-   cipher = EVP_aes_256_cbc_hmac_sha256 ();
-   block_size = EVP_CIPHER_block_size (cipher);
-   BSON_ASSERT (EVP_CIPHER_iv_length (cipher) == 16);
-   BSON_ASSERT (block_size == 16);
-   BSON_ASSERT (EVP_CIPHER_key_length (cipher) == 32);
-   r = EVP_EncryptInit_ex (&ctx, cipher, NULL /* engine */, key, iv);
-   if (!r) {
-      /* TODO: use ERR_get_error or similar to get OpenSSL error message? */
-      SET_CRYPT_ERR ("failed to initialize cipher");
-      goto cleanup;
+   if (!client || !client->crypt) {
+      return;
    }
-
-   /* From `man EVP_EncryptInit`: "as a result the amount of data written may be
-    * anything from zero bytes to (inl + cipher_block_size - 1)" and for
-    * finalize: "should have sufficient space for one block */
-   encrypted = bson_malloc0 (data_len + (block_size - 1) + block_size);
-   r = EVP_EncryptUpdate (&ctx, encrypted, &bytes_written, data, data_len);
-   if (!r) {
-      SET_CRYPT_ERR ("failed to encrypt");
-      goto cleanup;
-   }
-
-   encrypted_len += bytes_written;
-   r = EVP_EncryptFinal_ex (&ctx, encrypted + bytes_written, &bytes_written);
-   if (!r) {
-      SET_CRYPT_ERR ("failed to finalize\n");
-      goto cleanup;
-   }
-
-   encrypted_len += bytes_written;
-   *out = encrypted;
-   *out_len = (uint32_t) encrypted_len;
-   encrypted = NULL;
-   ret = true;
-cleanup:
-   EVP_CIPHER_CTX_cleanup (&ctx);
-   bson_free (encrypted);
-   return ret;
+   mongoc_client_destroy (client->crypt->mongocryptd_client);
+   mongoc_client_destroy (client->crypt->keyvault_client);
+   bson_free (client->crypt);
 }
-
-static bool
-_openssl_decrypt (const uint8_t *iv,
-                  const uint8_t *key,
-                  const uint8_t *data,
-                  uint32_t data_len,
-                  uint8_t **out,
-                  uint32_t *out_len,
-                  bson_error_t *error)
-{
-   const EVP_CIPHER *cipher;
-   EVP_CIPHER_CTX ctx;
-   bool ret = false;
-   int r;
-   uint8_t *decrypted = NULL;
-   int block_size, bytes_written, decrypted_len = 0;
-
-   EVP_CIPHER_CTX_init (&ctx);
-   cipher = EVP_aes_256_cbc_hmac_sha256 ();
-   block_size = EVP_CIPHER_block_size (cipher);
-   BSON_ASSERT (EVP_CIPHER_iv_length (cipher) == 16);
-   BSON_ASSERT (block_size == 16);
-   BSON_ASSERT (EVP_CIPHER_key_length (cipher) == 32);
-   r = EVP_DecryptInit_ex (&ctx, cipher, NULL /* engine */, key, iv);
-   if (!r) {
-      /* TODO: use ERR_get_error or similar to get OpenSSL error message? */
-      SET_CRYPT_ERR ("failed to initialize cipher");
-      goto cleanup;
-   }
-
-   /* " EVP_DecryptUpdate() should have sufficient room for (inl +
-     * cipher_block_size) bytes" */
-   /* decrypted length <= decrypted_len. */
-   decrypted = bson_malloc0 (data_len + block_size);
-   r = EVP_DecryptUpdate (&ctx, decrypted, &bytes_written, data, data_len);
-   if (!r) {
-      SET_CRYPT_ERR ("failed to decrypt");
-      goto cleanup;
-   }
-
-   decrypted_len += bytes_written;
-   r = EVP_DecryptFinal_ex (&ctx, decrypted + bytes_written, &bytes_written);
-   if (!r) {
-      SET_CRYPT_ERR ("failed to finalize\n");
-      goto cleanup;
-   }
-
-   decrypted_len += bytes_written;
-   *out = decrypted;
-   *out_len = (uint32_t) decrypted_len;
-   decrypted = NULL;
-   ret = true;
-cleanup:
-   EVP_CIPHER_CTX_cleanup (&ctx);
-   bson_free (decrypted);
-   return ret;
-}
-//#endif
 
 /*
  * _get_key
  * iter can either refer to a UUID or a string
 */
 bool
-_mongoc_crypt_get_key (mongoc_client_t *client,
+_mongoc_crypt_get_key (mongoc_crypt_t *crypt,
                        mongoc_crypt_binary_t *key_id,
                        const char *key_alt_name,
                        mongoc_crypt_key_t *out,
@@ -196,7 +93,8 @@ _mongoc_crypt_get_key (mongoc_client_t *client,
    const bson_t *doc;
    bool ret = false;
 
-   datakey_coll = mongoc_client_get_collection (client, "admin", "datakeys");
+   datakey_coll = mongoc_client_get_collection (
+      crypt->keyvault_client, "admin", "datakeys");
    bson_init (&filter);
    if (key_id->len) {
       mongoc_crypt_bson_append_binary (&filter, "_id", 3, key_id);
@@ -234,16 +132,16 @@ cleanup:
 }
 
 bool
-_mongoc_crypt_get_key_by_uuid (mongoc_client_t *client,
+_mongoc_crypt_get_key_by_uuid (mongoc_crypt_t *crypt,
                                mongoc_crypt_binary_t *key_id,
                                mongoc_crypt_key_t *out,
                                bson_error_t *error)
 {
-   return _mongoc_crypt_get_key (client, key_id, NULL, out, error);
+   return _mongoc_crypt_get_key (crypt, key_id, NULL, out, error);
 }
 
 static bool
-_append_encrypted (mongoc_client_t *client,
+_append_encrypted (mongoc_crypt_t *crypt,
                    mongoc_crypt_marking_t *marking,
                    bson_t *out,
                    const char *field,
@@ -261,7 +159,7 @@ _append_encrypted (mongoc_client_t *client,
 
    printf ("getting key from iter\n");
    if (!_mongoc_crypt_get_key (
-          client, &marking->key_id, marking->key_alt_name, &key, error)) {
+          crypt, &marking->key_id, marking->key_alt_name, &key, error)) {
       SET_CRYPT_ERR ("could not get key");
       goto cleanup;
    }
@@ -270,13 +168,13 @@ _append_encrypted (mongoc_client_t *client,
 
    /* TODO: 'a' and 'u' */
 
-   if (!_openssl_encrypt (marking->iv.data,
-                          key.key_material.data,
-                          bson_get_data (&to_encrypt),
-                          to_encrypt.len,
-                          &encrypted,
-                          &encrypted_len,
-                          error)) {
+   if (!_mongoc_crypt_do_encryption (marking->iv.data,
+                                     key.key_material.data,
+                                     bson_get_data (&to_encrypt),
+                                     to_encrypt.len,
+                                     &encrypted,
+                                     &encrypted_len,
+                                     error)) {
       goto cleanup;
    }
 
@@ -308,7 +206,7 @@ cleanup:
 }
 
 static bool
-_append_decrypted (mongoc_client_t *client,
+_append_decrypted (mongoc_crypt_t *crypt,
                    mongoc_crypt_encrypted_t *encrypted,
                    bson_t *out,
                    const char *field,
@@ -321,17 +219,17 @@ _append_decrypted (mongoc_client_t *client,
    bool ret = false;
 
    if (!_mongoc_crypt_get_key_by_uuid (
-          client, &encrypted->key_id, &key, error)) {
+          crypt, &encrypted->key_id, &key, error)) {
       return ret;
    }
 
-   if (!_openssl_decrypt (encrypted->iv.data,
-                          key.key_material.data,
-                          encrypted->e.data,
-                          encrypted->e.len,
-                          &decrypted,
-                          &decrypted_len,
-                          error)) {
+   if (!_mongoc_crypt_do_decryption (encrypted->iv.data,
+                                     key.key_material.data,
+                                     encrypted->e.data,
+                                     encrypted->e.len,
+                                     &decrypted,
+                                     &decrypted_len,
+                                     error)) {
       printf ("failed to decrypt\n");
       goto cleanup;
    } else {
@@ -359,7 +257,7 @@ typedef enum { MARKING_TO_ENCRYPTED, ENCRYPTED_TO_PLAIN } transform_t;
 
 /* TODO: document. */
 static bool
-_copy_and_transform (mongoc_client_t *client,
+_copy_and_transform (mongoc_client_t *crypt,
                      bson_iter_t iter,
                      bson_t *out,
                      bson_error_t *error,
@@ -380,7 +278,7 @@ _copy_and_transform (mongoc_client_t *client,
                if (!_mongoc_crypt_marking_parse (&as_bson, &marking, error)) {
                   return false;
                }
-               if (!_append_encrypted (client,
+               if (!_append_encrypted (crypt,
                                        &marking,
                                        out,
                                        bson_iter_key (&iter),
@@ -394,7 +292,7 @@ _copy_and_transform (mongoc_client_t *client,
                       &as_bson, &encrypted, error)) {
                   return false;
                }
-               if (!_append_decrypted (client,
+               if (!_append_decrypted (crypt,
                                        &encrypted,
                                        out,
                                        bson_iter_key (&iter),
@@ -416,7 +314,7 @@ _copy_and_transform (mongoc_client_t *client,
          bson_append_array_begin (
             out, bson_iter_key (&iter), bson_iter_key_len (&iter), &child_out);
          ret = _copy_and_transform (
-            client, child_iter, &child_out, error, transform);
+            crypt, child_iter, &child_out, error, transform);
          bson_append_array_end (out, &child_out);
          if (!ret) {
             return false;
@@ -430,7 +328,7 @@ _copy_and_transform (mongoc_client_t *client,
          bson_append_document_begin (
             out, bson_iter_key (&iter), bson_iter_key_len (&iter), &child_out);
          ret = _copy_and_transform (
-            client, child_iter, &child_out, error, transform);
+            crypt, child_iter, &child_out, error, transform);
          bson_append_document_end (out, &child_out);
          if (!ret) {
             return false;
@@ -447,7 +345,7 @@ _copy_and_transform (mongoc_client_t *client,
 
 
 static bool
-_replace_markings (mongoc_client_t *client,
+_replace_markings (mongoc_crypt_t *crypt,
                    const bson_t *reply,
                    bson_t *out,
                    bson_error_t *error)
@@ -469,7 +367,7 @@ _replace_markings (mongoc_client_t *client,
    bson_iter_next (&iter);
    /* recurse into first document. */
    bson_iter_recurse (&iter, &iter);
-   _copy_and_transform (client, iter, out, error, MARKING_TO_ENCRYPTED);
+   _copy_and_transform (crypt, iter, out, error, MARKING_TO_ENCRYPTED);
    return true;
 }
 
@@ -488,28 +386,20 @@ _make_marking_cmd (const bson_t *data, const bson_t *schema, bson_t *cmd)
 }
 
 bool
-mongoc_crypt_encrypt (mongoc_collection_t *coll,
-                      const bson_t *data,
+mongoc_crypt_encrypt (mongoc_crypt_t *crypt,
+                      const bson_t *schema,
+                      const bson_t *doc,
                       bson_t *out,
                       bson_error_t *error)
 {
-   mongoc_client_t *client;
-   bson_t cmd, schema, reply;
+   bson_t cmd, reply;
    bool ret;
 
    ret = false;
-   client = coll->client;
    bson_init (out);
 
-   /* TODO: maybe this function shouldn't check if encryption is necessary? */
-   if (!_mongoc_client_get_schema (client, coll->ns, &schema)) {
-      /* collection does not have encrypted fields. */
-      goto cleanup;
-   }
-
-   _make_marking_cmd (data, &schema, &cmd);
-   bson_destroy (&schema);
-   if (!mongoc_client_command_simple (client->encryption->mongocrypt_client,
+   _make_marking_cmd (doc, schema, &cmd);
+   if (!mongoc_client_command_simple (crypt->mongocryptd_client,
                                       "admin",
                                       &cmd,
                                       NULL /* read prefs */,
@@ -522,7 +412,7 @@ mongoc_crypt_encrypt (mongoc_collection_t *coll,
            bson_as_json (&cmd, NULL),
            bson_as_json (&reply, NULL));
 
-   if (!_replace_markings (client, &reply, out, error)) {
+   if (!_replace_markings (crypt, &reply, out, error)) {
       goto cleanup;
    }
 
@@ -534,21 +424,16 @@ cleanup:
 }
 
 bool
-mongoc_crypt_decrypt (mongoc_client_t *client,
-                      const bson_t *data,
+mongoc_crypt_decrypt (mongoc_crypt_t *crypt,
+                      const bson_t *doc,
                       bson_t *out,
                       bson_error_t *error)
 {
    bson_iter_t iter;
 
-   bson_iter_init (&iter, data);
+   bson_iter_init (&iter, doc);
    bson_init (out);
-
-   if (!client->encryption) {
-      return true;
-   }
-   bson_init (out);
-   if (!_copy_and_transform (client, iter, out, error, ENCRYPTED_TO_PLAIN)) {
+   if (!_copy_and_transform (crypt, iter, out, error, ENCRYPTED_TO_PLAIN)) {
       return false;
    }
    return true;
@@ -624,17 +509,18 @@ mongoc_client_new_with_opts (mongoc_uri_t *uri,
                          MONGOC_ERROR_BSON_INVALID,
                          "clientSideEncryption must be a document.");
       }
-      if (!_mongoc_client_crypt_init (client, error)) {
-         mongoc_client_destroy (client);
-         return NULL;
-      }
 
       bson_iter_document (&iter, &len, &data);
       bson_init_static (&nested_opts, data, len);
-
       if (!_mongoc_client_side_encryption_opts_parse (
              NULL, &nested_opts, &client->encryption_opts, error)) {
          _mongoc_client_side_encryption_opts_cleanup (&client->encryption_opts);
+         return NULL;
+      }
+
+      if (!_mongoc_client_crypt_init (client, error)) {
+         _mongoc_client_side_encryption_opts_cleanup (&client->encryption_opts);
+         mongoc_client_destroy (client);
          return NULL;
       }
    }
