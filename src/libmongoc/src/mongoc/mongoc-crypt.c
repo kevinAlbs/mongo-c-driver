@@ -41,39 +41,40 @@ _spawn_mongocryptd (void)
 #endif
 }
 
-bool
-_mongoc_client_crypt_init (mongoc_client_t *client, bson_error_t *error)
+mongoc_crypt_t*
+_mongoc_crypt_new (mongoc_client_t *client, bson_error_t *error)
 {
    /* store AWS credentials, init structures in client, store schema
     * somewhere. */
-   mongoc_client_t *mongocrypt_client, *keyvault_client;
-   mongoc_uri_t *copied_uri;
+   mongoc_crypt_t* crypt;
 
    _spawn_mongocryptd ();
-   client->crypt = bson_malloc0 (sizeof (mongoc_crypt_t));
-   mongocrypt_client =
-      mongoc_client_new ("mongodb://%2Ftmp%2Fmongocryptd.sock");
-   if (!mongocrypt_client) {
-      SET_CRYPT_ERR ("Unable to create client to mongocryptd");
-      return false;
-   }
-   client->crypt->mongocryptd_client = mongocrypt_client;
+   crypt = bson_malloc0 (sizeof (mongoc_crypt_t));
 
+   crypt->mongocryptd_client = mongoc_client_new ("mongodb://%2Ftmp%2Fmongocryptd.sock");
+   if (!crypt->mongocryptd_client) {
+      SET_CRYPT_ERR ("Unable to create client to mongocryptd");
+      return crypt;
+   }
    /* TODO: use 'u' from schema to get key vault clients. Note no opts here. */
-   client->crypt->keyvault_client =
+   crypt->keyvault_client =
       mongoc_client_new_from_uri (mongoc_client_get_uri (client));
-   return true;
+   if (!crypt->keyvault_client) {
+      SET_CRYPT_ERR ("Unable to create client to keyvault");
+      return crypt;
+   }
+   return crypt;
 }
 
 void
-_mongoc_client_crypt_destroy (mongoc_client_t *client)
+_mongoc_crypt_destroy (mongoc_crypt_t *crypt)
 {
-   if (!client || !client->crypt) {
+   if (!crypt) {
       return;
    }
-   mongoc_client_destroy (client->crypt->mongocryptd_client);
-   mongoc_client_destroy (client->crypt->keyvault_client);
-   bson_free (client->crypt);
+   mongoc_client_destroy (crypt->mongocryptd_client);
+   mongoc_client_destroy (crypt->keyvault_client);
+   bson_free (crypt);
 }
 
 /*
@@ -257,7 +258,7 @@ typedef enum { MARKING_TO_ENCRYPTED, ENCRYPTED_TO_PLAIN } transform_t;
 
 /* TODO: document. */
 static bool
-_copy_and_transform (mongoc_client_t *crypt,
+_copy_and_transform (mongoc_crypt_t *crypt,
                      bson_iter_t iter,
                      bson_t *out,
                      bson_error_t *error,
@@ -518,7 +519,8 @@ mongoc_client_new_with_opts (mongoc_uri_t *uri,
          return NULL;
       }
 
-      if (!_mongoc_client_crypt_init (client, error)) {
+      client->crypt = _mongoc_crypt_new (client, error);
+      if (!client->crypt) {
          _mongoc_client_side_encryption_opts_cleanup (&client->encryption_opts);
          mongoc_client_destroy (client);
          return NULL;

@@ -1051,8 +1051,9 @@ _mongoc_client_new_from_uri (mongoc_topology_t *topology)
    return client;
 }
 
+struct _mongoc_crypt_t;
 void
-_mongoc_client_crypt_destroy (mongoc_client_t *);
+_mongoc_crypt_destroy (struct _mongoc_crypt_t *);
 
 /*
  *--------------------------------------------------------------------------
@@ -1095,7 +1096,7 @@ mongoc_client_destroy (mongoc_client_t *client)
 
       if (client->crypt) {
          _mongoc_client_side_encryption_opts_cleanup (&client->encryption_opts);
-         _mongoc_client_crypt_destroy (client);
+         _mongoc_crypt_destroy (client->crypt);
       }
 
       mongoc_counter_clients_active_dec ();
