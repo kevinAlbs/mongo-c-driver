@@ -97,7 +97,6 @@ struct _mongoc_client_t {
    unsigned int csid_rand_seed;
 
    struct _mongoc_crypt_t *crypt;
-   struct _mongoc_client_side_encryption_opts_t encryption_opts;
 };
 
 

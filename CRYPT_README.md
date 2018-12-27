@@ -23,6 +23,10 @@ $ ./src/libmongoc/example-crypt
 Inserting { "name": "Todd Davis", "ssn": "457-55-5642" }
 CRYPT_TRACE: encrypted collection detected
 ```
+
+## Testing with live KMS
+TODO: make a nice python runner.
+
 ## Field-Level Encryption Support
 
 Currently, encryption is enabled with a URI parameter:

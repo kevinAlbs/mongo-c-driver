@@ -14,13 +14,20 @@ const keys = [
     "Y2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M=", /* 'c' repeated 32 times */
 ];
 
+// TEMP: These are the keys above (in base64), after they have been encrypted with my CMK.
+const wrapped_keys = [
+    "AQICAHgg8xic3qACagcogG7tCsrU/az1q4j3Nt2hQcUyQRVMtQHVMeCvT16tqR4Lrx+YZZPNAAAAizCBiAYJKoZIhvcNAQcGoHsweQIBADB0BgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDBgZBeKnJt8ciGCUvAIBEIBH8R8fYshXY1q/VrPGkiQs/+cv6gBCRR1tam+rIEGa2w2xO+Z24f/DcHfCkeVWuMSpGoyEov781YJo0iOE6Ptg0VynQNutuCw=",
+    "AQICAHgg8xic3qACagcogG7tCsrU/az1q4j3Nt2hQcUyQRVMtQEEb7Fjw345bF3S/Mtl0KdVAAAAizCBiAYJKoZIhvcNAQcGoHsweQIBADB0BgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDAm3EAPwy8J4dRanzQIBEIBHfe2CnDtIMMTy4EJ2onQ5yYxeKP2dPtZASeKxm2aQWYaWKxNgV0mXoxUXqQ5JDMTEZHAKPxouOaVR5FUVCl4jjas8+1zNFYM=",
+    "AQICAHgg8xic3qACagcogG7tCsrU/az1q4j3Nt2hQcUyQRVMtQHaVfzryC4Lnu3rkL8c9gWSAAAAizCBiAYJKoZIhvcNAQcGoHsweQIBADB0BgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDBfPk4bi+iEJ80fcWwIBEIBH5WxHC8QDjihAT3Tq242KRv9woyC2aTR/fA6BFTP8/KZOH36DEPG8v2oBUEYhgAgmRbVyDvj0cbZnis0dKIB5AGmlHdcdO1Q="
+];
+
 print("Dropping admin.datakeys collection");
 db = db.getSiblingDB("admin")
 db.datakeys.drop();
 db.datakeys.insert([
     {
         _id: uuids[0],
-        keyMaterial: new BinData(0, keys[0]),
+        keyMaterial: new BinData(0, wrapped_keys[0]), // Temp: using wrapped keys.
         creationDate: Date(),
         updatedDate: Date(),
         status: 1,
@@ -29,7 +36,7 @@ db.datakeys.insert([
     {
         _id: uuids[1],
         keyAltName: ["Todd Davis"],
-        keyMaterial: new BinData(0, keys[1]),
+        keyMaterial: new BinData(0, wrapped_keys[1]),
         creationDate: Date(),
         updatedDate: Date(),
         status: 1,
@@ -37,7 +44,7 @@ db.datakeys.insert([
     },
     {
         _id: uuids[2],
-        keyMaterial: new BinData(0, keys[2]),
+        keyMaterial: new BinData(0, wrapped_keys[2]),
         creationDate: Date(),
         updatedDate: Date(),
         status: 0, /* disabled key */

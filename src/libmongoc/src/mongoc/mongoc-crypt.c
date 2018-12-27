@@ -58,7 +58,7 @@ _spawn_mongocryptd (void)
 
 
 mongoc_crypt_t *
-_mongoc_crypt_new (mongoc_client_t *client, bson_error_t *error)
+_mongoc_crypt_new (mongoc_client_t *client, const bson_t* opts, bson_error_t *error)
 {
    /* store AWS credentials, init structures in client, store schema
     * somewhere. */
@@ -67,6 +67,13 @@ _mongoc_crypt_new (mongoc_client_t *client, bson_error_t *error)
    CRYPT_ENTRY;
    _spawn_mongocryptd ();
    crypt = bson_malloc0 (sizeof (mongoc_crypt_t));
+   if (!_mongoc_client_side_encryption_opts_parse (
+      NULL, opts, &crypt->opts, error)) {
+      _mongoc_client_side_encryption_opts_cleanup (&crypt->opts);
+      bson_free (crypt);
+      return NULL;
+   }
+
    crypt->mongocryptd_client =
       mongoc_client_new ("mongodb://%2Ftmp%2Fmongocryptd.sock");
    if (!crypt->mongocryptd_client) {
@@ -91,6 +98,7 @@ _mongoc_crypt_destroy (mongoc_crypt_t *crypt)
    if (!crypt) {
       return;
    }
+   _mongoc_client_side_encryption_opts_cleanup (&crypt->opts);
    mongoc_client_destroy (crypt->mongocryptd_client);
    mongoc_client_destroy (crypt->keyvault_client);
    bson_free (crypt);
@@ -142,7 +150,8 @@ _get_key (mongoc_crypt_t *crypt,
    if (!_mongoc_crypt_key_parse (doc, out, error)) {
       goto cleanup;
    }
-   CRYPT_TRACE ("parsed key");
+
+   CRYPT_TRACE("decrypting key_material");
 
    ret = true;
 
@@ -481,7 +490,7 @@ _mongoc_client_get_schema (mongoc_client_t *client,
 {
    /* TODO: do remote fetching and use JSONSchema cache. */
    bson_iter_t array_iter;
-   bson_iter_init (&array_iter, &client->encryption_opts.schemas);
+   bson_iter_init (&array_iter, &client->crypt->opts.schemas);
    const uint8_t *data;
    uint32_t len;
 
@@ -541,15 +550,9 @@ mongoc_client_new_with_opts (mongoc_uri_t *uri,
 
       bson_iter_document (&iter, &len, &data);
       bson_init_static (&nested_opts, data, len);
-      if (!_mongoc_client_side_encryption_opts_parse (
-             NULL, &nested_opts, &client->encryption_opts, error)) {
-         _mongoc_client_side_encryption_opts_cleanup (&client->encryption_opts);
-         return NULL;
-      }
 
-      client->crypt = _mongoc_crypt_new (client, error);
+      client->crypt = _mongoc_crypt_new (client, &nested_opts, error);
       if (!client->crypt) {
-         _mongoc_client_side_encryption_opts_cleanup (&client->encryption_opts);
          mongoc_client_destroy (client);
          return NULL;
       }
