@@ -19,7 +19,6 @@
 #include "mongoc/mongoc-error.h"
 #include "mongoc/mongoc-client-private.h"
 #include "mongoc/mongoc-collection-private.h"
-#include "mongoc/mongoc-opts-private.h"
 
 
 const char *
@@ -179,7 +178,7 @@ _append_encrypted (mongoc_crypt_t *crypt,
    bson_t to_encrypt = BSON_INITIALIZER;
    uint8_t *encrypted = NULL;
    uint32_t encrypted_len;
-   mongoc_crypt_key_t key = {0};
+   mongoc_crypt_key_t key = {{0}};
 
    CRYPT_ENTRY;
    if (!_get_key (
@@ -227,6 +226,7 @@ cleanup:
    bson_destroy (&to_encrypt);
    bson_free (encrypted);
    bson_destroy (&encrypted_w_metadata);
+   mongoc_crypt_key_cleanup(&key);
    return ret;
 }
 
@@ -239,7 +239,7 @@ _append_decrypted (mongoc_crypt_t *crypt,
                    uint32_t field_len,
                    bson_error_t *error)
 {
-   mongoc_crypt_key_t key = {0};
+   mongoc_crypt_key_t key = {{0}};
    uint8_t *decrypted;
    uint32_t decrypted_len;
    bool ret = false;
@@ -275,6 +275,7 @@ _append_decrypted (mongoc_crypt_t *crypt,
 
 cleanup:
    bson_free (decrypted);
+   mongoc_crypt_key_cleanup(&key);
    return ret;
 }
 
@@ -293,14 +294,14 @@ _copy_and_transform (mongoc_crypt_t *crypt,
          mongoc_crypt_binary_t value;
          bson_t as_bson;
 
-         mongoc_crypt_bson_iter_binary (&iter, &value);
+         mongoc_crypt_binary_from_iter_unowned (&iter, &value);
          bson_init_static (&as_bson, value.data, value.len);
          CRYPT_TRACE ("found FLE binary: %s", tmp_json (&as_bson));
          if (value.subtype == BSON_SUBTYPE_ENCRYPTED) {
             if (transform == MARKING_TO_ENCRYPTED) {
-               mongoc_crypt_marking_t marking = {0};
+               mongoc_crypt_marking_t marking = {{0}};
 
-               if (!_mongoc_crypt_marking_parse (&as_bson, &marking, error)) {
+               if (!_mongoc_crypt_marking_parse_unowned (&as_bson, &marking, error)) {
                   return false;
                }
                if (!_append_encrypted (crypt,
@@ -311,9 +312,9 @@ _copy_and_transform (mongoc_crypt_t *crypt,
                                        error))
                   return false;
             } else {
-               mongoc_crypt_encrypted_t encrypted = {0};
+               mongoc_crypt_encrypted_t encrypted = {{0}};
 
-               if (!_mongoc_crypt_encrypted_parse (
+               if (!_mongoc_crypt_encrypted_parse_unowned (
                       &as_bson, &encrypted, error)) {
                   return false;
                }

@@ -17,11 +17,37 @@
 #include "mongoc/mongoc.h"
 #include "mongoc/mongoc-crypt-private.h"
 
+/* TODO: be very careful. Audit this.
+ * Consider if copying is potentially worth the easier debuggability?
+ * I think the marking + encrypted parse should explicitly say "unowned".
+ * Parsing does not copy, but requires the BSON to be around.
+ */
+
 /* TODO: actually make this code consistent. */
 void
-mongoc_crypt_bson_iter_binary (bson_iter_t *iter, mongoc_crypt_binary_t *out)
+mongoc_crypt_binary_from_iter_unowned (bson_iter_t *iter, mongoc_crypt_binary_t *out)
 {
-   bson_iter_binary (iter, &out->subtype, &out->len, &out->data);
+   bson_iter_binary (iter, &out->subtype, &out->len, (const uint8_t**)&out->data);
+   out->owned = false;
+}
+
+
+/* copies */
+void
+mongoc_crypt_binary_from_iter (bson_iter_t *iter, mongoc_crypt_binary_t *out) {
+   const uint8_t* data;
+   bson_iter_binary (iter, &out->subtype, &out->len, &data);
+   out->data = bson_malloc(out->len);
+   memcpy(out->data, data, out->len);
+   out->owned = true;
+}
+
+
+void
+mongoc_crypt_binary_cleanup (mongoc_crypt_binary_t* binary) {
+   if (binary->owned) {
+      bson_free (binary->data);
+   }
 }
 
 
@@ -37,7 +63,7 @@ mongoc_crypt_bson_append_binary (bson_t *bson,
 
 /* out should be zeroed */
 bool
-_mongoc_crypt_marking_parse (const bson_t *bson,
+_mongoc_crypt_marking_parse_unowned (const bson_t *bson,
                              mongoc_crypt_marking_t *out,
                              bson_error_t *error)
 {
@@ -50,7 +76,7 @@ _mongoc_crypt_marking_parse (const bson_t *bson,
    } else if (BSON_ITER_HOLDS_UTF8 (&iter)) {
       out->key_alt_name = bson_iter_utf8 (&iter, NULL);
    } else if (BSON_ITER_HOLDS_BINARY (&iter)) {
-      mongoc_crypt_bson_iter_binary (&iter, &out->key_id);
+      mongoc_crypt_binary_from_iter_unowned (&iter, &out->key_id);
       if (out->key_id.subtype != BSON_SUBTYPE_UUID) {
          SET_CRYPT_ERR ("key id must be a UUID");
          goto cleanup;
@@ -68,7 +94,7 @@ _mongoc_crypt_marking_parse (const bson_t *bson,
       SET_CRYPT_ERR ("invalid marking, 'iv' is not binary");
       goto cleanup;
    }
-   mongoc_crypt_bson_iter_binary (&iter, &out->iv);
+   mongoc_crypt_binary_from_iter_unowned (&iter, &out->iv);
 
    if (out->iv.len != 16) {
       SET_CRYPT_ERR ("iv must be 16 bytes");
@@ -91,7 +117,7 @@ cleanup:
 
 
 bool
-_mongoc_crypt_encrypted_parse (const bson_t *bson,
+_mongoc_crypt_encrypted_parse_unowned (const bson_t *bson,
                                mongoc_crypt_encrypted_t *out,
                                bson_error_t *error)
 {
@@ -102,7 +128,7 @@ _mongoc_crypt_encrypted_parse (const bson_t *bson,
       SET_CRYPT_ERR ("invalid marking, no 'k'");
       goto cleanup;
    } else if (BSON_ITER_HOLDS_BINARY (&iter)) {
-      mongoc_crypt_bson_iter_binary (&iter, &out->key_id);
+      mongoc_crypt_binary_from_iter_unowned (&iter, &out->key_id);
       if (out->key_id.subtype != BSON_SUBTYPE_UUID) {
          SET_CRYPT_ERR ("key id must be a UUID");
          goto cleanup;
@@ -120,7 +146,7 @@ _mongoc_crypt_encrypted_parse (const bson_t *bson,
       SET_CRYPT_ERR ("invalid marking, 'iv' is not binary");
       goto cleanup;
    }
-   mongoc_crypt_bson_iter_binary (&iter, &out->iv);
+   mongoc_crypt_binary_from_iter_unowned (&iter, &out->iv);
 
    if (out->iv.len != 16) {
       SET_CRYPT_ERR ("iv must be 16 bytes");
@@ -131,7 +157,7 @@ _mongoc_crypt_encrypted_parse (const bson_t *bson,
       SET_CRYPT_ERR ("invalid marking, no 'e'");
       goto cleanup;
    } else {
-      mongoc_crypt_bson_iter_binary (&iter, &out->e);
+      mongoc_crypt_binary_from_iter (&iter, &out->e);
    }
 
    ret = true;
@@ -140,6 +166,7 @@ cleanup:
 }
 
 
+/* Takes ownership of all fields. */
 bool
 _mongoc_crypt_key_parse (const bson_t *bson,
                          mongoc_crypt_key_t *out,
@@ -152,7 +179,7 @@ _mongoc_crypt_key_parse (const bson_t *bson,
       SET_CRYPT_ERR ("invalid key, no '_id'");
       goto cleanup;
    } else if (BSON_ITER_HOLDS_BINARY (&iter)) {
-      mongoc_crypt_bson_iter_binary (&iter, &out->id);
+      mongoc_crypt_binary_from_iter (&iter, &out->id);
       if (out->id.subtype != BSON_SUBTYPE_UUID) {
          SET_CRYPT_ERR ("key id must be a UUID");
          goto cleanup;
@@ -166,7 +193,7 @@ _mongoc_crypt_key_parse (const bson_t *bson,
       SET_CRYPT_ERR ("invalid key, no 'keyMaterial'");
       goto cleanup;
    } else if (BSON_ITER_HOLDS_BINARY (&iter)) {
-      mongoc_crypt_bson_iter_binary (&iter, &out->key_material);
+      mongoc_crypt_binary_from_iter (&iter, &out->key_material);
       if (out->key_material.subtype != BSON_SUBTYPE_BINARY) {
          SET_CRYPT_ERR ("key material must be a binary");
          goto cleanup;
@@ -179,4 +206,11 @@ _mongoc_crypt_key_parse (const bson_t *bson,
    ret = true;
 cleanup:
    return ret;
+}
+
+void
+mongoc_crypt_key_cleanup (mongoc_crypt_key_t* key) {
+   mongoc_crypt_binary_cleanup (&key->id);
+   mongoc_crypt_binary_cleanup (&key->key_material);
+   mongoc_crypt_binary_cleanup (&key->data_key);
 }

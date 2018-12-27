@@ -22,6 +22,7 @@
 #include "bson/bson.h"
 #include "mongoc/mongoc-client.h"
 #include "mongoc/mongoc-error.h"
+#include "mongoc/mongoc-opts-private.h"
 
 /* TODO: use a new error code. */
 #define SET_CRYPT_ERR(...) \
@@ -53,17 +54,23 @@ typedef struct _mongoc_crypt_t {
    mongoc_client_t *keyvault_client; /* initially only one supported, later we
                                         detect changes. */
    mongoc_client_t *mongocryptd_client;
+   mongoc_client_side_encryption_opts_t opts;
 } mongoc_crypt_t;
 
 /* It's annoying passing around multiple values for bson binary values. */
 typedef struct {
-   const uint8_t *data;
+   uint8_t *data;
    bson_subtype_t subtype;
    uint32_t len;
+   bool owned;
 } mongoc_crypt_binary_t;
 
 void
-mongoc_crypt_bson_iter_binary (bson_iter_t *iter, mongoc_crypt_binary_t *out);
+mongoc_crypt_binary_from_iter (bson_iter_t *iter, mongoc_crypt_binary_t *out);
+void
+mongoc_crypt_binary_from_iter_unowned (bson_iter_t *iter, mongoc_crypt_binary_t *out);
+void
+mongoc_crypt_binary_cleanup (mongoc_crypt_binary_t* binary);
 void
 mongoc_crypt_bson_append_binary (bson_t *bson,
                                  const char *key,
@@ -88,20 +95,22 @@ typedef struct {
 typedef struct {
    mongoc_crypt_binary_t id;
    mongoc_crypt_binary_t key_material;
+   mongoc_crypt_binary_t data_key;
 } mongoc_crypt_key_t;
 
 bool
-_mongoc_crypt_marking_parse (const bson_t *bson,
+_mongoc_crypt_marking_parse_unowned (const bson_t *bson,
                              mongoc_crypt_marking_t *out,
                              bson_error_t *error);
 bool
-_mongoc_crypt_encrypted_parse (const bson_t *bson,
+_mongoc_crypt_encrypted_parse_unowned (const bson_t *bson,
                                mongoc_crypt_encrypted_t *out,
                                bson_error_t *error);
 bool
 _mongoc_crypt_key_parse (const bson_t *bson,
                          mongoc_crypt_key_t *out,
                          bson_error_t *error);
+void mongoc_crypt_key_cleanup(mongoc_crypt_key_t* key);
 
 bool
 mongoc_crypt_encrypt (mongoc_crypt_t *crypt,
