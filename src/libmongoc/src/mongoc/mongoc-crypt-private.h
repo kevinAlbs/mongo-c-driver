@@ -154,7 +154,8 @@ _mongoc_crypt_do_decryption (const uint8_t *iv,
                              uint32_t *out_len,
                              bson_error_t *error);
 
+/* Modifies key */
 bool
-_mongoc_crypt_kms_decrypt (const mongoc_crypt_binary_t* key_material);
+_mongoc_crypt_kms_decrypt (mongoc_crypt_t* crypt, mongoc_crypt_key_t* key, bson_error_t* error);
 
 #endif

@@ -16,9 +16,10 @@
 
 #include "mongoc/mongoc.h"
 #include "mongoc/mongoc-crypt-private.h"
-#include "mongoc/mongoc-error.h"
+/* careful, don't rely on private headers. libmongocrypt should depend on
+ * libmongoc, not reach inside. This is okay for now, we're only using this
+ * for the client methods that would otherwise be in mongoc-client.c */
 #include "mongoc/mongoc-client-private.h"
-#include "mongoc/mongoc-collection-private.h"
 
 
 const char *
