@@ -15,7 +15,9 @@
  */
 
 #include "mongoc/mongoc.h"
+#include "common-b64-private.h"
 #include "mongoc/mongoc-crypt-private.h"
+#include "kms_message/kms_message.h"
 
 #define ERRNO_IS_AGAIN(errno)                                          \
    ((errno == EINTR) || (errno == EAGAIN) || (errno == EWOULDBLOCK) || \
@@ -77,28 +79,147 @@ _get_aws_stream (bson_error_t *error)
    return tls_stream;
 }
 
-typedef struct {
-} kms_request_t;
-typedef struct {
-} kms_response_t;
+static void
+print_without_carriage_return (uint8_t *buf, ssize_t n)
+{
+   ssize_t i;
+
+   for (i = 0; i < n; i++) {
+      if (buf[i] != '\r') {
+         putchar (buf[i]);
+      }
+   }
+}
 
 static bool
 _api_call (mongoc_crypt_t *crypt,
-           const kms_request_t *request,
-           kms_response_t *response,
+   kms_request_t *request,
+           kms_response_t **response,
            bson_error_t *error)
 {
    bool ret = false;
    mongoc_stream_t *stream;
+   char *sreq = NULL;
+   size_t sreq_len;
+   ssize_t n;
+   uint8_t read_buf[64];
+   kms_response_parser_t *parser = kms_response_parser_new ();
+   int64_t start;
+   const int32_t timeout_msec = 1000;
 
    stream = _get_aws_stream (error);
    if (!stream) {
-      return false;
+      goto cleanup;
+   }
+
+   /* TODO: CRLF endings? */
+   sreq = kms_request_get_signed (request);
+   sreq_len = strlen (sreq);
+   printf ("%s\n", sreq);
+
+   n = mongoc_stream_write (stream, sreq, sreq_len, timeout_msec);
+   /* TODO: don't error, just keep writing. */
+   if (n != (ssize_t) sreq_len) {
+      SET_CRYPT_ERR (
+               "Only wrote %zd of %zu bytes (errno: %d)\n",
+               n,
+               sreq_len,
+               errno);
+      goto cleanup;
+   }
+
+   start = bson_get_monotonic_time ();
+   while (kms_response_parser_wants_bytes (parser, sizeof (read_buf))) {
+      if (bson_get_monotonic_time () - start > timeout_msec * 1000) {
+         SET_CRYPT_ERR ("Timed out reading response\n");
+         goto cleanup;
+      }
+
+      n = mongoc_stream_read (
+         stream, read_buf, sizeof (read_buf), 1, timeout_msec);
+      if (n < 0) {
+         SET_CRYPT_ERR ("Read returned %zd (errno: %d)\n", n, errno);
+         goto cleanup;
+      }
+
+      if (n == 0) {
+         break;
+      }
+
+      print_without_carriage_return (read_buf, n);
+      kms_response_parser_feed (parser, read_buf, (uint32_t) n);
+   }
+
+   *response = kms_response_parser_get_response (parser);
+   if (!*response) {
+      SET_CRYPT_ERR ("Could not get kms response");
+      goto cleanup;
    }
 
    ret = true;
 cleanup:
+   kms_response_parser_destroy (parser);
+   bson_free (sreq);
    mongoc_stream_destroy (stream);
+   return ret;
+}
+
+static bool
+_get_data_key_from_response (kms_response_t* response, mongoc_crypt_key_t* key, bson_error_t* error) {
+   bson_json_reader_t* reader = NULL;
+   const char* raw_response_body;
+   bson_t response_body = BSON_INITIALIZER;
+   bson_iter_t iter;
+   reader = bson_json_data_reader_new (false, 1024);
+   bool ret = false;
+   char* b64_str;
+   uint32_t b64_strlen;
+   uint8_t* decoded_data;
+   int decoded_len;
+
+   raw_response_body = kms_response_get_body (response);
+   bson_json_data_reader_ingest (reader, (const uint8_t*) raw_response_body, strlen(raw_response_body));
+   switch (bson_json_reader_read(reader, &response_body, error)) {
+   case 1:
+      break;
+   case -1:
+      /* error already set. */
+      goto cleanup;
+   default:
+      SET_CRYPT_ERR ("Could not read JSON document from response");
+      goto cleanup;
+   }
+
+   CRYPT_TRACE ("kms response: %s", tmp_json(&response_body));
+
+   if (!bson_iter_init_find (&iter, &response_body, "Plaintext")) {
+      SET_CRYPT_ERR ("JSON response does not include Plaintext");
+      goto cleanup;
+   }
+
+   b64_str = (char*)bson_iter_utf8 (&iter, &b64_strlen);
+   /* We need to doubly base64 decode. */
+   decoded_data = bson_malloc(b64_strlen + 1);
+   decoded_len = bson_b64_pton (b64_str, decoded_data, b64_strlen);
+
+   b64_str = (char*) decoded_data;
+   b64_str[decoded_len + 1] = '\0';
+   CRYPT_TRACE("decryption #1: %s\n", b64_str);
+   decoded_data = bson_malloc((size_t)decoded_len + 1);
+
+   decoded_len = bson_b64_pton(b64_str, decoded_data, (size_t)decoded_len);
+   decoded_data[decoded_len] = '\0';
+   CRYPT_TRACE ("decryption #2: %s\n", (char*)decoded_data);
+
+   bson_free (b64_str);
+
+   key->data_key.data = decoded_data;
+   key->data_key.len = (uint32_t)decoded_len;
+   key->data_key.owned = true;
+   ret = true;
+cleanup:
+   bson_destroy (&response_body);
+   bson_json_reader_destroy (reader);
    return ret;
 }
 
@@ -108,5 +229,33 @@ _mongoc_crypt_kms_decrypt (mongoc_crypt_t *crypt,
                            mongoc_crypt_key_t *key,
                            bson_error_t *error)
 {
-   return false;
+   kms_request_t* request = NULL;
+   kms_response_t* response = NULL;
+   kms_request_opt_t* request_opt = NULL;
+   bool ret = false;
+
+   request_opt = kms_request_opt_new ();
+   kms_request_opt_set_connection_close (request_opt, true);
+
+   request = kms_decrypt_request_new (
+      key->key_material.data, key->key_material.len /* - 1 ? */, request_opt);
+   kms_request_set_region (request, crypt->opts.awsRegion);
+   kms_request_set_service (request, "kms"); /* That seems odd. */
+   kms_request_set_access_key_id (request, crypt->opts.awsAccessKeyId);
+   kms_request_set_secret_key (request, crypt->opts.awsSecretAccessKey);
+
+   if (!_api_call(crypt, request, &response, error)) {
+      goto cleanup;
+   }
+
+   if (!_get_data_key_from_response(response, key, error)) {
+      goto cleanup;
+   }
+
+   ret = true;
+cleanup:
+   kms_request_opt_destroy (request_opt);
+   kms_request_destroy (request);
+   kms_response_destroy (response);
+   return ret;
 }

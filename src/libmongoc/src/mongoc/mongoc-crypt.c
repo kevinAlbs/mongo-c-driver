@@ -153,6 +153,9 @@ _get_key (mongoc_crypt_t *crypt,
    }
 
    CRYPT_TRACE("decrypting key_material");
+   if (!_mongoc_crypt_kms_decrypt (crypt, out, error)) {
+      goto cleanup;
+   }
 
    ret = true;
 
@@ -201,7 +204,7 @@ _append_encrypted (mongoc_crypt_t *crypt,
    /* TODO: 'a' and 'u' */
 
    if (!_mongoc_crypt_do_encryption (marking->iv.data,
-                                     key.key_material.data,
+                                     key.data_key.data,
                                      bson_get_data (&to_encrypt),
                                      to_encrypt.len,
                                      &encrypted,
@@ -260,7 +263,7 @@ _append_decrypted (mongoc_crypt_t *crypt,
    }
 
    if (!_mongoc_crypt_do_decryption (encrypted->iv.data,
-                                     key.key_material.data,
+                                     key.data_key.data,
                                      encrypted->e.data,
                                      encrypted->e.len,
                                      &decrypted,

@@ -21,8 +21,11 @@
 #include "test-libmongoc.h"
 #include "mongoc/mongoc-crypt-private.h"
 #include "mongoc/mongoc-collection-private.h"
+#include "mongoc/credentials-nocommit.txt"
 
 #include "openssl/evp.h"
+
+#define STRINGIZE(X) #X
 
 void
 test_encryption_with_schema (void)
@@ -49,7 +52,11 @@ test_encryption_with_schema (void)
    BSON_APPEND_DOCUMENT_BEGIN (
       &client_opts, "clientSideEncryption", &encryption_opts);
    BSON_APPEND_DOCUMENT (&encryption_opts, "schemas", &schemas);
+   BSON_APPEND_UTF8 (&encryption_opts, "awsAccessKeyId", AWS_ACCESS_KEY_ID); /* Define this in CFLAGS for now... */
+   BSON_APPEND_UTF8 (&encryption_opts, "awsSecretAccessKey", AWS_SECRET_ACCESS_KEY);
+   BSON_APPEND_UTF8 (&encryption_opts, "awsRegion", "us-east-1");
    bson_append_document_end (&client_opts, &encryption_opts);
+   printf("opts are: %s\n", tmp_json(&encryption_opts));
    uri = mongoc_uri_new_with_error ("mongodb://localhost:27017/", &error);
    ASSERT_OR_PRINT (uri, error);
 

@@ -624,6 +624,12 @@ endif ()
 add_library (mongoc_shared SHARED ${SOURCES} ${HEADERS} ${HEADERS_FORWARDING})
 set_target_properties (mongoc_shared PROPERTIES CMAKE_CXX_VISIBILITY_PRESET hidden)
 target_link_libraries (mongoc_shared ${LIBRARIES} ${BSON_LIBRARIES})
+
+# TODO: remove this later.
+find_package(KMS_MESSAGE REQUIRED)
+target_link_libraries (mongoc_shared /Users/kevinalbertson/bin/kms/lib/libkms_message.dylib)
+target_include_directories(mongoc_shared PUBLIC /Users/kevinalbertson/bin/kms/include)
+
 target_include_directories (mongoc_shared BEFORE PUBLIC ${BSON_INCLUDE_DIRS} ${MONGOC_INTERNAL_INCLUDE_DIRS})
 target_compile_definitions (mongoc_shared PUBLIC MONGOC_COMPILATION ${BSON_DEFINITIONS})
 
@@ -637,6 +643,9 @@ if (MONGOC_ENABLE_STATIC)
    target_compile_definitions (mongoc_static PUBLIC MONGOC_COMPILATION MONGOC_STATIC ${BSON_STATIC_DEFINITIONS})
    set_target_properties (mongoc_static PROPERTIES VERSION 0.0.0)
    set_target_properties (mongoc_static PROPERTIES OUTPUT_NAME "mongoc-static-${MONGOC_API_VERSION}")
+   target_link_libraries (mongoc_static /Users/kevinalbertson/bin/kms/lib/libkms_message.dylib)
+   target_include_directories(mongoc_static PUBLIC /Users/kevinalbertson/bin/kms/include)
+
 endif ()
 
 if (ENABLE_APPLE_FRAMEWORK)
@@ -663,6 +672,8 @@ endif ()
 function (mongoc_add_test test use_shared)
    if (ENABLE_TESTS)
       add_executable (${test} ${ARGN})
+      target_link_libraries (${test} /Users/kevinalbertson/bin/kms/lib/libkms_message.dylib)
+      target_include_directories(${test} PUBLIC /Users/kevinalbertson/bin/kms/include)
       if (NOT MSVC)
          # We've tests that test our deprecated api. MSVC 2013 will complain about invalid flag
          set_source_files_properties (${ARGN} PROPERTIES COMPILE_FLAGS -Wno-deprecated-declarations)
