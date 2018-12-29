@@ -21,27 +21,18 @@
 #include "test-libmongoc.h"
 #include "mongoc/mongoc-crypt-private.h"
 #include "mongoc/mongoc-collection-private.h"
-#include "mongoc/credentials-nocommit.txt"
 
 #include "openssl/evp.h"
 
-#define STRINGIZE(X) #X
-
-void
-test_encryption_with_schema (void)
+static void
+_append_encryption_opts (bson_t *client_opts)
 {
-   bson_error_t error;
    bson_json_reader_t *reader;
    bson_t schemas = BSON_INITIALIZER;
-   bson_t client_opts = BSON_INITIALIZER;
    bson_t encryption_opts;
-   bson_t schema;
-   mongoc_uri_t *uri;
-   mongoc_client_t *client;
-   mongoc_collection_t *coll;
+   bson_error_t error;
    int status;
-   bson_t encrypted, decrypted;
-   bool ret;
+
 
    reader = bson_json_reader_new_from_file ("./build/example.schemas", &error);
    ASSERT_OR_PRINT (reader, error);
@@ -50,15 +41,38 @@ test_encryption_with_schema (void)
    ASSERT_OR_PRINT (status == 1, error);
 
    BSON_APPEND_DOCUMENT_BEGIN (
-      &client_opts, "clientSideEncryption", &encryption_opts);
+      client_opts, "clientSideEncryption", &encryption_opts);
    BSON_APPEND_DOCUMENT (&encryption_opts, "schemas", &schemas);
-   BSON_APPEND_UTF8 (&encryption_opts, "awsAccessKeyId", AWS_ACCESS_KEY_ID); /* Define this in CFLAGS for now... */
-   BSON_APPEND_UTF8 (&encryption_opts, "awsSecretAccessKey", AWS_SECRET_ACCESS_KEY);
-   BSON_APPEND_UTF8 (&encryption_opts, "awsRegion", "us-east-1");
-   bson_append_document_end (&client_opts, &encryption_opts);
-   printf("opts are: %s\n", tmp_json(&encryption_opts));
+   BSON_APPEND_UTF8 (&encryption_opts,
+                     "awsAccessKeyId",
+                     test_framework_getenv ("AWS_ACCESS_KEY_ID"));
+   BSON_APPEND_UTF8 (&encryption_opts,
+                     "awsSecretAccessKey",
+                     test_framework_getenv ("AWS_SECRET_ACCESS_KEY"));
+   BSON_APPEND_UTF8 (
+      &encryption_opts, "awsRegion", test_framework_getenv ("AWS_REGION"));
+   bson_append_document_end (client_opts, &encryption_opts);
+   printf ("opts are: %s\n", tmp_json (&encryption_opts));
+   bson_destroy (&schemas);
+   bson_json_reader_destroy (reader);
+}
+
+void
+test_encryption_with_schema (void)
+{
+   bson_error_t error;
+   bson_t client_opts = BSON_INITIALIZER;
+   bson_t schema;
+   mongoc_uri_t *uri;
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   bson_t encrypted, decrypted;
+   bool ret;
+
    uri = mongoc_uri_new_with_error ("mongodb://localhost:27017/", &error);
    ASSERT_OR_PRINT (uri, error);
+
+   _append_encryption_opts (&client_opts);
 
    client = mongoc_client_new_with_opts (uri, &client_opts, &error);
    ASSERT_OR_PRINT (client, error);
@@ -85,13 +99,99 @@ test_encryption_with_schema (void)
    ASSERT_OR_PRINT (ret, error);
 
    bson_destroy (&schema);
-   bson_destroy (&schemas);
+
    bson_destroy (&client_opts);
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
    mongoc_uri_destroy (uri);
-   bson_json_reader_destroy (reader);
 }
+
+static bson_t *
+_find_one (mongoc_collection_t *coll, bson_t *filter)
+{
+   mongoc_cursor_t *cursor;
+   const bson_t *doc;
+   bson_t *returning;
+
+   cursor = mongoc_collection_find_with_opts (coll, filter, NULL, NULL);
+   ASSERT (mongoc_cursor_next (cursor, &doc));
+   returning = bson_copy (doc);
+   mongoc_cursor_destroy (cursor);
+   return returning;
+}
+
+#define FIND_ONE(coll) _find_one (coll, tmp_bson ("{}"))
+
+static void
+_assert_encrypted (mongoc_collection_t *coll_w_enc, char *field)
+{
+   /* creates an unencrypted client. */
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   mongoc_cursor_t *cursor;
+   const bson_t *doc;
+
+   client = mongoc_client_new_from_uri (coll_w_enc->client->uri);
+   coll = mongoc_client_get_collection (
+      client, coll_w_enc->db, coll_w_enc->collection);
+   cursor =
+      mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), NULL, NULL);
+
+   while (mongoc_cursor_next (cursor, &doc)) {
+      bson_iter_t iter;
+      mongoc_crypt_binary_t binary;
+
+      ASSERT (bson_iter_init_find (&iter, doc, field));
+      ASSERT (BSON_ITER_HOLDS_BINARY (&iter));
+      mongoc_crypt_binary_from_iter_unowned (&iter, &binary);
+      ASSERT (binary.subtype == BSON_SUBTYPE_ENCRYPTED);
+   }
+}
+
+
+void
+test_encryption_round_trip (void)
+{
+   bson_error_t error;
+   bson_t client_opts = BSON_INITIALIZER;
+   bson_t schema;
+   mongoc_uri_t *uri;
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   bool ret;
+   bson_t *returned;
+   const char *json = "{ 'name': 'Todd Davis', 'ssn': '457-55-5642' }";
+
+   uri = mongoc_uri_new_with_error ("mongodb://localhost:27017/", &error);
+   ASSERT_OR_PRINT (uri, error);
+
+   _append_encryption_opts (&client_opts);
+
+   client = mongoc_client_new_with_opts (uri, &client_opts, &error);
+   ASSERT_OR_PRINT (client, error);
+
+   coll = mongoc_client_get_collection (client, "test", "crypt");
+   BSON_ASSERT (_mongoc_client_get_schema (client, coll->ns, &schema));
+
+   (void) mongoc_collection_drop (coll,
+                                  &error); /* no worries if ns not found. */
+
+   ret =
+      mongoc_collection_insert_one (coll, tmp_bson (json), NULL, NULL, &error);
+   ASSERT_OR_PRINT (ret, error);
+
+   returned = FIND_ONE (coll);
+   ASSERT_MATCH (returned, json);
+
+   _assert_encrypted (coll, "ssn");
+
+   bson_destroy (&schema);
+   bson_destroy (&client_opts);
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+   mongoc_uri_destroy (uri);
+}
+
 
 void
 test_openssl (void)
@@ -179,4 +279,5 @@ test_crypt_install (TestSuite *suite)
 {
    TestSuite_AddLive (suite, "/openssl", test_openssl);
    TestSuite_AddLive (suite, "/crypt", test_encryption_with_schema);
+   TestSuite_AddLive (suite, "/crypt/round_trip", test_encryption_round_trip);
 }

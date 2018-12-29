@@ -27,6 +27,7 @@
 #include "mongoc/mongoc-util-private.h"
 #include "mongoc/mongoc-write-concern-private.h"
 #include "mongoc/mongoc-read-prefs-private.h"
+#include "mongoc/mongoc-crypt-private.h"
 
 
 #undef MONGOC_LOG_DOMAIN
@@ -1150,6 +1151,30 @@ _call_transition (mongoc_cursor_t *cursor)
    return state;
 }
 
+/* out is always initialized.
+ * if tried_encrypting = false, no encryption occurred and out is left as an
+ * empty document.
+ * */
+static bool
+_maybe_decrypt (mongoc_client_t *client,
+                const bson_t *in,
+                bson_t *out,
+                bool *tried_decrypting,
+                bson_error_t *error)
+{
+   bool ret;
+   bson_init (out);
+
+   if (!client->crypt) {
+      *tried_decrypting = false;
+      return true;
+   }
+
+   *tried_decrypting = true;
+
+   ret = mongoc_crypt_decrypt (client->crypt, in, out, error);
+   return ret;
+}
 
 bool
 mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
@@ -1226,6 +1251,25 @@ mongoc_cursor_next (mongoc_cursor_t *cursor, const bson_t **bson)
    }
 
 done:
+   if (ret) {
+      bson_t decrypted;
+      bool tried_decrypting = false;
+
+      if (!_maybe_decrypt (cursor->client,
+                           cursor->current,
+                           &decrypted,
+                           &tried_decrypting,
+                           &cursor->error)) {
+         cursor->state = DONE;
+         ret = false;
+      } else if (tried_decrypting) {
+         /* TODO: this leaks. Put this somewhere else. Better yet, use a new
+          * cursor interface that wraps other cursors. */
+         printf ("setting decrypted:%s\n", bson_as_json (&decrypted, NULL));
+         *bson = bson_copy (&decrypted);
+      }
+      bson_destroy (&decrypted);
+   }
    cursor->count++;
    RETURN (ret);
 }

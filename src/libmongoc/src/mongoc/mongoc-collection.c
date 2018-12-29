@@ -1763,6 +1763,39 @@ mongoc_collection_insert (mongoc_collection_t *collection,
 }
 
 
+#include "mongoc/mongoc-crypt-private.h"
+/* out is always initialized.
+ * if tried_encrypting = false, no encryption occurred and out is left as an
+ * empty document.
+ * */
+static bool
+_maybe_encrypt (mongoc_collection_t *coll,
+                const bson_t *in,
+                bson_t *out,
+                bool *tried_encrypting,
+                bson_error_t *error)
+{
+   bson_t schema;
+   bool ret;
+   mongoc_client_t *client = coll->client;
+
+   bson_init (out);
+
+   if (!client->crypt) {
+      *tried_encrypting = false;
+      return true;
+   }
+
+   *tried_encrypting = true;
+   if (!_mongoc_client_get_schema (client, coll->ns, &schema)) {
+      return false;
+   }
+
+   ret = mongoc_crypt_encrypt (client->crypt, &schema, in, out, error);
+   bson_destroy (&schema);
+   return ret;
+}
+
 /*
  *--------------------------------------------------------------------------
  *
@@ -1798,6 +1831,8 @@ mongoc_collection_insert_one (mongoc_collection_t *collection,
    mongoc_write_command_t command;
    mongoc_write_result_t result;
    bool ret = false;
+   bool tried_encrypting = false;
+   bson_t encrypted_doc;
 
    ENTRY;
 
@@ -1814,6 +1849,15 @@ mongoc_collection_insert_one (mongoc_collection_t *collection,
    if (!_mongoc_validate_new_document (
           document, insert_one_opts.crud.validate, error)) {
       GOTO (done);
+   }
+
+   if (!_maybe_encrypt (
+          collection, document, &encrypted_doc, &tried_encrypting, error)) {
+      GOTO (done);
+   }
+
+   if (tried_encrypting) {
+      document = &encrypted_doc;
    }
 
    _mongoc_write_result_init (&result);
@@ -1841,6 +1885,9 @@ mongoc_collection_insert_one (mongoc_collection_t *collection,
    _mongoc_write_command_destroy (&command);
 
 done:
+   if (tried_encrypting) {
+      bson_destroy (&encrypted_doc);
+   }
    _mongoc_insert_one_opts_cleanup (&insert_one_opts);
    RETURN (ret);
 }
