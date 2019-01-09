@@ -258,7 +258,7 @@ apm_match_visitor (match_ctx_t *ctx,
    } while (0)
 #define IS_COMMAND(cmd) (ends_with (ctx->path, "command") && !strcmp (key, cmd))
 
-   if (ends_with (ctx->path, "command") && !visitor_ctx->command_name) {
+   if (ends_with (ctx->path, "command") && !visitor_ctx->command_name && doc_iter) {
       visitor_ctx->command_name = bson_strdup (bson_iter_key (doc_iter));
    }
 
@@ -433,8 +433,8 @@ check_json_apm_events (json_test_ctx_t *ctx, const bson_t *expectations)
                         "\texpected: %s\n\n"
                         "\tactual  : %s\n\n"
                         "\terror   : %s\n\n",
+			bson_as_canonical_extended_json (&expectation, NULL),
                         bson_as_canonical_extended_json (&event, NULL),
-                        bson_as_canonical_extended_json (&expectation, NULL),
                         match_ctx.errmsg);
          }
       }

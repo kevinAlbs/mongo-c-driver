@@ -25,6 +25,7 @@
 
 #define SESSION_NEVER_USED (-1)
 
+#define WITH_TXN_TIMEOUT_MS 120 * 1000
 
 static void
 txn_opts_set (mongoc_transaction_opt_t *opts,
@@ -701,6 +702,10 @@ _mongoc_client_session_new (mongoc_client_t *client,
       session->opts.flags = MONGOC_SESSION_CAUSAL_CONSISTENCY;
    }
 
+   /* these values are used for testing only. */
+   session->with_txn_timeout_ms = 0;
+   session->fail_commit_label = NULL;
+
    RETURN (session);
 }
 
@@ -799,6 +804,108 @@ mongoc_client_session_advance_operation_time (mongoc_client_session_t *session,
    EXIT;
 }
 
+static bool
+timeout_exceeded (int64_t expire_at)
+{
+   int64_t current_time = bson_get_monotonic_time ();
+   return current_time >= expire_at;
+}
+
+bool
+mongoc_client_session_with_transaction (
+   mongoc_client_session_t *session,
+   mongoc_client_session_with_transaction_cb_t cb,
+   const mongoc_transaction_opt_t *opts,
+   void *ctx,
+   bson_error_t *error)
+{
+   mongoc_transaction_state_t state;
+   int64_t timeout;
+   int64_t expire_at;
+   bson_t reply;
+   bool res;
+
+   ENTRY;
+
+   timeout = session->with_txn_timeout_ms > 0 ? session->with_txn_timeout_ms
+                                              : WITH_TXN_TIMEOUT_MS;
+
+   expire_at = bson_get_monotonic_time () + ((int64_t) timeout * 1000);
+
+   /* Attempt to wrap a user callback in start- and end- transaction semantics.
+      If this fails for transient reasons, restart, either from the very
+      beginning,
+      or just retry committing the transaction. Will retry until the
+      timeout WITH_TXN_TIMEOUT_MS is exhausted. */
+   while (true) {
+      res = mongoc_client_session_start_transaction (session, opts, error);
+
+      if (!res) {
+         bson_init (&reply);
+         GOTO (done);
+      }
+
+      res = cb (session, ctx, &reply, error);
+      state = session->txn.state;
+
+      if (!res) {
+         if (state == MONGOC_TRANSACTION_STARTING ||
+             state == MONGOC_TRANSACTION_IN_PROGRESS) {
+            BSON_ASSERT (
+               mongoc_client_session_abort_transaction (session, NULL));
+         }
+
+         if (mongoc_error_has_label (&reply, TRANSIENT_TXN_ERR) &&
+             !timeout_exceeded (expire_at)) {
+            continue;
+         }
+
+         /* Unknown error running callback, fail. */
+         GOTO (done);
+      }
+
+      if (state == MONGOC_TRANSACTION_ABORTED ||
+          state == MONGOC_TRANSACTION_NONE ||
+          state == MONGOC_TRANSACTION_COMMITTED ||
+          state == MONGOC_TRANSACTION_COMMITTED_EMPTY) {
+         GOTO (done);
+      }
+
+      /* Commit the transaction, retrying either from here or from the start on
+       * error */
+      while (true) {
+         res =
+            mongoc_client_session_commit_transaction (session, &reply, error);
+
+         if (!res) {
+            if (mongoc_error_has_label (&reply, UNKNOWN_COMMIT_RESULT) &&
+                !timeout_exceeded (expire_at)) {
+               /* commit_transaction applies majority write concern on retry
+                * attempts */
+               continue;
+            }
+
+            if (mongoc_error_has_label (&reply, TRANSIENT_TXN_ERR) &&
+                !timeout_exceeded (expire_at)) {
+               /* In the case of a transient txn error, go back to outside loop
+                */
+               break;
+            }
+
+            /* Unknown error committing transaction, fail. */
+            GOTO (done);
+         }
+
+         /* Transaction successfully committed! */
+         GOTO (done);
+      }
+   }
+
+done:
+   bson_destroy (&reply);
+
+   RETURN (res);
+}
 
 bool
 mongoc_client_session_start_transaction (mongoc_client_session_t *session,
@@ -881,6 +988,24 @@ mongoc_client_session_commit_transaction (mongoc_client_session_t *session,
    ENTRY;
 
    BSON_ASSERT (session);
+
+   /* For testing only, mock out certain kinds of errors. */
+   if (session->fail_commit_label) {
+      bson_t labels;
+
+      BSON_ASSERT (reply);
+
+      bson_init (reply);
+      BSON_APPEND_ARRAY_BEGIN (reply, "errorLabels", &labels);
+      BSON_APPEND_UTF8 (&labels, "0", session->fail_commit_label);
+
+      /* Waste the test timeout, if there is one set. */
+      if (session->with_txn_timeout_ms) {
+         _mongoc_usleep (session->with_txn_timeout_ms * 1000);
+      }
+
+      RETURN (r);
+   }
 
    /* See Transactions Spec for state diagram. In COMMITTED state, user can call
     * commit again to retry after network error */
