@@ -170,6 +170,10 @@ _bson_context_set_oid_seq64_threadsafe (bson_context_t *context, /* IN */
    memcpy (&oid->bytes[4], &seq, sizeof (seq));
 }
 
+
+static void
+_bson_context_init_random (bson_context_t *context, bool init_sequence);
+
 /*
  *--------------------------------------------------------------------------
  *
@@ -191,6 +195,15 @@ _bson_context_set_oid_rand (bson_context_t *context, bson_oid_t *oid)
    BSON_ASSERT (context);
    BSON_ASSERT (oid);
 
+   if (context->flags & BSON_CONTEXT_DISABLE_PID_CACHE) {
+      uint16_t pid = _bson_getpid ();
+
+      if (pid != context->pid) {
+         context->pid = pid;
+         /* randomize the random bytes, not the sequence. */
+         _bson_context_init_random (context, false);
+      }
+   }
    memcpy (&oid->bytes[4], &context->rand, sizeof (context->rand));
 }
 
@@ -226,47 +239,57 @@ _get_rand (unsigned int *pseed)
 
 
 static void
-_bson_context_init (bson_context_t *context,    /* IN */
-                    bson_context_flags_t flags) /* IN */
+_bson_context_init_random (bson_context_t *context, bool init_sequence)
 {
+   int64_t rand_bytes;
    struct timeval tv;
    unsigned int seed[3];
    unsigned int real_seed;
-   int64_t rand_bytes;
-
-   context->flags = (int) flags;
-   context->oid_set_seq32 = _bson_context_set_oid_seq32;
-   context->oid_set_seq64 = _bson_context_set_oid_seq64;
 
    /*
-    * Generate a seed for our the random starting position of our increment
-    * bytes. We mask off the last nibble so that the last digit of the OID will
-    * start at zero. Just to be nice.
-    *
     * The seed itself is made up of the current time in seconds, milliseconds,
     * and pid xored together. I welcome better solutions if at all necessary.
     */
    bson_gettimeofday (&tv);
    seed[0] = (unsigned int) tv.tv_sec;
    seed[1] = (unsigned int) tv.tv_usec;
-   seed[2] = _bson_getpid ();
+   seed[2] = context->pid;
    real_seed = seed[0] ^ seed[1] ^ seed[2];
 
 #ifndef BSON_HAVE_RAND_R
    srand (real_seed);
 #endif
 
-   context->seq32 = _get_rand (&real_seed) & 0x007FFFF0;
+   /* Generate a seed for the random starting position of our increment
+    * bytes and the five byte random number. */
+   if (init_sequence) {
+      /* We mask off the last nibble so that the last digit of the OID will
+       * start at zero. Just to be nice. */
+      context->seq32 = _get_rand (&real_seed) & 0x007FFFF0;
+   }
+
    rand_bytes = _get_rand (&real_seed);
    rand_bytes <<= 32;
    rand_bytes |= _get_rand (&real_seed);
+
    /* Copy five random bytes, endianness does not matter. */
    memcpy (&context->rand, (char *) &rand_bytes, sizeof (context->rand));
+}
+
+static void
+_bson_context_init (bson_context_t *context, bson_context_flags_t flags)
+{
+   context->flags = (int) flags;
+   context->oid_set_seq32 = _bson_context_set_oid_seq32;
+   context->oid_set_seq64 = _bson_context_set_oid_seq64;
 
    if ((flags & BSON_CONTEXT_THREAD_SAFE)) {
       context->oid_set_seq32 = _bson_context_set_oid_seq32_threadsafe;
       context->oid_set_seq64 = _bson_context_set_oid_seq64_threadsafe;
    }
+
+   context->pid = _bson_getpid ();
+   _bson_context_init_random (context, true);
 }
 
 
