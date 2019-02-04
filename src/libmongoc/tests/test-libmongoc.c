@@ -2203,6 +2203,7 @@ WIRE_VERSION_CHECKS (4)
 WIRE_VERSION_CHECKS (5)
 WIRE_VERSION_CHECKS (6)
 WIRE_VERSION_CHECKS (7)
+WIRE_VERSION_CHECKS (8)
 
 bool
 test_framework_skip_if_no_dual_ip_hostname (void)
