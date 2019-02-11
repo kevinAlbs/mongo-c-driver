@@ -3795,7 +3795,7 @@ test_insert_bulk_validate (void)
    mongoc_client_t *client;
    mongoc_collection_t *collection;
    bson_error_t error;
-   bson_t *docs[] = {tmp_bson ("{'a': 1}"), tmp_bson ("{'$': 2}")};
+   const bson_t *docs[] = {tmp_bson ("{'a': 1}"), tmp_bson ("{'$': 2}")};
 
    BEGIN_IGNORE_DEPRECATIONS
    client = test_framework_client_new ();
@@ -5459,12 +5459,14 @@ _test_update_validate (update_fn_t update_fn)
       error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, msg);
 
    /* Check that validation passes for a valid update. */
-   BSON_ASSERT (update_fn (collection,
-                           selector,
-                           valid_update,
-                           tmp_bson ("{'validate': 31}"),
-                           NULL,
-                           &error));
+   ASSERT_OR_PRINT (
+      update_fn (collection,
+                 selector,
+                 valid_update,
+                 tmp_bson ("{'validate': %d}", BSON_VALIDATE_UTF8),
+                 NULL,
+                 &error),
+      error);
 
    mongoc_collection_destroy (collection);
    mongoc_client_destroy (client);
