@@ -857,6 +857,7 @@ mongoc_client_session_with_transaction (
 
          if (mongoc_error_has_label (&reply, TRANSIENT_TXN_ERR) &&
              !timeout_exceeded (expire_at)) {
+	    bson_destroy (&reply);
             continue;
          }
 
@@ -871,6 +872,8 @@ mongoc_client_session_with_transaction (
          GOTO (done);
       }
 
+      bson_destroy (&reply);
+
       /* Commit the transaction, retrying either from here or from the start on
        * error */
       while (true) {
@@ -882,6 +885,7 @@ mongoc_client_session_with_transaction (
                 !timeout_exceeded (expire_at)) {
                /* commit_transaction applies majority write concern on retry
                 * attempts */
+	       bson_destroy (&reply);
                continue;
             }
 
@@ -889,6 +893,7 @@ mongoc_client_session_with_transaction (
                 !timeout_exceeded (expire_at)) {
                /* In the case of a transient txn error, go back to outside loop
                 */
+	       bson_destroy (&reply);
                break;
             }
 

@@ -101,6 +101,7 @@ with_transaction_test_run_operation (json_test_ctx_t *ctx,
 
    bson_destroy (&args);
    bson_destroy (&reply);
+   mongoc_transaction_opts_destroy (opts);
 
    return res;
 }
