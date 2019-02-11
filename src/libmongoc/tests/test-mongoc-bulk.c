@@ -857,25 +857,25 @@ test_update_with_opts_validate (void)
    collection = get_test_collection (client, "test_update_with_opts_validate");
 
    for (i = 0; i < 2; i++) {
-      update_with_opts_fn update_fn;
+      update_with_opts_fn update_function;
 
-      update_fn = fns[i];
+      update_function = fns[i];
       bulk =
          mongoc_collection_create_bulk_operation_with_opts (collection, NULL);
-      BSON_ASSERT (!update_fn (
+      BSON_ASSERT (!update_function (
          bulk, tmp_bson ("{}"), tmp_bson ("{'a.a': 1}"), NULL, &error));
       ASSERT_ERROR_CONTAINS (error,
                              MONGOC_ERROR_COMMAND,
                              MONGOC_ERROR_COMMAND_INVALID_ARG,
                              "update only works with $ operators");
 
-      BSON_ASSERT (update_fn (bulk,
+      BSON_ASSERT (update_function (bulk,
                               tmp_bson ("{}"),
                               tmp_bson ("{'a.a': 1}"),
                               tmp_bson ("{'validate': %d}", BSON_VALIDATE_NONE),
                               &error));
       BSON_ASSERT (
-         !update_fn (bulk,
+         !update_function (bulk,
                      tmp_bson ("{}"),
                      tmp_bson ("{'a.a': 1}"),
                      tmp_bson ("{'validate': %d}", BSON_VALIDATE_DOT_KEYS),
@@ -891,7 +891,7 @@ test_update_with_opts_validate (void)
       bulk =
          mongoc_collection_create_bulk_operation_with_opts (collection, NULL);
       BSON_ASSERT (
-         update_fn (bulk,
+         update_function (bulk,
                     tmp_bson ("{}"),
                     tmp_bson ("{'$set': {'a': 1}}"),
                     tmp_bson ("{'validate': %d}", BSON_VALIDATE_DOT_KEYS),
