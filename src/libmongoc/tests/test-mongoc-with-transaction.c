@@ -38,8 +38,10 @@ with_transaction_callback_runner (mongoc_client_session_t *session,
       bson_lookup_doc (test, "operations", &operations);
       BSON_ASSERT (bson_iter_init (&iter, &operations));
 
+      bson_init (reply);
       while (bson_iter_next (&iter)) {
          bson_iter_bson (&iter, &operation);
+         bson_destroy (reply);
          res = json_test_operation (cb_ctx->ctx,
                                     test,
                                     &operation,
@@ -49,6 +51,7 @@ with_transaction_callback_runner (mongoc_client_session_t *session,
          if (!res) {
             break;
          }
+         
       }
    }
 
