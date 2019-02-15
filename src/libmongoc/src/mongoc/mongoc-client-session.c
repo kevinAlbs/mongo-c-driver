@@ -826,7 +826,7 @@ mongoc_client_session_with_transaction (
    bool res;
 
    ENTRY;
-
+   fprintf (stderr, "\n\ntop of with_transaction\n");
    timeout = session->with_txn_timeout_ms > 0 ? session->with_txn_timeout_ms
                                               : WITH_TXN_TIMEOUT_MS;
 
@@ -838,36 +838,43 @@ mongoc_client_session_with_transaction (
       or just retry committing the transaction. Will retry until the
       timeout WITH_TXN_TIMEOUT_MS is exhausted. */
    while (true) {
+      fprintf (stderr, "top of outer while loop\n");
       res = mongoc_client_session_start_transaction (session, opts, error);
 
       if (!res) {
+	 fprintf (stderr, "failed to start transaction\n");
          bson_init (&reply);
          GOTO (done);
       }
-
+      fprintf (stderr, "running callback\n");
       res = cb (session, ctx, &reply, error);
       state = session->txn.state;
 
       /* Make sure reply is initialized, even if the callback
     didn't do it. */
       if (reply.len == 0) {
+	 fprintf (stderr, "callback wasn't initialized\n");
          bson_init (&reply);
       }
 
       if (!res) {
+	 fprintf (stderr, "callback returned an error\n");
          if (state == MONGOC_TRANSACTION_STARTING ||
              state == MONGOC_TRANSACTION_IN_PROGRESS) {
+	    fprintf (stderr, "aborting transaction\n");
             BSON_ASSERT (
                mongoc_client_session_abort_transaction (session, NULL));
          }
 
          if (mongoc_error_has_label (&reply, TRANSIENT_TXN_ERR) &&
              !timeout_exceeded (expire_at)) {
+	    fprintf (stderr, "transient txn error, going to top of loop\n");
             bson_destroy (&reply);
             continue;
          }
 
          /* Unknown error running callback, fail. */
+	 fprintf (stderr, "unknown callback error.\n");
          GOTO (done);
       }
 
@@ -875,22 +882,27 @@ mongoc_client_session_with_transaction (
           state == MONGOC_TRANSACTION_NONE ||
           state == MONGOC_TRANSACTION_COMMITTED ||
           state == MONGOC_TRANSACTION_COMMITTED_EMPTY) {
+	 fprintf (stderr, "transaction aborted or committed already\n");
          GOTO (done);
       }
 
+      fprintf (stderr, "falling through to lower loop\n");
       bson_destroy (&reply);
 
       /* Commit the transaction, retrying either from here or from the start on
        * error */
       while (true) {
+	 fprintf (stderr, "top of inner loop\n");
          res =
             mongoc_client_session_commit_transaction (session, &reply, error);
 
          if (!res) {
+	    fprintf (stderr, "failed to commit transaction\n");
             if (mongoc_error_has_label (&reply, UNKNOWN_COMMIT_RESULT) &&
                 !timeout_exceeded (expire_at)) {
                /* commit_transaction applies majority write concern on retry
                 * attempts */
+	       fprintf (stderr, "unknown commit result, back to inner loop\n");
                bson_destroy (&reply);
                continue;
             }
@@ -899,20 +911,24 @@ mongoc_client_session_with_transaction (
                 !timeout_exceeded (expire_at)) {
                /* In the case of a transient txn error, go back to outside loop
                 */
+	       fprintf (stderr, "transient txn error, back to outer loop\n");
                bson_destroy (&reply);
                break;
             }
 
             /* Unknown error committing transaction, fail. */
+	    fprintf (stderr, "unknown error committing transaction\n");
             GOTO (done);
          }
 
          /* Transaction successfully committed! */
+	 fprintf (stderr, "transaction successfully committed\n");
          GOTO (done);
       }
    }
 
 done:
+   fprintf (stderr, "done label\n");
    bson_destroy (&reply);
 
    RETURN (res);
