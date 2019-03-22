@@ -428,6 +428,7 @@ set (SOURCES ${SOURCES}
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-change-stream.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-client.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-client-pool.c
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-client-side-encryption.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cluster.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cluster-sasl.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-collection.c
@@ -644,6 +645,9 @@ if (WIN32)
    set (LIBRARIES ${LIBRARIES} ws2_32)
 endif ()
 
+# Oddly, even with libmongocrypt installed in usr/local/lib, -lmongocrypt cannot find it.
+set (LIBRARIES ${LIBRARIES} /usr/local/lib/libmongocrypt.dylib)
+
 add_library (mongoc_shared SHARED ${SOURCES} ${HEADERS} ${HEADERS_FORWARDING})
 set_target_properties (mongoc_shared PROPERTIES CMAKE_CXX_VISIBILITY_PRESET hidden)
 target_link_libraries (mongoc_shared PRIVATE ${LIBRARIES} PUBLIC ${BSON_LIBRARIES})
@@ -772,6 +776,7 @@ set (test-libmongoc-sources
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-change-stream.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-client.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-client-pool.c
+   ${PROJECT_SOURCE_DIR}/tests/test-mongoc-client-side-encryption.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-cluster.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-collection.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-collection-find.c
@@ -910,6 +915,9 @@ mongoc_add_example (common-operations TRUE ${PROJECT_SOURCE_DIR}/examples/common
 
 # examples/find_and_modify_with_opts/
 mongoc_add_example (fam TRUE ${PROJECT_SOURCE_DIR}/examples/find_and_modify_with_opts/fam.c)
+
+# examples/example-client-side-encryption
+mongoc_add_example (example-client-side-encryption TRUE ${PROJECT_SOURCE_DIR}/examples/example-client-side-encryption.c)
 
 file (COPY ${PROJECT_SOURCE_DIR}/tests/binary DESTINATION ${PROJECT_BINARY_DIR}/tests)
 file (COPY ${PROJECT_SOURCE_DIR}/tests/json DESTINATION ${PROJECT_BINARY_DIR}/tests)

@@ -137,7 +137,7 @@ _mongoc_get_command_name (const bson_t *command)
    return name;
 }
 
-
+/* Duplicated with gCommandFields in mongoc-write-command.c */
 const char *
 _mongoc_get_documents_field_name (const char *command_name)
 {

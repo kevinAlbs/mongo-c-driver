@@ -21,6 +21,7 @@
 
 #include "mongoc/mongoc-cluster-private.h"
 #include "mongoc/mongoc-client-private.h"
+#include "mongoc/mongoc-client-side-encryption-private.h"
 #include "mongoc/mongoc-counters-private.h"
 #include "mongoc/mongoc-config.h"
 #include "mongoc/mongoc-error.h"
@@ -549,6 +550,9 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
    bson_error_t error_local;
    int32_t compressor_id;
    bson_iter_t iter;
+   bson_t encrypted = BSON_INITIALIZER;
+   bson_t decrypted = BSON_INITIALIZER;
+   mongoc_cmd_t encrypted_cmd;
 
    server_stream = cmd->server_stream;
    server_id = server_stream->sd->id;
@@ -560,6 +564,17 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
    }
    if (!error) {
       error = &error_local;
+   }
+
+   if (cluster->client->fle_enabled) {
+      bson_destroy (&encrypted);
+
+      retval = _mongoc_fle_auto_encrypt (cluster->client, cmd, &encrypted_cmd, &encrypted, error);
+      bson_init (reply);
+      cmd = &encrypted_cmd;
+      if (!retval) {
+         goto fail_no_events;
+      }
    }
 
    if (callbacks->started) {
@@ -576,6 +591,18 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
       retval = mongoc_cluster_run_command_opquery (
          cluster, cmd, server_stream->stream, compressor_id, reply, error);
    }
+
+   if (cluster->client->fle_enabled) {
+      bson_destroy (&decrypted);
+      retval = _mongoc_fle_auto_decrypt (cluster->client, cmd->db_name, reply, &decrypted, error);
+      bson_destroy (reply);
+      bson_steal (reply, &decrypted);
+      bson_init (&decrypted);
+      if (!retval) {
+         goto fail_no_events;
+      }
+   }
+
    if (retval && callbacks->succeeded) {
       bson_t fake_reply = BSON_INITIALIZER;
       /*
@@ -632,9 +659,13 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
       }
    }
 
+fail_no_events:
    if (reply == &reply_local) {
       bson_destroy (&reply_local);
    }
+
+   bson_destroy (&encrypted);
+   bson_destroy (&decrypted);
 
    _mongoc_topology_update_last_used (cluster->client->topology, server_id);
 
@@ -679,6 +710,8 @@ mongoc_cluster_run_command_private (mongoc_cluster_t *cluster,
       reply = &reply_local;
    }
    server_stream = cmd->server_stream;
+
+   /* TODO: FLE */
    if (server_stream->sd->max_wire_version >= WIRE_VERSION_OP_MSG) {
       retval = mongoc_cluster_run_opmsg (cluster, cmd, reply, error);
    } else {
@@ -2854,9 +2887,6 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
       return false;
    }
 
-   _mongoc_array_clear (&cluster->iov);
-   _mongoc_buffer_init (&buffer, NULL, 0, NULL, NULL);
-
    rpc.header.msg_len = 0;
    rpc.header.request_id = ++cluster->request_id;
    rpc.header.response_to = 0;
@@ -2867,6 +2897,7 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
    } else {
       rpc.msg.flags = MONGOC_MSG_MORE_TO_COME;
    }
+
 
    rpc.msg.n_sections = 1;
 
@@ -2884,6 +2915,9 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
       rpc.msg.sections[1] = section[1];
       rpc.msg.n_sections++;
    }
+
+   _mongoc_array_clear (&cluster->iov);
+   _mongoc_buffer_init (&buffer, NULL, 0, NULL, NULL);
 
    _mongoc_rpc_gather (&rpc, &cluster->iov);
    _mongoc_rpc_swab_to_le (&rpc);
@@ -2924,6 +2958,7 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
       ok = _mongoc_buffer_append_from_stream (
          &buffer, server_stream->stream, 4, cluster->sockettimeoutms, error);
       if (!ok) {
+         printf ("failed to read here\n");
          RUN_CMD_ERR_DECORATE;
          mongoc_cluster_disconnect_node (
             cluster, server_stream->sd->id, true, error);
@@ -3022,3 +3057,4 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
 
    return ok;
 }
+
