@@ -26,6 +26,7 @@
 #include "mongoc/mongoc-topology-private.h"
 #include "mongoc/mongoc-util-private.h"
 #include "mongoc/mongoc-util-private.h"
+#include "mongoc/mongoc-uri-private.h"
 
 #include "json-test-operations.h"
 #include "json-test.h"
@@ -70,13 +71,15 @@ json_test_ctx_init (json_test_ctx_t *ctx,
    ctx->config = config;
    ctx->n_events = 0;
    bson_init (&ctx->events);
+   
+   ctx->test_framework_uri = test_framework_get_uri ();
+
    if (bson_iter_init_find (&test_iter, test, "useMultipleMongoses") &&
        bson_iter_as_bool (&test_iter)) {
-      ctx->test_framework_uri =
-         mongoc_uri_new ("mongodb://localhost:27017,localhost:27018");
-   } else {
-      ctx->test_framework_uri = test_framework_get_uri ();
+      ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (ctx->test_framework_uri, "localhost:27017", &error), error);
+      ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (ctx->test_framework_uri, "localhost:27018", &error), error);
    }
+
    ctx->acknowledged = true;
    ctx->verbose = test_framework_getenv_bool ("MONGOC_TEST_MONITORING_VERBOSE");
    bson_init (&ctx->lsids[0]);
@@ -149,19 +152,6 @@ append_session (mongoc_client_session_t *session, bson_t *opts)
       ASSERT_OR_PRINT (r, error);
    }
 }
-
-
-static void
-value_init_from_doc (bson_value_t *value, const bson_t *doc)
-{
-   BSON_ASSERT (doc);
-
-   value->value_type = BSON_TYPE_DOCUMENT;
-   value->value.v_doc.data = bson_malloc ((size_t) doc->len);
-   memcpy (value->value.v_doc.data, bson_get_data (doc), (size_t) doc->len);
-   value->value.v_doc.data_len = doc->len;
-}
-
 
 static char *
 value_to_str (const bson_value_t *value)
@@ -361,6 +351,12 @@ error_code_from_name (const char *name)
       return 112;
    } else if (!strcmp (name, "Interrupted")) {
       return 11601;
+   } else if (!strcmp (name, "MaxTimeMSExpired")) {
+      return 50;
+   } else if (!strcmp (name, "UnknownReplWriteConcern")) {
+      return 79;
+   } else if (!strcmp (name, "UnsatisfiableWriteConcern")) {
+      return 100;
    }
 
    test_error ("Add errorCodeName \"%s\" to error_code_from_name()", name);
@@ -374,13 +370,20 @@ static void
 check_error_code_name (const bson_t *operation, const bson_error_t *error)
 {
    const char *code_name;
+   uint32_t expected_error_code;
 
    if (!bson_has_field (operation, "errorCodeName")) {
       return;
    }
 
    code_name = bson_lookup_utf8 (operation, "errorCodeName");
-   ASSERT_CMPUINT32 (error->code, ==, error_code_from_name (code_name));
+   expected_error_code = error_code_from_name (code_name);
+   if (error->code != expected_error_code) {
+      test_error ("Expected error code %d : %s but got error code %d\n",
+		  expected_error_code,
+		  code_name,
+		  error->code);
+   }
 }
 
 
@@ -394,6 +397,7 @@ check_error_contains (const bson_t *operation, const bson_error_t *error)
    }
 
    msg = bson_lookup_utf8 (operation, "errorContains");
+
    ASSERT_CONTAINS (error->message, msg);
 }
 
@@ -494,8 +498,7 @@ check_error_labels_omit (const bson_t *operation, const bson_value_t *result)
  *--------------------------------------------------------------------------
  */
 
-
-static void
+void
 check_result (const bson_t *test,
               const bson_t *operation,
               bool succeeded,
@@ -529,7 +532,6 @@ check_result (const bson_t *test,
           *          errorLabelsContain: ["TransientTransactionError"]
           *          errorLabelsOmit: ["UnknownTransactionCommitResult"]
           */
-
          check_success_expected (&expected_doc, succeeded, false, error);
          check_error_code_name (&expected_doc, error);
          check_error_contains (&expected_doc, error);
