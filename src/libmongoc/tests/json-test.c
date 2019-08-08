@@ -990,16 +990,18 @@ execute_test (const json_test_config_t *config,
       collection->client->topology, MONGOC_SS_WRITE, NULL, &error);
    ASSERT_OR_PRINT (server_id, error);
 
-   if (bson_has_field (test, "failPoint")) {
-      activate_fail_point (client, server_id, test, "failPoint");
-   }
-
    json_test_ctx_init (&ctx, test, client, db, collection, config);
-   set_apm_callbacks (&ctx, collection->client);
 
    if (config->before_test_cb) {
       config->before_test_cb (&ctx, test);
    }
+
+   if (bson_has_field (test, "failPoint")) {
+      activate_fail_point (client, server_id, test, "failPoint");
+   }
+
+
+   set_apm_callbacks (&ctx, collection->client);
 
    json_test_operations (&ctx, test);
 
@@ -1139,6 +1141,9 @@ set_uri_opts_from_bson (mongoc_uri_t *uri, const bson_t *opts)
       } else if (!strcmp (bson_iter_key (&iter), "retryWrites")) {
          mongoc_uri_set_option_as_bool (
             uri, "retryWrites", bson_iter_bool (&iter));
+      } else if (!strcmp (bson_iter_key (&iter), "heartbeatFrequencyMS")) {
+         mongoc_uri_set_option_as_int32 (
+            uri, "heartbeatFrequencyMS", bson_iter_int32 (&iter));
       } else {
          MONGOC_ERROR ("Unsupported clientOptions field \"%s\" in %s",
                        bson_iter_key (&iter),
@@ -1201,6 +1206,7 @@ run_json_general_test (const json_test_config_t *config)
       bson_error_t error;
       bool r;
       bson_iter_t uri_iter;
+      bool is_multi_mongos;
 
       ASSERT (BSON_ITER_HOLDS_DOCUMENT (&tests_iter));
       bson_iter_bson (&tests_iter, &test);
@@ -1224,7 +1230,10 @@ run_json_general_test (const json_test_config_t *config)
 
       bson_free (selected_test);
 
-      uri = bson_iter_init_find (&uri_iter, &test, "useMultipleMongoses")
+      is_multi_mongos =
+         bson_iter_init_find (&uri_iter, &test, "useMultipleMongoses") &&
+         bson_iter_as_bool (&uri_iter);
+      uri = is_multi_mongos
                ? mongoc_uri_new ("mongodb://localhost:27017,localhost:27018/")
                : test_framework_get_uri ();
 

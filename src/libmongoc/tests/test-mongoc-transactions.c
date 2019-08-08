@@ -10,6 +10,71 @@
 #include "json-test-operations.h"
 
 
+/* Reset server state by disabling failpoints, killing sessions, and... running
+ * a distinct command. */
+static void
+_reset_server (const char *uri_str)
+{
+   mongoc_client_t *client;
+   bson_error_t error;
+
+   /* Transactions spec test readme:
+      "To workaround this limitation, a driver test runner MUST run a
+      non-transactional distinct command on each Mongos before running any test
+      that uses distinct. To ease the implementation drivers can simply run
+      distinct before every test."
+   */
+   client = mongoc_client_new (uri_str);
+   ASSERT_OR_PRINT (
+      mongoc_client_command_simple (
+         client,
+         "admin",
+         tmp_bson ("{'configureFailPoint': 'failCommand', 'mode': 'off'}"),
+         NULL,
+         NULL,
+         &error),
+      error);
+
+   ASSERT_OR_PRINT (
+      mongoc_client_command_simple (client,
+                                    "admin",
+                                    tmp_bson ("{'killAllSessions': []}"),
+                                    NULL,
+                                    NULL,
+                                    &error),
+      error);
+
+   /* When testing against a sharded cluster run a distinct command on the newly
+    * created collection on all mongoses. For an explanation see, Why do tests
+    * that run distinct sometimes fail with StaleDbVersion? */
+   ASSERT_OR_PRINT (
+      mongoc_client_command_simple (
+         client,
+         "admin",
+         tmp_bson ("{'distinct': 'coll', 'key': 'test', 'query': {}}"),
+         NULL,
+         NULL,
+         &error),
+      error);
+   mongoc_client_destroy (client);
+}
+static void
+transactions_test_before_test (json_test_ctx_t *ctx, const bson_t *test)
+{
+   bson_iter_t test_iter;
+   bool is_multi_mongos;
+
+   _reset_server ("mongodb://localhost:27017");
+
+   is_multi_mongos =
+      bson_iter_init_find (&test_iter, test, "useMultipleMongoses") &&
+      bson_iter_as_bool (&test_iter);
+
+   if (is_multi_mongos) {
+      _reset_server ("mongodb://localhost:27018");
+   }
+}
+
 static bool
 transactions_test_run_operation (json_test_ctx_t *ctx,
                                  const bson_t *test,
@@ -42,6 +107,7 @@ static void
 test_transactions_cb (bson_t *scenario)
 {
    json_test_config_t config = JSON_TEST_CONFIG_INIT;
+   config.before_test_cb = transactions_test_before_test;
    config.run_operation_cb = transactions_test_run_operation;
    config.scenario = scenario;
    config.command_started_events_only = true;
@@ -638,15 +704,12 @@ test_transactions_install (TestSuite *suite)
    install_json_test_suite_with_check (
       suite, resolved, test_transactions_cb, test_framework_skip_if_no_txns);
 
-   /* skip mongos for now - txn support coming in 4.1.0 */
    TestSuite_AddFull (suite,
                       "/transactions/supported",
                       test_transactions_supported,
                       NULL,
                       NULL,
-                      test_framework_skip_if_no_sessions,
-                      test_framework_skip_if_no_crypto,
-                      test_framework_skip_if_mongos);
+                      test_framework_skip_if_no_txns);
    TestSuite_AddFull (suite,
                       "/transactions/in_transaction",
                       test_in_transaction,
@@ -656,15 +719,15 @@ test_transactions_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite,
                                 "/transactions/server_selection_err",
                                 test_server_selection_error,
-                                test_framework_skip_if_no_crypto);
+                                test_framework_skip_if_no_txns);
    TestSuite_AddMockServerTest (suite,
                                 "/transactions/network_err",
                                 test_network_error,
-                                test_framework_skip_if_no_crypto);
+                                test_framework_skip_if_no_txns);
    TestSuite_AddMockServerTest (suite,
                                 "/transactions/unknown_commit_result",
                                 test_unknown_commit_result,
-                                test_framework_skip_if_no_crypto);
+                                test_framework_skip_if_no_txns);
    TestSuite_AddFull (suite,
                       "/transactions/cursor_primary_read_pref",
                       test_cursor_primary_read_pref,
