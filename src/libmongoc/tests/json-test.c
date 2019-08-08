@@ -644,6 +644,7 @@ check_version_info (const bson_t *scenario)
       server_version = test_framework_get_server_version ();
       if (server_version > test_version) {
          if (test_suite_debug_output ()) {
+            /* TODO: don't print in "runOn" case. */
             printf ("      SKIP, maxServerVersion=\"%s\"\n", s);
             fflush (stdout);
          }
@@ -1205,7 +1206,6 @@ run_json_general_test (const json_test_config_t *config)
       bson_error_t error;
       bool r;
       bson_iter_t uri_iter;
-      bool is_multi_mongos;
 
       ASSERT (BSON_ITER_HOLDS_DOCUMENT (&tests_iter));
       bson_iter_bson (&tests_iter, &test);
