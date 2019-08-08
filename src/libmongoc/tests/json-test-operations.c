@@ -357,6 +357,8 @@ error_code_from_name (const char *name)
       return 79;
    } else if (!strcmp (name, "UnsatisfiableWriteConcern")) {
       return 100;
+   } else if (!strcmp (name, "OperationNotSupportedInTransaction")) {
+      return 263;
    }
 
    test_error ("Add errorCodeName \"%s\" to error_code_from_name()", name);
