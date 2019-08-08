@@ -644,6 +644,7 @@ check_version_info (const bson_t *scenario)
       server_version = test_framework_get_server_version ();
       if (server_version > test_version) {
          if (test_suite_debug_output ()) {
+            /* TODO: don't print in "runOn" case. */
             printf ("      SKIP, maxServerVersion=\"%s\"\n", s);
             fflush (stdout);
          }
@@ -989,16 +990,18 @@ execute_test (const json_test_config_t *config,
       collection->client->topology, MONGOC_SS_WRITE, NULL, &error);
    ASSERT_OR_PRINT (server_id, error);
 
-   if (bson_has_field (test, "failPoint")) {
-      activate_fail_point (client, server_id, test, "failPoint");
-   }
-
    json_test_ctx_init (&ctx, test, client, db, collection, config);
-   set_apm_callbacks (&ctx, collection->client);
 
    if (config->before_test_cb) {
       config->before_test_cb (&ctx, test);
    }
+
+   if (bson_has_field (test, "failPoint")) {
+      activate_fail_point (client, server_id, test, "failPoint");
+   }
+
+
+   set_apm_callbacks (&ctx, collection->client);
 
    json_test_operations (&ctx, test);
 
@@ -1138,6 +1141,9 @@ set_uri_opts_from_bson (mongoc_uri_t *uri, const bson_t *opts)
       } else if (!strcmp (bson_iter_key (&iter), "retryWrites")) {
          mongoc_uri_set_option_as_bool (
             uri, "retryWrites", bson_iter_bool (&iter));
+      } else if (!strcmp (bson_iter_key (&iter), "heartbeatFrequencyMS")) {
+         mongoc_uri_set_option_as_int32 (
+            uri, "heartbeatFrequencyMS", bson_iter_int32 (&iter));
       } else {
          MONGOC_ERROR ("Unsupported clientOptions field \"%s\" in %s",
                        bson_iter_key (&iter),
@@ -1226,14 +1232,10 @@ run_json_general_test (const json_test_config_t *config)
       uri = test_framework_get_uri ();
 
       /* If we are using multiple mongos, hardcode them in, for now,
-    but keep the other URI components (CDRIVER-3285) */
-      if (bson_iter_init_find (&uri_iter, &test, "useMultipleMongoses")) {
-         ASSERT_OR_PRINT (
-            mongoc_uri_upsert_host_and_port (uri, "localhost:27017", &error),
-            error);
-         ASSERT_OR_PRINT (
-            mongoc_uri_upsert_host_and_port (uri, "localhost:27018", &error),
-            error);
+	 but keep the other URI components (CDRIVER-3285) */
+      if (bson_iter_init_find (&uri_iter, &test, "useMultipleMongoses") && bson_iter_as_bool (&uri_iter)) {
+         ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (uri, "localhost:27017", &error), error);
+         ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (uri, "localhost:27018", &error), error);
       }
 
       if (bson_iter_init_find (&client_opts_iter, &test, "clientOptions")) {
