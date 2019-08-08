@@ -8,6 +8,7 @@
 #include "mock_server/future.h"
 #include "mock_server/future-functions.h"
 #include "json-test-operations.h"
+#include "mongoc/mongoc-uri-private.h"
 
 
 /* Reset server state by disabling failpoints, killing sessions, and... running
@@ -634,9 +635,13 @@ test_transaction_recovery_token_cleared (void *ctx)
    mongoc_client_session_t *session;
    mongoc_client_t *client;
    mongoc_collection_t *coll;
+   mongoc_uri_t *uri;
    bson_t txn_opts;
 
-   client = mongoc_client_new ("mongodb://localhost:27017,localhost:27018");
+   uri = test_framework_get_uri ();
+   ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (uri, "localhost:27018", &error), error);
+   client = mongoc_client_new_from_uri (uri);
+   mongoc_uri_destroy (uri);
    session = mongoc_client_start_session (client, NULL, &error);
    ASSERT_OR_PRINT (session, error);
    coll = get_test_collection (client, "transaction_test");
