@@ -25,6 +25,7 @@
 /* error labels: see Transactions Spec */
 #define TRANSIENT_TXN_ERR "TransientTransactionError"
 #define UNKNOWN_COMMIT_RESULT "UnknownTransactionCommitResult"
+#define MAX_TIME_MS_EXPIRED "MaxTimeMSExpired"
 
 #define MONGOC_DEFAULT_WTIMEOUT_FOR_COMMIT_RETRY 10000
 
@@ -32,6 +33,7 @@ struct _mongoc_transaction_opt_t {
    mongoc_read_concern_t *read_concern;
    mongoc_write_concern_t *write_concern;
    mongoc_read_prefs_t *read_prefs;
+   int64_t max_commit_time_ms;
 };
 
 typedef enum {
@@ -121,6 +123,9 @@ _mongoc_client_session_from_iter (mongoc_client_t *client,
 
 bool
 _mongoc_client_session_in_txn (const mongoc_client_session_t *session);
+
+bool
+_mongoc_client_session_in_txn_or_ending (const mongoc_client_session_t *session);
 
 bool
 _mongoc_client_session_txn_in_progress (const mongoc_client_session_t *session);

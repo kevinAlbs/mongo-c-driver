@@ -101,6 +101,7 @@ started_cb (const mongoc_apm_command_started_t *event)
    BSON_ASSERT (mongoc_apm_command_started_get_request_id (event) > 0);
    BSON_ASSERT (mongoc_apm_command_started_get_server_id (event) > 0);
    /* check that event->host is sane */
+   /* TODO: if using multiple mongos's  */
    assert_host_in_uri (event->host, ctx->test_framework_uri);
    new_event = BCON_NEW ("command_started_event",
                          "{",
