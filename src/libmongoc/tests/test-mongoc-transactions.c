@@ -19,11 +19,9 @@ _reset_server (json_test_ctx_t *ctx, const char *uri_str)
    mongoc_client_t *client;
    bson_error_t error;
    bool res;
-   const char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
+   char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
 
    client = mongoc_client_new (uri_w_auth);
-   /* TODO: repeat this many times. Do this in after test callback, before the
-    * outcome assertions. */
 
    /* From Transactions tests runner: "Create a MongoClient and call
     * client.admin.runCommand({killAllSessions: []}) to clean up any open
@@ -56,6 +54,7 @@ _reset_server (json_test_ctx_t *ctx, const char *uri_str)
          &error),
       error);
    mongoc_client_destroy (client);
+   bson_free (uri_w_auth);
 }
 
 static void
@@ -64,7 +63,7 @@ _disable_failpoints (json_test_ctx_t *ctx, const char *uri_str)
    mongoc_client_t *client;
    bson_error_t error;
    int i;
-   const char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
+   char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
 
    /* Some transactions tests have a failCommand for "isMaster" repeat seven
     * times.
@@ -83,6 +82,7 @@ _disable_failpoints (json_test_ctx_t *ctx, const char *uri_str)
          error);
       mongoc_client_destroy (client);
    }
+   bson_free (uri_w_auth);
 }
 
 static void
@@ -267,6 +267,7 @@ test_transactions_supported (void *ctx)
    bool r;
 
    if (test_framework_is_mongos ()) {
+      bson_destroy (&opts);
       return;
    }
 
