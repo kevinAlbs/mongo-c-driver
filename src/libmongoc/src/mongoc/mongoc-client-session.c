@@ -47,7 +47,8 @@ txn_opts_set (mongoc_transaction_opt_t *opts,
       mongoc_transaction_opts_set_read_prefs (opts, read_prefs);
    }
 
-   /* always overwrite this, in case this is called with max_commit_time_ms = DEFAULT_COMMIT_TIME_MS. */
+   /* always overwrite this, in case this is called with max_commit_time_ms =
+    * DEFAULT_COMMIT_TIME_MS. */
    mongoc_transaction_opts_set_max_commit_time_ms (opts, max_commit_time_ms);
 }
 

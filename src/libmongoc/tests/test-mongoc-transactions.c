@@ -19,7 +19,8 @@ _reset_server (json_test_ctx_t *ctx, const char *host_str)
    mongoc_client_t *client;
    bson_error_t error;
    bool res;
-   mongoc_uri_t *uri = _mongoc_uri_copy_and_replace_host_list (ctx->test_framework_uri, host_str);
+   mongoc_uri_t *uri = _mongoc_uri_copy_and_replace_host_list (
+      ctx->test_framework_uri, host_str);
 
    client = mongoc_client_new_from_uri (uri);
 
@@ -63,7 +64,8 @@ _disable_failpoints (json_test_ctx_t *ctx, const char *host_str)
    mongoc_client_t *client;
    bson_error_t error;
    int i;
-   mongoc_uri_t *uri = _mongoc_uri_copy_and_replace_host_list (ctx->test_framework_uri, host_str);
+   mongoc_uri_t *uri = _mongoc_uri_copy_and_replace_host_list (
+      ctx->test_framework_uri, host_str);
 
    /* Some transactions tests have a failCommand for "isMaster" repeat seven
     * times.

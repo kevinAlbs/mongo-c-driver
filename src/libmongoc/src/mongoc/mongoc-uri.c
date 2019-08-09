@@ -2700,7 +2700,7 @@ _mongoc_uri_requires_auth_negotiation (const mongoc_uri_t *uri)
  * auth, SSL, and compressors settings but with only one specific host. */
 mongoc_uri_t *
 _mongoc_uri_copy_and_replace_host_list (const mongoc_uri_t *original,
-                                       const char *host)
+                                        const char *host)
 {
    mongoc_uri_t *uri = mongoc_uri_copy (original);
    _mongoc_host_list_destroy_all (uri->hosts);
