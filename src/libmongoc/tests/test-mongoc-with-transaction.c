@@ -6,7 +6,7 @@
 #include "test-libmongoc.h"
 
 /* Note, the with_transaction spec tests are in test-mongoc-transactions.c,
-since it shares the same test runner with the transactions test runner. */
+ * since it shares the same test runner with the transactions test runner. */
 
 static bool
 with_transaction_fail_transient_txn (mongoc_client_session_t *session,

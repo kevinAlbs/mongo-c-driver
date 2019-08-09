@@ -644,7 +644,6 @@ check_version_info (const bson_t *scenario, bool print_reason)
       server_version = test_framework_get_server_version ();
       if (server_version > test_version) {
          if (print_reason && test_suite_debug_output ()) {
-            /* TODO: don't print in "runOn" case. */
             printf ("      SKIP, maxServerVersion=\"%s\"\n", s);
             fflush (stdout);
          }
@@ -1175,11 +1174,12 @@ _should_skip_due_to_server_39704 (const bson_t *test)
       "startTransaction options override defaults",
       "defaultTransactionOptions override client options",
       "readConcern snapshot in startTransaction options",
-      "withTransaction inherits transaction options from defaultTransactionOptions",
+      "withTransaction inherits transaction options from "
+      "defaultTransactionOptions",
       "withTransaction explicit transaction options",
-      "withTransaction explicit transaction options override defaultTransactionOptions",
-      "withTransaction explicit transaction options override client options"
-      };
+      "withTransaction explicit transaction options override "
+      "defaultTransactionOptions",
+      "withTransaction explicit transaction options override client options"};
    int i;
 
    /* Only an issue for sharded clusters. */

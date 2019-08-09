@@ -22,7 +22,8 @@ _reset_server (json_test_ctx_t *ctx, const char *uri_str)
    const char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
 
    client = mongoc_client_new (uri_w_auth);
-   /* TODO: repeat this many times. Do this in after test callback, before the outcome assertions. */
+   /* TODO: repeat this many times. Do this in after test callback, before the
+    * outcome assertions. */
 
    /* From Transactions tests runner: "Create a MongoClient and call
     * client.admin.runCommand({killAllSessions: []}) to clean up any open
@@ -30,16 +31,17 @@ _reset_server (json_test_ctx_t *ctx, const char *uri_str)
     * error code 11601 ("Interrupted") to work around SERVER-38335."
     */
    res = mongoc_client_command_simple (client,
-                                    "admin",
-                                    tmp_bson ("{'killAllSessions': []}"),
-                                    NULL,
-                                    NULL,
-                                    &error);
+                                       "admin",
+                                       tmp_bson ("{'killAllSessions': []}"),
+                                       NULL,
+                                       NULL,
+                                       &error);
    if (!res && error.code != 11601) {
       test_error ("Unexpected error: %s from killAllSessions\n", error.message);
    }
 
-   /* From Transactions spec test runner: "When testing against a sharded cluster run a distinct command on the newly
+   /* From Transactions spec test runner: "When testing against a sharded
+    * cluster run a distinct command on the newly
     * created collection on all mongoses. For an explanation see, Why do tests
     * that run distinct sometimes fail with StaleDbVersion?" */
 
@@ -47,7 +49,8 @@ _reset_server (json_test_ctx_t *ctx, const char *uri_str)
       mongoc_client_command_simple (
          client,
          mongoc_database_get_name (ctx->db),
-         tmp_bson ("{'distinct': '%s', 'key': 'test', 'query': {}}", mongoc_collection_get_name (ctx->collection)),
+         tmp_bson ("{'distinct': '%s', 'key': 'test', 'query': {}}",
+                   mongoc_collection_get_name (ctx->collection)),
          NULL /* read prefs */,
          NULL /* reply */,
          &error),
@@ -56,13 +59,15 @@ _reset_server (json_test_ctx_t *ctx, const char *uri_str)
 }
 
 static void
-_disable_failpoints (json_test_ctx_t *ctx, const char *uri_str) {
-mongoc_client_t *client;
+_disable_failpoints (json_test_ctx_t *ctx, const char *uri_str)
+{
+   mongoc_client_t *client;
    bson_error_t error;
    int i;
    const char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
 
-   /* Some transactions tests have a failCommand for "isMaster" repeat seven times.
+   /* Some transactions tests have a failCommand for "isMaster" repeat seven
+    * times.
     * Repeat this seven times. */
    for (i = 0; i < 7; i++) {
       client = mongoc_client_new (uri_w_auth);
@@ -863,15 +868,15 @@ test_transactions_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite,
                                 "/transactions/server_selection_err",
                                 test_server_selection_error,
-                                test_framework_skip_if_no_txns);
+                                test_framework_skip_if_no_crypto);
    TestSuite_AddMockServerTest (suite,
                                 "/transactions/network_err",
                                 test_network_error,
-                                test_framework_skip_if_no_txns);
+                                test_framework_skip_if_no_crypto);
    TestSuite_AddMockServerTest (suite,
                                 "/transactions/unknown_commit_result",
                                 test_unknown_commit_result,
-                                test_framework_skip_if_no_txns);
+                                test_framework_skip_if_no_crypto);
    TestSuite_AddFull (suite,
                       "/transactions/cursor_primary_read_pref",
                       test_cursor_primary_read_pref,
