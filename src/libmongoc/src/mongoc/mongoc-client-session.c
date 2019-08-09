@@ -26,7 +26,7 @@
 #define SESSION_NEVER_USED (-1)
 
 #define WITH_TXN_TIMEOUT_MS (120 * 1000)
-#define DEFAULT_MAX_COMMIT_TIME_MS -1
+#define DEFAULT_MAX_COMMIT_TIME_MS 0
 
 static void
 txn_opts_set (mongoc_transaction_opt_t *opts,
@@ -47,9 +47,9 @@ txn_opts_set (mongoc_transaction_opt_t *opts,
       mongoc_transaction_opts_set_read_prefs (opts, read_prefs);
    }
 
-   /* always overwrite this, in case this is called with max_commit_time_ms =
-    * DEFAULT_COMMIT_TIME_MS. */
-   mongoc_transaction_opts_set_max_commit_time_ms (opts, max_commit_time_ms);
+   if (max_commit_time_ms != DEFAULT_MAX_COMMIT_TIME_MS) {
+      mongoc_transaction_opts_set_max_commit_time_ms (opts, max_commit_time_ms);
+   }
 }
 
 

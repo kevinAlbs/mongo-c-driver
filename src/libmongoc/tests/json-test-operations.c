@@ -63,7 +63,6 @@ json_test_ctx_init (json_test_ctx_t *ctx,
    char *session_opts_path;
    int i;
    bson_error_t error;
-   bson_iter_t test_iter;
 
    ctx->client = client;
    ctx->db = db;
@@ -72,18 +71,7 @@ json_test_ctx_init (json_test_ctx_t *ctx,
    ctx->n_events = 0;
    bson_init (&ctx->events);
 
-   ctx->test_framework_uri = test_framework_get_uri ();
-
-   if (bson_iter_init_find (&test_iter, test, "useMultipleMongoses") &&
-       bson_iter_as_bool (&test_iter)) {
-      ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (
-                          ctx->test_framework_uri, "localhost:27017", &error),
-                       error);
-      ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (
-                          ctx->test_framework_uri, "localhost:27018", &error),
-                       error);
-   }
-
+   ctx->test_framework_uri = mongoc_uri_copy (client->uri);
    ctx->acknowledged = true;
    ctx->verbose = test_framework_getenv_bool ("MONGOC_TEST_MONITORING_VERBOSE");
    bson_init (&ctx->lsids[0]);
