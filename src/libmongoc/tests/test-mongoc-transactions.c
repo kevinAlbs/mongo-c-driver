@@ -14,69 +14,104 @@
 /* Reset server state by disabling failpoints, killing sessions, and... running
  * a distinct command. */
 static void
-_reset_server (const char *uri_str)
+_reset_server (json_test_ctx_t *ctx, const char *uri_str)
 {
    mongoc_client_t *client;
    bson_error_t error;
-
-   /* Transactions spec test readme:
-      "To workaround this limitation, a driver test runner MUST run a
-      non-transactional distinct command on each Mongos before running any test
-      that uses distinct. To ease the implementation drivers can simply run
-      distinct before every test."
-   */
-   const char* uri_w_auth = test_framework_add_user_password_from_env (uri_str);
+   bool res;
+   const char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
 
    client = mongoc_client_new (uri_w_auth);
-   ASSERT_OR_PRINT (
-      mongoc_client_command_simple (
-         client,
-         "admin",
-         tmp_bson ("{'configureFailPoint': 'failCommand', 'mode': 'off'}"),
-         NULL,
-         NULL,
-         &error),
-      error);
+   /* TODO: repeat this many times. Do this in after test callback, before the outcome assertions. */
 
-   ASSERT_OR_PRINT (
-      mongoc_client_command_simple (client,
+   /* From Transactions tests runner: "Create a MongoClient and call
+    * client.admin.runCommand({killAllSessions: []}) to clean up any open
+    * transactions from previous test failures. Ignore a command failure with
+    * error code 11601 ("Interrupted") to work around SERVER-38335."
+    */
+   res = mongoc_client_command_simple (client,
                                     "admin",
                                     tmp_bson ("{'killAllSessions': []}"),
                                     NULL,
                                     NULL,
-                                    &error),
-      error);
+                                    &error);
+   if (!res && error.code != 11601) {
+      test_error ("Unexpected error: %s from killAllSessions\n", error.message);
+   }
 
-   /* When testing against a sharded cluster run a distinct command on the newly
+   /* From Transactions spec test runner: "When testing against a sharded cluster run a distinct command on the newly
     * created collection on all mongoses. For an explanation see, Why do tests
-    * that run distinct sometimes fail with StaleDbVersion? */
+    * that run distinct sometimes fail with StaleDbVersion?" */
 
-   /* TODO: this should be on the test's collection. */
    ASSERT_OR_PRINT (
       mongoc_client_command_simple (
          client,
-         "admin",
-         tmp_bson ("{'distinct': 'coll', 'key': 'test', 'query': {}}"),
-         NULL,
-         NULL,
+         mongoc_database_get_name (ctx->db),
+         tmp_bson ("{'distinct': '%s', 'key': 'test', 'query': {}}", mongoc_collection_get_name (ctx->collection)),
+         NULL /* read prefs */,
+         NULL /* reply */,
          &error),
       error);
    mongoc_client_destroy (client);
 }
+
+static void
+_disable_failpoints (json_test_ctx_t *ctx, const char *uri_str) {
+mongoc_client_t *client;
+   bson_error_t error;
+   int i;
+   const char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
+
+   /* Some transactions tests have a failCommand for "isMaster" repeat seven times.
+    * Repeat this seven times. */
+   for (i = 0; i < 7; i++) {
+      client = mongoc_client_new (uri_w_auth);
+
+      ASSERT_OR_PRINT (
+         mongoc_client_command_simple (
+            client,
+            "admin",
+            tmp_bson ("{'configureFailPoint': 'failCommand', 'mode': 'off'}"),
+            NULL,
+            NULL,
+            &error),
+         error);
+      mongoc_client_destroy (client);
+   }
+}
+
 static void
 transactions_test_before_test (json_test_ctx_t *ctx, const bson_t *test)
 {
    bson_iter_t test_iter;
    bool is_multi_mongos;
 
-   _reset_server ("mongodb://localhost:27017");
+   _reset_server (ctx, "mongodb://localhost:27017");
 
    is_multi_mongos =
       bson_iter_init_find (&test_iter, test, "useMultipleMongoses") &&
       bson_iter_as_bool (&test_iter);
 
    if (is_multi_mongos) {
-      _reset_server ("mongodb://localhost:27018");
+      _reset_server (ctx, "mongodb://localhost:27018");
+   }
+}
+
+
+static void
+transactions_test_after_test (json_test_ctx_t *ctx, const bson_t *test)
+{
+   bson_iter_t test_iter;
+   bool is_multi_mongos;
+
+   _disable_failpoints (ctx, "mongodb://localhost:27017");
+
+   is_multi_mongos =
+      bson_iter_init_find (&test_iter, test, "useMultipleMongoses") &&
+      bson_iter_as_bool (&test_iter);
+
+   if (is_multi_mongos) {
+      _disable_failpoints (ctx, "mongodb://localhost:27018");
    }
 }
 
@@ -144,30 +179,26 @@ transactions_test_run_operation (json_test_ctx_t *ctx,
                                  const bson_t *test,
                                  const bson_t *operation)
 {
-
    mongoc_transaction_opt_t *opts = NULL;
    mongoc_client_session_t *session = NULL;
    bson_error_t error;
    bson_value_t value;
-   bson_t args;
    bson_t reply;
    bool res;
    cb_ctx_t cb_ctx;
 
-   bson_lookup_doc (operation, "arguments", &args);
-
    /* If there is a 'callback' field, run the nested operations through
       mongoc_client_session_with_transaction(). */
-   if (bson_has_field (&args, "callback")) {
+   if (bson_has_field (operation, "arguments.callback")) {
       ASSERT (bson_has_field (operation, "object"));
       session = session_from_name (ctx, bson_lookup_utf8 (operation, "object"));
       ASSERT (session);
 
-      bson_lookup_doc (&args, "callback", &cb_ctx.callback);
+      bson_lookup_doc (operation, "arguments.callback", &cb_ctx.callback);
       cb_ctx.ctx = ctx;
 
-      if (bson_has_field (&args, "options")) {
-         opts = bson_lookup_txn_opts (&args, "options");
+      if (bson_has_field (operation, "arguments.options")) {
+         opts = bson_lookup_txn_opts (operation, "arguments.options");
       }
 
       res = mongoc_client_session_with_transaction (
@@ -184,25 +215,24 @@ transactions_test_run_operation (json_test_ctx_t *ctx,
 
    } else {
       /* If there is no 'callback' field, then run simply. */
-      if (bson_has_field (&args, "session")) {
-         session = session_from_name (ctx, bson_lookup_utf8 (&args, "session"));
+      if (bson_has_field (operation, "arguments.session")) {
+         session = session_from_name (
+            ctx, bson_lookup_utf8 (operation, "arguments.session"));
       }
 
-   /* expect some warnings from abortTransaction, but don't suppress others: we
-    * want to know if any other tests log warnings */
-   capture_logs (true);
+      /* expect some warnings from abortTransaction, but don't suppress others:
+       * we want to know if any other tests log warnings */
+      capture_logs (true);
       res = json_test_operation (
          ctx, test, operation, ctx->collection, session, &reply);
-         assert_all_captured_logs_have_prefix ("Error in abortTransaction:");
-   capture_logs (false);
+      assert_all_captured_logs_have_prefix ("Error in abortTransaction:");
+      capture_logs (false);
    }
 
-   bson_destroy (&args);
    bson_destroy (&reply);
    mongoc_transaction_opts_destroy (opts);
 
    return res;
-
 }
 
 
@@ -212,6 +242,7 @@ test_transactions_cb (bson_t *scenario)
    json_test_config_t config = JSON_TEST_CONFIG_INIT;
    config.before_test_cb = transactions_test_before_test;
    config.run_operation_cb = transactions_test_run_operation;
+   config.after_test_cb = transactions_test_after_test;
    config.scenario = scenario;
    config.command_started_events_only = true;
    run_json_general_test (&config);
@@ -741,7 +772,8 @@ test_transaction_recovery_token_cleared (void *ctx)
    bson_t txn_opts;
 
    uri = test_framework_get_uri ();
-   ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (uri, "localhost:27018", &error), error);
+   ASSERT_OR_PRINT (
+      mongoc_uri_upsert_host_and_port (uri, "localhost:27018", &error), error);
    client = mongoc_client_new_from_uri (uri);
    mongoc_uri_destroy (uri);
    session = mongoc_client_start_session (client, NULL, &error);

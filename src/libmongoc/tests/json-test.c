@@ -702,7 +702,7 @@ check_version_info (const bson_t *scenario, bool print_reason)
       if (print_reason && test_suite_debug_output ()) {
          printf ("     SKIP, test topologies do not match current %s setup\n",
                  current_topology);
-                 fflush (stdout);
+         fflush (stdout);
       }
 
       return false;
@@ -1008,7 +1008,6 @@ execute_test (const json_test_config_t *config,
       activate_fail_point (client, server_id, test, "failPoint");
    }
 
-
    set_apm_callbacks (&ctx, collection->client);
 
    json_test_operations (&ctx, test);
@@ -1162,6 +1161,43 @@ set_uri_opts_from_bson (mongoc_uri_t *uri, const bson_t *opts)
 }
 
 
+static bool
+_should_skip_due_to_server_39704 (const bson_t *test)
+{
+   const char *desc = bson_lookup_utf8 (test, "description");
+   const char *bad_tests[] = {
+      "only first countDocuments includes readConcern",
+      "only first find includes readConcern",
+      "only first aggregate includes readConcern",
+      "only first distinct includes readConcern",
+      "only first runCommand includes readConcern",
+      "transaction options inherited from defaultTransactionOptions",
+      "startTransaction options override defaults",
+      "defaultTransactionOptions override client options",
+      "readConcern snapshot in startTransaction options",
+      "withTransaction inherits transaction options from defaultTransactionOptions",
+      "withTransaction explicit transaction options",
+      "withTransaction explicit transaction options override defaultTransactionOptions",
+      "withTransaction explicit transaction options override client options"
+      };
+   int i;
+
+   /* Only an issue for sharded clusters. */
+   if (!test_framework_is_mongos ()) {
+      return false;
+   }
+
+   for (i = 0; i < sizeof (bad_tests) / sizeof (char *); i++) {
+      if (0 == strcmp (desc, bad_tests[i])) {
+         return true;
+      }
+   }
+
+
+   return false;
+}
+
+
 /*
  *-----------------------------------------------------------------------
  *
@@ -1235,12 +1271,20 @@ run_json_general_test (const json_test_config_t *config)
          continue;
       }
 
+      if (_should_skip_due_to_server_39704 (&test)) {
+         fprintf (stderr,
+                  " - %s SKIPPED, reason: SERVER-39704 causes sharded tests to "
+                  "fail when using readConcern: snapshot\n",
+                  description);
+         continue;
+      }
+
       bson_free (selected_test);
 
       uri = test_framework_get_uri ();
 
-      /* If we are using multiple mongos, hardcode them in, for now,
-    but keep the other URI components (CDRIVER-3285) */
+      /* If we are using multiple mongos, hardcode them in, for now, but keep
+       * the other URI components (CDRIVER-3285) */
       if (bson_iter_init_find (&uri_iter, &test, "useMultipleMongoses") &&
           bson_iter_as_bool (&uri_iter)) {
          ASSERT_OR_PRINT (
