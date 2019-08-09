@@ -629,7 +629,7 @@ get_bson_from_json_file (char *filename)
 }
 
 static bool
-check_version_info (const bson_t *scenario)
+check_version_info (const bson_t *scenario, bool print_reason)
 {
    const char *s;
    char *padded;
@@ -643,7 +643,7 @@ check_version_info (const bson_t *scenario)
       bson_free (padded);
       server_version = test_framework_get_server_version ();
       if (server_version > test_version) {
-         if (test_suite_debug_output ()) {
+         if (print_reason && test_suite_debug_output ()) {
             /* TODO: don't print in "runOn" case. */
             printf ("      SKIP, maxServerVersion=\"%s\"\n", s);
             fflush (stdout);
@@ -658,7 +658,7 @@ check_version_info (const bson_t *scenario)
       test_version = test_framework_str_to_version (s);
       server_version = test_framework_get_server_version ();
       if (server_version < test_version) {
-         if (test_suite_debug_output ()) {
+         if (print_reason && test_suite_debug_output ()) {
             printf ("      SKIP, minServerVersion=\"%s\"\n", s);
             fflush (stdout);
          }
@@ -699,8 +699,11 @@ check_version_info (const bson_t *scenario)
       }
 
       /* If we didn't match any of the listed topologies, skip */
-      printf ("     SKIP, test topologies do not match current %s setup\n",
-              current_topology);
+      if (print_reason && test_suite_debug_output ()) {
+         printf ("     SKIP, test topologies do not match current %s setup\n",
+                 current_topology);
+                 fflush (stdout);
+      }
 
       return false;
    }
@@ -722,15 +725,20 @@ check_scenario_version (const bson_t *scenario)
 
       while (bson_iter_next (&iter)) {
          bson_iter_bson (&iter, &version_info);
-         if (check_version_info (&version_info)) {
+         if (check_version_info (&version_info, false)) {
             return true;
          }
+      }
+
+      if (test_suite_debug_output ()) {
+         printf ("      SKIP, no matching topologies in runOn\n");
+         fflush (stdout);
       }
 
       return false;
    }
 
-   return check_version_info (scenario);
+   return check_version_info (scenario, true);
 }
 
 
@@ -1232,10 +1240,15 @@ run_json_general_test (const json_test_config_t *config)
       uri = test_framework_get_uri ();
 
       /* If we are using multiple mongos, hardcode them in, for now,
-	 but keep the other URI components (CDRIVER-3285) */
-      if (bson_iter_init_find (&uri_iter, &test, "useMultipleMongoses") && bson_iter_as_bool (&uri_iter)) {
-         ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (uri, "localhost:27017", &error), error);
-         ASSERT_OR_PRINT (mongoc_uri_upsert_host_and_port (uri, "localhost:27018", &error), error);
+    but keep the other URI components (CDRIVER-3285) */
+      if (bson_iter_init_find (&uri_iter, &test, "useMultipleMongoses") &&
+          bson_iter_as_bool (&uri_iter)) {
+         ASSERT_OR_PRINT (
+            mongoc_uri_upsert_host_and_port (uri, "localhost:27017", &error),
+            error);
+         ASSERT_OR_PRINT (
+            mongoc_uri_upsert_host_and_port (uri, "localhost:27018", &error),
+            error);
       }
 
       if (bson_iter_init_find (&client_opts_iter, &test, "clientOptions")) {

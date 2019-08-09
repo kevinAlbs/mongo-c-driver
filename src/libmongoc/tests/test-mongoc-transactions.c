@@ -80,31 +80,129 @@ transactions_test_before_test (json_test_ctx_t *ctx, const bson_t *test)
    }
 }
 
+
+typedef struct _cb_ctx_t {
+   bson_t callback;
+   json_test_ctx_t *ctx;
+} cb_ctx_t;
+
+
+static bool
+with_transaction_callback_runner (mongoc_client_session_t *session,
+                                  void *ctx,
+                                  bson_t **reply,
+                                  bson_error_t *error)
+{
+   cb_ctx_t *cb_ctx = (cb_ctx_t *) ctx;
+   bson_t operation;
+   bson_t operations;
+   bson_t *test;
+   bson_iter_t iter;
+   bool res = false;
+   bson_t local_reply;
+
+   test = &(cb_ctx->callback);
+
+   if (bson_has_field (test, "operation")) {
+      bson_lookup_doc (test, "operation", &operation);
+      res = json_test_operation (cb_ctx->ctx,
+                                 test,
+                                 &operation,
+                                 cb_ctx->ctx->collection,
+                                 session,
+                                 &local_reply);
+   } else {
+      ASSERT (bson_has_field (test, "operations"));
+      bson_lookup_doc (test, "operations", &operations);
+      BSON_ASSERT (bson_iter_init (&iter, &operations));
+
+      bson_init (&local_reply);
+
+      while (bson_iter_next (&iter)) {
+         bson_destroy (&local_reply);
+         bson_iter_bson (&iter, &operation);
+         res = json_test_operation (cb_ctx->ctx,
+                                    test,
+                                    &operation,
+                                    cb_ctx->ctx->collection,
+                                    session,
+                                    &local_reply);
+         if (!res) {
+            break;
+         }
+      }
+   }
+
+   *reply = bson_copy (&local_reply);
+   bson_destroy (&local_reply);
+
+   return res;
+}
+
 static bool
 transactions_test_run_operation (json_test_ctx_t *ctx,
                                  const bson_t *test,
                                  const bson_t *operation)
 {
+
+   mongoc_transaction_opt_t *opts = NULL;
    mongoc_client_session_t *session = NULL;
+   bson_error_t error;
+   bson_value_t value;
+   bson_t args;
    bson_t reply;
    bool res;
+   cb_ctx_t cb_ctx;
 
-   if (bson_has_field (operation, "arguments.session")) {
-      session = session_from_name (
-         ctx, bson_lookup_utf8 (operation, "arguments.session"));
-   }
+   bson_lookup_doc (operation, "arguments", &args);
+
+   /* If there is a 'callback' field, run the nested operations through
+      mongoc_client_session_with_transaction(). */
+   if (bson_has_field (&args, "callback")) {
+      ASSERT (bson_has_field (operation, "object"));
+      session = session_from_name (ctx, bson_lookup_utf8 (operation, "object"));
+      ASSERT (session);
+
+      bson_lookup_doc (&args, "callback", &cb_ctx.callback);
+      cb_ctx.ctx = ctx;
+
+      if (bson_has_field (&args, "options")) {
+         opts = bson_lookup_txn_opts (&args, "options");
+      }
+
+      res = mongoc_client_session_with_transaction (
+         session,
+         with_transaction_callback_runner,
+         opts,
+         &cb_ctx,
+         &reply,
+         &error);
+
+      value_init_from_doc (&value, &reply);
+      check_result (test, operation, res, &value, &error);
+      bson_value_destroy (&value);
+
+   } else {
+      /* If there is no 'callback' field, then run simply. */
+      if (bson_has_field (&args, "session")) {
+         session = session_from_name (ctx, bson_lookup_utf8 (&args, "session"));
+      }
 
    /* expect some warnings from abortTransaction, but don't suppress others: we
     * want to know if any other tests log warnings */
    capture_logs (true);
-   res = json_test_operation (
-      ctx, test, operation, ctx->collection, session, &reply);
-   assert_all_captured_logs_have_prefix ("Error in abortTransaction:");
+      res = json_test_operation (
+         ctx, test, operation, ctx->collection, session, &reply);
+         assert_all_captured_logs_have_prefix ("Error in abortTransaction:");
    capture_logs (false);
+   }
 
+   bson_destroy (&args);
    bson_destroy (&reply);
+   mongoc_transaction_opts_destroy (opts);
 
    return res;
+
 }
 
 
@@ -711,6 +809,10 @@ test_transactions_install (TestSuite *suite)
    char resolved[PATH_MAX];
 
    ASSERT (realpath (JSON_DIR "/transactions", resolved));
+   install_json_test_suite_with_check (
+      suite, resolved, test_transactions_cb, test_framework_skip_if_no_txns);
+
+   test_framework_resolve_path (JSON_DIR "/with_transaction", resolved);
    install_json_test_suite_with_check (
       suite, resolved, test_transactions_cb, test_framework_skip_if_no_txns);
 
