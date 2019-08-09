@@ -9,19 +9,19 @@
 #include "mock_server/future-functions.h"
 #include "json-test-operations.h"
 #include "mongoc/mongoc-uri-private.h"
-
+#include "mongoc/mongoc-host-list-private.h"
 
 /* Reset server state by disabling failpoints, killing sessions, and... running
  * a distinct command. */
 static void
-_reset_server (json_test_ctx_t *ctx, const char *uri_str)
+_reset_server (json_test_ctx_t *ctx, const char *host_str)
 {
    mongoc_client_t *client;
    bson_error_t error;
    bool res;
-   char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
+   mongoc_uri_t *uri = _mongoc_uri_copy_and_replace_host_list (ctx->test_framework_uri, host_str);
 
-   client = mongoc_client_new (uri_w_auth);
+   client = mongoc_client_new_from_uri (uri);
 
    /* From Transactions tests runner: "Create a MongoClient and call
     * client.admin.runCommand({killAllSessions: []}) to clean up any open
@@ -54,22 +54,22 @@ _reset_server (json_test_ctx_t *ctx, const char *uri_str)
          &error),
       error);
    mongoc_client_destroy (client);
-   bson_free (uri_w_auth);
+   mongoc_uri_destroy (uri);
 }
 
 static void
-_disable_failpoints (json_test_ctx_t *ctx, const char *uri_str)
+_disable_failpoints (json_test_ctx_t *ctx, const char *host_str)
 {
    mongoc_client_t *client;
    bson_error_t error;
    int i;
-   char *uri_w_auth = test_framework_add_user_password_from_env (uri_str);
+   mongoc_uri_t *uri = _mongoc_uri_copy_and_replace_host_list (ctx->test_framework_uri, host_str);
 
    /* Some transactions tests have a failCommand for "isMaster" repeat seven
     * times.
     * Repeat this seven times. */
    for (i = 0; i < 7; i++) {
-      client = mongoc_client_new (uri_w_auth);
+      client = mongoc_client_new_from_uri (uri);
 
       ASSERT_OR_PRINT (
          mongoc_client_command_simple (
@@ -82,7 +82,7 @@ _disable_failpoints (json_test_ctx_t *ctx, const char *uri_str)
          error);
       mongoc_client_destroy (client);
    }
-   bson_free (uri_w_auth);
+   mongoc_uri_destroy (uri);
 }
 
 static void
@@ -91,14 +91,14 @@ transactions_test_before_test (json_test_ctx_t *ctx, const bson_t *test)
    bson_iter_t test_iter;
    bool is_multi_mongos;
 
-   _reset_server (ctx, "mongodb://localhost:27017");
+   _reset_server (ctx, "localhost:27017");
 
    is_multi_mongos =
       bson_iter_init_find (&test_iter, test, "useMultipleMongoses") &&
       bson_iter_as_bool (&test_iter);
 
    if (is_multi_mongos) {
-      _reset_server (ctx, "mongodb://localhost:27018");
+      _reset_server (ctx, "localhost:27018");
    }
 }
 
@@ -109,14 +109,14 @@ transactions_test_after_test (json_test_ctx_t *ctx, const bson_t *test)
    bson_iter_t test_iter;
    bool is_multi_mongos;
 
-   _disable_failpoints (ctx, "mongodb://localhost:27017");
+   _disable_failpoints (ctx, "localhost:27017");
 
    is_multi_mongos =
       bson_iter_init_find (&test_iter, test, "useMultipleMongoses") &&
       bson_iter_as_bool (&test_iter);
 
    if (is_multi_mongos) {
-      _disable_failpoints (ctx, "mongodb://localhost:27018");
+      _disable_failpoints (ctx, "localhost:27018");
    }
 }
 

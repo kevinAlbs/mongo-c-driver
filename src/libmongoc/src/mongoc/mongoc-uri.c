@@ -45,7 +45,7 @@ struct _mongoc_uri_t {
    char *username;
    char *password;
    char *database;
-   bson_t raw; /* Unparsed options, see mongoc_uri_parse_options */
+   bson_t raw;     /* Unparsed options, see mongoc_uri_parse_options */
    bson_t options; /* Type-coerced and canonicalized options */
    bson_t credentials;
    bson_t compressors;
@@ -160,13 +160,13 @@ validate_srv_result (mongoc_uri_t *uri, const char *host, bson_error_t *error)
 
 static mongoc_host_list_t *
 _mongoc_host_list_find_host_and_port (mongoc_host_list_t *hosts,
-				      const char *host_and_port)
+                                      const char *host_and_port)
 {
    mongoc_host_list_t *iter;
    LL_FOREACH (hosts, iter)
    {
       if (strcmp (iter->host_and_port, host_and_port) == 0) {
-            return iter;
+         return iter;
       }
    }
 
@@ -174,11 +174,11 @@ _mongoc_host_list_find_host_and_port (mongoc_host_list_t *hosts,
 }
 
 /* upsert @host into @uri's host list. Side effect: modifies host->next when
-* inserting. */
+ * inserting. */
 static bool
 _upsert_into_host_list (mongoc_uri_t *uri,
-			mongoc_host_list_t *host,
-			bson_error_t *error)
+                        mongoc_host_list_t *host,
+                        bson_error_t *error)
 {
    mongoc_host_list_t *link;
 
@@ -205,8 +205,8 @@ _upsert_into_host_list (mongoc_uri_t *uri,
 
 bool
 mongoc_uri_upsert_host_and_port (mongoc_uri_t *uri,
-				 const char *host_and_port,
-				 bson_error_t *error)
+                                 const char *host_and_port,
+                                 bson_error_t *error)
 {
    mongoc_host_list_t temp;
 
@@ -1118,14 +1118,14 @@ mongoc_uri_apply_options (mongoc_uri_t *uri,
       } else if (!strcmp (key, MONGOC_URI_AUTHMECHANISM) ||
                  !strcmp (key, MONGOC_URI_AUTHSOURCE)) {
          if (bson_has_field (&uri->credentials, key)) {
-            HANDLE_DUPE();
+            HANDLE_DUPE ();
          }
          mongoc_uri_bson_append_or_replace_key (
             &uri->credentials, canon, value);
 
       } else if (!strcmp (key, MONGOC_URI_READCONCERNLEVEL)) {
          if (!mongoc_read_concern_is_default (uri->read_concern)) {
-            HANDLE_DUPE();
+            HANDLE_DUPE ();
          }
          mongoc_read_concern_set_level (uri->read_concern, value);
 
@@ -1144,7 +1144,7 @@ mongoc_uri_apply_options (mongoc_uri_t *uri,
 
       } else if (!strcmp (key, MONGOC_URI_AUTHMECHANISMPROPERTIES)) {
          if (bson_has_field (&uri->credentials, key)) {
-            HANDLE_DUPE();
+            HANDLE_DUPE ();
          }
          if (!mongoc_uri_parse_auth_mechanism_properties (uri, value)) {
             goto UNSUPPORTED_VALUE;
@@ -1158,7 +1158,7 @@ mongoc_uri_apply_options (mongoc_uri_t *uri,
 
       } else if (!strcmp (key, MONGOC_URI_COMPRESSORS)) {
          if (!bson_empty (mongoc_uri_get_compressors (uri))) {
-            HANDLE_DUPE();
+            HANDLE_DUPE ();
          }
          if (!mongoc_uri_set_compressors (uri, value)) {
             goto UNSUPPORTED_VALUE;
@@ -1289,8 +1289,10 @@ mongoc_uri_finalize_auth (mongoc_uri_t *uri, bson_error_t *error)
          }
       }
       /* MONGODB-X509 is the only mechanism that doesn't require username */
-      if (strcasecmp (mongoc_uri_get_auth_mechanism (uri), "MONGODB-X509") != 0) {
-         if (!mongoc_uri_get_username (uri) || strcmp (mongoc_uri_get_username (uri), "") == 0) {
+      if (strcasecmp (mongoc_uri_get_auth_mechanism (uri), "MONGODB-X509") !=
+          0) {
+         if (!mongoc_uri_get_username (uri) ||
+             strcmp (mongoc_uri_get_username (uri), "") == 0) {
             MONGOC_URI_ERROR (error,
                               "'%s' authentication mechanism requires username",
                               mongoc_uri_get_auth_mechanism (uri));
@@ -1298,7 +1300,8 @@ mongoc_uri_finalize_auth (mongoc_uri_t *uri, bson_error_t *error)
          }
       }
       /* MONGODB-X509 errors if a password is supplied. */
-      if (strcasecmp (mongoc_uri_get_auth_mechanism (uri), "MONGODB-X509") == 0) {
+      if (strcasecmp (mongoc_uri_get_auth_mechanism (uri), "MONGODB-X509") ==
+          0) {
          if (mongoc_uri_get_password (uri)) {
             MONGOC_URI_ERROR (
                error,
@@ -2690,4 +2693,18 @@ bool
 _mongoc_uri_requires_auth_negotiation (const mongoc_uri_t *uri)
 {
    return mongoc_uri_get_username (uri) && !mongoc_uri_get_auth_mechanism (uri);
+}
+
+
+/* A bit of a hack. Needed for multi mongos tests to create a URI with the same
+ * auth, SSL, and compressors settings but with only one specific host. */
+mongoc_uri_t *
+_mongoc_uri_copy_and_replace_host_list (const mongoc_uri_t *original,
+                                       const char *host)
+{
+   mongoc_uri_t *uri = mongoc_uri_copy (original);
+   _mongoc_host_list_destroy_all (uri->hosts);
+   uri->hosts = bson_malloc0 (sizeof (mongoc_host_list_t));
+   _mongoc_host_list_from_string (uri->hosts, host);
+   return uri;
 }
