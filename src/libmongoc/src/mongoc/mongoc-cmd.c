@@ -834,6 +834,12 @@ mongoc_cmd_parts_assemble (mongoc_cmd_parts_t *parts,
 
       /* If an explicit session was not provided and lsid is not prohibited,
        * attempt to create an implicit session (ignoring any errors). */
+      
+      /* A temporary workaround until CDRIVER-3070 is fixed */
+      if (server_type == MONGOC_SERVER_STANDALONE) {
+         parts->prohibit_lsid = true;
+         cs = NULL;
+      }
       if (!cs && !parts->prohibit_lsid && parts->assembled.is_acknowledged) {
          cs = mongoc_client_start_session (parts->client, NULL, NULL);
 
@@ -901,12 +907,14 @@ mongoc_cmd_parts_assemble (mongoc_cmd_parts_t *parts,
 
       if (!is_get_more) {
          if (cs) {
+            /* TODO: doesn't this also need _mongoc_cmd_parts_ensure_copied (parts);? */
             _mongoc_client_session_append_read_concern (
                cs,
                &parts->read_concern_document,
                parts->is_read_command,
                &parts->assembled_body);
          } else if (!bson_empty (&parts->read_concern_document)) {
+            /* TODO: doesn't this also need _mongoc_cmd_parts_ensure_copied (parts);? */
             bson_append_document (&parts->assembled_body,
                                   "readConcern",
                                   11,
@@ -919,6 +927,7 @@ mongoc_cmd_parts_assemble (mongoc_cmd_parts_t *parts,
          _mongoc_cmd_parts_add_write_concern (parts);
       }
 
+      /* Another bug, we should be calling _mongoc_cmd_parts_ensure_copied if we append something */
       if (!_mongoc_client_session_append_txn (
              cs, &parts->assembled_body, error)) {
          GOTO (done);

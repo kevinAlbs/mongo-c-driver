@@ -6,28 +6,45 @@
 #include <mongoc/mongoc.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "mongoc/mongoc-apm-private.h"
+static void
+started_cb (const mongoc_apm_command_started_t *event)
+{
+   char *as_str;
+   bson_t *new_event;
+
+   new_event = BCON_NEW ("command_started_event",
+                         "{",
+                         "command",
+                         BCON_DOCUMENT (event->command),
+                         "command_name",
+                         BCON_UTF8 (event->command_name),
+                         "database_name",
+                         BCON_UTF8 (event->database_name),
+                         "operation_id",
+                         BCON_INT64 (event->operation_id),
+                         "}");
+   as_str = bson_as_json (new_event, NULL);
+   printf ("%s\n", as_str);
+   bson_free (as_str);
+   bson_destroy (new_event);
+}
 
 int
 main (int argc, char *argv[])
 {
    mongoc_client_t *client;
-   mongoc_collection_t *collection;
-   mongoc_cursor_t *cursor;
    bson_error_t error;
-   const bson_t *doc;
-   const char *collection_name = "test";
-   bson_t query;
-   char *str;
+   bson_t* cmd;
    const char *uri_string = "mongodb://127.0.0.1/?appname=client-example";
    mongoc_uri_t *uri;
+   mongoc_apm_callbacks_t *callbacks;
+   mongoc_read_concern_t *rc;
+   bson_t opts;
 
    mongoc_init ();
    if (argc > 1) {
       uri_string = argv[1];
-   }
-
-   if (argc > 2) {
-      collection_name = argv[2];
    }
 
    uri = mongoc_uri_new_with_error (uri_string, &error);
@@ -47,33 +64,27 @@ main (int argc, char *argv[])
 
    mongoc_client_set_error_api (client, 2);
 
-   bson_init (&query);
+   rc = mongoc_read_concern_new ();
+   mongoc_read_concern_set_level (rc, MONGOC_READ_CONCERN_LEVEL_MAJORITY);
+   bson_init (&opts);
+   mongoc_read_concern_append (rc, &opts);
 
-#if 0
-   bson_append_utf8 (&query, "hello", -1, "world", -1);
-#endif
+   callbacks = mongoc_apm_callbacks_new ();
+   mongoc_apm_set_command_started_cb (callbacks, started_cb);
+   mongoc_client_set_apm_callbacks (client, callbacks, NULL);
+   mongoc_apm_callbacks_destroy (callbacks);
 
-   collection = mongoc_client_get_collection (client, "test", collection_name);
-   cursor = mongoc_collection_find_with_opts (
-      collection,
-      &query,
-      NULL,  /* additional options */
-      NULL); /* read prefs, NULL for default */
 
-   while (mongoc_cursor_next (cursor, &doc)) {
-      str = bson_as_canonical_extended_json (doc, NULL);
-      fprintf (stdout, "%s\n", str);
-      bson_free (str);
+   cmd = BCON_NEW ("ping", BCON_INT32(1));
+
+   if (mongoc_client_command_with_opts (client, "db", cmd, NULL, &opts, NULL, &error)) {
+      printf("error=%s\n", error.message);
+      abort();
    }
 
-   if (mongoc_cursor_error (cursor, &error)) {
-      fprintf (stderr, "Cursor Failure: %s\n", error.message);
-      return EXIT_FAILURE;
-   }
-
-   bson_destroy (&query);
-   mongoc_cursor_destroy (cursor);
-   mongoc_collection_destroy (collection);
+   bson_destroy (&opts);
+   mongoc_read_concern_destroy (rc);
+   bson_destroy (cmd);
    mongoc_uri_destroy (uri);
    mongoc_client_destroy (client);
    mongoc_cleanup ();
