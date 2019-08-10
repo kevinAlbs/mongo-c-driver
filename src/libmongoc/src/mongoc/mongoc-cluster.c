@@ -549,6 +549,11 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
    bson_error_t error_local;
    int32_t compressor_id;
    bson_iter_t iter;
+   bool skip_print;
+
+
+   skip_print =
+      0 == strcmp (_mongoc_get_command_name (cmd->command), "endSessions");
 
    server_stream = cmd->server_stream;
    server_id = server_stream->sd->id;
@@ -571,7 +576,13 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
    }
 
    if (server_stream->sd->max_wire_version >= WIRE_VERSION_OP_MSG) {
+      if (!skip_print) {
+         printf ("sending: %s\n", bson_as_json (cmd->command, NULL));
+      }
       retval = mongoc_cluster_run_opmsg (cluster, cmd, reply, error);
+      if (!skip_print) {
+         printf ("recving: %s\n", bson_as_json (reply, NULL));
+      }
    } else {
       retval = mongoc_cluster_run_command_opquery (
          cluster, cmd, server_stream->stream, compressor_id, reply, error);
@@ -2779,12 +2790,6 @@ network_error_reply (bson_t *reply, mongoc_cmd_t *cmd)
 {
    bson_t labels;
 
-   if (!reply) {
-      return;
-   }
-
-   bson_init (reply);
-
    /* Transactions Spec defines TransientTransactionError: "Any
     * network error or server selection error encountered running any
     * command besides commitTransaction in a transaction. In the case
@@ -2792,6 +2797,14 @@ network_error_reply (bson_t *reply, mongoc_cmd_t *cmd)
     * network errors or server selection errors where the client
     * receives no server reply, the client adds the label." */
    if (_mongoc_client_session_in_txn (cmd->session) && !cmd->is_txn_finish) {
+      /* even if user supplied to reply to set a label on, we still need to
+       * unpin the session. */
+      cmd->session->server_id = 0;
+      if (!reply) {
+         return;
+      }
+
+      bson_init (reply);
       BSON_APPEND_ARRAY_BEGIN (reply, "errorLabels", &labels);
       BSON_APPEND_UTF8 (&labels, "0", TRANSIENT_TXN_ERR);
       bson_append_array_end (reply, &labels);

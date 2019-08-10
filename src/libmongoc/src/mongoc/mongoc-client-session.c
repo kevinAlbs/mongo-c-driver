@@ -153,6 +153,7 @@ txn_abort (mongoc_client_session_t *session, bson_t *reply, bson_error_t *error)
     * after it fails with a retryable error", same for abort */
    error_type = _mongoc_write_error_get_type (r, err_ptr, &reply_local);
    if (error_type == MONGOC_WRITE_ERR_RETRY) {
+      printf("unpin a\n");
       _mongoc_client_session_unpin (session);
       bson_destroy (&reply_local);
       r = mongoc_client_write_command_with_opts (
@@ -162,6 +163,7 @@ txn_abort (mongoc_client_session_t *session, bson_t *reply, bson_error_t *error)
    if (!r) {
       /* we won't return an error from abortTransaction, so warn */
       MONGOC_WARNING ("Error in abortTransaction: %s", err_ptr->message);
+      printf("unpin b\n");
       _mongoc_client_session_unpin (session);
    }
 
@@ -244,6 +246,7 @@ retry:
     * commitTransaction again, drivers MUST apply w:majority to the write
     * concern of the commitTransaction command." */
    if (!retry_wc && (retrying_after_error || explicitly_retrying)) {
+      printf("applying retry write concern majority\n");
       retry_wc = create_commit_retry_wc (session->txn.opts.write_concern
                                             ? session->txn.opts.write_concern
                                             : session->client->write_concern);
@@ -262,14 +265,19 @@ retry:
 
    /* will be reinitialized by mongoc_client_write_command_with_opts */
    bson_destroy (&reply_local);
+
+   printf("we're in txn_commit, about to send: %s\n", bson_as_json (&cmd, NULL));
    r = mongoc_client_write_command_with_opts (
       session->client, "admin", &cmd, &opts, &reply_local, err_ptr);
+
+   printf("we've gotten an error: %s\n", err_ptr->message);
 
    /* Transactions Spec: "Drivers MUST retry the commitTransaction command once
     * after it fails with a retryable error", same for abort */
    error_type = _mongoc_write_error_get_type (r, err_ptr, &reply_local);
-   if (!retrying_after_error && error_type == MONGOC_WRITE_ERR_RETRY) {
+   if (!retrying_after_error && (error_type == MONGOC_WRITE_ERR_RETRY || err_ptr->domain == MONGOC_ERROR_CLIENT)) {
       retrying_after_error = true; /* retry after error only once */
+      printf("unpinning 1\n");
       _mongoc_client_session_unpin (session);
       bson_reinit (&opts);
       GOTO (retry);
@@ -286,6 +294,7 @@ retry:
        * commitTransaction command attempt fails with an
        * UnknownTransactionCommitResult error label. Do this even if we won't
        * actually apply the error label due to reply being NULL */
+      printf("unpinning 2\n");
       _mongoc_client_session_unpin (session);
       if (reply) {
          bson_copy_to_excluding_noinit (
@@ -635,6 +644,12 @@ _mongoc_client_session_handle_reply (mongoc_client_session_t *session,
 
    if (!reply || !bson_iter_init (&iter, reply)) {
       return;
+   }
+
+   if (mongoc_error_has_label (reply, "TransientTransactionError")) {
+      /* unpin session */
+      printf("unpinning, new\n");
+      session->server_id = 0;
    }
 
    while (bson_iter_next (&iter)) {
@@ -1122,6 +1137,7 @@ mongoc_client_session_start_transaction (mongoc_client_session_t *session,
 
    /* Transactions Spec: Starting a new transaction on a pinned ClientSession
     * MUST unpin the session. */
+   printf("unpin c\n");
    _mongoc_client_session_unpin (session);
    session->txn.state = MONGOC_TRANSACTION_STARTING;
    /* Transactions spec: "Drivers MUST clear a session's cached
@@ -1179,7 +1195,7 @@ mongoc_client_session_commit_transaction (mongoc_client_session_t *session,
 
    /* See Transactions Spec for state diagram. In COMMITTED state, user can call
     * commit again to retry after network error */
-
+   printf("Txn state=%d\n", (int)session->txn.state);
    switch (session->txn.state) {
    case MONGOC_TRANSACTION_NONE:
       bson_set_error (error,
@@ -1199,6 +1215,7 @@ mongoc_client_session_commit_transaction (mongoc_client_session_t *session,
    case MONGOC_TRANSACTION_IN_PROGRESS: {
       bool explicitly_retrying =
          (session->txn.state == MONGOC_TRANSACTION_COMMITTED);
+      printf("explicitly_retrying=%d\n", explicitly_retrying);
       /* in MONGOC_TRANSACTION_ENDING we add txnNumber and autocommit: false
        * to the commitTransaction command, but if it fails with network error
        * we add UnknownTransactionCommitResult not TransientTransactionError */
