@@ -549,11 +549,6 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
    bson_error_t error_local;
    int32_t compressor_id;
    bson_iter_t iter;
-   bool skip_print;
-
-
-   skip_print =
-      0 == strcmp (_mongoc_get_command_name (cmd->command), "endSessions");
 
    server_stream = cmd->server_stream;
    server_id = server_stream->sd->id;
@@ -576,13 +571,7 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
    }
 
    if (server_stream->sd->max_wire_version >= WIRE_VERSION_OP_MSG) {
-      if (!skip_print) {
-         printf ("sending: %s\n", bson_as_json (cmd->command, NULL));
-      }
       retval = mongoc_cluster_run_opmsg (cluster, cmd, reply, error);
-      if (!skip_print) {
-         printf ("recving: %s\n", bson_as_json (reply, NULL));
-      }
    } else {
       retval = mongoc_cluster_run_command_opquery (
          cluster, cmd, server_stream->stream, compressor_id, reply, error);
