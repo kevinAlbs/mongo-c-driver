@@ -2790,6 +2790,9 @@ network_error_reply (bson_t *reply, mongoc_cmd_t *cmd)
 {
    bson_t labels;
 
+   if (reply) {
+      bson_init (reply);
+   }
    /* Transactions Spec defines TransientTransactionError: "Any
     * network error or server selection error encountered running any
     * command besides commitTransaction in a transaction. In the case
@@ -2804,7 +2807,6 @@ network_error_reply (bson_t *reply, mongoc_cmd_t *cmd)
          return;
       }
 
-      bson_init (reply);
       BSON_APPEND_ARRAY_BEGIN (reply, "errorLabels", &labels);
       BSON_APPEND_UTF8 (&labels, "0", TRANSIENT_TXN_ERR);
       bson_append_array_end (reply, &labels);
