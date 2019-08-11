@@ -674,7 +674,11 @@ _append_array_from_command (mongoc_write_command_t *command, bson_t *bson)
    bson_reader_destroy (reader);
 }
 
-/* parts is always initialized */
+/* Assemble the base @cmd with all of the command options.
+ * @parts is always initialized, even on error.
+ * This is called twice in _mongoc_write_opquery.
+ * Once with no payload documents, to determine the total size. And once with
+ * payload documents, to send the final command. */
 static bool
 _assemble_cmd (bson_t *cmd,
                mongoc_write_command_t *command,
@@ -765,17 +769,16 @@ again:
       mongoc_cmd_parts_cleanup (&parts);
       EXIT;
    }
-   mongoc_cmd_parts_cleanup (&parts);
 
-   /* If options were added in mongoc_cmd_parts_assemble,
-    * parts.assembled.command is a new bson_t. Otherwise,
-    * parts.assembled.command points to command_local. Use this to compute
-    * overhead, not cmd. */
-
-   /* 1 byte to specify array type, 1 byte for field name's null terminator */
+   /* Use the assembled command to compute the overhead, since it may be a new
+    * BSON document with options applied. If no options were applied, then
+    * parts.assembled.command points to cmd. The constant 2 is due to 1 byte to
+    * specify array type and 1 byte for field name's null terminator. */
    overhead =
       parts.assembled.command->len + 2 + gCommandFieldLens[command->type];
-
+   /* Toss out the assembled command, we'll assemble again after adding all of
+    * the payload documents. */
+   mongoc_cmd_parts_cleanup (&parts);
 
    reader = bson_reader_new_from_data (command->payload.data + data_offset,
                                        command->payload.len - data_offset);
