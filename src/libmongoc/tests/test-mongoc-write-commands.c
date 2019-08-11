@@ -385,6 +385,8 @@ test_split_opquery_with_options (void)
    request_t *request;
    const bson_t *insert;
    bson_t opts;
+   mongoc_write_concern_t *wc;
+   int n_docs;
 
    /* Use a reduced maxBsonObjectSize, and wire version for OP_QUERY */
    const char *ismaster = "{'ok': 1.0,"
@@ -396,8 +398,6 @@ test_split_opquery_with_options (void)
    server = mock_server_new ();
    mock_server_auto_ismaster (server, ismaster);
    mock_server_run (server);
-   mongoc_write_concern_t *wc;
-   int n_docs;
 
    /* Create an insert with two batches. Because of the reduced
    * maxBsonObjectSize, each document must be less than 100 bytes.

@@ -465,9 +465,6 @@ _mongoc_write_opmsg (mongoc_write_command_t *command,
    BSON_ASSERT (server_stream);
    BSON_ASSERT (collection);
 
-   /* MongoDB has a extra allowance to allow updating 16mb document,
-    * as the update operators would otherwise overflow the 16mb object limit
-    */
    max_bson_obj_size = mongoc_server_stream_max_bson_obj_size (server_stream);
    max_msg_size = mongoc_server_stream_max_msg_size (server_stream);
    max_document_count =
@@ -691,6 +688,7 @@ _assemble_cmd (bson_t *cmd,
 {
    bool ret;
    bson_iter_t iter;
+
    mongoc_cmd_parts_init (parts, client, database, MONGOC_QUERY_NONE, cmd);
    parts->is_write_command = true;
    parts->assembled.operation_id = command->operation_id;
