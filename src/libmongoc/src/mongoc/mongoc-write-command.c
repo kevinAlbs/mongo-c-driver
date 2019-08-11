@@ -610,6 +610,9 @@ _mongoc_write_opmsg (mongoc_write_command_t *command,
 
          if (!ret) {
             result->failed = true;
+            /* Conservatively set must_stop to true. Per CDRIVER-3305 we
+             * shouldn't stop for unordered bulk writes, but also need to check
+             * if the server stream was invalidated per CDRIVER-3306. */
             result->must_stop = true;
          }
 
@@ -623,7 +626,7 @@ _mongoc_write_opmsg (mongoc_write_command_t *command,
          bson_destroy (&reply);
       }
       /* While we have more documents to write */
-   } while (payload_total_offset < command->payload.len);
+   } while (payload_total_offset < command->payload.len && !result->must_stop);
 
    bson_destroy (&cmd);
    mongoc_cmd_parts_cleanup (&parts);
