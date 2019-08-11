@@ -674,6 +674,36 @@ _append_array_from_command (mongoc_write_command_t *command, bson_t *bson)
    bson_reader_destroy (reader);
 }
 
+/* parts is always initialized */
+static bool
+_assemble_cmd (bson_t *cmd,
+               mongoc_write_command_t *command,
+               mongoc_client_t *client,
+               mongoc_server_stream_t *server_stream,
+               const char *database,
+               const mongoc_write_concern_t *write_concern,
+               mongoc_cmd_parts_t *parts,
+               bson_error_t *error)
+{
+   bool ret;
+   bson_iter_t iter;
+   mongoc_cmd_parts_init (parts, client, database, MONGOC_QUERY_NONE, cmd);
+   parts->is_write_command = true;
+   parts->assembled.operation_id = command->operation_id;
+
+   ret = mongoc_cmd_parts_set_write_concern (
+      parts, write_concern, server_stream->sd->max_wire_version, error);
+   if (ret) {
+      BSON_ASSERT (bson_iter_init (&iter, &command->cmd_opts));
+      ret = mongoc_cmd_parts_append_opts (
+         parts, &iter, server_stream->sd->max_wire_version, error);
+   }
+   if (ret) {
+      ret = mongoc_cmd_parts_assemble (parts, server_stream, error);
+   }
+   return ret;
+}
+
 static void
 _mongoc_write_opquery (mongoc_write_command_t *command,
                        mongoc_client_t *client,
@@ -686,12 +716,10 @@ _mongoc_write_opquery (mongoc_write_command_t *command,
                        bson_error_t *error)
 {
    mongoc_cmd_parts_t parts;
-   bson_iter_t iter;
    const char *key;
    uint32_t len = 0;
    bson_t ar;
-   bson_t cmd_local;
-   bson_t *cmd;
+   bson_t cmd;
    char str[16];
    bool has_more;
    bool ret = false;
@@ -713,7 +741,7 @@ _mongoc_write_opquery (mongoc_write_command_t *command,
    BSON_ASSERT (server_stream);
    BSON_ASSERT (collection);
 
-   bson_init (&cmd_local);
+   bson_init (&cmd);
    max_bson_obj_size = mongoc_server_stream_max_bson_obj_size (server_stream);
    max_write_batch_size =
       mongoc_server_stream_max_write_batch_size (server_stream);
@@ -722,43 +750,37 @@ again:
    has_more = false;
    i = 0;
 
-   _mongoc_write_command_init (&cmd_local, command, collection);
-   mongoc_cmd_parts_init (
-      &parts, client, database, MONGOC_QUERY_NONE, &cmd_local);
-   parts.is_write_command = true;
-   parts.assembled.operation_id = command->operation_id;
-
-   ret = mongoc_cmd_parts_set_write_concern (
-      &parts, write_concern, server_stream->sd->max_wire_version, error);
-   if (ret) {
-      BSON_ASSERT (bson_iter_init (&iter, &command->cmd_opts));
-      ret = mongoc_cmd_parts_append_opts (
-         &parts, &iter, server_stream->sd->max_wire_version, error);
-   }
-   if (ret) {
-      ret = mongoc_cmd_parts_assemble (&parts, server_stream, error);
-   }
+   _mongoc_write_command_init (&cmd, command, collection);
    /* If any part of assembling failed, return with failure. */
-   if (!ret) {
+   if (!_assemble_cmd (&cmd,
+                       command,
+                       client,
+                       server_stream,
+                       database,
+                       write_concern,
+                       &parts,
+                       error)) {
       result->failed = true;
-      bson_destroy (&cmd_local);
+      bson_destroy (&cmd);
       mongoc_cmd_parts_cleanup (&parts);
       EXIT;
    }
+   mongoc_cmd_parts_cleanup (&parts);
 
    /* If options were added in mongoc_cmd_parts_assemble,
     * parts.assembled.command is a new bson_t. Otherwise,
-    * parts.assembled.command points to command_local. */
-   cmd = (bson_t *) parts.assembled.command;
+    * parts.assembled.command points to command_local. Use this to compute
+    * overhead, not cmd. */
 
    /* 1 byte to specify array type, 1 byte for field name's null terminator */
-   overhead = cmd->len + 2 + gCommandFieldLens[command->type];
+   overhead =
+      parts.assembled.command->len + 2 + gCommandFieldLens[command->type];
 
 
    reader = bson_reader_new_from_data (command->payload.data + data_offset,
                                        command->payload.len - data_offset);
 
-   bson_append_array_begin (cmd,
+   bson_append_array_begin (&cmd,
                             gCommandFields[command->type],
                             gCommandFieldLens[command->type],
                             &ar);
@@ -780,7 +802,7 @@ again:
       i++;
    }
 
-   bson_append_array_end (cmd, &ar);
+   bson_append_array_end (&cmd, &ar);
 
    if (!i) {
       _mongoc_write_command_too_large_error (error, i, len, max_bson_obj_size);
@@ -793,13 +815,23 @@ again:
    } else {
       bson_t reply;
 
-      ret = mongoc_cluster_run_command_monitored (
-         &client->cluster, &parts.assembled, &reply, error);
+      ret = _assemble_cmd (&cmd,
+                           command,
+                           client,
+                           server_stream,
+                           database,
+                           write_concern,
+                           &parts,
+                           error);
+      if (ret) {
+         ret = mongoc_cluster_run_command_monitored (
+            &client->cluster, &parts.assembled, &reply, error);
+      }
 
       if (!ret) {
          result->failed = true;
          if (bson_empty (&reply)) {
-            /* a network error running the command */
+            /* assembling failed, or a network error running the command */
             result->must_stop = true;
          }
       }
@@ -807,16 +839,16 @@ again:
       _mongoc_write_result_merge (result, command, &reply, offset);
       offset += i;
       bson_destroy (&reply);
+      mongoc_cmd_parts_cleanup (&parts);
    }
    bson_reader_destroy (reader);
-   mongoc_cmd_parts_cleanup (&parts);
 
    if (has_more && (ret || !command->flags.ordered) && !result->must_stop) {
-      bson_reinit (&cmd_local);
+      bson_reinit (&cmd);
       GOTO (again);
    }
 
-   bson_destroy (&cmd_local);
+   bson_destroy (&cmd);
    EXIT;
 }
 
