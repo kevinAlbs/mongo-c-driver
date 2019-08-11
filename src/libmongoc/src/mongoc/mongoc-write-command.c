@@ -829,6 +829,8 @@ again:
       if (ret) {
          ret = mongoc_cluster_run_command_monitored (
             &client->cluster, &parts.assembled, &reply, error);
+      } else {
+         bson_init (&reply);
       }
 
       if (!ret) {
