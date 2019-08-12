@@ -66,6 +66,7 @@ json_test_ctx_init (json_test_ctx_t *ctx,
    ctx->client = client;
    ctx->db = db;
    ctx->collection = collection;
+   ctx->change_stream = NULL;
    ctx->config = config;
    ctx->n_events = 0;
    bson_init (&ctx->events);
@@ -124,6 +125,7 @@ void
 json_test_ctx_cleanup (json_test_ctx_t *ctx)
 {
    json_test_ctx_end_sessions (ctx);
+   mongoc_change_stream_destroy (ctx->change_stream);
    bson_destroy (&ctx->lsids[0]);
    bson_destroy (&ctx->lsids[1]);
    bson_destroy (&ctx->events);
@@ -1703,41 +1705,6 @@ list_collections (mongoc_client_t *client,
 
 
 static bool
-change_stream_watch (mongoc_change_stream_t *cs,
-                     const bson_t *test,
-                     const bson_t *operation,
-                     mongoc_client_session_t *session,
-                     const mongoc_read_prefs_t *read_prefs,
-                     bson_t *reply)
-{
-   int i;
-   char key[12];
-   const char *keyptr = NULL;
-   const bson_t *next_doc;
-   bson_t doc = BSON_INITIALIZER;
-   bson_error_t error;
-   bson_value_t value;
-
-
-   i = 0;
-   while (mongoc_change_stream_next (cs, &next_doc)) {
-      bson_uint32_to_string (i++, &keyptr, key, sizeof key);
-      BSON_APPEND_DOCUMENT (&doc, keyptr, next_doc);
-   }
-
-   value_init_from_doc (&value, &doc);
-   value.value_type = BSON_TYPE_ARRAY;
-   check_result (test, operation, true, &value, &error);
-
-   bson_value_destroy (&value);
-   bson_destroy (&doc);
-   mongoc_change_stream_destroy (cs);
-
-   return true;
-}
-
-
-static bool
 gridfs_download (mongoc_database_t *db,
                  const bson_t *test,
                  const bson_t *operation,
@@ -1865,13 +1832,8 @@ json_test_operation (json_test_ctx_t *ctx,
             c, test, operation, session, read_prefs, reply, false);
       } else if (!strcmp (op_name, "watch")) {
          bson_t pipeline = BSON_INITIALIZER;
-         res =
-            change_stream_watch (mongoc_collection_watch (c, &pipeline, NULL),
-                                 test,
-                                 operation,
-                                 session,
-                                 read_prefs,
-                                 reply);
+         mongoc_change_stream_destroy (ctx->change_stream);
+         ctx->change_stream = mongoc_collection_watch (c, &pipeline, NULL);
       } else {
          test_error ("unrecognized collection operation name %s", op_name);
       }
@@ -1889,12 +1851,8 @@ json_test_operation (json_test_ctx_t *ctx,
             c->client, test, operation, session, read_prefs, reply, true);
       } else if (!strcmp (op_name, "watch")) {
          bson_t pipeline = BSON_INITIALIZER;
-         res = change_stream_watch (mongoc_database_watch (db, &pipeline, NULL),
-                                    test,
-                                    operation,
-                                    session,
-                                    read_prefs,
-                                    reply);
+         mongoc_change_stream_destroy (ctx->change_stream);
+         ctx->change_stream = mongoc_database_watch (db, &pipeline, NULL);
       } else {
          test_error ("unrecognized database operation name %s", op_name);
       }
@@ -1928,13 +1886,8 @@ json_test_operation (json_test_ctx_t *ctx,
             c->client, test, operation, session, read_prefs, reply, true);
       } else if (!strcmp (op_name, "watch")) {
          bson_t pipeline = BSON_INITIALIZER;
-         res = change_stream_watch (
-            mongoc_client_watch (c->client, &pipeline, NULL),
-            test,
-            operation,
-            session,
-            read_prefs,
-            reply);
+         mongoc_change_stream_destroy (ctx->change_stream);
+         ctx->change_stream = mongoc_client_watch (c->client, &pipeline, NULL);
       } else {
          test_error ("unrecognized client operation name %s", op_name);
       }
