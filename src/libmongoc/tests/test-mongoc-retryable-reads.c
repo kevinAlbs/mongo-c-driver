@@ -25,7 +25,7 @@ retryable_reads_test_run_operation (json_test_ctx_t *ctx,
                               *explicit_session ? ctx->sessions[0] : NULL,
                               &reply);
 
-   // bson_destroy (&reply);
+   bson_destroy (&reply);
 
    return res;
 }
@@ -176,7 +176,7 @@ test_all_spec_tests (TestSuite *suite)
 
    test_framework_resolve_path (JSON_DIR "/retryable_reads", resolved);
    install_json_test_suite_with_check (
-      suite, resolved, test_retryable_reads_cb);
+      suite, resolved, test_retryable_reads_cb, TestSuite_CheckLive);
 }
 
 void
@@ -188,11 +188,11 @@ test_retryable_reads_install (TestSuite *suite)
                       test_command_with_opts,
                       NULL,
                       NULL,
-                      test_framework_skip_if_not_rs_version_6);
+                      test_framework_skip_if_max_wire_version_less_than_6);
    TestSuite_AddFull (suite,
                       "/retryable_reads/retry_off",
                       test_retry_reads_off,
                       NULL,
                       NULL,
-                      test_framework_skip_if_not_rs_version_6);
+                      test_framework_skip_if_max_wire_version_less_than_6);
 }

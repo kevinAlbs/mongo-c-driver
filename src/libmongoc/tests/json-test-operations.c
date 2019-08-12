@@ -1353,7 +1353,8 @@ find_one (mongoc_collection_t *collection,
    mongoc_cursor_destroy (cursor);
    bson_destroy (&filter);
    bson_destroy (&opts);
-
+   bson_value_destroy (&value);
+   bson_init (&reply);
    return true;
 }
 
@@ -1728,6 +1729,7 @@ gridfs_download (mongoc_database_t *db,
    }
 
    mongoc_stream_destroy (stream);
+   mongoc_gridfs_bucket_destroy (bucket);
 
    return true;
 }
@@ -1834,6 +1836,8 @@ json_test_operation (json_test_ctx_t *ctx,
          bson_t pipeline = BSON_INITIALIZER;
          mongoc_change_stream_destroy (ctx->change_stream);
          ctx->change_stream = mongoc_collection_watch (c, &pipeline, NULL);
+         bson_init (reply);
+         bson_destroy (&pipeline);
       } else {
          test_error ("unrecognized collection operation name %s", op_name);
       }
@@ -1853,6 +1857,8 @@ json_test_operation (json_test_ctx_t *ctx,
          bson_t pipeline = BSON_INITIALIZER;
          mongoc_change_stream_destroy (ctx->change_stream);
          ctx->change_stream = mongoc_database_watch (db, &pipeline, NULL);
+         bson_init (reply);
+         bson_destroy (&pipeline);
       } else {
          test_error ("unrecognized database operation name %s", op_name);
       }
@@ -1888,6 +1894,8 @@ json_test_operation (json_test_ctx_t *ctx,
          bson_t pipeline = BSON_INITIALIZER;
          mongoc_change_stream_destroy (ctx->change_stream);
          ctx->change_stream = mongoc_client_watch (c->client, &pipeline, NULL);
+         bson_init (reply);
+         bson_destroy (&pipeline);
       } else {
          test_error ("unrecognized client operation name %s", op_name);
       }
@@ -1897,6 +1905,7 @@ json_test_operation (json_test_ctx_t *ctx,
             gridfs_download (db, test, operation, session, read_prefs, reply);
       } else if (!strcmp (op_name, "download_by_name")) {
          res = gridfs_download_by_name ();
+         bson_init (reply);
       } else {
          test_error ("unrecognized gridfs operation name %s", op_name);
       }

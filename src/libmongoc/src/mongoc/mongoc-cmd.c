@@ -39,6 +39,7 @@ mongoc_cmd_parts_init (mongoc_cmd_parts_t *parts,
    parts->is_write_command = false;
    parts->prohibit_lsid = false;
    parts->allow_txn_number = MONGOC_CMD_PARTS_ALLOW_TXN_NUMBER_UNKNOWN;
+   parts->is_retryable_read = false;
    parts->is_retryable_write = false;
    parts->has_temp_session = false;
    parts->client = client;
