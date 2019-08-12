@@ -1344,6 +1344,7 @@ find_one (mongoc_collection_t *collection,
 
    if (mongoc_cursor_next (cursor, &doc)) {
       value_init_from_doc (&value, doc);
+      mongoc_cursor_error (cursor, &error);
       check_result (test, operation, true, &value, &error);
    } else if (mongoc_cursor_error_document (cursor, &error, &doc)) {
       value_init_from_doc (&value, doc);
@@ -1354,7 +1355,7 @@ find_one (mongoc_collection_t *collection,
    bson_destroy (&filter);
    bson_destroy (&opts);
    bson_value_destroy (&value);
-   bson_init (&reply);
+   bson_init (reply);
    return true;
 }
 
@@ -1621,6 +1622,7 @@ list_databases (mongoc_client_t *client,
 
    check_cursor (cursor, test, operation);
    mongoc_cursor_destroy (cursor);
+   bson_init (reply);
    return true;
 }
 
@@ -1667,6 +1669,7 @@ list_indexes (mongoc_collection_t *collection,
 
    check_cursor (cursor, test, operation);
    mongoc_cursor_destroy (cursor);
+   bson_init (reply);
    return true;
 }
 
@@ -1700,6 +1703,7 @@ list_collections (mongoc_client_t *client,
 
    check_cursor (cursor, test, operation);
    mongoc_cursor_destroy (cursor);
+   bson_init (reply);
 
    return true;
 }
@@ -1730,6 +1734,7 @@ gridfs_download (mongoc_database_t *db,
 
    mongoc_stream_destroy (stream);
    mongoc_gridfs_bucket_destroy (bucket);
+   bson_init (reply);
 
    return true;
 }

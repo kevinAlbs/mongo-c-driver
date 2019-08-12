@@ -736,10 +736,6 @@ bool
 _is_retryable_read (const mongoc_cmd_parts_t *parts,
                     const mongoc_server_stream_t *server_stream)
 {
-   if (!parts->assembled.session) {
-      return false;
-   }
-
    if (!parts->is_read_command) {
       return false;
    }
@@ -748,7 +744,7 @@ _is_retryable_read (const mongoc_cmd_parts_t *parts,
       return false;
    }
 
-   if (server_stream->sd->type == MONGOC_SERVER_UNKNOWN) {
+   if (_mongoc_client_session_in_txn (parts->assembled.session)) {
       return false;
    }
 

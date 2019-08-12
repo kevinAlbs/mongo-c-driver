@@ -100,14 +100,14 @@ test_command_with_opts (void *ctx)
                        client, "admin", cmd, NULL, server_id, NULL, &error),
                     error);
 
-   cmd = tmp_bson ("{'count': 'coll'}", collection->collection);
+   cmd = tmp_bson ("{'count': '%s'}", collection->collection);
 
    ASSERT_OR_PRINT (mongoc_collection_read_command_with_opts (
                        collection, cmd, NULL, NULL, &reply, &error),
                     error);
 
    bson_iter_init_find (&iter, &reply, "n");
-   ASSERT (bson_iter_int32 (&iter) == 2);
+   ASSERT (bson_iter_as_int64 (&iter) == 2);
 
    deactivate_fail_points (client, server_id);
 
@@ -132,6 +132,7 @@ test_retry_reads_off (void *ctx)
    uri = test_framework_get_uri ();
    mongoc_uri_set_option_as_bool (uri, "retryreads", false);
    client = mongoc_client_new_from_uri (uri);
+   test_framework_set_ssl_opts (client);
 
    /* clean up in case a previous test aborted */
    server_id = mongoc_topology_select_server_id (
@@ -159,6 +160,7 @@ test_retry_reads_off (void *ctx)
    deactivate_fail_points (client, server_id);
 
    mongoc_collection_destroy (collection);
+   mongoc_uri_destroy (uri);
    mongoc_client_destroy (client);
 }
 
@@ -183,16 +185,19 @@ void
 test_retryable_reads_install (TestSuite *suite)
 {
    test_all_spec_tests (suite);
+   /* Since we need failpoints, require wire version 7 */
    TestSuite_AddFull (suite,
                       "/retryable_reads/command_with_opts",
                       test_command_with_opts,
                       NULL,
                       NULL,
-                      test_framework_skip_if_max_wire_version_less_than_6);
+                      test_framework_skip_if_max_wire_version_less_than_7,
+                      test_framework_skip_if_mongos);
    TestSuite_AddFull (suite,
                       "/retryable_reads/retry_off",
                       test_retry_reads_off,
                       NULL,
                       NULL,
-                      test_framework_skip_if_max_wire_version_less_than_6);
+                      test_framework_skip_if_max_wire_version_less_than_7,
+                      test_framework_skip_if_mongos);
 }
