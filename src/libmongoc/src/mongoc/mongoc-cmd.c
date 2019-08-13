@@ -740,6 +740,12 @@ _is_retryable_read (const mongoc_cmd_parts_t *parts,
       return false;
    }
 
+   /* Commands that go through read_write_command helpers are also write
+    * commands. Prohibit from read retry. */
+   if (parts->is_write_command) {
+      return false;
+   }
+
    if (server_stream->sd->max_wire_version < WIRE_VERSION_RETRY_READS) {
       return false;
    }

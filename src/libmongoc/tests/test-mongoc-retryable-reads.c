@@ -50,16 +50,28 @@ test_retryable_reads_cb (bson_t *scenario)
 }
 
 
-/* Test code paths for that must not retry that aren't exercised in the spec
- * tests */
 static void
-test_prohibited (void *ctx)
+_set_failpoint (mongoc_client_t *client)
+{
+   bson_error_t error;
+   bson_t *cmd =
+      tmp_bson ("{'configureFailPoint': 'failCommand',"
+                " 'mode': {'times': 1},"
+                " 'data': {'errorCode': 10107, 'failCommands': ['count']}}");
+
+   ASSERT_OR_PRINT (
+      mongoc_client_command_simple (client, "admin", cmd, NULL, NULL, &error),
+      error);
+}
+/* Test code paths for all command helpers */
+static void
+test_cmd_helpers (void *ctx)
 {
    mongoc_uri_t *uri;
    mongoc_client_t *client;
    uint32_t server_id;
    mongoc_collection_t *collection;
-   bson_t *cmd, *failpoint_cmd;
+   bson_t *cmd;
    bson_t reply;
    bson_error_t error;
    bson_iter_t iter;
@@ -98,54 +110,97 @@ test_prohibited (void *ctx)
                        collection, tmp_bson ("{'_id': 1}"), NULL, NULL, &error),
                     error);
 
-   failpoint_cmd =
-      tmp_bson ("{'configureFailPoint': 'failCommand',"
-                " 'mode': {'times': 1},"
-                " 'data': {'errorCode': 10107, 'failCommands': ['count']}}");
-
    cmd = tmp_bson ("{'count': '%s'}", collection->collection);
 
-   /* read helper must retry. */
-   ASSERT_OR_PRINT (
-      mongoc_client_command_simple_with_server_id (
-         client, "admin", failpoint_cmd, NULL, server_id, NULL, &error),
-      error);
-   ASSERT_OR_PRINT (mongoc_collection_read_command_with_opts (
-                       collection, cmd, NULL, NULL, &reply, &error),
+   /* read helpers must retry. */
+   _set_failpoint (client);
+   ASSERT_OR_PRINT (mongoc_client_read_command_with_opts (
+                       client, "test", cmd, NULL, NULL, &reply, &error),
                     error);
-
    bson_iter_init_find (&iter, &reply, "n");
    ASSERT (bson_iter_as_int64 (&iter) == 2);
    bson_destroy (&reply);
 
-   /* read/write agnostic helpers must not retry. */
-   ASSERT_OR_PRINT (mongoc_client_command_simple (
-                       client, "admin", failpoint_cmd, NULL, NULL, &error),
+   _set_failpoint (client);
+   ASSERT_OR_PRINT (mongoc_database_read_command_with_opts (
+                       database, cmd, NULL, NULL, &reply, &error),
                     error);
+   bson_iter_init_find (&iter, &reply, "n");
+   ASSERT (bson_iter_as_int64 (&iter) == 2);
+   bson_destroy (&reply);
 
-   ASSERT (!mongoc_client_command_simple (client, "test", cmd, NULL, NULL, &error));
+   _set_failpoint (client);
+   ASSERT_OR_PRINT (mongoc_collection_read_command_with_opts (
+                       collection, cmd, NULL, NULL, &reply, &error),
+                    error);
+   bson_iter_init_find (&iter, &reply, "n");
+   ASSERT (bson_iter_as_int64 (&iter) == 2);
+   bson_destroy (&reply);
+
+   /* TODO: once CDRIVER-3314 is resolved, test the read+write helpers. */
+
+   /* read/write agnostic command_simple helpers must not retry. */
+   _set_failpoint (client);
+   ASSERT (
+      !mongoc_client_command_simple (client, "test", cmd, NULL, NULL, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 10107, "Failing command");
 
-   ASSERT_OR_PRINT (mongoc_client_command_simple (
-                       client, "admin", failpoint_cmd, NULL, NULL, &error),
-                    error);
-
+   _set_failpoint (client);
    ASSERT (!mongoc_database_command_simple (database, cmd, NULL, NULL, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 10107, "Failing command");
 
-   ASSERT_OR_PRINT (mongoc_client_command_simple (
-                       client, "admin", failpoint_cmd, NULL, NULL, &error),
-                    error);
-
+   _set_failpoint (client);
    ASSERT (
       !mongoc_collection_command_simple (collection, cmd, NULL, NULL, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 10107, "Failing command");
 
-   /* deprecated command helper (which goes through cursor logic) function must
+
+   /* read/write agnostic command_with_opts helpers must not retry. */
+   _set_failpoint (client);
+   ASSERT (!mongoc_client_command_with_opts (
+      client, "test", cmd, NULL, NULL, NULL, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 10107, "Failing command");
+
+   _set_failpoint (client);
+   ASSERT (!mongoc_database_command_with_opts (
+      database, cmd, NULL, NULL, NULL, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 10107, "Failing command");
+
+   _set_failpoint (client);
+   ASSERT (!mongoc_collection_command_with_opts (
+      collection, cmd, NULL, NULL, NULL, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 10107, "Failing command");
+
+   /* read/write agnostic command_simple_with_server_id helper must not retry.
+    */
+   server_id = mongoc_topology_select_server_id (
+      client->topology, MONGOC_SS_WRITE, NULL, &error);
+   ASSERT_OR_PRINT (server_id, error);
+   _set_failpoint (client);
+   ASSERT (!mongoc_client_command_simple_with_server_id (
+      client, "test", cmd, NULL, server_id, NULL, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 10107, "Failing command");
+
+
+   /* deprecated command helpers (which goes through cursor logic) function must
     * not retry. */
-   ASSERT_OR_PRINT (mongoc_client_command_simple (
-                       client, "admin", failpoint_cmd, NULL, NULL, &error),
-                    error);
+   _set_failpoint (client);
+   cursor = mongoc_client_command (
+      client, "test", MONGOC_QUERY_NONE, 0, 1, 1, cmd, NULL, NULL);
+   ASSERT (!mongoc_cursor_next (cursor, &doc));
+   ASSERT (mongoc_cursor_error (cursor, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 10107, "Failing command");
+   mongoc_cursor_destroy (cursor);
+
+   _set_failpoint (client);
+   cursor = mongoc_database_command (
+      database, MONGOC_QUERY_NONE, 0, 1, 1, cmd, NULL, NULL);
+   ASSERT (!mongoc_cursor_next (cursor, &doc));
+   ASSERT (mongoc_cursor_error (cursor, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 10107, "Failing command");
+   mongoc_cursor_destroy (cursor);
+
+   _set_failpoint (client);
    cursor = mongoc_collection_command (
       collection, MONGOC_QUERY_NONE, 0, 1, 1, cmd, NULL, NULL);
    ASSERT (!mongoc_cursor_next (cursor, &doc));
@@ -230,8 +285,8 @@ test_retryable_reads_install (TestSuite *suite)
    test_all_spec_tests (suite);
    /* Since we need failpoints, require wire version 7 */
    TestSuite_AddFull (suite,
-                      "/retryable_reads/prohibited",
-                      test_prohibited,
+                      "/retryable_reads/cmd_helpers",
+                      test_cmd_helpers,
                       NULL,
                       NULL,
                       test_framework_skip_if_max_wire_version_less_than_7,
