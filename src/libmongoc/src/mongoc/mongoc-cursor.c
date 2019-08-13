@@ -906,7 +906,8 @@ bool
 _mongoc_cursor_run_command (mongoc_cursor_t *cursor,
                             const bson_t *command,
                             const bson_t *opts,
-                            bson_t *reply)
+                            bson_t *reply,
+                            bool retry_prohibited)
 {
    mongoc_server_stream_t *server_stream;
    bson_iter_t iter;
@@ -1022,6 +1023,9 @@ _mongoc_cursor_run_command (mongoc_cursor_t *cursor,
             is_retryable = false;
          }
       }
+   }
+   if (is_retryable && retry_prohibited) {
+      is_retryable = false;
    }
 
    if (cursor->write_concern &&
@@ -1658,7 +1662,7 @@ _mongoc_cursor_response_refresh (mongoc_cursor_t *cursor,
 
    /* server replies to find / aggregate with {cursor: {id: N, firstBatch: []}},
     * to getMore command with {cursor: {id: N, nextBatch: []}}. */
-   if (_mongoc_cursor_run_command (cursor, command, opts, &response->reply) &&
+   if (_mongoc_cursor_run_command (cursor, command, opts, &response->reply, false) &&
        _mongoc_cursor_start_reading_response (cursor, response)) {
       return;
    }
