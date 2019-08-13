@@ -275,8 +275,11 @@ test_all_spec_tests (TestSuite *suite)
    char resolved[PATH_MAX];
 
    test_framework_resolve_path (JSON_DIR "/retryable_reads", resolved);
-   install_json_test_suite_with_check (
-      suite, resolved, test_retryable_reads_cb, TestSuite_CheckLive);
+   install_json_test_suite_with_check (suite,
+                                       resolved,
+                                       test_retryable_reads_cb,
+                                       TestSuite_CheckLive,
+                                       test_framework_skip_if_no_failpoint);
 }
 
 void
@@ -290,12 +293,14 @@ test_retryable_reads_install (TestSuite *suite)
                       NULL,
                       NULL,
                       test_framework_skip_if_max_wire_version_less_than_7,
-                      test_framework_skip_if_mongos);
+                      test_framework_skip_if_mongos,
+                      test_framework_skip_if_no_failpoint);
    TestSuite_AddFull (suite,
                       "/retryable_reads/retry_off",
                       test_retry_reads_off,
                       NULL,
                       NULL,
                       test_framework_skip_if_max_wire_version_less_than_7,
-                      test_framework_skip_if_mongos);
+                      test_framework_skip_if_mongos,
+                      test_framework_skip_if_no_failpoint);
 }

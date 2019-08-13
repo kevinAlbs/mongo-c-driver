@@ -2257,6 +2257,34 @@ test_framework_skip_if_compressors (void)
    return !test_framework_skip_if_no_compressors ();
 }
 
+int
+test_framework_skip_if_no_failpoint (void)
+{
+   mongoc_client_t *client;
+   bool ret;
+   bson_error_t error;
+
+   client = test_framework_client_new ();
+   mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
+   ret = mongoc_client_command_simple (
+      client,
+      "admin",
+      tmp_bson ("{'configureFailPoint': 'failCommand', 'mode': 'off', 'data': "
+                "{'errorCode': 10107, 'failCommands': ['count']}}"),
+      NULL,
+      NULL,
+      &error);
+   mongoc_client_destroy (client);
+
+   if (!ret) {
+      return 0; /* do not proceed */
+   }
+
+   /* proceed. */
+   return 1;
+}
+
+
 void
 test_framework_resolve_path (const char *path, char *resolved)
 {
