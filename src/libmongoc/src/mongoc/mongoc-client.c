@@ -1604,7 +1604,8 @@ retry:
       &client->cluster, &parts->assembled, reply, error);
 
    if (is_retryable) {
-      _mongoc_write_error_update_if_unsupported_storage_engine (ret, error, reply);
+      _mongoc_write_error_update_if_unsupported_storage_engine (
+         ret, error, reply);
    }
 
    /* If a retryable error is encountered and the write is retryable, select
@@ -1647,7 +1648,6 @@ static bool
 _mongoc_client_retryable_read_command_with_stream (
    mongoc_client_t *client,
    mongoc_cmd_parts_t *parts,
-   const mongoc_read_prefs_t *read_prefs,
    mongoc_server_stream_t *server_stream,
    bson_t *reply,
    bson_error_t *error)
@@ -1687,7 +1687,7 @@ retry:
 
       retry_server_stream =
          mongoc_cluster_stream_for_reads (&client->cluster,
-                                          read_prefs,
+                                          parts->read_prefs,
                                           parts->assembled.session,
                                           NULL,
                                           &ignored_error);
@@ -1712,7 +1712,6 @@ retry:
 static bool
 _mongoc_client_command_with_stream (mongoc_client_t *client,
                                     mongoc_cmd_parts_t *parts,
-                                    const mongoc_read_prefs_t *read_prefs,
                                     mongoc_server_stream_t *server_stream,
                                     bson_t *reply,
                                     bson_error_t *error)
@@ -1732,7 +1731,7 @@ _mongoc_client_command_with_stream (mongoc_client_t *client,
 
    if (parts->is_retryable_read) {
       RETURN (_mongoc_client_retryable_read_command_with_stream (
-         client, parts, read_prefs, server_stream, reply, error));
+         client, parts, server_stream, reply, error));
    }
 
    RETURN (mongoc_cluster_run_command_monitored (
@@ -1778,7 +1777,7 @@ mongoc_client_command_simple (mongoc_client_t *client,
 
    if (server_stream) {
       ret = _mongoc_client_command_with_stream (
-         client, &parts, read_prefs, server_stream, reply, error);
+         client, &parts, server_stream, reply, error);
    } else {
       /* reply initialized by mongoc_cluster_stream_for_reads */
       ret = false;
@@ -1987,7 +1986,7 @@ _mongoc_client_command_with_opts (mongoc_client_t *client,
    }
 
    ret = _mongoc_client_command_with_stream (
-      client, &parts, user_prefs, server_stream, reply_ptr, error);
+      client, &parts, server_stream, reply_ptr, error);
 
    reply_initialized = true;
 
@@ -2144,7 +2143,7 @@ mongoc_client_command_simple_with_server_id (
       parts.read_prefs = read_prefs;
 
       ret = _mongoc_client_command_with_stream (
-         client, &parts, read_prefs, server_stream, reply, error);
+         client, &parts, server_stream, reply, error);
 
       mongoc_cmd_parts_cleanup (&parts);
       mongoc_server_stream_cleanup (server_stream);
