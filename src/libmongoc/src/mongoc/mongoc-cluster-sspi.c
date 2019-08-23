@@ -162,6 +162,7 @@ _mongoc_cluster_auth_node_sspi (mongoc_cluster_t *cluster,
    mongoc_server_stream_t *server_stream;
 
    state = _mongoc_cluster_sspi_new (cluster->uri, stream, sd->host.host);
+   memset (error, 0, sizeof (*error));
 
    if (!state) {
       bson_set_error (error,
