@@ -154,19 +154,6 @@ _mongoc_fle_enable_auto_encryption (
 #include "mongoc/mongoc-trace-private.h"
 #include "mongoc/mongoc-util-private.h"
 
-char json_string_storage[10024];
-static char *
-tmp_json (const bson_t *bson)
-{
-   char *as_json;
-   size_t as_json_len;
-   as_json = bson_as_json (bson, &as_json_len);
-   memcpy (json_string_storage, as_json, as_json_len + 1);
-   bson_free (as_json);
-   return json_string_storage;
-}
-
-
 static void
 _prefix_mongocryptd_error (bson_error_t *error)
 {
@@ -275,8 +262,6 @@ _need_mongo_collinfo (mongoc_client_t *client,
    mongocrypt_binary_t *collinfo_bin = NULL;
    bool ret = false;
 
-   printf ("state MONGOCRYPT_CTX_NEED_MONGO_COLLINFO\n");
-
    /* 1. Run listCollections on the encrypted MongoClient with the filter
     * provided by mongocrypt_ctx_mongo_op */
    filter_bin = mongocrypt_binary_new ();
@@ -291,7 +276,6 @@ _need_mongo_collinfo (mongoc_client_t *client,
    }
 
    bson_append_document (&opts, "filter", -1, &filter_bson);
-   printf ("sending: %s\n", tmp_json (&opts));
    db = mongoc_client_get_database (client, db_name);
    cursor = mongoc_database_find_collections_with_opts (db, &opts);
    if (mongoc_cursor_error (cursor, error)) {
@@ -318,13 +302,7 @@ _need_mongo_collinfo (mongoc_client_t *client,
    ret = true;
 
 fail:
-   if (!ret) {
-      printf ("COLLINFO error: %s\n", error->message);
-   } else if (collinfo_bson) {
-      printf ("COLLINFO reply: %s\n", tmp_json (collinfo_bson));
-   } else {
-      printf ("COLLINFO returned no documents\n");
-   }
+
    bson_destroy (&filter_bson);
    bson_destroy (&opts);
    mongocrypt_binary_destroy (filter_bin);
@@ -345,7 +323,6 @@ _need_mongo_markings (mongoc_client_t *client,
    bson_t mongocryptd_cmd_bson;
    bson_t reply = BSON_INITIALIZER;
 
-   printf ("state MONGOCRYPT_CTX_NEED_MONGO_MARKINGS\n");
    mongocryptd_cmd_bin = mongocrypt_binary_new ();
 
    if (!mongocrypt_ctx_mongo_op (ctx, mongocryptd_cmd_bin)) {
@@ -387,11 +364,6 @@ _need_mongo_markings (mongoc_client_t *client,
 
    ret = true;
 fail:
-   if (!ret) {
-      printf ("MARKINGS error: %s\n", error->message);
-   } else {
-      printf ("MARKINGS reply: %s\n", tmp_json (&reply));
-   }
    bson_destroy (&reply);
    mongocrypt_binary_destroy (mongocryptd_cmd_bin);
    mongocrypt_binary_destroy (mongocryptd_reply_bin);
@@ -412,8 +384,6 @@ _need_mongo_keys (mongoc_client_t *client,
    mongoc_cursor_t *cursor = NULL;
    mongoc_read_concern_t *rc = NULL;
    mongoc_collection_t *key_vault_coll = NULL;
-
-   printf ("state MONGOCRYPT_CTX_NEED_MONGO_KEYS\n");
 
    /* 1. Use MongoCollection.find on the MongoClient connected to the key vault
     * client (which may be the same as the encrypted client). Use the filter
@@ -445,7 +415,6 @@ _need_mongo_keys (mongoc_client_t *client,
    cursor = mongoc_collection_find_with_opts (
       key_vault_coll, &filter_bson, &opts, NULL /* read prefs */);
    while (mongoc_cursor_next (cursor, &key_bson)) {
-      printf ("KEYS reply: %s\n", tmp_json (key_bson));
       mongocrypt_binary_destroy (key_bin);
       key_bin = mongocrypt_binary_new_from_data (
          (uint8_t *) bson_get_data (key_bson), key_bson->len);
@@ -486,7 +455,6 @@ _get_stream (const char *endpoint,
    mongoc_ssl_opt_t ssl_opts = {0};
    mongoc_host_list_t host;
 
-   /* TODO: should port be included in URI? */
    if (!_mongoc_host_list_from_hostport_with_err (
           &host, endpoint, 443 /* https port */, error)) {
       goto fail;
@@ -497,8 +465,7 @@ _get_stream (const char *endpoint,
       goto fail;
    }
 
-   /* Wrap in a tls_stream. TODO: I think this expects port not to be included
-    * in hostname */
+   /* Wrap in a tls_stream. */
    memcpy (&ssl_opts, mongoc_ssl_opt_get_default (), sizeof ssl_opts);
    tls_stream = mongoc_stream_tls_new_with_hostname (
       base_stream, endpoint, &ssl_opts, 1 /* client */);
@@ -531,7 +498,6 @@ _need_kms (mongoc_client_t *client, mongocrypt_ctx_t *ctx, bson_error_t *error)
    mongocrypt_binary_t *http_reply = NULL;
    const char *endpoint;
 
-   printf ("state MONGOCRYPT_CTX_NEED_KMS\n");
    kms_ctx = mongocrypt_ctx_next_kms_ctx (ctx);
    while (kms_ctx) {
       mongoc_iovec_t iov;
@@ -542,7 +508,7 @@ _need_kms (mongoc_client_t *client, mongocrypt_ctx_t *ctx, bson_error_t *error)
          BSON_ASSERT (!_kms_ctx_check_error (kms_ctx, error));
          goto fail;
       }
-      printf ("http request: %s\n", (char *) mongocrypt_binary_data (http_req));
+
       if (!mongocrypt_kms_ctx_endpoint (kms_ctx, &endpoint)) {
          goto fail;
       }
@@ -554,8 +520,7 @@ _need_kms (mongoc_client_t *client, mongocrypt_ctx_t *ctx, bson_error_t *error)
 
       iov.iov_base = (char *) mongocrypt_binary_data (http_req);
       iov.iov_len = mongocrypt_binary_len (http_req);
-      /* TODO: why is sockettimeoutms on cluster?. Should I be passing cluster
-       * instead of client through here? */
+
       if (!_mongoc_stream_writev_full (
              tls_stream, &iov, 1, client->cluster.sockettimeoutms, error)) {
          goto fail;
@@ -576,7 +541,6 @@ _need_kms (mongoc_client_t *client, mongocrypt_ctx_t *ctx, bson_error_t *error)
                                         1 /* min_bytes. */,
                                         client->cluster.sockettimeoutms);
          if (read_ret == -1) {
-            /* TODO: is this the correct error handling? */
             bson_set_error (error,
                             MONGOC_ERROR_STREAM,
                             MONGOC_ERROR_STREAM_SOCKET,
@@ -586,16 +550,12 @@ _need_kms (mongoc_client_t *client, mongocrypt_ctx_t *ctx, bson_error_t *error)
          }
 
          if (read_ret == 0) {
-            /* TODO: is this the correct error handling? */
-            /* MONGOC_ERROR_STREAM_SOCKET */
             bson_set_error (error,
                             MONGOC_ERROR_STREAM,
                             MONGOC_ERROR_STREAM_SOCKET,
                             "unexpected EOF from KMS stream");
             goto fail;
          }
-
-         printf ("got back reply: %.*s", 1024, (char *) buf);
 
          mongocrypt_binary_destroy (http_reply);
          http_reply = mongocrypt_binary_new_from_data (buf, read_ret);
@@ -635,7 +595,6 @@ _ready (mongoc_client_t *client,
    bson_t tmp;
    bool ret = false;
 
-   printf ("state MONGOCRYPT_CTX_READY\n");
    result_bin = mongocrypt_binary_new ();
    if (!mongocrypt_ctx_finalize (ctx, result_bin)) {
       BSON_ASSERT (!_ctx_check_error (ctx, error));
@@ -647,7 +606,6 @@ _ready (mongoc_client_t *client,
    }
 
    *result = bson_copy (&tmp);
-   printf ("result=%s\n", tmp_json (*result));
 
    ret = true;
 fail:
@@ -681,7 +639,6 @@ _mongoc_fle_run_state_machine (mongoc_client_t *client,
       state = mongocrypt_ctx_state (ctx);
       switch (state) {
       case MONGOCRYPT_CTX_ERROR:
-         printf ("state MONGOCRYPT_CTX_ERROR\n");
          BSON_ASSERT (!_ctx_check_error (ctx, error));
          goto fail;
       case MONGOCRYPT_CTX_NEED_MONGO_COLLINFO:
@@ -711,7 +668,6 @@ _mongoc_fle_run_state_machine (mongoc_client_t *client,
          break;
 
       case MONGOCRYPT_CTX_DONE:
-         printf ("state MONGOCRYPT_CTX_DONE\n");
          goto success;
          break;
       }
@@ -815,7 +771,6 @@ _mongoc_fle_auto_encrypt (mongoc_client_t *client,
    ENTRY;
 
    bson_init (encrypted);
-   printf ("performing auto encryption\n");
 
    if (client->bypass_auto_encryption) {
       memcpy (encrypted_cmd, cmd, sizeof (mongoc_cmd_t));
@@ -916,7 +871,6 @@ _mongoc_fle_auto_decrypt (mongoc_client_t *client,
 
    ENTRY;
    bson_init (decrypted);
-   printf ("performing auto decryption\n");
 
    /* Create the context for the operation. */
    ctx = mongocrypt_ctx_new (client->crypt);

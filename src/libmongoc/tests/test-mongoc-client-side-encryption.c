@@ -30,7 +30,6 @@ _before_test (json_test_ctx_t *ctx, const bson_t *test)
    client = test_framework_client_new ();
 
    if (bson_iter_init_find (&iter, ctx->config->scenario, "key_vault_data")) {
-      printf ("--inserting key vault data\n");
       key_vault_coll =
          mongoc_client_get_collection (client, "admin", "datakeys");
 
@@ -68,7 +67,6 @@ _before_test (json_test_ctx_t *ctx, const bson_t *test)
       bson_t *cmd;
       bson_t json_schema;
 
-      printf ("--setting remote json_schema\n");
       bson_iter_bson (&iter, &json_schema);
       cmd = BCON_NEW ("collMod",
                       BCON_UTF8 (mongoc_collection_get_name (ctx->collection)),

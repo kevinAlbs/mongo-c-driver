@@ -681,6 +681,7 @@ fail_no_events:
  *       Internal function to run a command on a given stream.
  *       @error and @reply are optional out-pointers.
  *       The client's APM callbacks are not executed.
+ *       Automatic encryption/decryption is not performed.
  *
  * Returns:
  *       true if successful; otherwise false and @error is set.
@@ -710,8 +711,6 @@ mongoc_cluster_run_command_private (mongoc_cluster_t *cluster,
       reply = &reply_local;
    }
    server_stream = cmd->server_stream;
-
-   /* TODO: FLE */
    if (server_stream->sd->max_wire_version >= WIRE_VERSION_OP_MSG) {
       retval = mongoc_cluster_run_opmsg (cluster, cmd, reply, error);
    } else {
@@ -2887,6 +2886,9 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
       return false;
    }
 
+   _mongoc_array_clear (&cluster->iov);
+   _mongoc_buffer_init (&buffer, NULL, 0, NULL, NULL);
+
    rpc.header.msg_len = 0;
    rpc.header.request_id = ++cluster->request_id;
    rpc.header.response_to = 0;
@@ -2897,7 +2899,6 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
    } else {
       rpc.msg.flags = MONGOC_MSG_MORE_TO_COME;
    }
-
 
    rpc.msg.n_sections = 1;
 
@@ -2915,9 +2916,6 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
       rpc.msg.sections[1] = section[1];
       rpc.msg.n_sections++;
    }
-
-   _mongoc_array_clear (&cluster->iov);
-   _mongoc_buffer_init (&buffer, NULL, 0, NULL, NULL);
 
    _mongoc_rpc_gather (&rpc, &cluster->iov);
    _mongoc_rpc_swab_to_le (&rpc);
@@ -2958,7 +2956,6 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
       ok = _mongoc_buffer_append_from_stream (
          &buffer, server_stream->stream, 4, cluster->sockettimeoutms, error);
       if (!ok) {
-         printf ("failed to read here\n");
          RUN_CMD_ERR_DECORATE;
          mongoc_cluster_disconnect_node (
             cluster, server_stream->sd->id, true, error);
@@ -3057,4 +3054,3 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
 
    return ok;
 }
-

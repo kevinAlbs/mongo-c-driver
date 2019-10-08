@@ -12,18 +12,14 @@ main (int argc, char *argv[])
 {
    mongoc_client_t *client;
    mongoc_collection_t *collection;
-   mongoc_cursor_t *cursor = NULL;
+   mongoc_cursor_t *cursor;
    bson_error_t error;
    const bson_t *doc;
-   const char *collection_name = "default";
+   const char *collection_name = "test";
    bson_t query;
    char *str;
    const char *uri_string = "mongodb://127.0.0.1/?appname=client-example";
    mongoc_uri_t *uri;
-   mongoc_auto_encryption_opts_t *auto_encryption_opts;
-   char *aws_access_key_id;
-   char *aws_secret_access_key;
-   bson_t *kms_providers;
 
    mongoc_init ();
    if (argc > 1) {
@@ -45,38 +41,19 @@ main (int argc, char *argv[])
    }
 
    client = mongoc_client_new_from_uri (uri);
-   
-   auto_encryption_opts = mongoc_auto_encryption_opts_new ();
-
-   aws_access_key_id = getenv ("AWS_ACCESS_KEY_ID");
-   aws_secret_access_key = getenv ("AWS_SECRET_ACCESS_KEY");
-   kms_providers = BCON_NEW ("aws", "{", "secretAccessKey", BCON_UTF8(aws_secret_access_key), "accessKeyId", BCON_UTF8(aws_access_key_id), "}");
-
-   mongoc_auto_encryption_opts_set_key_vault_namespace (auto_encryption_opts, "admin", "datakeys");
-   mongoc_auto_encryption_opts_set_kms_providers (auto_encryption_opts, kms_providers);
-   if (!mongoc_client_enable_auto_encryption (client, auto_encryption_opts, &error)) {
-      fprintf (stderr, "error=%s\n", error.message);
+   if (!client) {
       return EXIT_FAILURE;
    }
-   bson_destroy (kms_providers);
-   mongoc_auto_encryption_opts_destroy (auto_encryption_opts);
 
    mongoc_client_set_error_api (client, 2);
 
    bson_init (&query);
-   bson_append_utf8 (&query, "encrypted_string", -1, "my encrypted string", -1);
-   collection =
-      mongoc_client_get_collection (client, "default", collection_name);
 
-   /* Now do an insert (this should be an OP_MSG document sequence...) */
-   if (!mongoc_collection_insert_one (
-          collection, &query, NULL /* opts */, NULL /* reply */, &error)) {
-      fprintf (stderr, "Insert failed: %s\n", error.message);
-      return EXIT_FAILURE;
-   }
+#if 0
+   bson_append_utf8 (&query, "hello", -1, "world", -1);
+#endif
 
-   /* find everything */
-   bson_reinit (&query);
+   collection = mongoc_client_get_collection (client, "test", collection_name);
    cursor = mongoc_collection_find_with_opts (
       collection,
       &query,

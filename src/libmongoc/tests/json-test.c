@@ -1450,7 +1450,6 @@ run_json_general_test (const json_test_config_t *config)
       client = mongoc_client_new_from_uri (uri);
       mongoc_client_set_error_api (client, 2);
       test_framework_set_ssl_opts (client);
-
       /* reconnect right away, if a fail point causes a disconnect */
       client->topology->min_heartbeat_frequency_msec = 0;
       mongoc_uri_destroy (uri);
