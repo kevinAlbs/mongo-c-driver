@@ -20,10 +20,12 @@
 #include "mongoc/mongoc-cmd-private.h"
 #include "bson/bson.h"
 
-#ifndef MONGOC_FLE_PRIVATE_H
-#define MONGOC_FLE_PRIVATE_H
+#ifndef MONGOC_CLIENT_SIDE_ENCRYPTION_PRIVATE_H
+#define MONGOC_CLIENT_SIDE_ENCRYPTION_PRIVATE_H
 
-/* Returns false on error. */
+/* fle (abbreviation for "Field Level Encryption") is used interchangeably with
+ * the more verbose client_side_encryption */
+
 bool
 _mongoc_fle_auto_encrypt (mongoc_client_t *client,
                           const mongoc_cmd_t *cmd,
@@ -39,8 +41,9 @@ _mongoc_fle_auto_decrypt (mongoc_client_t *client,
                           bson_error_t *error);
 
 bool
-_mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
-                                    mongoc_auto_encryption_opts_t *opts /* may be NULL */,
-                                    bson_error_t *error);
+_mongoc_fle_enable_auto_encryption (
+   mongoc_client_t *client,
+   mongoc_auto_encryption_opts_t *opts /* may be NULL */,
+   bson_error_t *error);
 
-#endif /* MONGOC_FLE_PRIVATE_H */
+#endif /* MONGOC_CLIENT_SIDE_ENCRYPTION_PRIVATE_H */

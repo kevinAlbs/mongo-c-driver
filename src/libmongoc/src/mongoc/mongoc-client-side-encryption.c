@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define MONGOC_LOG_DOMAIN "fle"
+#define MONGOC_LOG_DOMAIN "client-side-encryption"
 
 #include "mongoc/mongoc-client-side-encryption-private.h"
 
@@ -106,7 +106,8 @@ _mongoc_fle_auto_encrypt (mongoc_client_t *client,
                           bson_error_t *error)
 {
    bson_init (encrypted);
-   bson_set_error (error,
+   bson_set_error (
+      error,
       MONGOC_ERROR_CLIENT,
       MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
       "libmongoc is not built with support for Client Side Encryption");
@@ -121,7 +122,8 @@ _mongoc_fle_auto_decrypt (mongoc_client_t *client,
                           bson_error_t *error)
 {
    bson_init (decrypted);
-   bson_set_error (error, 
+   bson_set_error (
+      error,
       MONGOC_ERROR_CLIENT,
       MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
       "libmongoc is not built with support for Client Side Encryption");
@@ -134,7 +136,8 @@ _mongoc_fle_enable_auto_encryption (
    mongoc_auto_encryption_opts_t *opts /* may be NULL */,
    bson_error_t *error)
 {
-   bson_set_error (error, 
+   bson_set_error (
+      error,
       MONGOC_ERROR_CLIENT,
       MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
       "libmongoc is not built with support for Client Side Encryption");

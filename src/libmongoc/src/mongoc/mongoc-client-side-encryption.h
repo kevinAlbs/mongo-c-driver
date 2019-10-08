@@ -28,21 +28,35 @@ BSON_BEGIN_DECLS
 
 typedef struct _mongoc_auto_encryption_opts_t mongoc_auto_encryption_opts_t;
 
-MONGOC_EXPORT (mongoc_auto_encryption_opts_t*) mongoc_auto_encryption_opts_new (void);
+MONGOC_EXPORT (mongoc_auto_encryption_opts_t *)
+mongoc_auto_encryption_opts_new (void);
 
-MONGOC_EXPORT (void) mongoc_auto_encryption_opts_destroy (mongoc_auto_encryption_opts_t* opts);
+MONGOC_EXPORT (void)
+mongoc_auto_encryption_opts_destroy (mongoc_auto_encryption_opts_t *opts);
 
-MONGOC_EXPORT (void) mongoc_auto_encryption_opts_set_key_vault_client (mongoc_auto_encryption_opts_t* opts, struct _mongoc_client_t* client);
+MONGOC_EXPORT (void)
+mongoc_auto_encryption_opts_set_key_vault_client (
+   mongoc_auto_encryption_opts_t *opts, struct _mongoc_client_t *client);
 
-MONGOC_EXPORT (void) mongoc_auto_encryption_opts_set_key_vault_namespace (mongoc_auto_encryption_opts_t* opts, const char* db, const char* coll);
+MONGOC_EXPORT (void)
+mongoc_auto_encryption_opts_set_key_vault_namespace (
+   mongoc_auto_encryption_opts_t *opts, const char *db, const char *coll);
 
-MONGOC_EXPORT (void) mongoc_auto_encryption_opts_set_kms_providers (mongoc_auto_encryption_opts_t* opts, const bson_t* kms_providers);
+MONGOC_EXPORT (void)
+mongoc_auto_encryption_opts_set_kms_providers (
+   mongoc_auto_encryption_opts_t *opts, const bson_t *kms_providers);
 
-MONGOC_EXPORT (void) mongoc_auto_encryption_opts_set_schema_map (mongoc_auto_encryption_opts_t* opts, const bson_t* schema_map);
+MONGOC_EXPORT (void)
+mongoc_auto_encryption_opts_set_schema_map (mongoc_auto_encryption_opts_t *opts,
+                                            const bson_t *schema_map);
 
-MONGOC_EXPORT (void) mongoc_auto_encryption_opts_set_bypass_auto_encryption (mongoc_auto_encryption_opts_t* opts, bool bypass_auto_encryption);
+MONGOC_EXPORT (void)
+mongoc_auto_encryption_opts_set_bypass_auto_encryption (
+   mongoc_auto_encryption_opts_t *opts, bool bypass_auto_encryption);
 
-MONGOC_EXPORT (void) mongoc_auto_encryption_opts_set_extra (mongoc_auto_encryption_opts_t* opts, const bson_t *extra);
+MONGOC_EXPORT (void)
+mongoc_auto_encryption_opts_set_extra (mongoc_auto_encryption_opts_t *opts,
+                                       const bson_t *extra);
 
 BSON_END_DECLS
 
