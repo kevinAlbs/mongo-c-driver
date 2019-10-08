@@ -17,7 +17,9 @@
 #include "json-test.h"
 #include "test-libmongoc.h"
 
-static void _before_test (json_test_ctx_t *ctx, const bson_t *test) {
+static void
+_before_test (json_test_ctx_t *ctx, const bson_t *test)
+{
    mongoc_client_t *client;
    mongoc_collection_t *key_vault_coll;
    bson_iter_t iter;
@@ -29,7 +31,8 @@ static void _before_test (json_test_ctx_t *ctx, const bson_t *test) {
 
    if (bson_iter_init_find (&iter, ctx->config->scenario, "key_vault_data")) {
       printf ("--inserting key vault data\n");
-      key_vault_coll = mongoc_client_get_collection (client, "admin", "datakeys");
+      key_vault_coll =
+         mongoc_client_get_collection (client, "admin", "datakeys");
 
       /* Drop and recreate, inserting data. */
       ret = mongoc_collection_drop (key_vault_coll, &error);
@@ -50,7 +53,8 @@ static void _before_test (json_test_ctx_t *ctx, const bson_t *test) {
          bson_iter_bson (&iter, &doc);
          bson_init (&insert_opts);
          mongoc_write_concern_append (wc, &insert_opts);
-         ret = mongoc_collection_insert_one (key_vault_coll, &doc, &insert_opts, NULL /* reply */, &error);
+         ret = mongoc_collection_insert_one (
+            key_vault_coll, &doc, &insert_opts, NULL /* reply */, &error);
          ASSERT_OR_PRINT (ret, error);
 
          bson_destroy (&insert_opts);
@@ -66,8 +70,15 @@ static void _before_test (json_test_ctx_t *ctx, const bson_t *test) {
 
       printf ("--setting remote json_schema\n");
       bson_iter_bson (&iter, &json_schema);
-      cmd = BCON_NEW ("collMod", BCON_UTF8(mongoc_collection_get_name(ctx->collection)), "validator", "{", "$jsonSchema", BCON_DOCUMENT(&json_schema), "}");
-      ret = mongoc_client_command_simple (client, mongoc_database_get_name(ctx->db), cmd, NULL, NULL, &error);
+      cmd = BCON_NEW ("collMod",
+                      BCON_UTF8 (mongoc_collection_get_name (ctx->collection)),
+                      "validator",
+                      "{",
+                      "$jsonSchema",
+                      BCON_DOCUMENT (&json_schema),
+                      "}");
+      ret = mongoc_client_command_simple (
+         client, mongoc_database_get_name (ctx->db), cmd, NULL, NULL, &error);
       ASSERT_OR_PRINT (ret, error);
       bson_destroy (cmd);
    }
@@ -77,8 +88,8 @@ static void _before_test (json_test_ctx_t *ctx, const bson_t *test) {
 
 static bool
 _run_operation (json_test_ctx_t *ctx,
-                        const bson_t *test,
-                        const bson_t *operation)
+                const bson_t *test,
+                const bson_t *operation)
 {
    bson_t reply;
    bool res;
@@ -94,12 +105,9 @@ _run_operation (json_test_ctx_t *ctx,
 static void
 test_client_side_encryption_cb (bson_t *scenario)
 {
-   
    json_test_config_t config = JSON_TEST_CONFIG_INIT;
-   printf ("running test scenario\n");
    config.before_test_cb = _before_test;
    config.run_operation_cb = _run_operation;
-   // config.after_test_cb = transactions_test_after_test;
    config.scenario = scenario;
    config.command_started_events_only = true;
    run_json_general_test (&config);
@@ -112,5 +120,8 @@ test_client_side_encryption_install (TestSuite *suite)
 
    ASSERT (realpath (JSON_DIR "/client_side_encryption", resolved));
    install_json_test_suite_with_check (
-      suite, resolved, test_client_side_encryption_cb, NULL /* TODO skips */);
+      suite,
+      resolved,
+      test_client_side_encryption_cb,
+      test_framework_skip_if_no_client_side_encryption);
 }

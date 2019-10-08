@@ -1124,9 +1124,11 @@ mongoc_client_destroy (mongoc_client_t *client)
       _mongoc_ssl_opts_cleanup (&client->ssl_opts);
 #endif
 
+#ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
       mongoc_collection_destroy (client->key_vault_coll);
       mongoc_client_destroy (client->mongocryptd_client);
       mongocrypt_destroy (client->crypt);
+#endif
 
       bson_free (client);
 

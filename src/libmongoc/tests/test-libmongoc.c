@@ -2290,6 +2290,15 @@ test_framework_skip_if_no_failpoint (void)
    return 1;
 }
 
+int
+test_framework_skip_if_no_client_side_encryption (void)
+{
+#ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
+   return 1; /* proceed */
+#else
+   return 0; /* do not proceed. */
+#endif
+}
 
 void
 test_framework_resolve_path (const char *path, char *resolved)
