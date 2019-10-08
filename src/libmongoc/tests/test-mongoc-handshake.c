@@ -775,6 +775,15 @@ test_handshake_platform_config ()
 #ifdef MONGOC_TRACE
    BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_TRACE));
 #endif
+
+#ifdef MONGOC_ENABLE_ICU
+   BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_ENABLE_ICU));
+#endif
+
+#ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
+   BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_ENABLE_CLIENT_SIDE_ENCRYPTION));
+#endif
+
    /* any excess bits should all be zero. */
    for (i = LAST_MONGOC_MD_FLAG; i < total_bits; i++) {
       BSON_ASSERT (!_get_bit (config_str, i));

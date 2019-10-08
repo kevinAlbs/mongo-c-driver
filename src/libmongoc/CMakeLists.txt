@@ -396,6 +396,29 @@ if (NOT ENABLE_ICU STREQUAL OFF)
    endif()
 endif()
 
+# Default.
+set (MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION 0)
+if (NOT ENABLE_CLIENT_SIDE_ENCRYPTION MATCHES "AUTO|ON|OFF")
+   message (FATAL_ERROR, "ENABLE_CLIENT_SIDE_ENCRYPTION option must be AUTO, ON, or OFF")
+endif()
+
+if (NOT ENABLE_CLIENT_SIDE_ENCRYPTION STREQUAL OFF)
+   message ("Searching for libmongocrypt")
+   find_package (mongocrypt)
+   if (mongocrypt_FOUND)
+      set (CLIENT_SIDE_ENCRYPTION_LIBRARIES mongo::mongocrypt)
+      get_target_property (LIBMONGOCRYPT_LOCATION mongo::mongocrypt LOCATION)
+      get_target_property (LIBMONGOCRYPT_INCLUDE_DIRECTORIES mongo::mongocrypt INTERFACE_INCLUDE_DIRECTORIES)
+      message ("--   libmongocrypt found in ${LIBMONGOCRYPT_LOCATION}")
+      message ("--   libmongocrypt include path ${LIBMONGOCRYPT_INCLUDE_DIRECTORIES}")
+      set (MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION 1)
+   elseif (ENABLE_CLIENT_SIDE_ENCRYPTION STREQUAL ON)
+      message (FATAL_ERROR "libmongocrypt not found but required.")
+   else ()
+      message (STATUS "libmongocrypt not found. Configuring without Client Side Encryption support.")
+   endif ()
+endif ()
+
 configure_file (
    "${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-config.h.in"
    "${PROJECT_BINARY_DIR}/src/mongoc/mongoc-config.h"
@@ -634,19 +657,16 @@ endif ()
 
 set (LIBRARIES
    ${SASL_LIBRARIES} ${SSL_LIBRARIES} ${SHM_LIBRARIES} ${RESOLV_LIBRARIES}
-   ${SNAPPY_LIBRARIES} ${ZLIB_LIBRARIES} ${MONGOC_ZSTD_LIBRARIES} Threads::Threads ${ICU_LIBRARIES}
+   ${SNAPPY_LIBRARIES} ${ZLIB_LIBRARIES} ${MONGOC_ZSTD_LIBRARIES} Threads::Threads ${ICU_LIBRARIES} ${CLIENT_SIDE_ENCRYPTION_LIBRARIES}
 )
 set (STATIC_LIBRARIES
    ${SASL_LIBRARIES} ${SSL_LIBRARIES} ${SHM_LIBRARIES} ${RESOLV_LIBRARIES}
-   ${SNAPPY_LIBRARIES} ${ZLIB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${ICU_LIBRARIES}
+   ${SNAPPY_LIBRARIES} ${ZLIB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${ICU_LIBRARIES} ${CLIENT_SIDE_ENCRYPTION_LIBRARIES}
 )
 
 if (WIN32)
    set (LIBRARIES ${LIBRARIES} ws2_32)
 endif ()
-
-# Oddly, even with libmongocrypt installed in usr/local/lib, -lmongocrypt cannot find it.
-set (LIBRARIES ${LIBRARIES} /usr/local/lib/libmongocrypt.dylib)
 
 add_library (mongoc_shared SHARED ${SOURCES} ${HEADERS} ${HEADERS_FORWARDING})
 set_target_properties (mongoc_shared PROPERTIES CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -915,9 +935,6 @@ mongoc_add_example (common-operations TRUE ${PROJECT_SOURCE_DIR}/examples/common
 
 # examples/find_and_modify_with_opts/
 mongoc_add_example (fam TRUE ${PROJECT_SOURCE_DIR}/examples/find_and_modify_with_opts/fam.c)
-
-# examples/example-client-side-encryption
-mongoc_add_example (example-client-side-encryption TRUE ${PROJECT_SOURCE_DIR}/examples/example-client-side-encryption.c)
 
 file (COPY ${PROJECT_SOURCE_DIR}/tests/binary DESTINATION ${PROJECT_BINARY_DIR}/tests)
 file (COPY ${PROJECT_SOURCE_DIR}/tests/json DESTINATION ${PROJECT_BINARY_DIR}/tests)
