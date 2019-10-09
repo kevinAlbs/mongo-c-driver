@@ -108,11 +108,12 @@ _mongoc_fle_auto_encrypt (mongoc_client_t *client,
                           bson_error_t *error)
 {
    bson_init (encrypted);
-   bson_set_error (
-      error,
-      MONGOC_ERROR_CLIENT,
-      MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
-      "libmongoc is not built with support for Client-Side Field Level Encryption. Configure with ENABLE_CLIENT_SIDE_ENCRYPTION=ON or AUTO.");
+   bson_set_error (error,
+                   MONGOC_ERROR_CLIENT,
+                   MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
+                   "libmongoc is not built with support for Client-Side Field "
+                   "Level Encryption. Configure with "
+                   "ENABLE_CLIENT_SIDE_ENCRYPTION=ON or AUTO.");
    return false;
 }
 
@@ -124,11 +125,12 @@ _mongoc_fle_auto_decrypt (mongoc_client_t *client,
                           bson_error_t *error)
 {
    bson_init (decrypted);
-   bson_set_error (
-      error,
-      MONGOC_ERROR_CLIENT,
-      MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
-      "libmongoc is not built with support for Client-Side Field Level Encryption. Configure with ENABLE_CLIENT_SIDE_ENCRYPTION=ON or AUTO.");
+   bson_set_error (error,
+                   MONGOC_ERROR_CLIENT,
+                   MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
+                   "libmongoc is not built with support for Client-Side Field "
+                   "Level Encryption. Configure with "
+                   "ENABLE_CLIENT_SIDE_ENCRYPTION=ON or AUTO.");
    return false;
 }
 
@@ -138,11 +140,12 @@ _mongoc_fle_enable_auto_encryption (
    mongoc_auto_encryption_opts_t *opts /* may be NULL */,
    bson_error_t *error)
 {
-   bson_set_error (
-      error,
-      MONGOC_ERROR_CLIENT,
-      MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
-      "libmongoc is not built with support for Client-Side Field Level Encryption. Configure with ENABLE_CLIENT_SIDE_ENCRYPTION=ON or AUTO.");
+   bson_set_error (error,
+                   MONGOC_ERROR_CLIENT,
+                   MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
+                   "libmongoc is not built with support for Client-Side Field "
+                   "Level Encryption. Configure with "
+                   "ENABLE_CLIENT_SIDE_ENCRYPTION=ON or AUTO.");
    return false;
 }
 
@@ -1075,7 +1078,9 @@ _mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
    }
 
    if (!mongocryptd_uri) {
-      /* Always default to connecting to TCP, despite spec v1.0.0. Because starting mongocryptd when one is running removes the domain socket file per SERVER-41029. Connecting over TCP is more reliable. */
+      /* Always default to connecting to TCP, despite spec v1.0.0. Because
+       * starting mongocryptd when one is running removes the domain socket file
+       * per SERVER-41029. Connecting over TCP is more reliable. */
       mongocryptd_uri = mongoc_uri_new_with_error (
          "mongodb://localhost:27020/?serverSelectionTimeoutMS=1000", error);
       if (!mongocryptd_uri) {
