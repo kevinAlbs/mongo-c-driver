@@ -181,7 +181,10 @@
                   }
                 ]
               },
-              "$db": "admin"
+              "$db": "admin",
+              "readConcern": {
+                "level": "majority"
+              }
             },
             "command_name": "find"
           }
@@ -317,7 +320,10 @@
                   }
                 ]
               },
-              "$db": "admin"
+              "$db": "admin",
+              "readConcern": {
+                "level": "majority"
+              }
             },
             "command_name": "find"
           }

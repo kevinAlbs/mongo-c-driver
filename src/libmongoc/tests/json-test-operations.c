@@ -1838,7 +1838,7 @@ json_test_operation (json_test_ctx_t *ctx,
          res = find_one (c, test, operation, session, read_prefs, reply);
       } else if (!strcmp (op_name, "aggregate")) {
          res = aggregate (c, test, operation, session, read_prefs, reply);
-      } else if (!strcmp (op_name, "listIndexes")) {
+      } else if (!strcmp (op_name, "listIndexes") || !strcmp(op_name, "listIndexNames")) {
          res = list_indexes (c, test, operation, session, reply);
       } else if (!strcmp (op_name, "watch")) {
          bson_t pipeline = BSON_INITIALIZER;
@@ -1846,8 +1846,7 @@ json_test_operation (json_test_ctx_t *ctx,
          ctx->change_stream = mongoc_collection_watch (c, &pipeline, NULL);
          bson_init (reply);
          bson_destroy (&pipeline);
-      } else if (!strcmp (op_name, "mapReduce") ||
-                 !strcmp (op_name, "listIndexNames")) {
+      } else if (!strcmp (op_name, "mapReduce")) {
          test_error ("operation not implemented in libmongoc");
       } else {
          test_error ("unrecognized collection operation name %s", op_name);
