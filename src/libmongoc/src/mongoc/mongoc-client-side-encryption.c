@@ -913,6 +913,36 @@ fail:
    RETURN (ret);
 }
 
+static void
+_log_callback (mongocrypt_log_level_t mongocrypt_log_level, const char *message, uint32_t message_len, void* ctx) {
+   mongoc_log_level_t log_level = MONGOC_LOG_LEVEL_ERROR;
+
+   switch (mongocrypt_log_level) {
+      case MONGOCRYPT_LOG_LEVEL_FATAL:
+      log_level = MONGOC_LOG_LEVEL_CRITICAL;
+      break;
+      case MONGOCRYPT_LOG_LEVEL_ERROR:
+      log_level = MONGOC_LOG_LEVEL_ERROR;
+      break;
+      case MONGOCRYPT_LOG_LEVEL_WARNING:
+      log_level = MONGOC_LOG_LEVEL_WARNING;
+      break;
+      case MONGOCRYPT_LOG_LEVEL_INFO:
+      log_level = MONGOC_LOG_LEVEL_INFO;
+      break;
+      case MONGOCRYPT_LOG_LEVEL_TRACE:
+      log_level = MONGOC_LOG_LEVEL_TRACE;
+      break;
+   }
+
+   mongoc_log (log_level, MONGOC_LOG_DOMAIN, "%s", message, NULL);
+}
+
+static void
+_spawn_mongocryptd (void) {
+   /* TODO: spawn if server selection to mongocryptd fails */
+}
+
 bool
 _mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
                                     mongoc_auto_encryption_opts_t *opts,
@@ -972,6 +1002,8 @@ _mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
 
    /* Create the handle to libmongocrypt. */
    client->crypt = mongocrypt_new ();
+
+   mongocrypt_setopt_log_handler (client->crypt, _log_callback, NULL /* context */);
 
    /* Take options from the kms_providers map. */
    if (bson_iter_init_find (&iter, opts->kms_providers, "aws")) {
