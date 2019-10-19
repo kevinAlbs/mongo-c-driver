@@ -19,6 +19,7 @@
 #ifndef MONGOC_TOPOLOGY_PRIVATE_H
 #define MONGOC_TOPOLOGY_PRIVATE_H
 
+#include "mongoc/mongoc-config.h"
 #include "mongoc/mongoc-topology-scanner-private.h"
 #include "mongoc/mongoc-server-description-private.h"
 #include "mongoc/mongoc-topology-description-private.h"
@@ -71,6 +72,9 @@ typedef struct _mongoc_topology_t {
    bool stale;
 
    mongoc_server_session_t *session_pool;
+#ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
+   mongoc_client_pool_t *mongocryptd_client_pool;
+#endif
 } mongoc_topology_t;
 
 mongoc_topology_t *
@@ -167,4 +171,7 @@ const bson_t *
 _mongoc_topology_get_ismaster (mongoc_topology_t *topology);
 void
 _mongoc_topology_request_scan (mongoc_topology_t *topology);
+
+void
+_mongoc_topology_bypass_cooldown (mongoc_topology_t *topology);
 #endif

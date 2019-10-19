@@ -418,6 +418,10 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
    _mongoc_topology_background_thread_stop (topology);
    _mongoc_topology_description_monitor_closed (&topology->description);
 
+#ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
+   mongoc_client_pool_destroy (topology->mongocryptd_client_pool);
+#endif
+
    mongoc_uri_destroy (topology->uri);
    mongoc_topology_description_destroy (&topology->description);
    mongoc_topology_scanner_destroy (topology->scanner);
@@ -1635,4 +1639,11 @@ _mongoc_topology_get_ismaster (mongoc_topology_t *topology)
    cmd = _mongoc_topology_scanner_get_ismaster (topology->scanner);
    bson_mutex_unlock (&topology->mutex);
    return cmd;
+}
+
+void
+_mongoc_topology_bypass_cooldown (mongoc_topology_t *topology)
+{
+   BSON_ASSERT (topology->single_threaded);
+   topology->scanner->bypass_cooldown = true;
 }
