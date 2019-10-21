@@ -137,7 +137,7 @@ _command_started (const mongoc_apm_command_started_t *event)
 
 /* Prose test: BSON size limits and batch splitting */
 static void
-test_bson_size_limits_and_batch_splitting (void* unused)
+test_bson_size_limits_and_batch_splitting (void *unused)
 {
    /* Expect an insert of two documents over 2MiB to split into two inserts but
     * still succeed. */
@@ -312,8 +312,8 @@ test_bson_size_limits_and_batch_splitting (void* unused)
       "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[0], "_id", -1, "under_16mib", -1);
    bson_append_utf8 (docs[0], "unencrypted", -1, as, 16777216 - 2000);
-   BSON_ASSERT (! mongoc_collection_insert_one (
-         coll, docs[0], NULL /* opts */, NULL /* reply */, &error));
+   BSON_ASSERT (!mongoc_collection_insert_one (
+      coll, docs[0], NULL /* opts */, NULL /* reply */, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 2, "too large");
    bson_destroy (docs[0]);
 
@@ -348,5 +348,5 @@ test_client_side_encryption_install (TestSuite *suite)
       NULL,
       NULL,
       test_framework_skip_if_no_client_side_encryption,
-         test_framework_skip_if_max_wire_version_less_than_8);
+      test_framework_skip_if_max_wire_version_less_than_8);
 }
