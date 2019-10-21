@@ -1005,7 +1005,7 @@ _mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
    if (!client->bypass_auto_encryption) {
       /* Spawn mongocryptd if needed, and create a client to it. */
       bool mongocryptd_bypass_spawn = false;
-      const char *mongocryptd_spawn_path;
+      const char *mongocryptd_spawn_path = NULL;
       bson_iter_t mongocryptd_spawn_args;
       bool has_spawn_args = false;
 
@@ -1205,6 +1205,75 @@ fail:
 }
 
 #ifdef _WIN32
+static bool
+_do_spawn (const char *path, char **args, bson_error_t *error)
+{
+   bson_string_t *command;
+   char **arg;
+   PROCESS_INFORMATION process_information;
+   STARTUPINFO startup_info;
+
+   /* Construct the full command, quote path and arguments. */
+   command = bson_string_new ("");
+   bson_string_append (command, "\"");
+   if (path) {
+      bson_string_append (command, path);
+   }
+   bson_string_append (command, "mongocryptd.exe");
+   bson_string_append (command, "\"");
+   /* skip the "mongocryptd" first arg. */
+   arg = args + 1;
+   while (*arg) {
+      bson_string_append (command, " \"");
+      bson_string_append (command, *arg);
+      bson_string_append (command, "\"");
+      arg++;
+   }
+
+   ZeroMemory (&process_information, sizeof (process_information));
+   ZeroMemory (&startup_info, sizeof (startup_info));
+
+   startup_info.cb = sizeof (startup_info);
+   startup_info.dwFlags = STARTF_USESHOWWINDOW;
+   startup_info.wShowWindow = SW_HIDE;
+
+   if (!CreateProcessA (NULL,
+                        command->str,
+                        NULL,
+                        NULL,
+                        false /* inherit descriptors */,
+                        /* FLAGS */ DETACHED_PROCESS,
+                        NULL /* environment */,
+                        NULL /* current directory */,
+                        &startup_info,
+                        &process_information)) {
+
+      long lastError = GetLastError ();
+      LPTSTR message = NULL;
+         FormatMessageA (
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_ARGUMENT_ARRAY |
+               FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL,
+            lastError,
+            0,
+            (LPSTR) &message,
+            0,
+            NULL);
+         bson_set_error (
+            error,
+            MONGOC_ERROR_CLIENT,
+            MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
+            "failed to spawn mongocryptd: %s",
+            message);
+         LocalFree (message);
+      
+      bson_string_free (command, true);
+      return false;
+   }
+
+   bson_string_free (command, true);
+   return true;
+}
 #else
 
 /*--------------------------------------------------------------------------
