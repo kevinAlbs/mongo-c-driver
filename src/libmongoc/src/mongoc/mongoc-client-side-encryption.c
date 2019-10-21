@@ -1247,26 +1247,25 @@ _do_spawn (const char *path, char **args, bson_error_t *error)
                         NULL /* current directory */,
                         &startup_info,
                         &process_information)) {
-
       long lastError = GetLastError ();
       LPTSTR message = NULL;
-         FormatMessageA (
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_ARGUMENT_ARRAY |
-               FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            lastError,
-            0,
-            (LPSTR) &message,
-            0,
-            NULL);
-         bson_set_error (
-            error,
-            MONGOC_ERROR_CLIENT,
-            MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
-            "failed to spawn mongocryptd: %s",
-            message);
-         LocalFree (message);
-      
+
+      FormatMessageA (
+         FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_ARGUMENT_ARRAY |
+            FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+         NULL,
+         lastError,
+         0,
+         (LPSTR) &message,
+         0,
+         NULL);
+
+      bson_set_error (error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
+                      "failed to spawn mongocryptd: %s",
+                      message);
+      LocalFree (message);
       bson_string_free (command, true);
       return false;
    }
