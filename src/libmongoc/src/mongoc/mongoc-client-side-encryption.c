@@ -1450,7 +1450,6 @@ _mongoc_fle_spawn_mongocryptd (const char *mongocryptd_spawn_path,
    bson_iter_t iter;
    bool passed_idle_shutdown_timeout_secs = false;
    int num_args = 2; /* for leading "mongocrypt" and trailing NULL */
-   char **arg;
    int i;
 
    /* iterate once to get length and validate all are strings */

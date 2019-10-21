@@ -137,7 +137,7 @@ _command_started (const mongoc_apm_command_started_t *event)
 
 /* Prose test: BSON size limits and batch splitting */
 static void
-test_bson_size_limits_and_batch_splitting (void)
+test_bson_size_limits_and_batch_splitting (void* unused)
 {
    /* Expect an insert of two documents over 2MiB to split into two inserts but
     * still succeed. */
@@ -160,6 +160,7 @@ test_bson_size_limits_and_batch_splitting (void)
    /* Drop and create db.coll configured with limits-schema.json */
    uri = test_framework_get_uri ();
    client = mongoc_client_new_from_uri (uri);
+   mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
    coll = mongoc_client_get_collection (client, "db", "coll");
    (void) mongoc_collection_drop (coll, NULL);
    corpus_schema = get_bson_from_json_file (
@@ -189,6 +190,7 @@ test_bson_size_limits_and_batch_splitting (void)
 
    mongoc_client_destroy (client);
    client = mongoc_client_new_from_uri (uri);
+   mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
 
    kms_providers = BCON_NEW (
       "local", "{", "key", BCON_BIN (0, (uint8_t *) LOCAL_MASTERKEY, 96), "}");
@@ -310,10 +312,9 @@ test_bson_size_limits_and_batch_splitting (void)
       "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[0], "_id", -1, "under_16mib", -1);
    bson_append_utf8 (docs[0], "unencrypted", -1, as, 16777216 - 2000);
-   ASSERT_OR_PRINT (
-      mongoc_collection_insert_one (
-         coll, docs[0], NULL /* opts */, NULL /* reply */, &error),
-      error);
+   BSON_ASSERT (! mongoc_collection_insert_one (
+         coll, docs[0], NULL /* opts */, NULL /* reply */, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 2, "too large");
    bson_destroy (docs[0]);
 
    bson_free (as);
@@ -340,10 +341,12 @@ test_client_side_encryption_install (TestSuite *suite)
       resolved,
       test_client_side_encryption_cb,
       test_framework_skip_if_no_client_side_encryption);
-   TestSuite_AddLive (
+   TestSuite_AddFull (
       suite,
       "/client_side_encryption/bson_size_limits_and_batch_splitting",
       test_bson_size_limits_and_batch_splitting,
-      test_framework_skip_if_no_client_side_encryption
+      NULL,
+      NULL,
+      test_framework_skip_if_no_client_side_encryption,
          test_framework_skip_if_max_wire_version_less_than_8);
 }
