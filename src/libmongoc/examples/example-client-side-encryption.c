@@ -24,6 +24,7 @@ main (int argc, char *argv[])
    char *aws_secret_access_key;
    char *str;
    const char* schema_str;
+   bson_t *extra;
 
    mongoc_init ();
    client = mongoc_client_new ("mongodb://localhost:27017");
@@ -66,6 +67,8 @@ main (int argc, char *argv[])
        fprintf (stderr, "could not parse JSON: %s\n", error.message);
    }
    
+   extra = BCON_NEW ("mongocryptdSpawnArgs", "[", "--logpath", "./logs.txt", "--idleShutdownTimeoutSecs=120", "]");
+   mongoc_auto_encryption_opts_set_extra (auto_encryption_opts, extra);
    mongoc_auto_encryption_opts_set_schema_map (auto_encryption_opts, &schema);
    
    if (!mongoc_client_enable_auto_encryption (client, auto_encryption_opts, &error)) {
@@ -107,6 +110,7 @@ main (int argc, char *argv[])
       return EXIT_FAILURE;
    }
 
+   bson_destroy (extra);
    bson_destroy (to_insert);
    bson_destroy (filter);
    bson_destroy (kms_providers);

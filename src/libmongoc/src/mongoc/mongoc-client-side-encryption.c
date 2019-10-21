@@ -963,6 +963,9 @@ _mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
    mongoc_uri_t *mongocryptd_uri = NULL;
 
    ENTRY;
+
+   BSON_ASSERT (client->topology->single_threaded);
+
    if (client->fle_enabled) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
@@ -1000,8 +1003,7 @@ _mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
    client->bypass_auto_encryption = opts->bypass_auto_encryption;
 
    if (!client->bypass_auto_encryption) {
-      /* Attempt to spawn mongocryptd, which is required for automatic
-       * encryption. */
+      /* Spawn mongocryptd if needed, and create a client to it. */
       bool mongocryptd_bypass_spawn = false;
       const char *mongocryptd_spawn_path;
       bson_iter_t mongocryptd_spawn_args;
@@ -1022,6 +1024,22 @@ _mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
             memcpy (&mongocryptd_spawn_args, &iter, sizeof (bson_iter_t));
             has_spawn_args = true;
          }
+
+         if (bson_iter_init_find (&iter, opts->extra, "mongocryptdURI")) {
+            if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
+               bson_set_error (
+                  error,
+                  MONGOC_ERROR_CLIENT,
+                  MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_ARG,
+                  "Expected string for option 'mongocryptdURI'");
+               goto fail;
+            }
+            mongocryptd_uri =
+               mongoc_uri_new_with_error (bson_iter_utf8 (&iter, NULL), error);
+            if (!mongocryptd_uri) {
+               goto fail;
+            }
+         }
       }
 
       if (!mongocryptd_bypass_spawn) {
@@ -1032,6 +1050,54 @@ _mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
             goto fail;
          }
       }
+
+      if (!mongocryptd_uri) {
+         /* Always default to connecting to TCP, despite spec v1.0.0. Because
+          * starting mongocryptd when one is running removes the domain socket
+          * file per SERVER-41029. Connecting over TCP is more reliable.
+          */
+         mongocryptd_uri =
+            mongoc_uri_new_with_error ("mongodb://localhost:27020", error);
+
+         if (!mongocryptd_uri) {
+            goto fail;
+         }
+
+         if (!mongoc_uri_set_option_as_int32 (
+                mongocryptd_uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 5000)) {
+            _uri_construction_error (error);
+            goto fail;
+         }
+      }
+
+      /* By default, single threaded clients set serverSelectionTryOnce to
+       * true, which means server selection fails if a topology scan fails
+       * the first time (i.e. it will not make repeat attempts until
+       * serverSelectionTimeoutMS expires). Override this, since the first
+       * attempt to connect to mongocryptd may fail when spawning, as it
+       * takes some time for mongocryptd to listen on sockets. */
+      if (!mongoc_uri_set_option_as_bool (
+             mongocryptd_uri, MONGOC_URI_SERVERSELECTIONTRYONCE, false)) {
+         _uri_construction_error (error);
+         goto fail;
+      }
+
+      client->mongocryptd_client = mongoc_client_new_from_uri (mongocryptd_uri);
+
+      if (!client->mongocryptd_client) {
+         bson_set_error (
+            error,
+            MONGOC_ERROR_CLIENT,
+            MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
+            "Unable to create client to mongocryptd");
+         goto fail;
+      }
+      /* Similarly, single threaded clients will by default wait for 5 second
+       * cooldown period after failing to connect to a server before making
+       * another attempt. Meaning if the first attempt to mongocryptd fails
+       * to connect, then the user observes a 5 second delay. This is not
+       * configurable in the URI, so override. */
+      _mongoc_topology_bypass_cooldown (client->mongocryptd_client->topology);
    }
 
    /* Get the key vault collection. */
@@ -1130,90 +1196,6 @@ _mongoc_fle_enable_auto_encryption (mongoc_client_t *client,
       goto fail;
    }
 
-   /* Spawn mongocryptd (if applicable) and create a client to it. */
-   if (opts->extra) {
-      bson_iter_t subiter;
-
-      if (bson_iter_init_find (&subiter, opts->extra, "mongocryptdURI")) {
-         if (!BSON_ITER_HOLDS_UTF8 (&subiter)) {
-            bson_set_error (
-               error,
-               MONGOC_ERROR_CLIENT,
-               MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_ARG,
-               "Expected string for option 'mongocryptdURI'");
-            goto fail;
-         }
-         mongocryptd_uri =
-            mongoc_uri_new_with_error (bson_iter_utf8 (&subiter, NULL), error);
-         if (!mongocryptd_uri) {
-            goto fail;
-         }
-      }
-
-      /* TODO: parse spawning options and spawn mongocryptd */
-   }
-
-   if (!mongocryptd_uri) {
-      /* Always default to connecting to TCP, despite spec v1.0.0. Because
-       * starting mongocryptd when one is running removes the domain socket file
-       * per SERVER-41029. Connecting over TCP is more reliable.
-       */
-      mongocryptd_uri =
-         mongoc_uri_new_with_error ("mongodb://localhost:27020", error);
-
-      if (!mongocryptd_uri) {
-         goto fail;
-      }
-
-      if (!mongoc_uri_set_option_as_int32 (
-             mongocryptd_uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 1000)) {
-         _uri_construction_error (error);
-         goto fail;
-      }
-   }
-
-   if (client->topology->single_threaded) {
-      /* By default, single threaded clients set serverSelectionTryOnce to true,
-       * which means server selection fails if a topology scan fails the first
-       * time (i.e. it will not make repeat attempts until
-       * serverSelectionTimeoutMS expires). Override this, since the first
-       * attempt to connect to mongocryptd may fail when spawning, as it takes
-       * some time for mongocryptd to listen on sockets. */
-      if (!mongoc_uri_set_option_as_bool (
-             mongocryptd_uri, MONGOC_URI_SERVERSELECTIONTRYONCE, false)) {
-         _uri_construction_error (error);
-         goto fail;
-      }
-      client->mongocryptd_client = mongoc_client_new_from_uri (mongocryptd_uri);
-      /* Similarly, single threaded clients will by default wait for 5 second
-       * cooldown period after failing to connect to a server before making
-       * another attempt. Meaning if the first attempt to mongocryptd fails to
-       * connect, then the user observes a 5 second delay. This is not
-       * configurable in the URI, so override. */
-      _mongoc_topology_bypass_cooldown (client->mongocryptd_client->topology);
-   } else {
-      /* Grab a client from the shared client pool. If the client pool does not
-       * exist, create it. */
-      bson_mutex_lock (&client->topology->mutex);
-      if (!client->topology->mongocryptd_client_pool) {
-         client->topology->mongocryptd_client_pool =
-            mongoc_client_pool_new (mongocryptd_uri);
-      }
-      if (client->topology->mongocryptd_client_pool) {
-         client->mongocryptd_client =
-            mongoc_client_pool_pop (client->topology->mongocryptd_client_pool);
-      }
-      bson_mutex_unlock (&client->topology->mutex);
-   }
-
-   if (!client->mongocryptd_client) {
-      bson_set_error (error,
-                      MONGOC_ERROR_CLIENT,
-                      MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_STATE,
-                      "Unable to create client to mongocryptd");
-      goto fail;
-   }
-
    ret = true;
 fail:
    mongocrypt_binary_destroy (local_masterkey_bin);
@@ -1259,10 +1241,11 @@ fail:
  *--------------------------------------------------------------------------
  */
 static bool
-_do_spawn (char **args, bson_error_t *error)
+_do_spawn (const char *path, char **args, bson_error_t *error)
 {
    pid_t pid;
    int fd;
+   char *to_exec;
 
    /* Fork. The child will terminate immediately (after fork-exec'ing
     * mongocryptd). This orphans mongocryptd, and allows parent to wait on
@@ -1294,7 +1277,7 @@ _do_spawn (char **args, bson_error_t *error)
       /* parent is done at this point, return. */
       return true;
    }
-   printf ("in child\n");
+
    /* We're no longer in the parent process. Errors encountered result in an
     * exit.
     * Note, we're not logging here, because that would require the user's log
@@ -1305,7 +1288,6 @@ _do_spawn (char **args, bson_error_t *error)
    /* Start a new session for the child, so it is not bound to the current
     * session (e.g. terminal session). */
    if (setsid () < 0) {
-      printf ("1\n");
       exit (EXIT_FAILURE);
    }
 
@@ -1314,7 +1296,6 @@ _do_spawn (char **args, bson_error_t *error)
    signal (SIGHUP, SIG_IGN);
    pid = fork ();
    if (pid < 0) {
-      printf ("2\n");
       exit (EXIT_FAILURE);
    } else if (pid > 0) {
       /* Child terminates immediately. */
@@ -1331,7 +1312,6 @@ _do_spawn (char **args, bson_error_t *error)
    /* Close and reopen stdin. */
    fd = open ("/dev/null", O_RDONLY);
    if (fd < 0) {
-      printf ("3\n");
       exit (EXIT_FAILURE);
    }
    dup2 (fd, STDIN_FILENO);
@@ -1340,7 +1320,6 @@ _do_spawn (char **args, bson_error_t *error)
    /* Close and reopen stdout. */
    fd = open ("/dev/null", O_WRONLY);
    if (fd < 0) {
-      printf ("4\n");
       exit (EXIT_FAILURE);
    }
    if (dup2 (fd, STDOUT_FILENO) < 0 || close (fd) < 0) {
@@ -1357,7 +1336,12 @@ _do_spawn (char **args, bson_error_t *error)
    }
    fd = 0;
 
-   if (execvp ("mongocryptd", args) < 0) {
+   if (path) {
+      to_exec = bson_strdup_printf ("%s%s", path, args[0]);
+   } else {
+      to_exec = bson_strdup (args[0]);
+   }
+   if (execvp (to_exec, args) < 0) {
       /* Need to exit. */
       exit (EXIT_FAILURE);
    }
@@ -1394,9 +1378,64 @@ _mongoc_fle_spawn_mongocryptd (const char *mongocryptd_spawn_path,
                                const bson_iter_t *mongocryptd_spawn_args,
                                bson_error_t *error)
 {
-   char *args[] = {"mongocryptd", NULL};
-   /* TODO */
-   return _do_spawn (args, error);
+   char **args = NULL;
+   bson_iter_t iter;
+   bool passed_idle_shutdown_timeout_secs = false;
+   int num_args = 2; /* for leading "mongocrypt" and trailing NULL */
+   char **arg;
+   int i;
+
+   /* iterate once to get length and validate all are strings */
+   if (mongocryptd_spawn_args) {
+      BSON_ASSERT (BSON_ITER_HOLDS_ARRAY (mongocryptd_spawn_args));
+      bson_iter_recurse (mongocryptd_spawn_args, &iter);
+      while (bson_iter_next (&iter)) {
+         if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
+            bson_set_error (
+               error,
+               MONGOC_ERROR_CLIENT,
+               MONGOC_ERROR_CLIENT_INVALID_CLIENT_SIDE_ENCRYPTION_ARG,
+               "invalid argument for mongocryptd, must be string");
+            return false;
+         }
+         /* Check if the arg starts with --idleShutdownTimeoutSecs= or is equal
+          * to --idleShutdownTimeoutSecs */
+         if (0 == strncmp ("--idleShutdownTimeoutSecs=",
+                           bson_iter_utf8 (&iter, NULL),
+                           26) ||
+             0 == strcmp ("--idleShutdownTimeoutSecs",
+                          bson_iter_utf8 (&iter, NULL))) {
+            passed_idle_shutdown_timeout_secs = true;
+         }
+         num_args++;
+      }
+   }
+
+   if (!passed_idle_shutdown_timeout_secs) {
+      /* add one more */
+      num_args++;
+   }
+
+   args = (char **) bson_malloc (sizeof (char *) * num_args);
+   i = 0;
+   args[i++] = "mongocryptd";
+
+   if (mongocryptd_spawn_args) {
+      BSON_ASSERT (BSON_ITER_HOLDS_ARRAY (mongocryptd_spawn_args));
+      bson_iter_recurse (mongocryptd_spawn_args, &iter);
+      while (bson_iter_next (&iter)) {
+         args[i++] = (char *) bson_iter_utf8 (&iter, NULL);
+      }
+   }
+
+   if (!passed_idle_shutdown_timeout_secs) {
+      args[i++] = "--idleShutdownTimeoutSecs=60";
+   }
+
+   BSON_ASSERT (i == num_args - 1);
+   args[i++] = NULL;
+
+   return _do_spawn (mongocryptd_spawn_path, args, error);
 }
 
 #endif /* MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION */
