@@ -111,67 +111,95 @@ test_client_side_encryption_cb (bson_t *scenario)
    run_json_general_test (&config);
 }
 
-#define LOCAL_MASTERKEY "\x32\x78\x34\x34\x2b\x78\x64\x75\x54\x61\x42\x42\x6b\x59\x31\x36\x45\x72\x35\x44\x75\x41\x44\x61\x67\x68\x76\x53\x34\x76\x77\x64\x6b\x67\x38\x74\x70\x50\x70\x33\x74\x7a\x36\x67\x56\x30\x31\x41\x31\x43\x77\x62\x44\x39\x69\x74\x51\x32\x48\x46\x44\x67\x50\x57\x4f\x70\x38\x65\x4d\x61\x43\x31\x4f\x69\x37\x36\x36\x4a\x7a\x58\x5a\x42\x64\x42\x64\x62\x64\x4d\x75\x72\x64\x6f\x6e\x4a\x31\x64"
+#define LOCAL_MASTERKEY                                                       \
+   "\x32\x78\x34\x34\x2b\x78\x64\x75\x54\x61\x42\x42\x6b\x59\x31\x36\x45\x72" \
+   "\x35\x44\x75\x41\x44\x61\x67\x68\x76\x53\x34\x76\x77\x64\x6b\x67\x38\x74" \
+   "\x70\x50\x70\x33\x74\x7a\x36\x67\x56\x30\x31\x41\x31\x43\x77\x62\x44\x39" \
+   "\x69\x74\x51\x32\x48\x46\x44\x67\x50\x57\x4f\x70\x38\x65\x4d\x61\x43\x31" \
+   "\x4f\x69\x37\x36\x36\x4a\x7a\x58\x5a\x42\x64\x42\x64\x62\x64\x4d\x75\x72" \
+   "\x64\x6f\x6e\x4a\x31\x64"
 
 typedef struct {
    int num_inserts;
 } limits_apm_ctx_t;
 
-static void _command_started (const mongoc_apm_command_started_t* event) {
+static void
+_command_started (const mongoc_apm_command_started_t *event)
+{
    limits_apm_ctx_t *ctx;
 
-   ctx = (limits_apm_ctx_t*) mongoc_apm_command_started_get_context (event);
-   if (0 == strcmp ("insert", mongoc_apm_command_started_get_command_name (event))) {
+   ctx = (limits_apm_ctx_t *) mongoc_apm_command_started_get_context (event);
+   if (0 ==
+       strcmp ("insert", mongoc_apm_command_started_get_command_name (event))) {
       ctx->num_inserts++;
    }
 }
 
 /* Prose test: BSON size limits and batch splitting */
 static void
-test_bson_size_limits_and_batch_splitting (void) {
-   /* Expect an insert of two documents over 2MiB to split into two inserts but still succeed. */
+test_bson_size_limits_and_batch_splitting (void)
+{
+   /* Expect an insert of two documents over 2MiB to split into two inserts but
+    * still succeed. */
    mongoc_client_t *client;
    mongoc_auto_encryption_opts_t *opts;
    mongoc_uri_t *uri;
    mongoc_collection_t *coll;
    bson_error_t error;
-   bson_t* corpus_schema;
-   bson_t* datakey;
-   bson_t* cmd;
-   bson_t* kms_providers;
-   bson_t* docs[2];
-   char* as;
+   bson_t *corpus_schema;
+   bson_t *datakey;
+   bson_t *cmd;
+   bson_t *kms_providers;
+   bson_t *docs[2];
+   char *as;
    limits_apm_ctx_t ctx = {0};
    mongoc_apm_callbacks_t *callbacks;
 
    /* Do the test setup. */
 
    /* Drop and create db.coll configured with limits-schema.json */
-   uri = test_framework_get_uri();
+   uri = test_framework_get_uri ();
    client = mongoc_client_new_from_uri (uri);
    coll = mongoc_client_get_collection (client, "db", "coll");
    (void) mongoc_collection_drop (coll, NULL);
-   corpus_schema = get_bson_from_json_file ("./src/libmongoc/tests/client_side_encryption_prose/limits-schema.json");
-   cmd = BCON_NEW ("create", "coll", "validator", "{", "$jsonSchema", BCON_DOCUMENT(corpus_schema), "}");
-   ASSERT_OR_PRINT (mongoc_client_command_simple (client, "db", cmd, NULL /* read prefs */, NULL /* reply */, &error), error);
+   corpus_schema = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/limits-schema.json");
+   cmd = BCON_NEW ("create",
+                   "coll",
+                   "validator",
+                   "{",
+                   "$jsonSchema",
+                   BCON_DOCUMENT (corpus_schema),
+                   "}");
+   ASSERT_OR_PRINT (
+      mongoc_client_command_simple (
+         client, "db", cmd, NULL /* read prefs */, NULL /* reply */, &error),
+      error);
 
    /* Drop and create the key vault collection, admin.datakeys. */
    mongoc_collection_destroy (coll);
    coll = mongoc_client_get_collection (client, "admin", "datakeys");
    (void) mongoc_collection_drop (coll, NULL);
-   datakey = get_bson_from_json_file ("./src/libmongoc/tests/client_side_encryption_prose/limits-key.json");
-   ASSERT_OR_PRINT (mongoc_collection_insert_one (coll, datakey, NULL /* opts */, NULL /* reply */, &error), error);
+   datakey = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/limits-key.json");
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (
+         coll, datakey, NULL /* opts */, NULL /* reply */, &error),
+      error);
 
    mongoc_client_destroy (client);
    client = mongoc_client_new_from_uri (uri);
 
-   kms_providers = BCON_NEW ("local", "{", "key", BCON_BIN(0, (uint8_t*)LOCAL_MASTERKEY, 96), "}");
+   kms_providers = BCON_NEW (
+      "local", "{", "key", BCON_BIN (0, (uint8_t *) LOCAL_MASTERKEY, 96), "}");
    opts = mongoc_auto_encryption_opts_new ();
-   mongoc_auto_encryption_opts_set_key_vault_namespace (opts, "admin", "datakeys");
+   mongoc_auto_encryption_opts_set_key_vault_namespace (
+      opts, "admin", "datakeys");
    mongoc_auto_encryption_opts_set_kms_providers (opts, kms_providers);
 
-   ASSERT_OR_PRINT (mongoc_client_enable_auto_encryption (client, opts, &error), error);
-   
+   ASSERT_OR_PRINT (mongoc_client_enable_auto_encryption (client, opts, &error),
+                    error);
+
    callbacks = mongoc_apm_callbacks_new ();
    mongoc_apm_set_command_started_cb (callbacks, _command_started);
    mongoc_client_set_apm_callbacks (client, callbacks, &ctx);
@@ -179,72 +207,113 @@ test_bson_size_limits_and_batch_splitting (void) {
    mongoc_collection_destroy (coll);
    coll = mongoc_client_get_collection (client, "db", "coll");
 
-   /* Insert { "_id": "over_2mib_under_16mib", "unencrypted": <the string "a" repeated 2097152 times> } */
+   /* Insert { "_id": "over_2mib_under_16mib", "unencrypted": <the string "a"
+    * repeated 2097152 times> } */
    docs[0] = BCON_NEW ("_id", "over_2mib_under_16mib");
    as = bson_malloc (16777216);
    memset (as, 'a', 16777216);
    bson_append_utf8 (docs[0], "unencrypted", -1, as, 2097152);
-   ASSERT_OR_PRINT (mongoc_collection_insert_one (coll, docs[0], NULL /* opts */, NULL /* reply */, &error), error);
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (
+         coll, docs[0], NULL /* opts */, NULL /* reply */, &error),
+      error);
    bson_destroy (docs[0]);
 
-   /* Insert the document `limits/limits-doc.json <../limits/limits-doc.json>`_ concatenated with ``{ "_id": "encryption_exceeds_2mib", "unencrypted": < the string "a" repeated (2097152 - 2000) times > }`` */
-   docs[0] = get_bson_from_json_file ("./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
+   /* Insert the document `limits/limits-doc.json <../limits/limits-doc.json>`_
+    * concatenated with ``{ "_id": "encryption_exceeds_2mib", "unencrypted": <
+    * the string "a" repeated (2097152 - 2000) times > }`` */
+   docs[0] = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[0], "_id", -1, "encryption_exceeds_2mib", -1);
    bson_append_utf8 (docs[0], "unencrypted", -1, as, 2097152 - 2000);
-   ASSERT_OR_PRINT (mongoc_collection_insert_one (coll, docs[0], NULL /* opts */, NULL /* reply */, &error), error);
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (
+         coll, docs[0], NULL /* opts */, NULL /* reply */, &error),
+      error);
    bson_destroy (docs[0]);
 
    /* Bulk insert the following:
 
-   - ``{ "_id": "over_2mib_1", "unencrypted": <the string "a" repeated (2097152) times> }``
+   - ``{ "_id": "over_2mib_1", "unencrypted": <the string "a" repeated (2097152)
+   times> }``
 
-   - ``{ "_id": "over_2mib_2", "unencrypted": <the string "a" repeated (2097152) times> }``
+   - ``{ "_id": "over_2mib_2", "unencrypted": <the string "a" repeated (2097152)
+   times> }``
 
-   Expect the bulk write to succeed and split after first doc (i.e. two inserts occur). This may be verified using `command monitoring <https://github.com/mongodb/specifications/tree/master/source/command-monitoring/command-monitoring.rst>`_.
+   Expect the bulk write to succeed and split after first doc (i.e. two inserts
+   occur). This may be verified using `command monitoring
+   <https://github.com/mongodb/specifications/tree/master/source/command-monitoring/command-monitoring.rst>`_.
    */
    docs[0] = BCON_NEW ("_id", "over_2mib_1");
    bson_append_utf8 (docs[0], "unencrypted", -1, as, 2097152);
    docs[1] = BCON_NEW ("_id", "over_2mib_2");
    bson_append_utf8 (docs[1], "unencrypted", -1, as, 2097152);
    ctx.num_inserts = 0;
-   ASSERT_OR_PRINT (mongoc_collection_insert_many (coll, (const bson_t**) docs, 2, NULL /* opts */, NULL /* reply */, &error), error);
+   ASSERT_OR_PRINT (mongoc_collection_insert_many (coll,
+                                                   (const bson_t **) docs,
+                                                   2,
+                                                   NULL /* opts */,
+                                                   NULL /* reply */,
+                                                   &error),
+                    error);
    ASSERT_CMPINT (ctx.num_inserts, ==, 2);
    bson_destroy (docs[0]);
    bson_destroy (docs[1]);
 
    /* #. Bulk insert the following:
 
-   - The document `limits/limits-doc.json <../limits/limits-doc.json>`_ concatenated with ``{ "_id": "encryption_exceeds_2mib_1", "unencrypted": < the string "a" repeated (2097152 - 2000) times > }``
+   - The document `limits/limits-doc.json <../limits/limits-doc.json>`_
+   concatenated with ``{ "_id": "encryption_exceeds_2mib_1", "unencrypted": <
+   the string "a" repeated (2097152 - 2000) times > }``
 
-   - The document `limits/limits-doc.json <../limits/limits-doc.json>`_ concatenated with ``{ "_id": "encryption_exceeds_2mib_2", "unencrypted": < the string "a" repeated (2097152 - 2000) times > }``
+   - The document `limits/limits-doc.json <../limits/limits-doc.json>`_
+   concatenated with ``{ "_id": "encryption_exceeds_2mib_2", "unencrypted": <
+   the string "a" repeated (2097152 - 2000) times > }``
 
-   Expect the bulk write to succeed and split after first doc (i.e. two inserts occur). This may be verified using `command monitoring <https://github.com/mongodb/specifications/tree/master/source/command-monitoring/command-monitoring.rst>`_.
+   Expect the bulk write to succeed and split after first doc (i.e. two inserts
+   occur). This may be verified using `command monitoring
+   <https://github.com/mongodb/specifications/tree/master/source/command-monitoring/command-monitoring.rst>`_.
    */
 
-   docs[0] = get_bson_from_json_file ("./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
+   docs[0] = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[0], "_id", -1, "encryption_exceeds_2mib_1", -1);
    bson_append_utf8 (docs[0], "unencrypted", -1, as, 2097152 - 2000);
-   docs[1] = get_bson_from_json_file ("./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
+   docs[1] = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[1], "_id", -1, "encryption_exceeds_2mib_2", -1);
    bson_append_utf8 (docs[1], "unencrypted", -1, as, 2097152 - 2000);
    ctx.num_inserts = 0;
-   ASSERT_OR_PRINT (mongoc_collection_insert_many (coll, (const bson_t**) docs, 2, NULL /* opts */, NULL /* reply */, &error), error);
+   ASSERT_OR_PRINT (mongoc_collection_insert_many (coll,
+                                                   (const bson_t **) docs,
+                                                   2,
+                                                   NULL /* opts */,
+                                                   NULL /* reply */,
+                                                   &error),
+                    error);
    ASSERT_CMPINT (ctx.num_inserts, ==, 2);
    bson_destroy (docs[0]);
    bson_destroy (docs[1]);
 
    /* Check that inserting close to, but not exceeding, 16MiB, passes */
-   docs[0] = bson_new();
+   docs[0] = bson_new ();
    bson_append_utf8 (docs[0], "_id", -1, "under_16mib", -1);
    bson_append_utf8 (docs[0], "unencrypted", -1, as, 16777216 - 2000);
-   ASSERT_OR_PRINT (mongoc_collection_insert_one (coll, docs[0], NULL /* opts */, NULL /* reply */, &error), error);
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (
+         coll, docs[0], NULL /* opts */, NULL /* reply */, &error),
+      error);
    bson_destroy (docs[0]);
 
    /* but.. */
-   docs[0] = get_bson_from_json_file ("./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
+   docs[0] = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[0], "_id", -1, "under_16mib", -1);
    bson_append_utf8 (docs[0], "unencrypted", -1, as, 16777216 - 2000);
-   ASSERT_OR_PRINT (mongoc_collection_insert_one (coll, docs[0], NULL /* opts */, NULL /* reply */, &error), error);
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (
+         coll, docs[0], NULL /* opts */, NULL /* reply */, &error),
+      error);
    bson_destroy (docs[0]);
 
    bson_free (as);
@@ -271,5 +340,10 @@ test_client_side_encryption_install (TestSuite *suite)
       resolved,
       test_client_side_encryption_cb,
       test_framework_skip_if_no_client_side_encryption);
-   TestSuite_AddLive (suite, "/tmp", test_bson_size_limits_and_batch_splitting);
+   TestSuite_AddLive (
+      suite,
+      "/client_side_encryption/bson_size_limits_and_batch_splitting",
+      test_bson_size_limits_and_batch_splitting,
+      test_framework_skip_if_no_client_side_encryption
+         test_framework_skip_if_max_wire_version_less_than_8);
 }

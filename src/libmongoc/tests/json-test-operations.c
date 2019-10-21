@@ -1838,7 +1838,8 @@ json_test_operation (json_test_ctx_t *ctx,
          res = find_one (c, test, operation, session, read_prefs, reply);
       } else if (!strcmp (op_name, "aggregate")) {
          res = aggregate (c, test, operation, session, read_prefs, reply);
-      } else if (!strcmp (op_name, "listIndexes") || !strcmp(op_name, "listIndexNames")) {
+      } else if (!strcmp (op_name, "listIndexes") ||
+                 !strcmp (op_name, "listIndexNames")) {
          res = list_indexes (c, test, operation, session, reply);
       } else if (!strcmp (op_name, "watch")) {
          bson_t pipeline = BSON_INITIALIZER;

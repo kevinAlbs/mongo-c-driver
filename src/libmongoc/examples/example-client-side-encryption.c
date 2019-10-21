@@ -23,61 +23,77 @@ main (int argc, char *argv[])
    char *aws_access_key_id;
    char *aws_secret_access_key;
    char *str;
-   const char* schema_str;
+   const char *schema_str;
    bson_t *extra;
 
    mongoc_init ();
    client = mongoc_client_new ("mongodb://localhost:27017");
    mongoc_client_set_error_api (client, 2);
-   
+
    /* configure automatic encryption/decryption. */
    auto_encryption_opts = mongoc_auto_encryption_opts_new ();
 
    /* set key vault namespace to admin.datakeys */
-   mongoc_auto_encryption_opts_set_key_vault_namespace (auto_encryption_opts, "admin", "datakeys");
+   mongoc_auto_encryption_opts_set_key_vault_namespace (
+      auto_encryption_opts, "admin", "datakeys");
 
    /* set KMS provider for "aws" */
    aws_access_key_id = getenv ("AWS_ACCESS_KEY_ID");
    aws_secret_access_key = getenv ("AWS_SECRET_ACCESS_KEY");
-   kms_providers = BCON_NEW ("aws", "{", "secretAccessKey", BCON_UTF8(aws_secret_access_key), "accessKeyId", BCON_UTF8(aws_access_key_id), "}");
-   mongoc_auto_encryption_opts_set_kms_providers (auto_encryption_opts, kms_providers);
+   kms_providers = BCON_NEW ("aws",
+                             "{",
+                             "secretAccessKey",
+                             BCON_UTF8 (aws_secret_access_key),
+                             "accessKeyId",
+                             BCON_UTF8 (aws_access_key_id),
+                             "}");
+   mongoc_auto_encryption_opts_set_kms_providers (auto_encryption_opts,
+                                                  kms_providers);
 
    /* set a local JSON schema for "test.test" */
-   schema_str = "{ \"test.test\": {"
-    "  \"properties\": {"
-    "    \"encrypted_string\": {"
-    "      \"encrypt\": {"
-    "        \"keyId\": ["
-    "          {"
-    "            \"$binary\": {"
-    "              \"base64\": \"AAAAAAAAAAAAAAAAAAAAAA==\","
-    "              \"subType\": \"04\""
-    "            }"
-    "          }"
-    "        ],"
-    "        \"bsonType\": \"string\","
-    "        \"algorithm\": \"AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic\""
-    "      }"
-    "    }"
-    "  },"
-    "  \"bsonType\": \"object\""
-    "}}";
+   schema_str =
+      "{ \"test.test\": {"
+      "  \"properties\": {"
+      "    \"encrypted_string\": {"
+      "      \"encrypt\": {"
+      "        \"keyId\": ["
+      "          {"
+      "            \"$binary\": {"
+      "              \"base64\": \"AAAAAAAAAAAAAAAAAAAAAA==\","
+      "              \"subType\": \"04\""
+      "            }"
+      "          }"
+      "        ],"
+      "        \"bsonType\": \"string\","
+      "        \"algorithm\": \"AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic\""
+      "      }"
+      "    }"
+      "  },"
+      "  \"bsonType\": \"object\""
+      "}}";
 
-   if (!bson_init_from_json (&schema, schema_str, strlen (schema_str), &error)) {
-       fprintf (stderr, "could not parse JSON: %s\n", error.message);
+   if (!bson_init_from_json (
+          &schema, schema_str, strlen (schema_str), &error)) {
+      fprintf (stderr, "could not parse JSON: %s\n", error.message);
    }
-   
-   extra = BCON_NEW ("mongocryptdSpawnArgs", "[", "--logpath", "./logs.txt", "--idleShutdownTimeoutSecs=120", "]");
+
+   extra = BCON_NEW ("mongocryptdSpawnArgs",
+                     "[",
+                     "--logpath",
+                     "./logs.txt",
+                     "--idleShutdownTimeoutSecs=120",
+                     "]");
    mongoc_auto_encryption_opts_set_extra (auto_encryption_opts, extra);
    mongoc_auto_encryption_opts_set_schema_map (auto_encryption_opts, &schema);
-   
-   if (!mongoc_client_enable_auto_encryption (client, auto_encryption_opts, &error)) {
+
+   if (!mongoc_client_enable_auto_encryption (
+          client, auto_encryption_opts, &error)) {
       fprintf (stderr, "error=%s\n", error.message);
       return EXIT_FAILURE;
    }
 
    /* Insert should undergo auto encryption */
-   to_insert = BCON_NEW ("encrypted_string", BCON_UTF8("hello world"));
+   to_insert = BCON_NEW ("encrypted_string", BCON_UTF8 ("hello world"));
    collection = mongoc_client_get_collection (client, "test", "test");
 
    str = bson_as_json (to_insert, NULL);
@@ -91,17 +107,14 @@ main (int argc, char *argv[])
    }
 
    /* find everything */
-   filter = bson_new();
+   filter = bson_new ();
    cursor = mongoc_collection_find_with_opts (
-      collection,
-      filter,
-      NULL /* opts */,
-      NULL /* read prefs */);
+      collection, filter, NULL /* opts */, NULL /* read prefs */);
 
    printf ("found: \n");
    while (mongoc_cursor_next (cursor, &to_find)) {
       str = bson_as_json (to_find, NULL);
-      printf("- %s\n", str);
+      printf ("- %s\n", str);
       bson_free (str);
    }
 
