@@ -1234,21 +1234,19 @@ _do_spawn (const char *path, char **args, bson_error_t *error)
    ZeroMemory (&startup_info, sizeof (startup_info));
 
    startup_info.cb = sizeof (startup_info);
-   startup_info.dwFlags = STARTF_USESHOWWINDOW;
-   startup_info.wShowWindow = SW_HIDE;
 
    if (!CreateProcessA (NULL,
                         command->str,
                         NULL,
                         NULL,
                         false /* inherit descriptors */,
-                        /* FLAGS */ DETACHED_PROCESS,
+                        DETACHED_PROCESS /* FLAGS */,
                         NULL /* environment */,
                         NULL /* current directory */,
                         &startup_info,
                         &process_information)) {
       long lastError = GetLastError ();
-      LPTSTR message = NULL;
+      LPSTR message = NULL;
 
       FormatMessageA (
          FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_ARGUMENT_ARRAY |
@@ -1349,8 +1347,7 @@ _do_spawn (const char *path, char **args, bson_error_t *error)
    /* We're no longer in the parent process. Errors encountered result in an
     * exit.
     * Note, we're not logging here, because that would require the user's log
-    * callback
-    * to be fork-safe.
+    * callback to be fork-safe.
     */
 
    /* Start a new session for the child, so it is not bound to the current
