@@ -103,6 +103,7 @@ _mongoc_socket_setflags (int sd)
    flags = fcntl (sd, F_GETFL, sd);
 
 #ifdef FD_CLOEXEC
+   printf("setting FD_CLOEXEC\n");
    return (-1 != fcntl (sd, F_SETFL, (flags | O_NONBLOCK | FD_CLOEXEC)));
 #else
    return (-1 != fcntl (sd, F_SETFL, (flags | O_NONBLOCK)));
