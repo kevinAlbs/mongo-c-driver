@@ -14,11 +14,11 @@ set_path ()
          ;;
 
       darwin)
-         export DYLD_LIBRARY_PATH=".:install-dir/lib:src/libbson:src/libmongoc:$EXTRA_LIB_PATH:$DYLD_LIBRARY_PATH:$LIBMONGOCRYPT_PATH/lib"
+         export DYLD_LIBRARY_PATH=".:install-dir/lib:src/libbson:src/libmongoc:$EXTRA_LIB_PATH:$DYLD_LIBRARY_PATH"
          ;;
 
       *)
-         export LD_LIBRARY_PATH=".:install-dir/lib:src/libbson:src/libmongoc:$EXTRA_LIB_PATH:$LD_LIBRARY_PATH:$LIBMONGOCRYPT_PATH/lib"
+         export LD_LIBRARY_PATH=".:install-dir/lib:src/libbson:src/libmongoc:$EXTRA_LIB_PATH:$LD_LIBRARY_PATH"
          ;;
    esac
 

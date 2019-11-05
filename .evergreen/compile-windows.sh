@@ -14,7 +14,7 @@ set -o errexit  # Exit the script with error if any of the commands fail
 INSTALL_DIR="C:/mongoc"
 CONFIGURE_FLAGS="\
    -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
-   -DCMAKE_PREFIX_PATH=${INSTALL_DIR};C:/libmongocrypt \
+   -DCMAKE_PREFIX_PATH=${INSTALL_DIR} \
    -DENABLE_AUTOMATIC_INIT_AND_CLEANUP:BOOL=OFF \
    -DENABLE_MAINTAINER_FLAGS=ON \
    -DENABLE_BSON=ON"
@@ -119,12 +119,12 @@ esac
 if [ "$RELEASE" ]; then
    BUILD_FLAGS="$BUILD_FLAGS /p:Configuration=RelWithDebInfo"
    TEST_PATH="./src/libmongoc/RelWithDebInfo/test-libmongoc.exe"
-   export PATH=$PATH:`pwd`/src/libbson/RelWithDebInfo:`pwd`/src/libmongoc/RelWithDebInfo:/cygdrive/c/libmongocrypt/bin
+   export PATH=$PATH:`pwd`/src/libbson/RelWithDebInfo:`pwd`/src/libmongoc/RelWithDebInfo:`pwd`/install-dir/bin
 else
    CONFIGURE_FLAGS="$CONFIGURE_FLAGS"
    BUILD_FLAGS="$BUILD_FLAGS /p:Configuration=Debug"
    TEST_PATH="./src/libmongoc/Debug/test-libmongoc.exe"
-   export PATH=$PATH:`pwd`/src/libbson/Debug:`pwd`/src/libmongoc/Debug:/cygdrive/c/libmongocrypt/bin
+   export PATH=$PATH:`pwd`/src/libbson/Debug:`pwd`/src/libmongoc/Debug:`pwd`/install-dir/bin
 fi
 
 "$CMAKE" -G "$CC" "-DCMAKE_PREFIX_PATH=${INSTALL_DIR}/lib/cmake" $CONFIGURE_FLAGS

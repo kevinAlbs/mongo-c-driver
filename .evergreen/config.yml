@@ -964,7 +964,7 @@ tasks:
         set -o errexit
         set -o xtrace
         export CC="clang-3.8"
-        export CFLAGS="-fsanitize=address -fno-omit-frame-pointer"
+        export CFLAGS="-fsanitize=address -fno-omit-frame-pointer -DBSON_MEMCHECK"
         export CHECK_LOG="ON"
         export DEBUG="ON"
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_EXTRA_ALIGNMENT=OFF"
@@ -1008,7 +1008,7 @@ tasks:
         set -o errexit
         set -o xtrace
         export CC="clang-3.8"
-        export CFLAGS="-fsanitize=address -fno-omit-frame-pointer"
+        export CFLAGS="-fsanitize=address -fno-omit-frame-pointer -DBSON_MEMCHECK"
         export CHECK_LOG="ON"
         export DEBUG="ON"
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_EXTRA_ALIGNMENT=OFF"
@@ -1287,8 +1287,6 @@ tasks:
         export DEBUG="ON"
         export SASL="SSPI"
         export SSL="WINDOWS"
-        echo "workdir is ${workdir}"
-        echo "for now, use the full C path, but later I'll have to figure this out."
         CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-nosrv
@@ -4371,7 +4369,6 @@ tasks:
   - openssl
   - sasl
   - server
-  # TEMP bypass compile. JK this doesn't work because this overwrites the evergreen source scripts too.
   depends_on:
     name: debug-compile-sasl-openssl
   commands:
@@ -12220,7 +12217,7 @@ buildvariants:
   display_name: ASAN Tests (Ubuntu 16.04)
   expansions:
     CC: clang
-    libmongocrypt_variant: ubuntu1604
+    libmongocrypt_url: https://s3.amazonaws.com/mciuploads/libmongocrypt/ubuntu1604/master/latest/5dc1a5670ae60653b20f8bbf/libmongocrypt.tar.gz
   run_on: ubuntu1604-test
   tasks:
   - .debug-compile .asan-clang
