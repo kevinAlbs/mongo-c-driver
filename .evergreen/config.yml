@@ -643,10 +643,10 @@ functions:
         mkdir -p ./mongoc/install-dir/bin/
         mkdir -p ./mongoc/install-dir/lib/
         mkdir -p ./mongoc/install-dir/include/
-        cp -R libmongocrypt/shared_bson/bin/* ./mongoc/install-dir/bin/
-        cp -R libmongocrypt/shared_bson/lib/* ./mongoc/install-dir/lib/
-        cp -R libmongocrypt/shared_bson/lib64/* ./mongoc/install-dir/lib/
-        cp -R libmongocrypt/shared_bson/include/* ./mongoc/install-dir/include
+        cp -R libmongocrypt/sharedbson/bin/* ./mongoc/install-dir/bin/
+        cp -R libmongocrypt/sharedbson/lib/* ./mongoc/install-dir/lib/
+        cp -R libmongocrypt/sharedbson/lib64/* ./mongoc/install-dir/lib/
+        cp -R libmongocrypt/sharedbson/include/* ./mongoc/install-dir/include
 
 pre:
 - func: fetch source
