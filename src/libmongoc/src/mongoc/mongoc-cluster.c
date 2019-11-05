@@ -2907,7 +2907,7 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
    section[0].payload_type = 0;
    section[0].payload.bson_document = bson_get_data (cmd->command);
    rpc.msg.sections[0] = section[0];
-
+   
    if (cmd->payload) {
       section[1].payload_type = 1;
       section[1].payload.sequence.size = cmd->payload_size +

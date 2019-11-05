@@ -74,9 +74,9 @@ _mongoc_socket_capture_errno (mongoc_socket_t *sock) /* IN */
  *
  * _mongoc_socket_setflags --
  *
- *       A helper to set socket flags. Sets to nonblocking mode. On
+ *       A helper to set a socket flags. Sets to nonblocking mode. On
  *       POSIX sets closeonexec.
- *
+ *       
  *
  * Returns:
  *       true if successful; otherwise false.
@@ -107,7 +107,7 @@ _mongoc_socket_setflags (int sd)
 #else
    return (-1 != fcntl (sd, F_SETFL, (flags | O_NONBLOCK)));
 #endif
-
+   
 #endif
 }
 

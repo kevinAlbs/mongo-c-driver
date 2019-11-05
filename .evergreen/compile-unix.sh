@@ -74,7 +74,7 @@ DEBUG_AND_RELEASE_FLAGS="\
    -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF \
    -DENABLE_TRACING=$TRACING \
    -DENABLE_RDTSCP=$RDTSCP \
-   -DCMAKE_PREFIX_PATH=$INSTALL_DIR \
+   -DCMAKE_PREFIX_PATH=$INSTALL_DIR;$LIBMONGOCRYPT_PATH \
    -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
    -DENABLE_SHM_COUNTERS=$ENABLE_SHM_COUNTERS \
 "
@@ -233,10 +233,11 @@ mkfifo pipe || true
 if [ -e pipe ]; then
    set +o xtrace
    tee error.log < pipe &
-   run_valgrind ./src/libmongoc/test-libmongoc -d -F test-results.json 2>pipe
+   # TEMP pass -l /client_side_encryption/aggregate to check linking
+   run_valgrind ./src/libmongoc/test-libmongoc -d -F test-results.json -l /client_side_encryption/aggregate 2>pipe
    rm pipe
 else
-   run_valgrind ./src/libmongoc/test-libmongoc -d -F test-results.json
+   run_valgrind ./src/libmongoc/test-libmongoc -d -F -l /client_side_encryption/aggregate test-results.json
 fi
 
 # Check if the error.log exists, and is more than 0 byte

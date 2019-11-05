@@ -68,7 +68,9 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/${task_name}/${build_id}.tar.gz
+      # TEMP: for bypassing compile, URLs will be fixed at CSE_TESTING + task + variant
+      # remote_file: ${project}/${build_variant}/${revision}/${task_name}/${build_id}.tar.gz
+      remote_file: ${project}/${build_variant}/CSE_TESTING/${task_name}/${build_variant}_${task_name}.tar.gz
       bucket: mciuploads
       permissions: public-read
       local_file: ${build_id}.tar.gz
@@ -111,7 +113,9 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/${BUILD_NAME}/${build_id}.tar.gz
+      # TEMP: bypass compile while debugging tests and evergreen.
+      remote_file: ${project}/${build_variant}/CSE_TESTING/${BUILD_NAME}/${build_variant}_${BUILD_NAME}.tar.gz
+      # remote_file: ${project}/${build_variant}/${revision}/${BUILD_NAME}/${build_id}.tar.gz
       bucket: mciuploads
       local_file: build.tar.gz
   - command: shell.exec
@@ -408,6 +412,15 @@ functions:
         export VALGRIND=${VALGRIND}
         export MONGOC_TEST_URI=${URI}
         export DNS=${DNS}
+        export CLIENT_SIDE_ENCRYPTION=${CLIENT_SIDE_ENCRYPTION}
+        export ASAN=${ASAN}
+        export LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt
+        if [ "${CLIENT_SIDE_ENCRYPTION}" = "on" ]; then
+          set +o xtrace
+          export MONGOC_TEST_AWS_SECRET_ACCESS_KEY="${client_side_encryption_aws_secret_access_key}"
+          export MONGOC_TEST_AWS_ACCESS_KEY_ID="${client_side_encryption_aws_access_key_id}"
+          set -o xtrace
+        fi
         sh .evergreen/run-tests.sh
   run tests bson:
   - command: shell.exec
@@ -599,11 +612,46 @@ functions:
         set -o xtrace
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_COVERAGE=ON -DENABLE_EXAMPLES=OFF"
         DEBUG=ON CC='${CC}' MARCH='${MARCH}' SASL=OFF SSL=OPENSSL SKIP_TESTS=ON sh .evergreen/compile.sh
+  fetch libmongocrypt:
+  - command: shell.exec
+    type: test
+    ignore_standard_error: true
+    params:
+      script: |-
+        if [ "${libmongocrypt_variant}" = "" ]; then
+           echo "libmongocrypt not available for platform"
+           exit 1
+        fi
+  - command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: libmongocrypt/${libmongocrypt_variant}/master/latest/libmongocrypt.tar.gz
+      bucket: mciuploads
+      local_file: libmongocrypt.tar.gz
+  - command: archive.targz_extract
+    params:
+      path: libmongocrypt.tar.gz
+      destination: libmongocrypt
+  - command: shell.exec
+    type: test
+    params:
+      script: |-
+        # It's tricky on Windows to refer to the path inside MCI.
+        # And on POSIX we don't have permissions outside of home directory.
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        case "$OS" in
+          cygwin*)
+              mv libmongocrypt /cygdrive/c/
+          ;;
+        esac
+    
 pre:
 - func: fetch source
 - func: windows fix
 - func: make files executable
 - func: prepare kerberos
+- func: fetch libmongocrypt
 post:
 - func: backtrace
 - func: upload working dir
@@ -914,7 +962,7 @@ tasks:
         set -o errexit
         set -o xtrace
         export CC="clang-3.8"
-        export CFLAGS="-fsanitize=address -fno-omit-frame-pointer -DBSON_MEMCHECK"
+        export CFLAGS="-fsanitize=address -fno-omit-frame-pointer"
         export CHECK_LOG="ON"
         export DEBUG="ON"
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_EXTRA_ALIGNMENT=OFF"
@@ -922,7 +970,7 @@ tasks:
         export SNAPPY="OFF"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-asan-gcc
   tags:
@@ -958,7 +1006,7 @@ tasks:
         set -o errexit
         set -o xtrace
         export CC="clang-3.8"
-        export CFLAGS="-fsanitize=address -fno-omit-frame-pointer -DBSON_MEMCHECK"
+        export CFLAGS="-fsanitize=address -fno-omit-frame-pointer"
         export CHECK_LOG="ON"
         export DEBUG="ON"
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_EXTRA_ALIGNMENT=OFF"
@@ -967,7 +1015,7 @@ tasks:
         export SSL="OPENSSL"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-ubsan
   tags:
@@ -1134,7 +1182,7 @@ tasks:
         export DEBUG="ON"
         export SASL="AUTO"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-darwinssl
   tags:
@@ -1152,7 +1200,7 @@ tasks:
         export DEBUG="ON"
         export SASL="AUTO"
         export SSL="DARWIN"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-winssl
   tags:
@@ -1237,7 +1285,9 @@ tasks:
         export DEBUG="ON"
         export SASL="SSPI"
         export SSL="WINDOWS"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        echo "workdir is ${workdir}"
+        echo "for now, use the full C path, but later I'll have to figure this out."
+        LIBMONGOCRYPT_PATH="C:/$(pwd)/../libmongocrypt" CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-nosrv
   tags:
@@ -2437,6 +2487,7 @@ tasks:
       AUTH: auth
       SSL: openssl
       VALGRIND: 'off'
+      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-asan-latest-server-noauth-nosasl-nossl
   tags:
   - test-asan
@@ -2459,6 +2510,7 @@ tasks:
       AUTH: noauth
       SSL: nossl
       VALGRIND: 'off'
+      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-asan-latest-replica-set-auth-nosasl-openssl
   tags:
   - test-asan
@@ -4162,6 +4214,7 @@ tasks:
       AUTH: auth
       SSL: openssl
       VALGRIND: 'off'
+      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-latest-server-auth-sasl-darwinssl
   tags:
   - auth
@@ -4237,6 +4290,7 @@ tasks:
       AUTH: auth
       SSL: winssl
       VALGRIND: 'off'
+      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-latest-server-auth-nosasl-openssl
   tags:
   - auth
@@ -4319,6 +4373,7 @@ tasks:
   - openssl
   - sasl
   - server
+  # TEMP bypass compile. JK this doesn't work because this overwrites the evergreen source scripts too.
   depends_on:
     name: debug-compile-sasl-openssl
   commands:
@@ -4337,6 +4392,7 @@ tasks:
       AUTH: noauth
       SSL: openssl
       VALGRIND: 'off'
+      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-latest-server-noauth-sasl-darwinssl
   tags:
   - darwinssl
@@ -4362,6 +4418,7 @@ tasks:
       AUTH: noauth
       SSL: darwinssl
       VALGRIND: 'off'
+      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-latest-server-noauth-sasl-winssl
   tags:
   - latest
@@ -11729,6 +11786,7 @@ buildvariants:
   display_name: clang 3.8 (Ubuntu 16.04)
   expansions:
     CC: clang
+    libmongocrypt_variant: ubuntu1604
   run_on: ubuntu1604-test
   tasks:
   - .compression !.zstd
@@ -11900,6 +11958,7 @@ buildvariants:
   display_name: '*Darwin, macOS (Apple LLVM)'
   expansions:
     CC: clang
+    libmongocrypt_variant: macos
   run_on: macos-1012
   tasks:
   - .compression !.snappy !.zstd
@@ -11929,6 +11988,7 @@ buildvariants:
   display_name: Windows (VS 2015)
   expansions:
     CC: Visual Studio 14 2015 Win64
+    libmongocrypt_variant: windows-test
   run_on: windows-64-vs2015-compile
   tasks:
   - .compression !.snappy !.zstd
@@ -12165,6 +12225,7 @@ buildvariants:
   display_name: ASAN Tests (Ubuntu 16.04)
   expansions:
     CC: clang
+    libmongocrypt_variant: ubuntu1604
   run_on: ubuntu1604-test
   tasks:
   - .debug-compile .asan-clang

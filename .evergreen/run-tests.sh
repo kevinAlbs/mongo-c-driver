@@ -12,7 +12,7 @@ DNS=${DNS:-nodns}
 
 # AddressSanitizer configuration
 export ASAN_OPTIONS="detect_leaks=1 abort_on_error=1 symbolize=1"
-export ASAN_SYMBOLIZER_PATH="/usr/lib/llvm-3.4/bin/llvm-symbolizer"
+export ASAN_SYMBOLIZER_PATH="/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
 
 echo "COMPRESSORS='${COMPRESSORS}' CC='${CC}' AUTH=${AUTH} SSL=${SSL} URI=${URI} IPV4_ONLY=${IPV4_ONLY} VALGRIND=${VALGRIND} MONGOC_TEST_URI=${MONGOC_TEST_URI}"
 
@@ -71,20 +71,36 @@ DIR=$(dirname $0)
 . $DIR/add-build-dirs-to-paths.sh
 . $DIR/valgrind.sh
 
+check_mongocryptd() {
+   mongocryptd --version
+   if [ "$ASAN" = "on" -a "$CLIENT_SIDE_ENCRYPTION" = "on" ]; then
+      # ASAN does not play well with spawned processes. In addition to --no-fork, do not spawn mongocryptd
+      # for client-side encryption tests.
+      export "MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN=on"
+      mongocryptd --logpath ./mongocryptd.logs --fork --pidfilepath="$(pwd)/mongocryptd.pid"
+   fi
+}
+
 case "$OS" in
    cygwin*)
+      export PATH=$PATH:/cygdrive/c/mongodb/bin:/cygdrive/c/libmongocrypt/bin
+      check_mongocryptd
+      
       chmod +x src/libmongoc/Debug/test-libmongoc.exe
-      ./src/libmongoc/Debug/test-libmongoc.exe $TEST_ARGS
+      ./src/libmongoc/Debug/test-libmongoc.exe -l "/client_side_encryption/*" $TEST_ARGS
       ;;
 
    *)
       ulimit -c unlimited || true
+      # Need mongocryptd on the path.
+      export PATH=$PATH:$(pwd)/mongodb/bin
+      check_mongocryptd
 
       if [ "$VALGRIND" = "on" ]; then
          . $DIR/valgrind.sh
          run_valgrind ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS
       else
-         ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS
+         ./src/libmongoc/test-libmongoc --no-fork -l "/client_side_encryption/*" $TEST_ARGS
       fi
 
       ;;

@@ -18,7 +18,12 @@
 
 #include "mongoc/mongoc-client-side-encryption-private.h"
 
-#include "mongoc/mongoc-config.h"
+#ifndef _WIN32
+#include <sys/wait.h>
+#include <signal.h>
+#endif
+
+#include "mongoc/mongoc.h"
 
 /* Auto encryption opts. */
 struct _mongoc_auto_encryption_opts_t {

@@ -14,7 +14,7 @@ set -o errexit  # Exit the script with error if any of the commands fail
 INSTALL_DIR="C:/mongoc"
 CONFIGURE_FLAGS="\
    -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
-   -DCMAKE_PREFIX_PATH=${INSTALL_DIR} \
+   -DCMAKE_PREFIX_PATH=${INSTALL_DIR};C:/libmongocrypt \
    -DENABLE_AUTOMATIC_INIT_AND_CLEANUP:BOOL=OFF \
    -DENABLE_MAINTAINER_FLAGS=ON \
    -DENABLE_BSON=ON"
@@ -119,12 +119,12 @@ esac
 if [ "$RELEASE" ]; then
    BUILD_FLAGS="$BUILD_FLAGS /p:Configuration=RelWithDebInfo"
    TEST_PATH="./src/libmongoc/RelWithDebInfo/test-libmongoc.exe"
-   export PATH=$PATH:`pwd`/src/libbson/RelWithDebInfo:`pwd`/src/libmongoc/RelWithDebInfo
+   export PATH=$PATH:`pwd`/src/libbson/RelWithDebInfo:`pwd`/src/libmongoc/RelWithDebInfo:/cygdrive/c/libmongocrypt/bin
 else
    CONFIGURE_FLAGS="$CONFIGURE_FLAGS"
    BUILD_FLAGS="$BUILD_FLAGS /p:Configuration=Debug"
    TEST_PATH="./src/libmongoc/Debug/test-libmongoc.exe"
-   export PATH=$PATH:`pwd`/src/libbson/Debug:`pwd`/src/libmongoc/Debug
+   export PATH=$PATH:`pwd`/src/libbson/Debug:`pwd`/src/libmongoc/Debug:/cygdrive/c/libmongocrypt/bin
 fi
 
 "$CMAKE" -G "$CC" "-DCMAKE_PREFIX_PATH=${INSTALL_DIR}/lib/cmake" $CONFIGURE_FLAGS
@@ -134,4 +134,5 @@ fi
 export MONGOC_TEST_FUTURE_TIMEOUT_MS=30000
 export MONGOC_TEST_SKIP_LIVE=on
 export MONGOC_TEST_SKIP_SLOW=on
-"$TEST_PATH" --no-fork -d -F test-results.json
+# TEMP  pass -l /client_side_encryption/aggregate to check linking
+"$TEST_PATH" -l /client_side_encryption/aggregate --no-fork -d -F test-results.json
