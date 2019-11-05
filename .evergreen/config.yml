@@ -618,7 +618,7 @@ functions:
     ignore_standard_error: true
     params:
       script: |-
-        if [ "${libmongocrypt_url}" = "" ]; then
+        if [ "${libmongocrypt_variant}" = "" ]; then
            echo "libmongocrypt not available for platform"
            exit 1
         fi
@@ -626,7 +626,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${libmongocrypt_url}
+      remote_file: libmongocrypt/${libmongocrypt_variant}/master/latest/libmongocrypt.tar.gz
       bucket: mciuploads
       local_file: libmongocrypt.tar.gz
   - command: archive.targz_extract
@@ -11779,7 +11779,7 @@ buildvariants:
   display_name: clang 3.8 (Ubuntu 16.04)
   expansions:
     CC: clang
-    libmongocrypt_url: https://s3.amazonaws.com/mciuploads/libmongocrypt/ubuntu1604/master/latest/5dc1a5670ae60653b20f8bbf/libmongocrypt.tar.gz
+    libmongocrypt_variant: ubuntu1604
   run_on: ubuntu1604-test
   tasks:
   - .compression !.zstd
@@ -11980,7 +11980,7 @@ buildvariants:
   display_name: Windows (VS 2015)
   expansions:
     CC: Visual Studio 14 2015 Win64
-    libmongocrypt_url: https://s3.amazonaws.com/mciuploads/libmongocrypt/windows-test/master/latest/5dc1a5670ae60653b20f8bbf/libmongocrypt.tar.gz
+    libmongocrypt_variant: windows-test
   run_on: windows-64-vs2015-compile
   tasks:
   - .compression !.snappy !.zstd
@@ -12217,7 +12217,7 @@ buildvariants:
   display_name: ASAN Tests (Ubuntu 16.04)
   expansions:
     CC: clang
-    libmongocrypt_url: https://s3.amazonaws.com/mciuploads/libmongocrypt/ubuntu1604/master/latest/5dc1a5670ae60653b20f8bbf/libmongocrypt.tar.gz
+    libmongocrypt_variant: ubuntu1604
   run_on: ubuntu1604-test
   tasks:
   - .debug-compile .asan-clang
