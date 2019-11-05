@@ -1186,6 +1186,32 @@ tasks:
         export SSL="OPENSSL"
         CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
+- name: debug-compile-sasl-openssl-cse
+  tags:
+  - debug-compile
+  - openssl
+  - sasl
+  - client-side-encryption
+  commands:
+  - func: fetch build
+    vars:
+      BUILD_NAME: debug-compile-sasl-openssl
+  - command: shell.exec
+      type: test
+      params:
+        working_dir: mongoc
+        script: |-
+          set -o errexit
+          set -o xtrace
+          export DEBUG="ON"
+          export SASL="AUTO"
+          export SSL="OPENSSL"
+          # mock server tests were already run without CSE.
+          export SKIP_TESTS="ON"
+          export COMPILE_LIBMONGOCRYPT="ON"
+          CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+  
+  - func: upload build
 - name: debug-compile-sasl-darwinssl
   tags:
   - darwinssl

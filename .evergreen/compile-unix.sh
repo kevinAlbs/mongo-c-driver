@@ -188,6 +188,16 @@ export PATH=$INSTALL_DIR/bin:$PATH
 echo "OpenSSL Version:"
 pkg-config --modversion libssl || true
 
+if [ "$COMPILE_LIBMONGOCRYPT" = "ON" ]; then
+   # Build libmongocrypt, using the previously fetched installed source.
+   git clone https://github.com/mongodb/libmongocrypt.git
+   mkdir libmongocrypt/cmake-build
+   cd libmongocrypt/cmake-build
+   $CMAKE -DENABLE_SHARED_BSON=ON -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR" ../
+   make install
+   cd ../../
+fi
+
 if [ "$ANALYZE" = "ON" ]; then
    # Clang static analyzer, available on Ubuntu 16.04 images.
    # https://clang-analyzer.llvm.org/scan-build.html
@@ -210,6 +220,9 @@ openssl md5 README.rst || true
 
 ulimit -c unlimited || true
 
+if [ "$ANALYZE" != "ON" ]; then
+   make -j8 install
+fi
 
 # We are done here if we don't want to run the tests.
 if [ "$SKIP_TESTS" = "ON" ]; then
