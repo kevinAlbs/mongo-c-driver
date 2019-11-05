@@ -1322,7 +1322,6 @@ set_auto_encryption_opts (mongoc_client_t *client, bson_t *test)
    }
    
    if (test_framework_getenv_bool ("MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN") && !bson_iter_init_find (&iter, &extra, "mongocryptdBypassSpawn")) {
-      printf ("bypassing spawn\n");
       /* forking is disallowed in test runner, bypass spawning mongocryptd and assume it is running in the background. */
       BSON_APPEND_BOOL (&extra, "mongocryptdBypassSpawn", true);
    }

@@ -7,10 +7,10 @@ set_path ()
       cygwin*)
          export PATH=$PATH:`pwd`/src/libbson/Debug
          export PATH=$PATH:`pwd`/src/libbson/Release
-         export PATH=$PATH:$LIBMONGOCRYPT_PATH
+         export PATH=$PATH:`pwd`/install-dir/bin
          chmod +x src/libmongoc/Debug/* src/libbson/Debug/* || true
          chmod +x src/libmongoc/Release/* src/libbson/Release/* || true
-         chmod +x $LIBMONGOCRYPT_PATH/lib/* || true
+         chmod +x `pwd`/install-dir/bin/* || true
          ;;
 
       darwin)

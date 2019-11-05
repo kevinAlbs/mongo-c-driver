@@ -414,13 +414,13 @@ functions:
         export DNS=${DNS}
         export CLIENT_SIDE_ENCRYPTION=${CLIENT_SIDE_ENCRYPTION}
         export ASAN=${ASAN}
-        export LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt
-        if [ "${CLIENT_SIDE_ENCRYPTION}" = "on" ]; then
-          set +o xtrace
-          export MONGOC_TEST_AWS_SECRET_ACCESS_KEY="${client_side_encryption_aws_secret_access_key}"
-          export MONGOC_TEST_AWS_ACCESS_KEY_ID="${client_side_encryption_aws_access_key_id}"
-          set -o xtrace
-        fi
+        # Do not output credentials.
+        set +o xtrace
+        set +o errexit
+        export MONGOC_TEST_AWS_SECRET_ACCESS_KEY="${client_side_encryption_aws_secret_access_key}"
+        export MONGOC_TEST_AWS_ACCESS_KEY_ID="${client_side_encryption_aws_access_key_id}"
+        set -o errexit
+        set -o xtrace
         sh .evergreen/run-tests.sh
   run tests bson:
   - command: shell.exec
@@ -618,7 +618,7 @@ functions:
     ignore_standard_error: true
     params:
       script: |-
-        if [ "${libmongocrypt_variant}" = "" ]; then
+        if [ "${libmongocrypt_url}" = "" ]; then
            echo "libmongocrypt not available for platform"
            exit 1
         fi
@@ -626,7 +626,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: libmongocrypt/${libmongocrypt_variant}/master/latest/libmongocrypt.tar.gz
+      remote_file: ${libmongocrypt_url}
       bucket: mciuploads
       local_file: libmongocrypt.tar.gz
   - command: archive.targz_extract
@@ -637,15 +637,17 @@ functions:
     type: test
     params:
       script: |-
-        # It's tricky on Windows to refer to the path inside MCI.
-        # And on POSIX we don't have permissions outside of home directory.
-        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-        case "$OS" in
-          cygwin*)
-              mv libmongocrypt /cygdrive/c/
-          ;;
-        esac
-    
+        set -o xtrace
+
+        # Copy just the files we need.
+        mkdir -p ./mongoc/install-dir/bin/
+        mkdir -p ./mongoc/install-dir/lib/
+        mkdir -p ./mongoc/install-dir/include/
+        cp -R libmongocrypt/shared_bson/bin/* ./mongoc/install-dir/bin/
+        cp -R libmongocrypt/shared_bson/lib/* ./mongoc/install-dir/lib/
+        cp -R libmongocrypt/shared_bson/lib64/* ./mongoc/install-dir/lib/
+        cp -R libmongocrypt/shared_bson/include/* ./mongoc/install-dir/include
+
 pre:
 - func: fetch source
 - func: windows fix
@@ -970,7 +972,7 @@ tasks:
         export SNAPPY="OFF"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-asan-gcc
   tags:
@@ -1015,7 +1017,7 @@ tasks:
         export SSL="OPENSSL"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-ubsan
   tags:
@@ -1182,7 +1184,7 @@ tasks:
         export DEBUG="ON"
         export SASL="AUTO"
         export SSL="OPENSSL"
-        LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-darwinssl
   tags:
@@ -1200,7 +1202,7 @@ tasks:
         export DEBUG="ON"
         export SASL="AUTO"
         export SSL="DARWIN"
-        LIBMONGOCRYPT_PATH=${workdir}/libmongocrypt CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-winssl
   tags:
@@ -1287,7 +1289,7 @@ tasks:
         export SSL="WINDOWS"
         echo "workdir is ${workdir}"
         echo "for now, use the full C path, but later I'll have to figure this out."
-        LIBMONGOCRYPT_PATH="C:/$(pwd)/../libmongocrypt" CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-nosrv
   tags:
@@ -2487,7 +2489,6 @@ tasks:
       AUTH: auth
       SSL: openssl
       VALGRIND: 'off'
-      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-asan-latest-server-noauth-nosasl-nossl
   tags:
   - test-asan
@@ -2510,7 +2511,6 @@ tasks:
       AUTH: noauth
       SSL: nossl
       VALGRIND: 'off'
-      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-asan-latest-replica-set-auth-nosasl-openssl
   tags:
   - test-asan
@@ -4214,7 +4214,6 @@ tasks:
       AUTH: auth
       SSL: openssl
       VALGRIND: 'off'
-      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-latest-server-auth-sasl-darwinssl
   tags:
   - auth
@@ -4290,7 +4289,6 @@ tasks:
       AUTH: auth
       SSL: winssl
       VALGRIND: 'off'
-      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-latest-server-auth-nosasl-openssl
   tags:
   - auth
@@ -4392,7 +4390,6 @@ tasks:
       AUTH: noauth
       SSL: openssl
       VALGRIND: 'off'
-      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-latest-server-noauth-sasl-darwinssl
   tags:
   - darwinssl
@@ -4418,7 +4415,6 @@ tasks:
       AUTH: noauth
       SSL: darwinssl
       VALGRIND: 'off'
-      CLIENT_SIDE_ENCRYPTION: 'on'
 - name: test-latest-server-noauth-sasl-winssl
   tags:
   - latest
@@ -11786,7 +11782,7 @@ buildvariants:
   display_name: clang 3.8 (Ubuntu 16.04)
   expansions:
     CC: clang
-    libmongocrypt_variant: ubuntu1604
+    libmongocrypt_url: https://s3.amazonaws.com/mciuploads/libmongocrypt/ubuntu1604/master/latest/5dc1a5670ae60653b20f8bbf/libmongocrypt.tar.gz
   run_on: ubuntu1604-test
   tasks:
   - .compression !.zstd
@@ -11958,7 +11954,6 @@ buildvariants:
   display_name: '*Darwin, macOS (Apple LLVM)'
   expansions:
     CC: clang
-    libmongocrypt_variant: macos
   run_on: macos-1012
   tasks:
   - .compression !.snappy !.zstd
@@ -11988,7 +11983,7 @@ buildvariants:
   display_name: Windows (VS 2015)
   expansions:
     CC: Visual Studio 14 2015 Win64
-    libmongocrypt_variant: windows-test
+    libmongocrypt_url: https://s3.amazonaws.com/mciuploads/libmongocrypt/windows-test/master/latest/5dc1a5670ae60653b20f8bbf/libmongocrypt.tar.gz
   run_on: windows-64-vs2015-compile
   tasks:
   - .compression !.snappy !.zstd

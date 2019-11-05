@@ -73,7 +73,7 @@ DIR=$(dirname $0)
 
 check_mongocryptd() {
    mongocryptd --version
-   if [ "$ASAN" = "on" -a "$CLIENT_SIDE_ENCRYPTION" = "on" ]; then
+   if [ "$ASAN" = "on" ]; then
       # ASAN does not play well with spawned processes. In addition to --no-fork, do not spawn mongocryptd
       # for client-side encryption tests.
       export "MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN=on"
