@@ -23,6 +23,7 @@
 
 /* Forward declare */
 struct _mongoc_client_t;
+struct _mongoc_client_pool_t;
 
 BSON_BEGIN_DECLS
 
@@ -37,6 +38,10 @@ mongoc_auto_encryption_opts_destroy (mongoc_auto_encryption_opts_t *opts);
 MONGOC_EXPORT (void)
 mongoc_auto_encryption_opts_set_key_vault_client (
    mongoc_auto_encryption_opts_t *opts, struct _mongoc_client_t *client);
+
+MONGOC_EXPORT (void)
+mongoc_auto_encryption_opts_set_key_vault_client_pool (
+   mongoc_auto_encryption_opts_t *opts, struct _mongoc_client_pool_t *pool);
 
 MONGOC_EXPORT (void)
 mongoc_auto_encryption_opts_set_key_vault_namespace (

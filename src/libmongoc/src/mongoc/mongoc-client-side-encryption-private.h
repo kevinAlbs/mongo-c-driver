@@ -20,6 +20,7 @@
 #define MONGOC_CLIENT_SIDE_ENCRYPTION_PRIVATE_H
 
 #include "mongoc/mongoc-client.h"
+#include "mongoc/mongoc-client-pool.h"
 #include "mongoc/mongoc-client-side-encryption.h"
 #include "mongoc/mongoc-cmd-private.h"
 #include "bson/bson.h"
@@ -43,6 +44,12 @@ _mongoc_cse_auto_decrypt (mongoc_client_t *client,
 bool
 _mongoc_cse_enable_auto_encryption (
    mongoc_client_t *client,
+   mongoc_auto_encryption_opts_t *opts /* may be NULL */,
+   bson_error_t *error);
+
+bool
+_mongoc_pool_cse_enable_auto_encryption (
+   mongoc_client_pool_t *pool,
    mongoc_auto_encryption_opts_t *opts /* may be NULL */,
    bson_error_t *error);
 

@@ -329,6 +329,14 @@ test_bson_size_limits_and_batch_splitting (void *unused)
 }
 
 
+static void
+test_invalid__single_and_pool_mismatches (void* unused) {
+   /* Test calling mongoc_client_enable_auto_encryption on a client derived from a pool. */
+   /* Test setting key_vault_client_pool on a single threaded client. */
+   /* Test setting key_vault_client on a client pool. */
+   /* TODO. */
+}
+
 void
 test_client_side_encryption_install (TestSuite *suite)
 {
@@ -340,10 +348,18 @@ test_client_side_encryption_install (TestSuite *suite)
       resolved,
       test_client_side_encryption_cb,
       test_framework_skip_if_no_client_side_encryption);
+   // TestSuite_AddFull (
+   //    suite,
+   //    "/client_side_encryption/bson_size_limits_and_batch_splitting",
+   //    test_bson_size_limits_and_batch_splitting,
+   //    NULL,
+   //    NULL,
+   //    test_framework_skip_if_no_client_side_encryption,
+   //    test_framework_skip_if_max_wire_version_less_than_8);
    TestSuite_AddFull (
       suite,
-      "/client_side_encryption/bson_size_limits_and_batch_splitting",
-      test_bson_size_limits_and_batch_splitting,
+      "/client_side_encryption/single_and_pool_mismatches",
+      test_invalid__single_and_pool_mismatches,
       NULL,
       NULL,
       test_framework_skip_if_no_client_side_encryption,

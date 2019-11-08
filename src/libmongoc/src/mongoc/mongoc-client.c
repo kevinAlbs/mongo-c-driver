@@ -1141,7 +1141,8 @@ mongoc_client_destroy (mongoc_client_t *client)
 #endif
 
 #ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
-      mongoc_collection_destroy (client->key_vault_coll);
+      bson_free (client->key_vault_db);
+      bson_free (client->key_vault_coll);
       mongoc_client_destroy (client->mongocryptd_client);
       mongocrypt_destroy (client->crypt);
 #endif

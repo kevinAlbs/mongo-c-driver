@@ -114,8 +114,10 @@ struct _mongoc_client_t {
 
 #ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
    mongocrypt_t *crypt;
-   mongoc_client_t *mongocryptd_client;
-   struct _mongoc_collection_t *key_vault_coll;
+   struct _mongoc_client_t *mongocryptd_client;
+   struct _mongoc_client_t *key_vault_client;
+   char *key_vault_db;
+   char *key_vault_coll;
    bool bypass_auto_encryption;
 #endif
 };
