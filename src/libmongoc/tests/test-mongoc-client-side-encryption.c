@@ -187,6 +187,7 @@ test_bson_size_limits_and_batch_splitting (void *unused)
          coll, datakey, NULL /* opts */, NULL /* reply */, &error),
       error);
 
+   mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
    client = mongoc_client_new_from_uri (uri);
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
@@ -205,7 +206,6 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    mongoc_apm_set_command_started_cb (callbacks, _command_started);
    mongoc_client_set_apm_callbacks (client, callbacks, &ctx);
 
-   mongoc_collection_destroy (coll);
    coll = mongoc_client_get_collection (client, "db", "coll");
 
    /* Insert { "_id": "over_2mib_under_16mib", "unencrypted": <the string "a"

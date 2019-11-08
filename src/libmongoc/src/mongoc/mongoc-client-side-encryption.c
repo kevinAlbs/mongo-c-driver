@@ -987,11 +987,35 @@ _uri_construction_error (bson_error_t *error)
                    "Error constructing URI to mongocryptd");
 }
 
-bool
-_mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
-                                    mongoc_auto_encryption_opts_t *opts,
-                                    bson_error_t *error)
-{
+/* Initial state shared when enabling automatic encryption on pooled and single threaded clients
+ */
+typedef struct {
+   bool bypass_auto_encryption;
+   mongoc_uri_t* mongocryptd_uri;
+   bool mongocryptd_bypass_spawn;
+   const char *mongocryptd_spawn_path;
+   bson_iter_t mongocryptd_spawn_args;
+   bool has_spawn_args;
+   mongocrypt_t *crypt;
+} _auto_encrypt_t;
+
+static _auto_encrypt_t*
+_auto_encrypt_new (void) {
+   return bson_malloc0 (sizeof (_auto_encrypt_t));
+}
+
+static void
+_auto_encrypt_destroy (_auto_encrypt_t * auto_encrypt) {
+   if (!auto_encrypt) {
+      return;
+   }
+   mongoc_uri_destroy (auto_encrypt->mongocryptd_uri);
+   mongocrypt_destroy (auto_encrypt->crypt);
+   bson_free (auto_encrypt);
+}
+
+static bool
+_auto_encrypt_init (mongoc_auto_encryption_opts_t *opts, _auto_encrypt_t* auto_encrypt, bson_error_t *error) {
    bson_iter_t iter;
    bool ret = false;
    mongocrypt_binary_t *local_masterkey_bin = NULL;
@@ -999,24 +1023,6 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
    mongoc_uri_t *mongocryptd_uri = NULL;
 
    ENTRY;
-
-
-   if (!client->topology->single_threaded) {
-      bson_set_error (
-         error,
-         MONGOC_ERROR_CLIENT,
-         MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
-         "Automatic encryption on pooled clients must be set on the pool");
-      goto fail;
-   }
-
-   if (client->cse_enabled) {
-      bson_set_error (error,
-                      MONGOC_ERROR_CLIENT,
-                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                      "Automatic encryption already set");
-      goto fail;
-   }
 
    if (!opts) {
       bson_set_error (error,
@@ -1043,30 +1049,25 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
       goto fail;
    }
 
-   client->cse_enabled = true;
-   client->bypass_auto_encryption = opts->bypass_auto_encryption;
+   auto_encrypt->bypass_auto_encryption = opts->bypass_auto_encryption;
 
-   if (!client->bypass_auto_encryption) {
+   if (!auto_encrypt->bypass_auto_encryption) {
       /* Spawn mongocryptd if needed, and create a client to it. */
-      bool mongocryptd_bypass_spawn = false;
-      const char *mongocryptd_spawn_path = NULL;
-      bson_iter_t mongocryptd_spawn_args;
-      bool has_spawn_args = false;
 
       if (opts->extra) {
          if (bson_iter_init_find (
                 &iter, opts->extra, "mongocryptdBypassSpawn") &&
              bson_iter_as_bool (&iter)) {
-            mongocryptd_bypass_spawn = true;
+            auto_encrypt->mongocryptd_bypass_spawn = true;
          }
          if (bson_iter_init_find (&iter, opts->extra, "mongocryptdSpawnPath") &&
              BSON_ITER_HOLDS_UTF8 (&iter)) {
-            mongocryptd_spawn_path = bson_iter_utf8 (&iter, NULL);
+            auto_encrypt->mongocryptd_spawn_path = bson_iter_utf8 (&iter, NULL);
          }
          if (bson_iter_init_find (&iter, opts->extra, "mongocryptdSpawnArgs") &&
              BSON_ITER_HOLDS_ARRAY (&iter)) {
-            memcpy (&mongocryptd_spawn_args, &iter, sizeof (bson_iter_t));
-            has_spawn_args = true;
+            memcpy (&auto_encrypt->mongocryptd_spawn_args, &iter, sizeof (bson_iter_t));
+            auto_encrypt->has_spawn_args = true;
          }
 
          if (bson_iter_init_find (&iter, opts->extra, "mongocryptdURI")) {
@@ -1077,7 +1078,7 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
                                "Expected string for option 'mongocryptdURI'");
                goto fail;
             }
-            mongocryptd_uri =
+            auto_encrypt->mongocryptd_uri =
                mongoc_uri_new_with_error (bson_iter_utf8 (&iter, NULL), error);
             if (!mongocryptd_uri) {
                goto fail;
@@ -1085,77 +1086,31 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
          }
       }
 
-      if (!mongocryptd_bypass_spawn) {
-         if (!_mongoc_fle_spawn_mongocryptd (
-                mongocryptd_spawn_path,
-                has_spawn_args ? &mongocryptd_spawn_args : NULL,
-                error)) {
-            goto fail;
-         }
-      }
-
-      if (!mongocryptd_uri) {
+      if (!auto_encrypt->mongocryptd_uri) {
          /* Always default to connecting to TCP, despite spec v1.0.0. Because
           * starting mongocryptd when one is running removes the domain socket
           * file per SERVER-41029. Connecting over TCP is more reliable.
           */
-         mongocryptd_uri =
+         auto_encrypt->mongocryptd_uri =
             mongoc_uri_new_with_error ("mongodb://localhost:27020", error);
 
-         if (!mongocryptd_uri) {
+         if (!auto_encrypt->mongocryptd_uri) {
             goto fail;
          }
 
          if (!mongoc_uri_set_option_as_int32 (
-                mongocryptd_uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 5000)) {
+                auto_encrypt->mongocryptd_uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 5000)) {
             _uri_construction_error (error);
             goto fail;
          }
       }
-
-      /* By default, single threaded clients set serverSelectionTryOnce to
-       * true, which means server selection fails if a topology scan fails
-       * the first time (i.e. it will not make repeat attempts until
-       * serverSelectionTimeoutMS expires). Override this, since the first
-       * attempt to connect to mongocryptd may fail when spawning, as it
-       * takes some time for mongocryptd to listen on sockets. */
-      if (!mongoc_uri_set_option_as_bool (
-             mongocryptd_uri, MONGOC_URI_SERVERSELECTIONTRYONCE, false)) {
-         _uri_construction_error (error);
-         goto fail;
-      }
-
-      client->mongocryptd_client = mongoc_client_new_from_uri (mongocryptd_uri);
-
-      if (!client->mongocryptd_client) {
-         bson_set_error (error,
-                         MONGOC_ERROR_CLIENT,
-                         MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                         "Unable to create client to mongocryptd");
-         goto fail;
-      }
-      /* Similarly, single threaded clients will by default wait for 5 second
-       * cooldown period after failing to connect to a server before making
-       * another attempt. Meaning if the first attempt to mongocryptd fails
-       * to connect, then the user observes a 5 second delay. This is not
-       * configurable in the URI, so override. */
-      _mongoc_topology_bypass_cooldown (client->mongocryptd_client->topology);
-   }
-
-   /* Get the key vault collection. */
-   if (opts->key_vault_client) {
-      client->key_vault_coll = mongoc_client_get_collection (
-         opts->key_vault_client, opts->db, opts->coll);
-   } else {
-      client->key_vault_coll =
-         mongoc_client_get_collection (client, opts->db, opts->coll);
    }
 
    /* Create the handle to libmongocrypt. */
-   client->crypt = mongocrypt_new ();
+   auto_encrypt->crypt = mongocrypt_new ();
 
    mongocrypt_setopt_log_handler (
-      client->crypt, _log_callback, NULL /* context */);
+      auto_encrypt->crypt, _log_callback, NULL /* context */);
 
    /* Take options from the kms_providers map. */
    if (bson_iter_init_find (&iter, opts->kms_providers, "aws")) {
@@ -1185,12 +1140,12 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
       }
 
       /* libmongocrypt returns error if options are NULL. */
-      if (!mongocrypt_setopt_kms_provider_aws (client->crypt,
+      if (!mongocrypt_setopt_kms_provider_aws (auto_encrypt->crypt,
                                                aws_access_key_id,
                                                aws_access_key_id_len,
                                                aws_secret_access_key,
                                                aws_secret_access_key_len)) {
-         _crypt_check_error (client->crypt, error, true);
+         _crypt_check_error (auto_encrypt->crypt, error, true);
          goto fail;
       }
    }
@@ -1217,9 +1172,9 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
       }
 
       /* libmongocrypt returns error if options are NULL. */
-      if (!mongocrypt_setopt_kms_provider_local (client->crypt,
+      if (!mongocrypt_setopt_kms_provider_local (auto_encrypt->crypt,
                                                  local_masterkey_bin)) {
-         _crypt_check_error (client->crypt, error, true);
+         _crypt_check_error (auto_encrypt->crypt, error, true);
          goto fail;
       }
    }
@@ -1227,14 +1182,14 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
    if (opts->schema_map) {
       schema_map_bin = mongocrypt_binary_new_from_data (
          (uint8_t *) bson_get_data (opts->schema_map), opts->schema_map->len);
-      if (!mongocrypt_setopt_schema_map (client->crypt, schema_map_bin)) {
-         _crypt_check_error (client->crypt, error, true);
+      if (!mongocrypt_setopt_schema_map (auto_encrypt->crypt, schema_map_bin)) {
+         _crypt_check_error (auto_encrypt->crypt, error, true);
          goto fail;
       }
    }
 
-   if (!mongocrypt_init (client->crypt)) {
-      _crypt_check_error (client->crypt, error, true);
+   if (!mongocrypt_init (auto_encrypt->crypt)) {
+      _crypt_check_error (auto_encrypt->crypt, error, true);
       goto fail;
    }
 
@@ -1242,7 +1197,99 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
 fail:
    mongocrypt_binary_destroy (local_masterkey_bin);
    mongocrypt_binary_destroy (schema_map_bin);
-   mongoc_uri_destroy (mongocryptd_uri);
+   RETURN (ret);
+}
+
+
+bool
+_mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
+                                    mongoc_auto_encryption_opts_t *opts,
+                                    bson_error_t *error)
+{
+   bool ret = false;
+   _auto_encrypt_t* auto_encrypt = NULL;
+
+   ENTRY;
+
+   if (!client->topology->single_threaded) {
+      bson_set_error (
+         error,
+         MONGOC_ERROR_CLIENT,
+         MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+         "Automatic encryption on pooled clients must be set on the pool");
+      goto fail;
+   }
+
+   if (client->cse_enabled) {
+      bson_set_error (error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
+                      "Automatic encryption already set");
+      goto fail;
+   }
+
+   auto_encrypt = _auto_encrypt_new ();
+   if (!_auto_encrypt_init (opts, auto_encrypt, error)) {
+      goto fail;
+   }
+
+   /* Steal "crypt" */
+   client->crypt = auto_encrypt->crypt;
+   auto_encrypt->crypt = NULL;
+   client->cse_enabled = true;
+   client->bypass_auto_encryption = auto_encrypt->bypass_auto_encryption;
+
+   if (!auto_encrypt->bypass_auto_encryption) {
+      if (!auto_encrypt->mongocryptd_bypass_spawn) {
+         if (!_mongoc_fle_spawn_mongocryptd (
+                auto_encrypt->mongocryptd_spawn_path,
+                auto_encrypt->has_spawn_args ? &auto_encrypt->mongocryptd_spawn_args : NULL,
+                error)) {
+            goto fail;
+         }
+      }
+
+      /* By default, single threaded clients set serverSelectionTryOnce to
+       * true, which means server selection fails if a topology scan fails
+       * the first time (i.e. it will not make repeat attempts until
+       * serverSelectionTimeoutMS expires). Override this, since the first
+       * attempt to connect to mongocryptd may fail when spawning, as it
+       * takes some time for mongocryptd to listen on sockets. */
+      if (!mongoc_uri_set_option_as_bool (
+             auto_encrypt->mongocryptd_uri, MONGOC_URI_SERVERSELECTIONTRYONCE, false)) {
+         _uri_construction_error (error);
+         goto fail;
+      }
+
+      client->mongocryptd_client = mongoc_client_new_from_uri (auto_encrypt->mongocryptd_uri);
+
+      if (!client->mongocryptd_client) {
+         bson_set_error (error,
+                         MONGOC_ERROR_CLIENT,
+                         MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
+                         "Unable to create client to mongocryptd");
+         goto fail;
+      }
+      /* Similarly, single threaded clients will by default wait for 5 second
+       * cooldown period after failing to connect to a server before making
+       * another attempt. Meaning if the first attempt to mongocryptd fails
+       * to connect, then the user observes a 5 second delay. This is not
+       * configurable in the URI, so override. */
+      _mongoc_topology_bypass_cooldown (client->mongocryptd_client->topology);
+   }
+
+   /* Get the key vault collection. */
+   if (opts->key_vault_client) {
+      client->key_vault_coll = mongoc_client_get_collection (
+         opts->key_vault_client, opts->db, opts->coll);
+   } else {
+      client->key_vault_coll =
+         mongoc_client_get_collection (client, opts->db, opts->coll);
+   }
+
+   ret = true;
+fail:
+   _auto_encrypt_destroy (auto_encrypt);
    RETURN (ret);
 }
 
@@ -1489,6 +1536,7 @@ _mongoc_fle_spawn_mongocryptd (const char *mongocryptd_spawn_path,
    bool passed_idle_shutdown_timeout_secs = false;
    int num_args = 2; /* for leading "mongocrypt" and trailing NULL */
    int i;
+   bool ret;
 
    /* iterate once to get length and validate all are strings */
    if (mongocryptd_spawn_args) {
@@ -1539,7 +1587,9 @@ _mongoc_fle_spawn_mongocryptd (const char *mongocryptd_spawn_path,
    BSON_ASSERT (i == num_args - 1);
    args[i++] = NULL;
 
-   return _do_spawn (mongocryptd_spawn_path, args, error);
+   ret = _do_spawn (mongocryptd_spawn_path, args, error);
+   bson_free (args);
+   return ret;
 }
 
 #endif /* MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION */
