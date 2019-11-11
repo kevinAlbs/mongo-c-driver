@@ -2991,8 +2991,11 @@ mongoc_client_enable_auto_encryption (mongoc_client_t *client,
                                       bson_error_t *error)
 {
    if (!client->topology->single_threaded) {
-      MONGOC_ERROR ("Cannot enable auto encryption on a pooled client, use "
-                    "mongoc_client_pool_enable_auto_encryption");
+      bson_set_error (error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                      "Cannot enable auto encryption on a pooled client, use "
+                      "mongoc_client_pool_enable_auto_encryption");
       return false;
    }
    return _mongoc_cse_enable_auto_encryption (client, opts, error);

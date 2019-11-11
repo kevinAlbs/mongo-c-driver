@@ -457,8 +457,9 @@ mongoc_client_pool_set_appname (mongoc_client_pool_t *pool, const char *appname)
 
 bool
 mongoc_client_pool_enable_auto_encryption (mongoc_client_pool_t *pool,
-                                      mongoc_auto_encryption_opts_t *opts,
-                                      bson_error_t *error)
+                                           mongoc_auto_encryption_opts_t *opts,
+                                           bson_error_t *error)
 {
-   return _mongoc_pool_cse_enable_auto_encryption (pool, opts, error);
+   return _mongoc_topology_cse_enable_auto_encryption (
+      pool->topology, opts, error);
 }

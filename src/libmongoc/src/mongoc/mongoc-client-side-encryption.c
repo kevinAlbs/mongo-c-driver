@@ -17,6 +17,7 @@
 #define MONGOC_LOG_DOMAIN "client-side-encryption"
 
 #include "mongoc/mongoc-client-side-encryption-private.h"
+#include "mongoc/mongoc-topology-private.h"
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -48,6 +49,9 @@ mongoc_auto_encryption_opts_new (void)
 void
 mongoc_auto_encryption_opts_destroy (mongoc_auto_encryption_opts_t *opts)
 {
+   if (!opts) {
+      return;
+   }
    bson_destroy (opts->extra);
    bson_destroy (opts->kms_providers);
    bson_destroy (opts->schema_map);
@@ -477,7 +481,8 @@ _state_need_mongo_keys (mongoc_client_t *client,
    } else {
       key_vault_client = client;
    }
-   key_vault_coll = mongoc_client_get_collection (key_vault_client, client->key_vault_db, client->key_vault_coll);
+   key_vault_coll = mongoc_client_get_collection (
+      key_vault_client, client->key_vault_db, client->key_vault_coll);
    cursor = mongoc_collection_find_with_opts (
       key_vault_coll, &filter_bson, &opts, NULL /* read prefs */);
    /* 2. Feed all resulting documents back (if any) with repeated calls to
@@ -1332,12 +1337,35 @@ fail:
 }
 
 bool
-_mongoc_pool_cse_enable_auto_encryption (mongoc_client_pool_t *pool,
-                                         mongoc_auto_encryption_opts_t *opts,
-                                         bson_error_t *error)
+_mongoc_topology_cse_enable_auto_encryption (
+   mongoc_topology_t *topology,
+   mongoc_auto_encryption_opts_t *opts,
+   bson_error_t *error)
 {
+   bool ret = false;
+
    /* TODO */
-   return false;
+   if (opts->key_vault_client) {
+      bson_set_error (error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                      "The key vault client only applies to a single threaded "
+                      "client not a single threaded client. Set a key vault "
+                      "client pool");
+      goto fail;
+   }
+
+   if (topology->cse_enabled) {
+      bson_set_error (error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
+                      "Automatic encryption already set");
+      goto fail;
+   }
+
+   ret = true;
+fail:
+   return ret;
 }
 
 #ifdef _WIN32

@@ -23,6 +23,7 @@
 #include "mongoc/mongoc-client-pool.h"
 #include "mongoc/mongoc-client-side-encryption.h"
 #include "mongoc/mongoc-cmd-private.h"
+#include "mongoc/mongoc-topology-private.h"
 #include "bson/bson.h"
 
 /* cse is an abbreviation for "Client Side Encryption" */
@@ -48,8 +49,8 @@ _mongoc_cse_enable_auto_encryption (
    bson_error_t *error);
 
 bool
-_mongoc_pool_cse_enable_auto_encryption (
-   mongoc_client_pool_t *pool,
+_mongoc_topology_cse_enable_auto_encryption (
+   mongoc_topology_t *topology,
    mongoc_auto_encryption_opts_t *opts /* may be NULL */,
    bson_error_t *error);
 
