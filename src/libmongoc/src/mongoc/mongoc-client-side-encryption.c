@@ -1343,6 +1343,7 @@ _mongoc_topology_cse_enable_auto_encryption (
    bson_error_t *error)
 {
    bool ret = false;
+   _auto_encrypt_t *auto_encrypt = NULL;
 
    /* TODO */
    if (opts->key_vault_client) {
@@ -1361,6 +1362,49 @@ _mongoc_topology_cse_enable_auto_encryption (
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
                       "Automatic encryption already set");
       goto fail;
+   }
+
+   /* TODO: lock the mutex? */
+
+   auto_encrypt = _auto_encrypt_new ();
+   if (!_auto_encrypt_init (opts, auto_encrypt, error)) {
+      goto fail;
+   }
+
+   /* Steal "crypt" */
+   topology->crypt = auto_encrypt->crypt;
+   auto_encrypt->crypt = NULL;
+   topology->cse_enabled = true;
+   topology->bypass_auto_encryption = auto_encrypt->bypass_auto_encryption;
+
+   if (!auto_encrypt->bypass_auto_encryption) {
+      if (!auto_encrypt->mongocryptd_bypass_spawn) {
+         if (!_mongoc_fle_spawn_mongocryptd (
+                auto_encrypt->mongocryptd_spawn_path,
+                auto_encrypt->has_spawn_args
+                   ? &auto_encrypt->mongocryptd_spawn_args
+                   : NULL,
+                error)) {
+            goto fail;
+         }
+      }
+
+      topology->mongocryptd_client_pool =
+         mongoc_client_pool_new (auto_encrypt->mongocryptd_uri);
+
+      if (!client->mongocryptd_client_pool) {
+         bson_set_error (error,
+                         MONGOC_ERROR_CLIENT,
+                         MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
+                         "Unable to create client pool to mongocryptd");
+         goto fail;
+      }
+   }
+
+   topology->key_vault_db = bson_strdup (opts->db);
+   topology->key_vault_coll = bson_strdup (opts->coll);
+   if (opts->key_vault_client_pool) {
+      topology->key_vault_client_pool = opts->key_vault_client_pool;
    }
 
    ret = true;
