@@ -311,9 +311,62 @@ _bin_to_static_bson (mongocrypt_binary_t *bin, bson_t *out, bson_error_t *error)
    return true;
 }
 
+/* All the bits the state machine needs. */
+typedef struct {
+   mongocrypt_t *crypt;
+   mongoc_client_t *mongocryptd_client;
+   mongoc_client_t *key_vault_client;
+   mongoc_client_t *collinfo_client;
+   const char *key_vault_db;
+   const char *key_vault_coll;
+   bool bypass_auto_encryption;
+} _auto_encrypt_t;
+
+_auto_encrypt_t* _auto_encrypt_new (mongoc_client_t* client) {
+   _auto_encrypt_t *auto_encrypt;
+
+   auto_encrypt = bson_malloc0 (sizeof (*auto_encrypt));
+   if (client->topology->single_threaded) {
+      auto_encrypt->crypt = client->crypt;
+      auto_encrypt->mongocryptd_client = client->mongocryptd_client;
+      auto_encrypt->key_vault_client = client->key_vault_client;
+      if (!auto_encrypt->key_vault_client) {
+         auto_encrypt->key_vault_client = client;
+      }
+      auto_encrypt->collinfo_client = client;
+      auto_encrypt->key_vault_db = client->key_vault_db;
+      auto_encrypt->key_vault_coll = client->key_vault_coll;
+      auto_encrypt->bypass_auto_encryption = client->bypass_auto_encryption;
+   } else {
+      auto_encrypt->crypt = client->topology->crypt;
+      auto_encrypt->mongocryptd_client = mongoc_client_pool_pop (client->topology->mongocryptd_client_pool);
+      if (client->topology->key_vault_client_pool) {
+         auto_encrypt->key_vault_client = mongoc_client_pool_pop (client->topology->key_vault_client_pool);
+      } else {
+         auto_encrypt->key_vault_client = client;
+      }
+
+      auto_encrypt->collinfo_client = client;
+      auto_encrypt->key_vault_db = client->topology->key_vault_db;
+      auto_encrypt->key_vault_coll = client->topology->key_vault_coll;
+      auto_encrypt->bypass_auto_encryption = client->topology->bypass_auto_encryption;
+   }
+   return auto_encrypt;
+}
+
+void _auto_encrypt_destroy (_auto_encrypt_t *auto_encrypt, mongoc_client_t* client) {
+   if (!client->topology->single_threaded) {
+      mongoc_client_pool_push (client->topology->mongocryptd_client_pool, auto_encrypt->mongocryptd_client);
+      if (client->topology->key_vault_client_pool) {
+         mongoc_client_pool_push (client->topology->key_vault_client_pool, auto_encrypt->key_vault_client);
+      }
+   }
+   bson_free (auto_encrypt);
+}
+
 /* State handler MONGOCRYPT_CTX_NEED_MONGO_COLLINFO */
 static bool
-_state_need_mongo_collinfo (mongoc_client_t *client,
+_state_need_mongo_collinfo (_auto_encrypt_t *auto_encrypt,
                             const char *db_name,
                             mongocrypt_ctx_t *ctx,
                             bson_error_t *error)
@@ -340,7 +393,7 @@ _state_need_mongo_collinfo (mongoc_client_t *client,
    }
 
    bson_append_document (&opts, "filter", -1, &filter_bson);
-   db = mongoc_client_get_database (client, db_name);
+   db = mongoc_client_get_database (auto_encrypt->collinfo_client, db_name);
    cursor = mongoc_database_find_collections_with_opts (db, &opts);
    if (mongoc_cursor_error (cursor, error)) {
       goto fail;
@@ -378,7 +431,7 @@ fail:
 }
 
 static bool
-_state_need_mongo_markings (mongoc_client_t *client,
+_state_need_mongo_markings (_auto_encrypt_t *auto_encrypt,
                             mongocrypt_ctx_t *ctx,
                             bson_error_t *error)
 {
@@ -403,7 +456,7 @@ _state_need_mongo_markings (mongoc_client_t *client,
    /* 1. Use db.runCommand to run the command provided by
     * mongocrypt_ctx_mongo_op on the MongoClient connected to mongocryptd. */
    bson_destroy (&reply);
-   if (!mongoc_client_command_simple (client->mongocryptd_client,
+   if (!mongoc_client_command_simple (auto_encrypt->mongocryptd_client,
                                       "admin",
                                       &mongocryptd_cmd_bson,
                                       NULL /* read_prefs */,
@@ -436,7 +489,7 @@ fail:
 }
 
 static bool
-_state_need_mongo_keys (mongoc_client_t *client,
+_state_need_mongo_keys (_auto_encrypt_t *auto_encrypt,
                         mongocrypt_ctx_t *ctx,
                         bson_error_t *error)
 {
@@ -448,7 +501,6 @@ _state_need_mongo_keys (mongoc_client_t *client,
    const bson_t *key_bson;
    mongoc_cursor_t *cursor = NULL;
    mongoc_read_concern_t *rc = NULL;
-   mongoc_client_t *key_vault_client;
    mongoc_collection_t *key_vault_coll = NULL;
 
    /* 1. Use MongoCollection.find on the MongoClient connected to the key vault
@@ -476,13 +528,8 @@ _state_need_mongo_keys (mongoc_client_t *client,
       goto fail;
    }
 
-   if (client->key_vault_client) {
-      key_vault_client = client->key_vault_client;
-   } else {
-      key_vault_client = client;
-   }
    key_vault_coll = mongoc_client_get_collection (
-      key_vault_client, client->key_vault_db, client->key_vault_coll);
+      auto_encrypt->key_vault_client, auto_encrypt->key_vault_db, auto_encrypt->key_vault_coll);
    cursor = mongoc_collection_find_with_opts (
       key_vault_coll, &filter_bson, &opts, NULL /* read prefs */);
    /* 2. Feed all resulting documents back (if any) with repeated calls to
@@ -570,7 +617,7 @@ fail:
 }
 
 static bool
-_state_need_kms (mongoc_client_t *client,
+_state_need_kms (_auto_encrypt_t *auto_encrypt,
                  mongocrypt_ctx_t *ctx,
                  bson_error_t *error)
 {
@@ -598,7 +645,7 @@ _state_need_kms (mongoc_client_t *client,
       }
 
       tls_stream =
-         _get_stream (endpoint, client->cluster.sockettimeoutms, error);
+         _get_stream (endpoint, auto_encrypt->key_vault_client->cluster.sockettimeoutms, error);
       if (!tls_stream) {
          goto fail;
       }
@@ -607,7 +654,7 @@ _state_need_kms (mongoc_client_t *client,
       iov.iov_len = mongocrypt_binary_len (http_req);
 
       if (!_mongoc_stream_writev_full (
-             tls_stream, &iov, 1, client->cluster.sockettimeoutms, error)) {
+             tls_stream, &iov, 1, auto_encrypt->key_vault_client->cluster.sockettimeoutms, error)) {
          goto fail;
       }
 
@@ -627,7 +674,7 @@ _state_need_kms (mongoc_client_t *client,
                                         buf,
                                         bytes_needed,
                                         1 /* min_bytes. */,
-                                        client->cluster.sockettimeoutms);
+                                        auto_encrypt->key_vault_client->cluster.sockettimeoutms);
          if (read_ret == -1) {
             bson_set_error (error,
                             MONGOC_ERROR_STREAM,
@@ -675,8 +722,7 @@ fail:
 }
 
 static bool
-_state_ready (mongoc_client_t *client,
-              mongocrypt_ctx_t *ctx,
+_state_ready (mongocrypt_ctx_t *ctx,
               bson_t **result,
               bson_error_t *error)
 {
@@ -715,7 +761,7 @@ fail:
  * --------------------------------------------------------------------------
  */
 bool
-_mongoc_cse_run_state_machine (mongoc_client_t *client,
+_mongoc_cse_run_state_machine (_auto_encrypt_t *auto_encrypt,
                                const char *db_name,
                                mongocrypt_ctx_t *ctx,
                                bson_t **result,
@@ -732,27 +778,27 @@ _mongoc_cse_run_state_machine (mongoc_client_t *client,
          _ctx_check_error (ctx, error, true);
          goto fail;
       case MONGOCRYPT_CTX_NEED_MONGO_COLLINFO:
-         if (!_state_need_mongo_collinfo (client, db_name, ctx, error)) {
+         if (!_state_need_mongo_collinfo (auto_encrypt, db_name, ctx, error)) {
             goto fail;
          }
          break;
       case MONGOCRYPT_CTX_NEED_MONGO_MARKINGS:
-         if (!_state_need_mongo_markings (client, ctx, error)) {
+         if (!_state_need_mongo_markings (auto_encrypt, ctx, error)) {
             goto fail;
          }
          break;
       case MONGOCRYPT_CTX_NEED_MONGO_KEYS:
-         if (!_state_need_mongo_keys (client, ctx, error)) {
+         if (!_state_need_mongo_keys (auto_encrypt, ctx, error)) {
             goto fail;
          }
          break;
       case MONGOCRYPT_CTX_NEED_KMS:
-         if (!_state_need_kms (client, ctx, error)) {
+         if (!_state_need_kms (auto_encrypt, ctx, error)) {
             goto fail;
          }
          break;
       case MONGOCRYPT_CTX_READY:
-         if (!_state_ready (client, ctx, result, error)) {
+         if (!_state_ready (ctx, result, error)) {
             goto fail;
          }
          break;
@@ -808,7 +854,7 @@ _prep_for_auto_encryption (const mongoc_cmd_t *cmd, bson_t *out)
  *       True on success, false on error.
  *
  * Pre-conditions:
- *       CSE is enabled on client.
+ *       CSE is enabled on client or its associated client pool.
  *
  * Post-conditions:
  *       If return false, @error is set. @encrypted is always initialized.
@@ -833,18 +879,21 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client,
    bson_t cmd_bson = BSON_INITIALIZER;
    bson_t *result = NULL;
    bson_iter_t iter;
+   _auto_encrypt_t* auto_encrypt;
 
    ENTRY;
 
    bson_init (encrypted);
+   /* TODO: push this logic into auto_encrypt class? */
+   auto_encrypt = _auto_encrypt_new (client);
 
-   if (client->bypass_auto_encryption) {
+   if (auto_encrypt->bypass_auto_encryption) {
       memcpy (encrypted_cmd, cmd, sizeof (mongoc_cmd_t));
       bson_destroy (&cmd_bson);
       return true;
    }
 
-   if (!client->bypass_auto_encryption &&
+   if (!auto_encrypt->bypass_auto_encryption &&
        cmd->server_stream->sd->max_wire_version < WIRE_VERSION_CSE) {
       bson_set_error (
          error,
@@ -856,9 +905,9 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client,
    }
 
    /* Create the context for the operation. */
-   ctx = mongocrypt_ctx_new (client->crypt);
+   ctx = mongocrypt_ctx_new (auto_encrypt->crypt);
    if (!ctx) {
-      _crypt_check_error (client->crypt, error, true);
+      _crypt_check_error (auto_encrypt->crypt, error, true);
       goto fail;
    }
 
@@ -874,7 +923,7 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client,
    }
 
    if (!_mongoc_cse_run_state_machine (
-          client, cmd->db_name, ctx, &result, error)) {
+          auto_encrypt, cmd->db_name, ctx, &result, error)) {
       goto fail;
    }
 
@@ -904,6 +953,7 @@ fail:
    bson_destroy (&cmd_bson);
    mongocrypt_binary_destroy (cmd_bin);
    mongocrypt_ctx_destroy (ctx);
+   _auto_encrypt_destroy (auto_encrypt, client);
    RETURN (ret);
 }
 
@@ -935,14 +985,17 @@ _mongoc_cse_auto_decrypt (mongoc_client_t *client,
    mongocrypt_binary_t *reply_bin = NULL;
    bool ret = false;
    bson_t *result = NULL;
+   _auto_encrypt_t* auto_encrypt;
 
    ENTRY;
    bson_init (decrypted);
 
+   auto_encrypt = _auto_encrypt_new (client);
+
    /* Create the context for the operation. */
-   ctx = mongocrypt_ctx_new (client->crypt);
+   ctx = mongocrypt_ctx_new (auto_encrypt->crypt);
    if (!ctx) {
-      _crypt_check_error (client->crypt, error, true);
+      _crypt_check_error (auto_encrypt->crypt, error, true);
       goto fail;
    }
 
@@ -953,7 +1006,7 @@ _mongoc_cse_auto_decrypt (mongoc_client_t *client,
       goto fail;
    }
 
-   if (!_mongoc_cse_run_state_machine (client, db_name, ctx, &result, error)) {
+   if (!_mongoc_cse_run_state_machine (auto_encrypt, db_name, ctx, &result, error)) {
       goto fail;
    }
 
@@ -969,6 +1022,7 @@ fail:
    bson_destroy (result);
    mongocrypt_binary_destroy (reply_bin);
    mongocrypt_ctx_destroy (ctx);
+   _auto_encrypt_destroy (auto_encrypt, client);
    RETURN (ret);
 }
 
@@ -1021,16 +1075,16 @@ typedef struct {
    bson_iter_t mongocryptd_spawn_args;
    bool has_spawn_args;
    mongocrypt_t *crypt;
-} _auto_encrypt_t;
+} _auto_encrypt_init_t;
 
-static _auto_encrypt_t *
-_auto_encrypt_new (void)
+static _auto_encrypt_init_t *
+_auto_encrypt_init_new (void)
 {
-   return bson_malloc0 (sizeof (_auto_encrypt_t));
+   return bson_malloc0 (sizeof (_auto_encrypt_init_t));
 }
 
 static void
-_auto_encrypt_destroy (_auto_encrypt_t *auto_encrypt)
+_auto_encrypt_init_destroy (_auto_encrypt_init_t *auto_encrypt)
 {
    if (!auto_encrypt) {
       return;
@@ -1042,7 +1096,7 @@ _auto_encrypt_destroy (_auto_encrypt_t *auto_encrypt)
 
 static bool
 _auto_encrypt_init (mongoc_auto_encryption_opts_t *opts,
-                    _auto_encrypt_t *auto_encrypt,
+                    _auto_encrypt_init_t *auto_encrypt,
                     bson_error_t *error)
 {
    bson_iter_t iter;
@@ -1240,7 +1294,7 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
                                     bson_error_t *error)
 {
    bool ret = false;
-   _auto_encrypt_t *auto_encrypt = NULL;
+   _auto_encrypt_init_t *auto_encrypt = NULL;
 
    ENTRY;
 
@@ -1270,7 +1324,7 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
       goto fail;
    }
 
-   auto_encrypt = _auto_encrypt_new ();
+   auto_encrypt = _auto_encrypt_init_new ();
    if (!_auto_encrypt_init (opts, auto_encrypt, error)) {
       goto fail;
    }
@@ -1332,7 +1386,7 @@ _mongoc_cse_enable_auto_encryption (mongoc_client_t *client,
 
    ret = true;
 fail:
-   _auto_encrypt_destroy (auto_encrypt);
+   _auto_encrypt_init_destroy (auto_encrypt);
    RETURN (ret);
 }
 
@@ -1343,7 +1397,7 @@ _mongoc_topology_cse_enable_auto_encryption (
    bson_error_t *error)
 {
    bool ret = false;
-   _auto_encrypt_t *auto_encrypt = NULL;
+   _auto_encrypt_init_t *auto_encrypt = NULL;
 
    /* TODO */
    if (opts->key_vault_client) {
@@ -1366,7 +1420,7 @@ _mongoc_topology_cse_enable_auto_encryption (
 
    /* TODO: lock the mutex? */
 
-   auto_encrypt = _auto_encrypt_new ();
+   auto_encrypt = _auto_encrypt_init_new ();
    if (!_auto_encrypt_init (opts, auto_encrypt, error)) {
       goto fail;
    }
@@ -1392,7 +1446,7 @@ _mongoc_topology_cse_enable_auto_encryption (
       topology->mongocryptd_client_pool =
          mongoc_client_pool_new (auto_encrypt->mongocryptd_uri);
 
-      if (!client->mongocryptd_client_pool) {
+      if (!topology->mongocryptd_client_pool) {
          bson_set_error (error,
                          MONGOC_ERROR_CLIENT,
                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
@@ -1409,6 +1463,7 @@ _mongoc_topology_cse_enable_auto_encryption (
 
    ret = true;
 fail:
+   _auto_encrypt_init_destroy (auto_encrypt);
    return ret;
 }
 

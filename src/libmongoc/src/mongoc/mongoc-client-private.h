@@ -109,7 +109,7 @@ struct _mongoc_client_t {
 
    uint32_t generation;
 
-   /* Is client side encryption enabled? */
+   /* Is client side encryption enabled? If it is enabled on the pool, then this is set to true, but other CSE options are on the topology */
    bool cse_enabled;
 
 #ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION

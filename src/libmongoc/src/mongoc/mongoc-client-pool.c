@@ -227,6 +227,10 @@ _initialize_new_client (mongoc_client_pool_t *pool, mongoc_client_t *client)
       mongoc_client_set_ssl_opts (client, &pool->ssl_opts);
    }
 #endif
+
+   if (pool->topology->cse_enabled) {
+      client->cse_enabled = true;
+   }
 }
 
 mongoc_client_t *

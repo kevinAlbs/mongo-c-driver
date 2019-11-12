@@ -488,6 +488,77 @@ test_invalid_single_and_pool_mismatches (void *unused)
 }
 
 /* TODO Then implement a multi-threaded test. */
+/* Also test with external key vault client pool. */
+static void
+test_multi_threaded (void* unused)
+{
+   mongoc_uri_t *uri;
+   mongoc_client_pool_t *pool;
+   mongoc_client_t *client;
+   mongoc_auto_encryption_opts_t *opts;
+   bson_t *datakey;
+   mongoc_collection_t *coll;
+   bson_t *schema;
+   bson_t *schema_map;
+   bool ret;
+   bson_error_t error;
+   bson_t *kms_providers;
+
+   uri = test_framework_get_uri ();
+   pool = mongoc_client_pool_new (uri);
+   client = mongoc_client_new_from_uri (uri);
+   opts = mongoc_auto_encryption_opts_new ();
+
+   coll = mongoc_client_get_collection (client, "db", "keyvault");
+   (void) mongoc_collection_drop (coll, NULL);
+   datakey = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/limits-key.json");
+   BSON_ASSERT (datakey);
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (
+         coll, datakey, NULL /* opts */, NULL /* reply */, &error),
+      error);
+
+   mongoc_client_destroy (client);
+
+   /* create pool with auto encryption */
+   if (test_framework_getenv_bool ("MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN")) {
+      bson_t *extra;
+
+      extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
+      mongoc_auto_encryption_opts_set_extra (opts, extra);
+      bson_destroy (extra);
+   }
+
+   mongoc_auto_encryption_opts_set_key_vault_namespace (opts, "db", "keyvault");
+   kms_providers = BCON_NEW (
+      "local", "{", "key", BCON_BIN (0, (uint8_t *) LOCAL_MASTERKEY, 96), "}");
+   mongoc_auto_encryption_opts_set_kms_providers (opts, kms_providers);
+
+   schema = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/schema.json");
+   BSON_ASSERT (schema);
+   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT(schema));
+   mongoc_auto_encryption_opts_set_schema_map (opts, schema_map);
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+
+   client = mongoc_client_pool_pop (pool);
+   mongoc_collection_destroy (coll);
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   ret = mongoc_collection_insert_one (coll, tmp_bson ("{'encrypted_string': 'abc'}"), NULL, NULL, &error);
+   ASSERT_OR_PRINT (ret, error);
+
+   mongoc_collection_destroy (coll);
+   mongoc_client_pool_push (pool, client);
+   mongoc_client_pool_destroy (pool);
+   bson_destroy (schema);
+   bson_destroy (schema_map);
+   bson_destroy (datakey);
+   mongoc_auto_encryption_opts_destroy (opts);
+   mongoc_uri_destroy (uri);
+   bson_destroy (kms_providers);
+}
 
 void
 test_client_side_encryption_install (TestSuite *suite)
@@ -511,6 +582,13 @@ test_client_side_encryption_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/client_side_encryption/single_and_pool_mismatches",
                       test_invalid_single_and_pool_mismatches,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption,
+                      test_framework_skip_if_max_wire_version_less_than_8);
+   TestSuite_AddFull (suite,
+                      "/client_side_encryption/multi_threaded",
+                      test_multi_threaded,
                       NULL,
                       NULL,
                       test_framework_skip_if_no_client_side_encryption,
