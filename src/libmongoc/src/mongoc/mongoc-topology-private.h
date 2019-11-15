@@ -26,10 +26,7 @@
 #include "mongoc/mongoc-thread-private.h"
 #include "mongoc/mongoc-uri.h"
 #include "mongoc/mongoc-client-session-private.h"
-
-#ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
-#include <mongocrypt/mongocrypt.h>
-#endif
+#include "mongoc/mongoc-crypt-private.h"
 
 #define MONGOC_TOPOLOGY_MIN_HEARTBEAT_FREQUENCY_MS 500
 #define MONGOC_TOPOLOGY_SOCKET_CHECK_INTERVAL_MS 5000
@@ -83,7 +80,7 @@ typedef struct _mongoc_topology_t {
    bool cse_enabled;
 
 #ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
-   mongocrypt_t *crypt;
+   mongoc_crypt_t *crypt;
    mongoc_client_pool_t *mongocryptd_client_pool;
    struct _mongoc_client_pool_t *key_vault_client_pool;
    char *key_vault_db;

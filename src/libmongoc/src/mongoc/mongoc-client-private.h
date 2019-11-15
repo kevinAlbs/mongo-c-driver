@@ -36,9 +36,7 @@
 #include "mongoc/mongoc-stream.h"
 #include "mongoc/mongoc-topology-private.h"
 #include "mongoc/mongoc-write-concern.h"
-
-#ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
-#include <mongocrypt/mongocrypt.h>
+#include "mongoc/mongoc-crypt-private.h"
 #endif
 
 BSON_BEGIN_DECLS
@@ -113,7 +111,7 @@ struct _mongoc_client_t {
    bool cse_enabled;
 
 #ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
-   mongocrypt_t *crypt;
+   mongoc_crypt_t *crypt;
    struct _mongoc_client_t *mongocryptd_client;
    struct _mongoc_client_t *key_vault_client;
    char *key_vault_db;

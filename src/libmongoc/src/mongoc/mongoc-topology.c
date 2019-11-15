@@ -419,7 +419,7 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
    bson_free (topology->key_vault_db);
    bson_free (topology->key_vault_coll);
    mongoc_client_pool_destroy (topology->mongocryptd_client_pool);
-   mongocrypt_destroy (topology->crypt);
+   mongoc_crypt_destroy (topology->crypt);
 #endif
 
    _mongoc_topology_background_thread_stop (topology);

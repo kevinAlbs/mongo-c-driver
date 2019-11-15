@@ -1144,7 +1144,7 @@ mongoc_client_destroy (mongoc_client_t *client)
       bson_free (client->key_vault_db);
       bson_free (client->key_vault_coll);
       mongoc_client_destroy (client->mongocryptd_client);
-      mongocrypt_destroy (client->crypt);
+      mongoc_crypt_destroy (client->crypt);
 #endif
 
       bson_free (client);

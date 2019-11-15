@@ -91,7 +91,7 @@ MONGOC_EXPORT (void)
 mongoc_client_encryption_destroy (mongoc_client_encryption_t *client_encryption);
 
 MONGOC_EXPORT (bool)
-mongoc_client_encryption_create_data_key (mongoc_client_encryption_t *client_encryption, const char* kms_provider, mongoc_client_encryption_datakey_opts_t* opts, bson_value_t *keyid, bson_error_t* error);
+mongoc_client_encryption_create_datakey (mongoc_client_encryption_t *client_encryption, const char* kms_provider, mongoc_client_encryption_datakey_opts_t* opts, bson_value_t *keyid, bson_error_t* error);
 
 MONGOC_EXPORT (bool)
 mongoc_client_encryption_encrypt (mongoc_client_encryption_t *client_encryption, bson_value_t *value, mongoc_client_encryption_encrypt_opts_t* opts, bson_value_t *ciphertext, bson_error_t* error);
