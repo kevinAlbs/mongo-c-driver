@@ -34,7 +34,7 @@ main (int argc, char *argv[])
    auto_encryption_opts = mongoc_auto_encryption_opts_new ();
 
    /* set key vault namespace to admin.datakeys */
-   mongoc_auto_encryption_opts_set_key_vault_namespace (
+   mongoc_auto_encryption_opts_set_keyvault_namespace (
       auto_encryption_opts, "admin", "datakeys");
 
    /* set KMS provider for "aws" */

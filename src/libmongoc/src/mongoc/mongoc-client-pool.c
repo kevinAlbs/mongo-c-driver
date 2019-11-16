@@ -227,10 +227,6 @@ _initialize_new_client (mongoc_client_pool_t *pool, mongoc_client_t *client)
       mongoc_client_set_ssl_opts (client, &pool->ssl_opts);
    }
 #endif
-
-   if (pool->topology->cse_enabled) {
-      client->cse_enabled = true;
-   }
 }
 
 mongoc_client_t *
@@ -464,6 +460,5 @@ mongoc_client_pool_enable_auto_encryption (mongoc_client_pool_t *pool,
                                            mongoc_auto_encryption_opts_t *opts,
                                            bson_error_t *error)
 {
-   return _mongoc_topology_cse_enable_auto_encryption (
-      pool->topology, opts, error);
+   return _mongoc_cse_pool_enable_auto_encryption (pool->topology, opts, error);
 }

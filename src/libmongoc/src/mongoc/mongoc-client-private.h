@@ -37,7 +37,6 @@
 #include "mongoc/mongoc-topology-private.h"
 #include "mongoc/mongoc-write-concern.h"
 #include "mongoc/mongoc-crypt-private.h"
-#endif
 
 BSON_BEGIN_DECLS
 
@@ -106,18 +105,6 @@ struct _mongoc_client_t {
    unsigned int csid_rand_seed;
 
    uint32_t generation;
-
-   /* Is client side encryption enabled? If it is enabled on the pool, then this is set to true, but other CSE options are on the topology */
-   bool cse_enabled;
-
-#ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
-   mongoc_crypt_t *crypt;
-   struct _mongoc_client_t *mongocryptd_client;
-   struct _mongoc_client_t *key_vault_client;
-   char *key_vault_db;
-   char *key_vault_coll;
-   bool bypass_auto_encryption;
-#endif
 };
 
 /* Defines whether _mongoc_client_command_with_opts() is acting as a read

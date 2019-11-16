@@ -1140,13 +1140,6 @@ mongoc_client_destroy (mongoc_client_t *client)
       _mongoc_ssl_opts_cleanup (&client->ssl_opts);
 #endif
 
-#ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
-      bson_free (client->key_vault_db);
-      bson_free (client->key_vault_coll);
-      mongoc_client_destroy (client->mongocryptd_client);
-      mongoc_crypt_destroy (client->crypt);
-#endif
-
       bson_free (client);
 
       mongoc_counter_clients_active_dec ();
@@ -2998,5 +2991,5 @@ mongoc_client_enable_auto_encryption (mongoc_client_t *client,
                       "mongoc_client_pool_enable_auto_encryption");
       return false;
    }
-   return _mongoc_cse_enable_auto_encryption (client, opts, error);
+   return _mongoc_cse_client_enable_auto_encryption (client, opts, error);
 }

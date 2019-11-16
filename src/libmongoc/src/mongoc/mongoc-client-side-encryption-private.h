@@ -49,9 +49,17 @@ _mongoc_cse_client_enable_auto_encryption (
    bson_error_t *error);
 
 bool
-_mongoc_cse_topology_enable_auto_encryption (
+_mongoc_cse_pool_enable_auto_encryption (
    mongoc_topology_t *topology,
    mongoc_auto_encryption_opts_t *opts /* may be NULL */,
    bson_error_t *error);
+
+/* If this returns true, client side encryption is enabled
+ * on the client (or it's parent client pool), and cannot
+ * be disabled. This check is done while  holding the
+ * topology lock. So if this returns true, callers are
+ * guaranteed that CSE remains enabled afterwards. */
+bool
+_mongoc_cse_is_enabled (mongoc_client_t *client);
 
 #endif /* MONGOC_CLIENT_SIDE_ENCRYPTION_PRIVATE_H */

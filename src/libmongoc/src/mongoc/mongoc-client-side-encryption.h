@@ -36,15 +36,15 @@ MONGOC_EXPORT (void)
 mongoc_auto_encryption_opts_destroy (mongoc_auto_encryption_opts_t *opts);
 
 MONGOC_EXPORT (void)
-mongoc_auto_encryption_opts_set_key_vault_client (
+mongoc_auto_encryption_opts_set_keyvault_client (
    mongoc_auto_encryption_opts_t *opts, struct _mongoc_client_t *client);
 
 MONGOC_EXPORT (void)
-mongoc_auto_encryption_opts_set_key_vault_client_pool (
+mongoc_auto_encryption_opts_set_keyvault_client_pool (
    mongoc_auto_encryption_opts_t *opts, struct _mongoc_client_pool_t *pool);
 
 MONGOC_EXPORT (void)
-mongoc_auto_encryption_opts_set_key_vault_namespace (
+mongoc_auto_encryption_opts_set_keyvault_namespace (
    mongoc_auto_encryption_opts_t *opts, const char *db, const char *coll);
 
 MONGOC_EXPORT (void)
@@ -66,65 +66,94 @@ mongoc_auto_encryption_opts_set_extra (mongoc_auto_encryption_opts_t *opts,
 /* TODO document that it is not thread safe. */
 typedef struct _mongoc_client_encryption_opts_t mongoc_client_encryption_opts_t;
 typedef struct _mongoc_client_encryption_t mongoc_client_encryption_t;
-typedef struct _mongoc_client_encryption_encrypt_opts_t mongoc_client_encryption_encrypt_opts_t;
-typedef struct _mongoc_client_encryption_datakey_opts_t mongoc_client_encryption_datakey_opts_t;
+typedef struct _mongoc_client_encryption_encrypt_opts_t
+   mongoc_client_encryption_encrypt_opts_t;
+typedef struct _mongoc_client_encryption_datakey_opts_t
+   mongoc_client_encryption_datakey_opts_t;
 
-MONGOC_EXPORT (mongoc_client_encryption_opts_t*)
+MONGOC_EXPORT (mongoc_client_encryption_opts_t *)
 mongoc_client_encryption_opts_new (void);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_opts_destroy (mongoc_client_encryption_opts_t* opts);
+mongoc_client_encryption_opts_destroy (mongoc_client_encryption_opts_t *opts);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_opts_set_key_vault_client (mongoc_client_encryption_opts_t* opts, struct _mongoc_client_t *key_vault_client);
+mongoc_client_encryption_opts_set_keyvault_client (
+   mongoc_client_encryption_opts_t *opts,
+   struct _mongoc_client_t *keyvault_client);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_opts_set_key_vault_namespace (mongoc_client_encryption_opts_t *opts, const char* db, const char* coll);
+mongoc_client_encryption_opts_set_keyvault_namespace (
+   mongoc_client_encryption_opts_t *opts, const char *db, const char *coll);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_opts_set_kms_providers (mongoc_client_encryption_opts_t *opts, const bson_t *kms_providers);
+mongoc_client_encryption_opts_set_kms_providers (
+   mongoc_client_encryption_opts_t *opts, const bson_t *kms_providers);
 
 MONGOC_EXPORT (mongoc_client_encryption_t *)
-mongoc_client_encryption_new (mongoc_client_encryption_opts_t* opts, bson_error_t *error);
+mongoc_client_encryption_new (mongoc_client_encryption_opts_t *opts,
+                              bson_error_t *error);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_destroy (mongoc_client_encryption_t *client_encryption);
+mongoc_client_encryption_destroy (
+   mongoc_client_encryption_t *client_encryption);
 
 MONGOC_EXPORT (bool)
-mongoc_client_encryption_create_datakey (mongoc_client_encryption_t *client_encryption, const char* kms_provider, mongoc_client_encryption_datakey_opts_t* opts, bson_value_t *keyid, bson_error_t* error);
+mongoc_client_encryption_create_datakey (
+   mongoc_client_encryption_t *client_encryption,
+   const char *kms_provider,
+   mongoc_client_encryption_datakey_opts_t *opts,
+   bson_value_t *keyid,
+   bson_error_t *error);
 
 MONGOC_EXPORT (bool)
-mongoc_client_encryption_encrypt (mongoc_client_encryption_t *client_encryption, bson_value_t *value, mongoc_client_encryption_encrypt_opts_t* opts, bson_value_t *ciphertext, bson_error_t* error);
+mongoc_client_encryption_encrypt (mongoc_client_encryption_t *client_encryption,
+                                  bson_value_t *value,
+                                  mongoc_client_encryption_encrypt_opts_t *opts,
+                                  bson_value_t *ciphertext,
+                                  bson_error_t *error);
 
 MONGOC_EXPORT (bool)
-mongoc_client_encryption_decrypt (mongoc_client_encryption_t *client_encryption, bson_value_t *ciphertext, bson_value_t *value, bson_error_t* error);
+mongoc_client_encryption_decrypt (mongoc_client_encryption_t *client_encryption,
+                                  bson_value_t *ciphertext,
+                                  bson_value_t *value,
+                                  bson_error_t *error);
 
-MONGOC_EXPORT (mongoc_client_encryption_encrypt_opts_t*)
+MONGOC_EXPORT (mongoc_client_encryption_encrypt_opts_t *)
 mongoc_client_encryption_encrypt_opts_new (void);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_encrypt_opts_destroy (mongoc_client_encryption_encrypt_opts_t* opts);
+mongoc_client_encryption_encrypt_opts_destroy (
+   mongoc_client_encryption_encrypt_opts_t *opts);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_encrypt_opts_set_keyid (mongoc_client_encryption_encrypt_opts_t* opts, const bson_value_t* keyid);
+mongoc_client_encryption_encrypt_opts_set_keyid (
+   mongoc_client_encryption_encrypt_opts_t *opts, const bson_value_t *keyid);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_encrypt_opts_set_keyaltname (mongoc_client_encryption_encrypt_opts_t* opts, const char* keyaltname);
+mongoc_client_encryption_encrypt_opts_set_keyaltname (
+   mongoc_client_encryption_encrypt_opts_t *opts, const char *keyaltname);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_encrypt_opts_set_algorithm (mongoc_client_encryption_encrypt_opts_t* opts, const char* algorithm);
+mongoc_client_encryption_encrypt_opts_set_algorithm (
+   mongoc_client_encryption_encrypt_opts_t *opts, const char *algorithm);
 
-MONGOC_EXPORT (mongoc_client_encryption_datakey_opts_t*)
+MONGOC_EXPORT (mongoc_client_encryption_datakey_opts_t *)
 mongoc_client_encryption_datakey_opts_new ();
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_datakey_opts_destroy (mongoc_client_encryption_datakey_opts_t* opts);
+mongoc_client_encryption_datakey_opts_destroy (
+   mongoc_client_encryption_datakey_opts_t *opts);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_datakey_opts_set_masterkey (mongoc_client_encryption_datakey_opts_t *opts, const bson_t* masterkey);
+mongoc_client_encryption_datakey_opts_set_masterkey (
+   mongoc_client_encryption_datakey_opts_t *opts, const bson_t *masterkey);
 
 MONGOC_EXPORT (void)
-mongoc_client_encryption_datakey_opts_set_keyaltnames (mongoc_client_encryption_datakey_opts_t *opts, char** keyaltnames, uint32_t keyaltnames_count);
+mongoc_client_encryption_datakey_opts_set_keyaltnames (
+   mongoc_client_encryption_datakey_opts_t *opts,
+   char **keyaltnames,
+   uint32_t keyaltnames_count);
 
 BSON_END_DECLS
 

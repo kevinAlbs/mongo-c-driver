@@ -18,6 +18,7 @@
 
 #include "mongoc/mongoc-client-private.h"
 #include "mongoc/mongoc-client-session-private.h"
+#include "mongoc/mongoc-client-side-encryption-private.h"
 #include "mongoc/mongoc-error.h"
 #include "mongoc/mongoc-trace-private.h"
 #include "mongoc/mongoc-write-command-private.h"
@@ -467,7 +468,7 @@ _mongoc_write_opmsg (mongoc_write_command_t *command,
 
    max_bson_obj_size = mongoc_server_stream_max_bson_obj_size (server_stream);
    max_msg_size = mongoc_server_stream_max_msg_size (server_stream);
-   if (client->cse_enabled) {
+   if (_mongoc_cse_is_enabled (client)) {
       max_msg_size = MONGOC_REDUCED_MAX_MSG_SIZE_FOR_FLE;
    }
    max_document_count =

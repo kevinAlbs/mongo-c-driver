@@ -23,8 +23,10 @@
 
 #ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
 
+#include "mongoc/mongoc.h"
+
 /* For interacting with libmongocrypt */
-typedef _mongoc_crypt_t;
+typedef struct __mongoc_crypt_t _mongoc_crypt_t;
 
 /*
 Creates a new handle into libmongocrypt.
@@ -35,6 +37,9 @@ _mongoc_crypt_t *
 _mongoc_crypt_new (const bson_t *kms_providers,
                    const bson_t *schema_map,
                    bson_error_t *error);
+
+void
+_mongoc_crypt_destroy (_mongoc_crypt_t *crypt);
 
 /*
 Perform auto encryption.
@@ -65,7 +70,8 @@ _mongoc_crypt_auto_decrypt (_mongoc_crypt_t *crypt,
 
 /*
 Perform explicit encryption.
-- exactly one of keyid or keyaltname must be set, the other NULL, or an error is returned.
+- exactly one of keyid or keyaltname must be set, the other NULL, or an error is
+returned.
 - value_out is always initialized.
 - may return false and set error.
 */
@@ -98,11 +104,11 @@ Create a data key document (does not insert into key vault).
 */
 bool
 _mongoc_crypt_create_datakey (_mongoc_crypt_t *crypt,
-                               const bson_t *masterkey,
-                               char **keyaltnames,
-                               uint32_t keyaltnames_count,
-                               bson_t *doc_out,
-                               bson_error_t *error);
+                              const bson_t *masterkey,
+                              char **keyaltnames,
+                              uint32_t keyaltnames_count,
+                              bson_t *doc_out,
+                              bson_error_t *error);
 
 #endif /* MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION */
 #endif /* MONGOC_CRYPT_PRIVATE_H */

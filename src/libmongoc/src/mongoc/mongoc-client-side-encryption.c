@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#define MONGOC_LOG_DOMAIN "client-side-encryption"
-
 #include "mongoc/mongoc-client-side-encryption-private.h"
 #include "mongoc/mongoc-topology-private.h"
 
@@ -28,12 +26,12 @@
 
 /* Auto encryption opts. */
 struct _mongoc_auto_encryption_opts_t {
-   /* key_vault_client and key_vault_client_pool is not owned and must outlive
+   /* keyvault_client and keyvault_client_pool is not owned and must outlive
     * auto encrypted client/pool. */
-   mongoc_client_t *key_vault_client;
-   mongoc_client_pool_t *key_vault_client_pool;
-   char *db;
-   char *coll;
+   mongoc_client_t *keyvault_client;
+   mongoc_client_pool_t *keyvault_client_pool;
+   char *keyvault_db;
+   char *keyvault_coll;
    bson_t *kms_providers;
    bson_t *schema_map;
    bool bypass_auto_encryption;
@@ -55,35 +53,41 @@ mongoc_auto_encryption_opts_destroy (mongoc_auto_encryption_opts_t *opts)
    bson_destroy (opts->extra);
    bson_destroy (opts->kms_providers);
    bson_destroy (opts->schema_map);
-   bson_free (opts->db);
-   bson_free (opts->coll);
+   bson_free (opts->keyvault_db);
+   bson_free (opts->keyvault_coll);
    bson_free (opts);
 }
 
 void
-mongoc_auto_encryption_opts_set_key_vault_client (
+mongoc_auto_encryption_opts_set_keyvault_client (
    mongoc_auto_encryption_opts_t *opts, mongoc_client_t *client)
 {
    /* Does not own. */
-   opts->key_vault_client = client;
+   opts->keyvault_client = client;
 }
 
 void
-mongoc_auto_encryption_opts_set_key_vault_client_pool (
+mongoc_auto_encryption_opts_set_keyvault_client_pool (
    mongoc_auto_encryption_opts_t *opts, mongoc_client_pool_t *pool)
 {
    /* Does not own. */
-   opts->key_vault_client_pool = pool;
+   opts->keyvault_client_pool = pool;
 }
 
 void
-mongoc_auto_encryption_opts_set_key_vault_namespace (
+mongoc_auto_encryption_opts_set_keyvault_namespace (
    mongoc_auto_encryption_opts_t *opts, const char *db, const char *coll)
 {
-   bson_free (opts->db);
-   opts->db = bson_strdup (db);
-   bson_free (opts->coll);
-   opts->coll = bson_strdup (coll);
+   bson_free (opts->keyvault_db);
+   opts->keyvault_db = NULL;
+   if (db) {
+      opts->keyvault_db = bson_strdup (db);
+   }
+   bson_free (opts->keyvault_coll);
+   opts->keyvault_coll = NULL;
+   if (coll) {
+      opts->keyvault_coll = bson_strdup (coll);
+   }
 }
 
 void
@@ -127,9 +131,9 @@ mongoc_auto_encryption_opts_set_extra (mongoc_auto_encryption_opts_t *opts,
 }
 
 struct _mongoc_client_encryption_opts_t {
-   mongoc_client_t *key_vault_client;
-   char *key_vault_db;
-   char *key_vault_coll;
+   mongoc_client_t *keyvault_client;
+   char *keyvault_db;
+   char *keyvault_coll;
    bson_t *kms_providers;
 };
 
@@ -142,29 +146,33 @@ mongoc_client_encryption_opts_new (void)
 void
 mongoc_client_encryption_opts_destroy (mongoc_client_encryption_opts_t *opts)
 {
-   bson_free (opts->key_vault_db);
-   bson_free (opts->key_vault_coll);
+   bson_free (opts->keyvault_db);
+   bson_free (opts->keyvault_coll);
    bson_destroy (opts->kms_providers);
    bson_free (opts);
 }
 
 void
-mongoc_client_encryption_opts_set_key_vault_client (
-   mongoc_client_encryption_opts_t *opts, mongoc_client_t *key_vault_client)
+mongoc_client_encryption_opts_set_keyvault_client (
+   mongoc_client_encryption_opts_t *opts, mongoc_client_t *keyvault_client)
 {
-   opts->key_vault_client = key_vault_client;
+   opts->keyvault_client = keyvault_client;
 }
 
 void
-mongoc_client_encryption_opts_set_key_vault_namespace (
-   mongoc_client_encryption_opts_t *opts,
-   const char *key_vault_db,
-   const char *key_vault_coll)
+mongoc_client_encryption_opts_set_keyvault_namespace (
+   mongoc_client_encryption_opts_t *opts, const char *db, const char *coll)
 {
-   bson_free (opts->key_vault_db);
-   opts->key_vault_db = bson_strdup (key_vault_db);
-   bson_free (opts->key_vault_coll);
-   opts->key_vault_coll = bson_strdup (key_vault_coll);
+   bson_free (opts->keyvault_db);
+   opts->keyvault_db = NULL;
+   if (db) {
+      opts->keyvault_db = bson_strdup (db);
+   }
+   bson_free (opts->keyvault_coll);
+   opts->keyvault_coll = NULL;
+   if (coll) {
+      opts->keyvault_coll = bson_strdup (coll);
+   }
 }
 
 void
@@ -231,6 +239,7 @@ mongoc_client_encryption_datakey_opts_set_keyaltnames (
 {
    int i;
 
+   /* Free all first (if any have been set before). */
    if (opts->keyaltnames_count) {
       for (i = 0; i < opts->keyaltnames_count; i++) {
          bson_free (opts->keyaltnames[i]);
@@ -309,6 +318,18 @@ mongoc_client_encryption_encrypt_opts_set_algorithm (
 
 #ifndef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
 
+static bool
+_disabled_error (bson_error_t *error)
+{
+   bson_set_error (error,
+                   MONGOC_ERROR_CLIENT,
+                   MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
+                   "libmongoc is not built with support for Client-Side Field "
+                   "Level Encryption. Configure with "
+                   "ENABLE_CLIENT_SIDE_ENCRYPTION=ON.");
+   return false;
+}
+
 bool
 _mongoc_cse_auto_encrypt (mongoc_client_t *client,
                           const mongoc_cmd_t *cmd,
@@ -317,13 +338,8 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client,
                           bson_error_t *error)
 {
    bson_init (encrypted);
-   bson_set_error (error,
-                   MONGOC_ERROR_CLIENT,
-                   MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                   "libmongoc is not built with support for Client-Side Field "
-                   "Level Encryption. Configure with "
-                   "ENABLE_CLIENT_SIDE_ENCRYPTION=ON.");
-   return false;
+
+   return _disabled_error (error);
 }
 
 bool
@@ -334,42 +350,77 @@ _mongoc_cse_auto_decrypt (mongoc_client_t *client,
                           bson_error_t *error)
 {
    bson_init (decrypted);
-   bson_set_error (error,
-                   MONGOC_ERROR_CLIENT,
-                   MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                   "libmongoc is not built with support for Client-Side Field "
-                   "Level Encryption. Configure with "
-                   "ENABLE_CLIENT_SIDE_ENCRYPTION=ON.");
-   return false;
+   return _disabled_error (error);
 }
 
 bool
-_mongoc_cse_enable_auto_encryption (
+_mongoc_cse_client_enable_auto_encryption (
    mongoc_client_t *client,
    mongoc_auto_encryption_opts_t *opts /* may be NULL */,
    bson_error_t *error)
 {
-   bson_set_error (error,
-                   MONGOC_ERROR_CLIENT,
-                   MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                   "libmongoc is not built with support for Client-Side Field "
-                   "Level Encryption. Configure with "
-                   "ENABLE_CLIENT_SIDE_ENCRYPTION=ON.");
-   return false;
+   return _disabled_error (error);
 }
 
 bool
-_mongoc_topology_cse_enable_auto_encryption (
+_mongoc_cse_pool_enable_auto_encryption (
    mongoc_topology_t *topology,
    mongoc_auto_encryption_opts_t *opts /* may be NULL */,
    bson_error_t *error)
 {
-   bson_set_error (error,
-                   MONGOC_ERROR_CLIENT,
-                   MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                   "libmongoc is not built with support for Client-Side Field "
-                   "Level Encryption. Configure with "
-                   "ENABLE_CLIENT_SIDE_ENCRYPTION=ON.");
+   return _disabled_error (error);
+}
+
+
+bool
+mongoc_client_encryption_create_datakey (
+   mongoc_client_encryption_t *client_encryption,
+   const char *kms_provider,
+   mongoc_client_encryption_datakey_opts_t *opts,
+   bson_value_t *keyid,
+   bson_error_t *error)
+{
+   memset (keyid, 0, sizeof (*keyid));
+   return _disabled_error (error);
+}
+
+
+MONGOC_EXPORT (mongoc_client_encryption_t *)
+mongoc_client_encryption_new (mongoc_client_encryption_opts_t *opts,
+                              bson_error_t *error)
+{
+   _disabled_error (error);
+   return NULL;
+}
+
+void
+mongoc_client_encryption_destroy (mongoc_client_encryption_t *client_encryption)
+{ }
+
+bool
+mongoc_client_encryption_encrypt (mongoc_client_encryption_t *client_encryption,
+                                  bson_value_t *value,
+                                  mongoc_client_encryption_encrypt_opts_t *opts,
+                                  bson_value_t *ciphertext,
+                                  bson_error_t *error)
+{
+   memset (ciphertext, 0, sizeof (*ciphertext));
+   return _disabled_error (error);
+}
+
+bool
+mongoc_client_encryption_decrypt (mongoc_client_encryption_t *client_encryption,
+                                  bson_value_t *ciphertext,
+                                  bson_value_t *value,
+                                  bson_error_t *error)
+{
+   memset (value, 0, sizeof (*value));
+   return _disabled_error (error);
+}
+
+bool
+_mongoc_cse_is_enabled (mongoc_client_t *client)
+{
    return false;
 }
 
@@ -411,50 +462,91 @@ _prep_for_auto_encryption (const mongoc_cmd_t *cmd, bson_t *out)
    _mongoc_cmd_append_payload_as_array (cmd, out);
 }
 
-mongoc_client_t *_get_mongocryptd_client (mongoc_client_t* client_encrypted) {
+/* Return the mongocryptd client to use on a client with automatic encryption
+ * enabled.
+ * If @client_encrypted is single-threaded, the mongocryptd_client is stored on
+ * it.
+ * Otherwise, if multi-threaded, there is a shared mongocryptd_client_pool in
+ * the topology.
+ */
+mongoc_client_t *
+_get_mongocryptd_client (mongoc_client_t *client_encrypted)
+{
    if (client_encrypted->topology->single_threaded) {
-      return  client_encrypted->mongocryptd_client;
+      return client_encrypted->topology->mongocryptd_client;
    }
-   return mongoc_client_pool_pop (client_encrypted->topology->mongocryptd_client_pool);
+   return mongoc_client_pool_pop (
+      client_encrypted->topology->mongocryptd_client_pool);
 }
 
-void _release_mongocryptd_client (mongoc_client_t* client_encrypted, mongoc_client_t* mongocryptd_client) {
+void
+_release_mongocryptd_client (mongoc_client_t *client_encrypted,
+                             mongoc_client_t *mongocryptd_client)
+{
    if (!mongocryptd_client) {
       return;
    }
    if (!client_encrypted->topology->single_threaded) {
-      mongoc_client_pool_push (client_encrypted->topology->mongocryptd_client_pool, mongocryptd_client)
+      mongoc_client_pool_push (
+         client_encrypted->topology->mongocryptd_client_pool,
+         mongocryptd_client)
    }
 }
 
-mongoc_collection_t *_get_keyvault_coll (mongoc_client_t* client_encrypted) {
-   mongoc_client_t *key_vault_client;
-   const char* db;
-   const char* coll;
+/* Return the key vault collection to use on a client with automatic encryption
+ * enabled.
+ * If no custom key vault client/pool is set, create a collection from the
+ * @client_encrypted itself.
+ * If @client_encrypted is single-threaded, create a collection from the key
+ * vault client stored on it.
+ * Otherwise, @client_encrypted is multi-threaded, create a collection from a
+ * key vault client popped
+ * from the shared key vault client topology pool.
+ */
+mongoc_collection_t *
+_get_keyvault_coll (mongoc_client_t *client_encrypted)
+{
+   mongoc_client_t *keyvault_client;
+   const char *db;
+   const char *coll;
 
    if (client_encrypted->topology->single_threaded) {
-      key_vault_client = client_encrypted->keyvault_client;
-      db = client_encrypted->key_vault_db;
-      coll = client_encrypted->key_vault_coll;
+      if (client_encrypted->topology->keyvault_client) {
+         keyvault_client = client_encrypted->topology->keyvault_client;
+      } else {
+         keyvault_client = client_encrypted;
+      }
+      db = client_encrypted->topology->->keyvault_db;
+      coll = client_encrypted->topology->->keyvault_coll;
    } else {
-      key_vault_client = mongoc_client_pool_pop  (client_encrypted->topology->keyvault_client_pool);
-      db = client_encrypted->topology->key_vault_db;
-      coll = client_encrypted->topology->key_vault_coll;
+      if (client_encrypted->topology->keyvault_client_pool) {
+         keyvault_client = mongoc_client_pool_pop (
+            client_encrypted->topology->keyvault_client_pool);
+      } else {
+         keyvault_client = client_encrypted;
+      }
+      db = client_encrypted->topology->keyvault_db;
+      coll = client_encrypted->topology->keyvault_coll;
    }
-   return mongoc_client_get_collection (key_vault_client, db, coll);
+   return mongoc_client_get_collection (keyvault_client, db, coll);
 }
 
-void _release_keyvault_coll (mongoc_client_t* client_encrypted, mongoc_collection_t* keyvault_coll) {
+void
+_release_keyvault_coll (mongoc_client_t *client_encrypted,
+                        mongoc_collection_t *keyvault_coll)
+{
    mongoc_client_t *keyvault_client;
 
    if (!keyvault_coll) {
       return;
    }
 
-   keyvault_client =  keyvault_coll->client;
+   keyvault_client = keyvault_coll->client;
    mongoc_collection_destroy (keyvault_coll);
-   if (!client_encrypted->topology->single_threaded) {
-      mongoc_client_pool_push  (client_encrypted->topology->keyvault_client_pool, keyvault_client);
+   if (!client_encrypted->topology->single_threaded &&
+       client_encrypted->topology->keyvault_client_pool) {
+      mongoc_client_pool_push (client_encrypted->topology->keyvault_client_pool,
+                               keyvault_client);
    }
 }
 
@@ -481,7 +573,7 @@ void _release_keyvault_coll (mongoc_client_t* client_encrypted, mongoc_collectio
  *--------------------------------------------------------------------------
  */
 bool
-_mongoc_cse_auto_encrypt (mongoc_client_t *client,
+_mongoc_cse_auto_encrypt (mongoc_client_t *client_encrypted,
                           const mongoc_cmd_t *cmd,
                           mongoc_cmd_t *encrypted_cmd,
                           bson_t *encrypted,
@@ -498,14 +590,13 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client,
 
    bson_init (encrypted);
 
-   if (auto_encrypt->bypass_auto_encryption) {
+   if (client_encrypted->topology->bypass_auto_encryption) {
       memcpy (encrypted_cmd, cmd, sizeof (mongoc_cmd_t));
       bson_destroy (&cmd_bson);
       return true;
    }
 
-   if (!auto_encrypt->bypass_auto_encryption &&
-       cmd->server_stream->sd->max_wire_version < WIRE_VERSION_CSE) {
+   if (cmd->server_stream->sd->max_wire_version < WIRE_VERSION_CSE) {
       bson_set_error (
          error,
          MONGOC_ERROR_PROTOCOL,
@@ -519,10 +610,17 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client,
     * type 1 payload, convert it to a type 0 payload. */
    bson_destroy (&cmd_bson);
    _prep_for_auto_encryption (cmd, &cmd_bson);
+   keyvault_coll = _get_keyvault_coll (client_encrypted);
+   mongocryptd_client = _get_mongocryptd_client (client_encrypted);
    bson_destroy (&encrypted);
-   keyvault_coll =  _get_keyvault_coll (client);
-   mongocryptd_client =  _get_mongocryptd_client (client);
-   if (!_mongoc_crypt_auto_encrypt (client->crypt, keyvault_coll, mongocryptd_client, client, cmd->db_name, &cmd_bson, encrypted, error)) {
+   if (!_mongoc_crypt_auto_encrypt (client_encrypted->topology->crypt,
+                                    keyvault_coll,
+                                    mongocryptd_client,
+                                    client_encrypted,
+                                    cmd->db_name,
+                                    &cmd_bson,
+                                    encrypted,
+                                    error)) {
       goto fail;
    }
 
@@ -545,8 +643,8 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client,
 fail:
    bson_destroy (result);
    bson_destroy (&cmd_bson);
-   _release_mongocryptd_client (client, mongocryptd_client);
-   _release_keyvault_coll (client, keyvault_coll);
+   _release_mongocryptd_client (client_encrypted, mongocryptd_client);
+   _release_keyvault_coll (client_encrypted, keyvault_coll);
    RETURN (ret);
 }
 
@@ -568,31 +666,30 @@ fail:
  *--------------------------------------------------------------------------
  */
 bool
-_mongoc_cse_auto_decrypt (mongoc_client_t *client,
+_mongoc_cse_auto_decrypt (mongoc_client_t *client_encrypted,
                           const char *db_name,
                           const bson_t *reply,
                           bson_t *decrypted,
                           bson_error_t *error)
 {
    bool ret = false;
-   bson_t *result = NULL;
-   mongoc_collection_t* keyvault_coll =  NULL;
+   mongoc_collection_t *keyvault_coll = NULL;
 
    ENTRY;
 
-   keyvault_coll = _get_keyvault_coll (client);
-   if (!_mongoc_crypt_auto_decrypt (client->crypt,
-                            key_vault_coll,
-                            reply,
-                            decrypted,
-                            error)) {
-                               goto fail;
-                            }
+   keyvault_coll = _get_keyvault_coll (client_encrypted);
+   if (!_mongoc_crypt_auto_decrypt (client_encrypted->topology->crypt,
+                                    keyvault_coll,
+                                    reply,
+                                    decrypted,
+                                    error)) {
+      GOTO (fail);
+   }
 
    ret = true;
 
 fail:
-   _release_keyvault_coll (client, keyvault_coll);
+   _release_keyvault_coll (client_encrypted, keyvault_coll);
    RETURN (ret);
 }
 
@@ -817,6 +914,91 @@ _do_spawn (const char *path, char **args, bson_error_t *error)
 }
 #endif
 
+/*--------------------------------------------------------------------------
+ *
+ * _spawn_mongocryptd --
+ *
+ *   Attempt to spawn mongocryptd as a background process.
+ *
+ * Return:
+ *   False if an error definitely occurred. Returns true if no reportable
+ *   error occurred (though an error may have occurred in starting
+ *   mongocryptd, resulting in the process not running).
+ *
+ * Arguments:
+ *    mongocryptd_spawn_path May be NULL, otherwise the path to mongocryptd.
+ *    mongocryptd_spawn_args May be NULL, otherwise a bson_iter_t to the
+ *    value "mongocryptdSpawnArgs" in AutoEncryptionOpts.extraOptions
+ *    (see spec).
+ *
+ * Post-conditions:
+ *    If return false, @error is set.
+ *
+ *--------------------------------------------------------------------------
+ */
+static bool
+_spawn_mongocryptd (const char *mongocryptd_spawn_path,
+                    const bson_iter_t *mongocryptd_spawn_args,
+                    bson_error_t *error)
+{
+   char **args = NULL;
+   bson_iter_t iter;
+   bool passed_idle_shutdown_timeout_secs = false;
+   int num_args = 2; /* for leading "mongocrypt" and trailing NULL */
+   int i;
+
+   /* iterate once to get length and validate all are strings */
+   if (mongocryptd_spawn_args) {
+      BSON_ASSERT (BSON_ITER_HOLDS_ARRAY (mongocryptd_spawn_args));
+      bson_iter_recurse (mongocryptd_spawn_args, &iter);
+      while (bson_iter_next (&iter)) {
+         if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
+            bson_set_error (error,
+                            MONGOC_ERROR_CLIENT,
+                            MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                            "invalid argument for mongocryptd, must be string");
+            return false;
+         }
+         /* Check if the arg starts with --idleShutdownTimeoutSecs= or is equal
+          * to --idleShutdownTimeoutSecs */
+         if (0 == strncmp ("--idleShutdownTimeoutSecs=",
+                           bson_iter_utf8 (&iter, NULL),
+                           26) ||
+             0 == strcmp ("--idleShutdownTimeoutSecs",
+                          bson_iter_utf8 (&iter, NULL))) {
+            passed_idle_shutdown_timeout_secs = true;
+         }
+         num_args++;
+      }
+   }
+
+   if (!passed_idle_shutdown_timeout_secs) {
+      /* add one more */
+      num_args++;
+   }
+
+   args = (char **) bson_malloc (sizeof (char *) * num_args);
+   i = 0;
+   args[i++] = "mongocryptd";
+
+   if (mongocryptd_spawn_args) {
+      BSON_ASSERT (BSON_ITER_HOLDS_ARRAY (mongocryptd_spawn_args));
+      bson_iter_recurse (mongocryptd_spawn_args, &iter);
+      while (bson_iter_next (&iter)) {
+         args[i++] = (char *) bson_iter_utf8 (&iter, NULL);
+      }
+   }
+
+   if (!passed_idle_shutdown_timeout_secs) {
+      args[i++] = "--idleShutdownTimeoutSecs=60";
+   }
+
+   BSON_ASSERT (i == num_args - 1);
+   args[i++] = NULL;
+
+   return _do_spawn (mongocryptd_spawn_path, args, error);
+}
+
 /* Initial state shared when enabling automatic encryption on pooled and single
  * threaded clients
  */
@@ -845,7 +1027,7 @@ _extra_parsed_destroy (_extra_parsed_t *extra_parsed)
 }
 
 static bool
-_extra_parsed_init (const bson_t* extra,
+_extra_parsed_init (const bson_t *extra,
                     _extra_parsed_t *extra_parsed,
                     bson_error_t *error)
 {
@@ -855,68 +1037,56 @@ _extra_parsed_init (const bson_t* extra,
 
    ENTRY;
 
-   if (!extra) {
-      return true;
-   }
-
-   extra_parsed->bypass_auto_encryption = opts->bypass_auto_encryption;
-
-   if (!extra_parsed->bypass_auto_encryption) {
-      /* Spawn mongocryptd if needed, and create a client to it. */
-
-      if (opts->extra) {
-         if (bson_iter_init_find (
-                &iter, opts->extra, "mongocryptdBypassSpawn") &&
-             bson_iter_as_bool (&iter)) {
-            extra_parsed->mongocryptd_bypass_spawn = true;
-         }
-         if (bson_iter_init_find (&iter, opts->extra, "mongocryptdSpawnPath") &&
-             BSON_ITER_HOLDS_UTF8 (&iter)) {
-            extra_parsed->mongocryptd_spawn_path = bson_iter_utf8 (&iter, NULL);
-         }
-         if (bson_iter_init_find (&iter, opts->extra, "mongocryptdSpawnArgs") &&
-             BSON_ITER_HOLDS_ARRAY (&iter)) {
-            memcpy (&extra_parsed->mongocryptd_spawn_args,
-                    &iter,
-                    sizeof (bson_iter_t));
-            extra_parsed->has_spawn_args = true;
-         }
-
-         if (bson_iter_init_find (&iter, opts->extra, "mongocryptdURI")) {
-            if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
-               bson_set_error (error,
-                               MONGOC_ERROR_CLIENT,
-                               MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
-                               "Expected string for option 'mongocryptdURI'");
-               goto fail;
-            }
-            extra_parsed->mongocryptd_uri =
-               mongoc_uri_new_with_error (bson_iter_utf8 (&iter, NULL), error);
-            if (!mongocryptd_uri) {
-               goto fail;
-            }
-         }
+   if (extra) {
+      if (bson_iter_init_find (&iter, extra, "mongocryptdBypassSpawn") &&
+          bson_iter_as_bool (&iter)) {
+         extra_parsed->mongocryptd_bypass_spawn = true;
+      }
+      if (bson_iter_init_find (&iter, extra, "mongocryptdSpawnPath") &&
+          BSON_ITER_HOLDS_UTF8 (&iter)) {
+         extra_parsed->mongocryptd_spawn_path = bson_iter_utf8 (&iter, NULL);
+      }
+      if (bson_iter_init_find (&iter, extra, "mongocryptdSpawnArgs") &&
+          BSON_ITER_HOLDS_ARRAY (&iter)) {
+         memcpy (
+            &extra_parsed->mongocryptd_spawn_args, &iter, sizeof (bson_iter_t));
+         extra_parsed->has_spawn_args = true;
       }
 
-      if (!extra_parsed->mongocryptd_uri) {
-         /* Always default to connecting to TCP, despite spec v1.0.0. Because
-          * starting mongocryptd when one is running removes the domain socket
-          * file per SERVER-41029. Connecting over TCP is more reliable.
-          */
+      if (bson_iter_init_find (&iter, extra, "mongocryptdURI")) {
+         if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
+            bson_set_error (error,
+                            MONGOC_ERROR_CLIENT,
+                            MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                            "Expected string for option 'mongocryptdURI'");
+            goto fail;
+         }
          extra_parsed->mongocryptd_uri =
-            mongoc_uri_new_with_error ("mongodb://localhost:27020", error);
-
-         if (!extra_parsed->mongocryptd_uri) {
+            mongoc_uri_new_with_error (bson_iter_utf8 (&iter, NULL), error);
+         if (!mongocryptd_uri) {
             goto fail;
          }
+      }
+   }
 
-         if (!mongoc_uri_set_option_as_int32 (
-                extra_parsed->mongocryptd_uri,
-                MONGOC_URI_SERVERSELECTIONTIMEOUTMS,
-                5000)) {
-            _uri_construction_error (error);
-            goto fail;
-         }
+
+   if (!extra_parsed->mongocryptd_uri) {
+      /* Always default to connecting to TCP, despite spec v1.0.0. Because
+         * starting mongocryptd when one is running removes the domain socket
+         * file per SERVER-41029. Connecting over TCP is more reliable.
+         */
+      extra_parsed->mongocryptd_uri =
+         mongoc_uri_new_with_error ("mongodb://localhost:27020", error);
+
+      if (!extra_parsed->mongocryptd_uri) {
+         goto fail;
+      }
+
+      if (!mongoc_uri_set_option_as_int32 (extra_parsed->mongocryptd_uri,
+                                           MONGOC_URI_SERVERSELECTIONTIMEOUTMS,
+                                           5000)) {
+         _uri_construction_error (error);
+         goto fail;
       }
    }
 
@@ -928,8 +1098,8 @@ fail:
 
 bool
 _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
-                                    mongoc_auto_encryption_opts_t *opts,
-                                    bson_error_t *error)
+                                           mongoc_auto_encryption_opts_t *opts,
+                                           bson_error_t *error)
 {
    bool ret = false;
    _extra_parsed_t *extra_parsed = NULL;
@@ -945,12 +1115,12 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
       GOTO (fail);
    }
 
-   if (client->cse_enabled) {
+   if (!_mongoc_cse_set_enabled (client->topology)) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
                       "Automatic encryption already set");
-GOTO (fail);
+      GOTO (fail);
    }
 
    if (!opts) {
@@ -958,16 +1128,16 @@ GOTO (fail);
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
                       "Auto encryption options required");
-GOTO (fail);
+      GOTO (fail);
    }
 
-   if (opts->key_vault_client_pool) {
+   if (opts->keyvault_client_pool) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
                       "The key vault client pool only applies to a client "
                       "pool, not a single threaded client");
-GOTO (fail);
+      GOTO (fail);
    }
 
    /* Check for required options */
@@ -976,7 +1146,7 @@ GOTO (fail);
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
                       "Key vault namespace option required");
-GOTO (fail);
+      GOTO (fail);
    }
 
    if (!opts->kms_providers) {
@@ -984,7 +1154,7 @@ GOTO (fail);
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
                       "KMS providers option required");
-GOTO (fail);
+      GOTO (fail);
    }
 
    extra_parsed = _extra_parsed_new ();
@@ -992,14 +1162,15 @@ GOTO (fail);
       GOTO (fail);
    }
 
-   client->crypt = _mongoc_crypt_new (opts->kms_providers, opts->schema_map, error);
-   if (!client->crypt) {
+   client->topology->crypt =
+      _mongoc_crypt_new (opts->kms_providers, opts->schema_map, error);
+   if (!client->topology->crypt) {
       goto fail;
    }
-   client->cse_enabled = true;
-   client->bypass_auto_encryption = opts->bypass_auto_encryption;
 
-   if (!client->bypass_auto_encryption) {
+   client->topology->bypass_auto_encryption = opts->bypass_auto_encryption;
+
+   if (!client->topology->bypass_auto_encryption) {
       if (!extra_parsed->mongocryptd_bypass_spawn) {
          if (!_spawn_mongocryptd (extra_parsed->mongocryptd_spawn_path,
                                   extra_parsed->has_spawn_args
@@ -1023,10 +1194,10 @@ GOTO (fail);
          goto fail;
       }
 
-      client->mongocryptd_client =
+      client->topology->mongocryptd_client =
          mongoc_client_new_from_uri (extra_parsed->mongocryptd_uri);
 
-      if (!client->mongocryptd_client) {
+      if (!client->topology->mongocryptd_client) {
          bson_set_error (error,
                          MONGOC_ERROR_CLIENT,
                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
@@ -1038,13 +1209,14 @@ GOTO (fail);
        * another attempt. Meaning if the first attempt to mongocryptd fails
        * to connect, then the user observes a 5 second delay. This is not
        * configurable in the URI, so override. */
-      _mongoc_topology_bypass_cooldown (client->mongocryptd_client->topology);
+      _mongoc_topology_bypass_cooldown (
+         client->topology->mongocryptd_client->topology);
    }
 
-   client->key_vault_db = bson_strdup (opts->db);
-   client->key_vault_coll = bson_strdup (opts->coll);
-   if (opts->key_vault_client) {
-      client->key_vault_client = opts->key_vault_client;
+   client->topology->keyvault_db = bson_strdup (opts->db);
+   client->topology->keyvault_coll = bson_strdup (opts->coll);
+   if (opts->keyvault_client) {
+      client->topology->keyvault_client = opts->keyvault_client;
    }
 
    ret = true;
@@ -1062,7 +1234,7 @@ _mongoc_topology_cse_enable_auto_encryption (
    bool ret = false;
    _extra_parsed_t *extra_parsed = NULL;
 
-   if (topology->cse_enabled) {
+   if (!_mongoc_cse_set_enabled (topology)) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
@@ -1078,7 +1250,7 @@ _mongoc_topology_cse_enable_auto_encryption (
       goto fail;
    }
 
-   if (opts->key_vault_client) {
+   if (opts->keyvault_client) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
@@ -1111,11 +1283,12 @@ _mongoc_topology_cse_enable_auto_encryption (
       goto fail;
    }
 
-   topology->crypt = _mongoc_crypt_new (opts->kms_providers, opts->schema_map, error);
+   topology->crypt =
+      _mongoc_crypt_new (opts->kms_providers, opts->schema_map, error);
    if (!topology->crypt) {
       goto fail;
    }
-   topology->cse_enabled = true;
+
    topology->bypass_auto_encryption = opts->bypass_auto_encryption;
 
    if (!topology->bypass_auto_encryption) {
@@ -1141,10 +1314,10 @@ _mongoc_topology_cse_enable_auto_encryption (
       }
    }
 
-   topology->key_vault_db = bson_strdup (opts->db);
-   topology->key_vault_coll = bson_strdup (opts->coll);
-   if (opts->key_vault_client_pool) {
-      topology->key_vault_client_pool = opts->key_vault_client_pool;
+   topology->keyvault_db = bson_strdup (opts->db);
+   topology->keyvault_coll = bson_strdup (opts->coll);
+   if (opts->keyvault_client_pool) {
+      topology->keyvault_client_pool = opts->keyvault_client_pool;
    }
 
    ret = true;
@@ -1153,11 +1326,9 @@ fail:
    return ret;
 }
 
-
-
 struct _mongoc_client_encryption_t {
-   mongocrypt_t *crypt;
-   mongoc_client_t *key_vault_coll;
+   mongoc_crypt_t *crypt;
+   mongoc_client_t *keyvault_coll;
    bson_t *kms_providers;
 };
 
@@ -1169,7 +1340,7 @@ mongoc_client_encryption_new (mongoc_client_encryption_opts_t *opts,
    bool success = false;
 
    /* Check for required options */
-   if (!opts->key_vault_client || !opts->key_vault_db || !opts->key_vault_coll) {
+   if (!opts->keyvault_client || !opts->keyvault_db || !opts->keyvault_coll) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
@@ -1185,11 +1356,12 @@ mongoc_client_encryption_new (mongoc_client_encryption_opts_t *opts,
       goto fail;
    }
 
-
    client_encryption = bson_malloc0 (sizeof (*client_encryption));
-   client_encryption->key_vault_coll = mongoc_client_get_collection (opts->key_vault_client, opts->key_vault_db, opts->key_vault_coll);
+   client_encryption->keyvault_coll = mongoc_client_get_collection (
+      opts->keyvault_client, opts->keyvault_db, opts->keyvault_coll);
    client_encryption->kms_providers = bson_copy (opts->kms_providers);
-   client_encryption->crypt = _mongoc_crypt_new (opts->kms_providers, NULL /* schema_map */, error);
+   client_encryption->crypt =
+      _mongoc_crypt_new (opts->kms_providers, NULL /* schema_map */, error);
    if (!client_encryption->crypt) {
       goto fail;
    }
@@ -1207,7 +1379,7 @@ void
 mongoc_client_encryption_destroy (mongoc_client_encryption_t *client_encryption)
 {
    _mongoc_crypt_destroy (client_encryption->crypt);
-   mongoc_collection_destroy (client_encryption->key_vault_coll);
+   mongoc_collection_destroy (client_encryption->keyvault_coll);
    bson_destroy (client_encryption->kms_providers);
    bson_free (client_encryption);
 }
@@ -1241,15 +1413,15 @@ mongoc_client_encryption_create_datakey (
                                opts->keyaltnames_count,
                                datakey,
                                error) {
-                                  goto fail;
+      goto fail;
                                }
 
    /* Insert the data key with write concern majority */
    wc = mongoc_write_concern_new ();
    mongoc_write_concern_set_wmajority (wc, 1000);
-   coll = mongoc_client_get_collection (client_encryption->key_vault_client,
-                                        client_encryption->key_vault_db,
-                                        client_encryption->key_vault_coll);
+   coll = mongoc_client_get_collection (client_encryption->keyvault_client,
+                                        client_encryption->keyvault_db,
+                                        client_encryption->keyvault_coll);
    mongoc_collection_set_write_concern (coll, wc);
    ret = mongoc_collection_insert_one (
       coll, datakey, NULL /* opts */, NULL /* reply */, error);
@@ -1300,10 +1472,10 @@ mongoc_client_encryption_encrypt (mongoc_client_encryption_t *client_encryption,
 
    bson_destroy (&result);
    if (!_mongoc_crypt_explicit_encrypt (client_encryption->crypt,
-                                client_encryption->key_vault_coll,
-                                value_in,
-                                ciphertext,
-                                error)) {
+                                        client_encryption->keyvault_coll,
+                                        value_in,
+                                        ciphertext,
+                                        error)) {
       goto fail;
    }
 
@@ -1334,12 +1506,12 @@ mongoc_client_encryption_decrypt (mongoc_client_encryption_t *client_encryption,
 
    bson_destroy (result);
    if (!_mongoc_crypt_auto_decrypt (client_encryption->crypt,
-                            client_encryption->key_vault_coll,
-                            to_decrypt_doc,
-                            &result,
-                            error)) {
-                               goto fail;
-                            }
+                                    client_encryption->keyvault_coll,
+                                    to_decrypt_doc,
+                                    &result,
+                                    error)) {
+      goto fail;
+   }
    if (!result) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
@@ -1368,6 +1540,32 @@ fail:
    mongocrypt_binary_destroy (to_decrypt_bin);
    bson_destroy (result);
    RETURN (ret);
+}
+
+bool
+_mongoc_cse_is_enabled (mongoc_client_t *client)
+{
+   bool ret = false;
+
+   mongoc_mutex_lock (client->topology->mutex);
+   ret = client->topology->cse_enabled;
+   mongoc_mutex_unlock (client->topology->mutex);
+   return ret;
+}
+
+bool
+_mongoc_cse_set_enabled (mongoc_topology_t *topology)
+{
+   bool ret = false;
+
+   mongoc_mutex_lock (topology->mutex);
+   if (!client->topology->cse_enabled) {
+      client->topology->cse_enabled = true;
+      ret = true;
+   }
+   /* Otherwise, it has already been set. */
+   mongoc_mutex_unlock (topology->mutex);
+   return ret;
 }
 
 #endif /* MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION */
