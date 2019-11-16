@@ -49,7 +49,7 @@ _mongoc_cse_client_enable_auto_encryption (
    bson_error_t *error);
 
 bool
-_mongoc_cse_pool_enable_auto_encryption (
+_mongoc_cse_client_pool_enable_auto_encryption (
    mongoc_topology_t *topology,
    mongoc_auto_encryption_opts_t *opts /* may be NULL */,
    bson_error_t *error);

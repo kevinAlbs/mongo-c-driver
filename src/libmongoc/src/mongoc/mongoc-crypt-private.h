@@ -93,8 +93,8 @@ Perform explicit decryption.
 bool
 _mongoc_crypt_explicit_decrypt (_mongoc_crypt_t *crypt,
                                 mongoc_collection_t *key_vault_coll,
-                                const bson_t *value_in,
-                                bson_t *value_out,
+                                const bson_value_t *value_in,
+                                bson_value_t *value_out,
                                 bson_error_t *error);
 /*
 Create a data key document (does not insert into key vault).
@@ -104,6 +104,7 @@ Create a data key document (does not insert into key vault).
 */
 bool
 _mongoc_crypt_create_datakey (_mongoc_crypt_t *crypt,
+                              const char* kms_provider,
                               const bson_t *masterkey,
                               char **keyaltnames,
                               uint32_t keyaltnames_count,

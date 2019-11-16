@@ -418,9 +418,9 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
 #ifdef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
    bson_free (topology->keyvault_db);
    bson_free (topology->keyvault_coll);
-   mongoc_client_destroy (client->mongocryptd_client);
+   mongoc_client_destroy (topology->mongocryptd_client);
    mongoc_client_pool_destroy (topology->mongocryptd_client_pool);
-   mongoc_crypt_destroy (topology->crypt);
+   _mongoc_crypt_destroy (topology->crypt);
 #endif
 
    _mongoc_topology_background_thread_stop (topology);
