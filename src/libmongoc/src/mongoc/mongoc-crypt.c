@@ -810,6 +810,7 @@ _mongoc_crypt_auto_encrypt (_mongoc_crypt_t *crypt,
       mongocrypt_binary_new_from_data ((uint8_t*)bson_get_data (cmd_in), cmd_in->len);
    if (!mongocrypt_ctx_encrypt_init (
           state_machine->ctx, db_name, -1, cmd_bin)) {
+      _ctx_check_error (state_machine->ctx, error, true);
       goto fail;
    }
 
@@ -849,6 +850,7 @@ _mongoc_crypt_auto_decrypt (_mongoc_crypt_t *crypt,
    doc_bin =
       mongocrypt_binary_new_from_data ((uint8_t*)bson_get_data (doc_in), doc_in->len);
    if (!mongocrypt_ctx_decrypt_init (state_machine->ctx, doc_bin)) {
+      _ctx_check_error (state_machine->ctx, error, true);
       goto fail;
    }
 
