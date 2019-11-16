@@ -1425,7 +1425,8 @@ mongoc_client_encryption_create_datakey (
    }
 
    bson_destroy (&datakey);
-   if (!_mongoc_crypt_create_datakey (client_encryption->crypt, kms_provider,
+   if (!_mongoc_crypt_create_datakey (client_encryption->crypt,
+                               kms_provider,
                                opts->masterkey,
                                opts->keyaltnames,
                                opts->keyaltnames_count,

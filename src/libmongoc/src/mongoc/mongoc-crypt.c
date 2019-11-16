@@ -197,6 +197,7 @@ _state_machine_t * _state_machine_new (void) {
 }
 
 void _state_machine_destroy (_state_machine_t* state_machine) {
+   mongocrypt_ctx_destroy (state_machine->ctx);
    bson_free (state_machine);
 }
 
@@ -362,6 +363,7 @@ _state_need_mongo_keys (_state_machine_t *state_machine, bson_error_t *error)
       state_machine->keyvault_coll, &filter_bson, &opts, NULL /* read prefs */);
    /* 2. Feed all resulting documents back (if any) with repeated calls to
     * mongocrypt_ctx_mongo_feed. */
+   printf ("checking key vault collection: %s.%s\n", state_machine->keyvault_coll->db, state_machine->keyvault_coll->collection);
    while (mongoc_cursor_next (cursor, &key_bson)) {
       mongocrypt_binary_destroy (key_bin);
       key_bin = mongocrypt_binary_new_from_data (
@@ -790,6 +792,7 @@ _mongoc_crypt_auto_encrypt (_mongoc_crypt_t *crypt,
 {
    _state_machine_t *state_machine = NULL;
    mongocrypt_binary_t *cmd_bin = NULL;
+   bool ret = false;
 
    bson_init (cmd_out);
 
@@ -816,10 +819,11 @@ _mongoc_crypt_auto_encrypt (_mongoc_crypt_t *crypt,
       goto fail;
    }
 
+   ret = true;
 fail:
    mongocrypt_binary_destroy (cmd_bin);
    _state_machine_destroy (state_machine);
-   return false;
+   return ret;
 }
 
 bool
@@ -829,6 +833,7 @@ _mongoc_crypt_auto_decrypt (_mongoc_crypt_t *crypt,
                             bson_t *doc_out,
                             bson_error_t *error)
 {
+   bool ret = false;
    _state_machine_t *state_machine = NULL;
    mongocrypt_binary_t *doc_bin = NULL;
 
@@ -853,10 +858,11 @@ _mongoc_crypt_auto_decrypt (_mongoc_crypt_t *crypt,
       goto fail;
    }
 
+   ret = true;
 fail:
    mongocrypt_binary_destroy (doc_bin);
    _state_machine_destroy (state_machine);
-   return false;
+   return ret;
 }
 
 bool
@@ -1043,6 +1049,7 @@ _mongoc_crypt_create_datakey (_mongoc_crypt_t *crypt,
    bool ret = false;
 
    bson_init (doc_out);
+   state_machine = _state_machine_new ();
    state_machine->ctx = mongocrypt_ctx_new (crypt->handle);
    if (!state_machine->ctx) {
       _crypt_check_error (crypt->handle, error, true);

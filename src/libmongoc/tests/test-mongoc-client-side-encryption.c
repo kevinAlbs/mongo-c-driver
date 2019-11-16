@@ -35,7 +35,7 @@ _before_test (json_test_ctx_t *ctx, const bson_t *test)
    bson_init (&insert_opts);
    mongoc_write_concern_append (wc, &insert_opts);
 
-   if (bson_iter_init_find (&iter, ctx->config->scenario, "keyvault_data")) {
+   if (bson_iter_init_find (&iter, ctx->config->scenario, "key_vault_data")) {
       keyvault_coll =
          mongoc_client_get_collection (client, "admin", "datakeys");
 
