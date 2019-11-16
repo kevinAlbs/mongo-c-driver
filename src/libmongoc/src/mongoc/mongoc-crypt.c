@@ -363,7 +363,6 @@ _state_need_mongo_keys (_state_machine_t *state_machine, bson_error_t *error)
       state_machine->keyvault_coll, &filter_bson, &opts, NULL /* read prefs */);
    /* 2. Feed all resulting documents back (if any) with repeated calls to
     * mongocrypt_ctx_mongo_feed. */
-   printf ("checking key vault collection: %s.%s\n", state_machine->keyvault_coll->db, state_machine->keyvault_coll->collection);
    while (mongoc_cursor_next (cursor, &key_bson)) {
       mongocrypt_binary_destroy (key_bin);
       key_bin = mongocrypt_binary_new_from_data (
