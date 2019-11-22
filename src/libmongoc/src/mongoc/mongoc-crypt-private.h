@@ -103,13 +103,17 @@ Create a data key document (does not insert into key vault).
 - may return false and set error.
 */
 bool
-_mongoc_crypt_create_datakey (_mongoc_crypt_t *crypt,
-                              const char* kms_provider,
-                              const bson_t *masterkey,
-                              char **keyaltnames,
-                              uint32_t keyaltnames_count,
-                              bson_t *doc_out,
-                              bson_error_t *error);
+_mongoc_crypt_create_datakey (
+   _mongoc_crypt_t *crypt,
+   mongoc_collection_t *key_vault_coll, /* TODO: we don't really need the key
+                                           vault collection, just a socket
+                                           timeout. */
+   const char *kms_provider,
+   const bson_t *masterkey,
+   char **keyaltnames,
+   uint32_t keyaltnames_count,
+   bson_t *doc_out,
+   bson_error_t *error);
 
 #endif /* MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION */
 #endif /* MONGOC_CRYPT_PRIVATE_H */

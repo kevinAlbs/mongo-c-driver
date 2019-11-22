@@ -1082,6 +1082,178 @@ test_views_are_prohibited (void *unused)
    mongoc_client_destroy (client);
 }
 
+static void
+test_custom_endpoint (void *unused)
+{
+   bson_t *kms_providers;
+   mongoc_client_t *keyvault_client;
+   mongoc_client_encryption_opts_t *client_encryption_opts;
+   mongoc_client_encryption_t *client_encryption;
+   mongoc_client_encryption_datakey_opts_t *datakey_opts;
+   bson_error_t error;
+   bool res;
+   bson_t *masterkey;
+   bson_value_t keyid;
+   bson_value_t test;
+   bson_value_t ciphertext;
+   mongoc_client_encryption_encrypt_opts_t *encrypt_opts;
+
+   keyvault_client = test_framework_client_new ();
+   kms_providers = _make_kms_providers (true /* aws */, false /* local */);
+   client_encryption_opts = mongoc_client_encryption_opts_new ();
+   mongoc_client_encryption_opts_set_kms_providers (client_encryption_opts,
+                                                    kms_providers);
+   mongoc_client_encryption_opts_set_keyvault_namespace (
+      client_encryption_opts, "admin", "datakeys");
+   mongoc_client_encryption_opts_set_keyvault_client (client_encryption_opts,
+                                                      keyvault_client);
+   client_encryption =
+      mongoc_client_encryption_new (client_encryption_opts, &error);
+   ASSERT_OR_PRINT (client_encryption, error);
+
+   datakey_opts = mongoc_client_encryption_datakey_opts_new ();
+   test.value_type = BSON_TYPE_UTF8;
+   test.value.v_utf8.str = "test";
+   test.value.v_utf8.len = 4;
+
+   encrypt_opts = mongoc_client_encryption_encrypt_opts_new ();
+   mongoc_client_encryption_encrypt_opts_set_algorithm (
+      encrypt_opts, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic");
+
+   /* No endpoint, expect to succeed. */
+   masterkey = BCON_NEW (
+      "region", "us-east-1", "key", "arn:aws:kms:us-east-1:579766882180:key/"
+                                    "89fcc2c4-08b0-4bd9-9f25-e30687b580d0");
+   mongoc_client_encryption_datakey_opts_set_masterkey (datakey_opts,
+                                                        masterkey);
+   res = mongoc_client_encryption_create_datakey (
+      client_encryption, "aws", datakey_opts, &keyid, &error);
+   /* Use the returned UUID of the key to explicitly encrypt and decrypt the
+    * string "test" to validate it works. */
+   ASSERT_OR_PRINT (res, error);
+   mongoc_client_encryption_encrypt_opts_set_keyid (encrypt_opts, &keyid);
+   res = mongoc_client_encryption_encrypt (
+      client_encryption, &test, encrypt_opts, &ciphertext, &error);
+   ASSERT_OR_PRINT (res, error);
+   bson_value_destroy (&keyid);
+   bson_value_destroy (&ciphertext);
+   bson_destroy (masterkey);
+
+   /* Custom endpoint, with the same as the default. Expect to succeed */
+   masterkey = BCON_NEW ("region",
+                         "us-east-1",
+                         "key",
+                         "arn:aws:kms:us-east-1:579766882180:key/"
+                         "89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
+                         "endpoint",
+                         "kms.us-east-1.amazonaws.com");
+   mongoc_client_encryption_datakey_opts_set_masterkey (datakey_opts,
+                                                        masterkey);
+   res = mongoc_client_encryption_create_datakey (
+      client_encryption, "aws", datakey_opts, &keyid, &error);
+   /* Use the returned UUID of the key to explicitly encrypt and decrypt the
+    * string "test" to validate it works. */
+   ASSERT_OR_PRINT (res, error);
+   mongoc_client_encryption_encrypt_opts_set_keyid (encrypt_opts, &keyid);
+   res = mongoc_client_encryption_encrypt (
+      client_encryption, &test, encrypt_opts, &ciphertext, &error);
+   ASSERT_OR_PRINT (res, error);
+   bson_value_destroy (&keyid);
+   bson_value_destroy (&ciphertext);
+   bson_destroy (masterkey);
+
+   /* Custom endpoint, with the same as the default but port included. Expect to
+    * succeed */
+   masterkey = BCON_NEW ("region",
+                         "us-east-1",
+                         "key",
+                         "arn:aws:kms:us-east-1:579766882180:key/"
+                         "89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
+                         "endpoint",
+                         "kms.us-east-1.amazonaws.com:443");
+   mongoc_client_encryption_datakey_opts_set_masterkey (datakey_opts,
+                                                        masterkey);
+   res = mongoc_client_encryption_create_datakey (
+      client_encryption, "aws", datakey_opts, &keyid, &error);
+   /* Use the returned UUID of the key to explicitly encrypt and decrypt the
+    * string "test" to validate it works. */
+   ASSERT_OR_PRINT (res, error);
+   mongoc_client_encryption_encrypt_opts_set_keyid (encrypt_opts, &keyid);
+   res = mongoc_client_encryption_encrypt (
+      client_encryption, &test, encrypt_opts, &ciphertext, &error);
+   ASSERT_OR_PRINT (res, error);
+   bson_value_destroy (&keyid);
+   bson_value_destroy (&ciphertext);
+   bson_destroy (masterkey);
+
+   /* Custom endpoint, with the same as the default but wrong port included.
+    * Expect to fail with socket error */
+   masterkey = BCON_NEW ("region",
+                         "us-east-1",
+                         "key",
+                         "arn:aws:kms:us-east-1:579766882180:key/"
+                         "89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
+                         "endpoint",
+                         "kms.us-east-1.amazonaws.com:12345");
+   mongoc_client_encryption_datakey_opts_set_masterkey (datakey_opts,
+                                                        masterkey);
+   res = mongoc_client_encryption_create_datakey (
+      client_encryption, "aws", datakey_opts, &keyid, &error);
+   BSON_ASSERT (!res);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_STREAM,
+                          MONGOC_ERROR_STREAM_CONNECT,
+                          "Failed to connect");
+   bson_value_destroy (&keyid);
+   bson_destroy (masterkey);
+
+   /* Custom endpoint, but wrong region. */
+   masterkey = BCON_NEW ("region",
+                         "us-east-1",
+                         "key",
+                         "arn:aws:kms:us-east-1:579766882180:key/"
+                         "89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
+                         "endpoint",
+                         "kms.us-east-2.amazonaws.com");
+   mongoc_client_encryption_datakey_opts_set_masterkey (datakey_opts,
+                                                        masterkey);
+   memset (&error, 0, sizeof (bson_error_t));
+   res = mongoc_client_encryption_create_datakey (
+      client_encryption, "aws", datakey_opts, &keyid, &error);
+   BSON_ASSERT (!res);
+   ASSERT_ERROR_CONTAINS (
+      error, MONGOC_ERROR_CLIENT_SIDE_ENCRYPTION, 1, "us-east-1");
+   bson_value_destroy (&keyid);
+   bson_destroy (masterkey);
+
+   /* Custom endpoint to example.com. */
+   masterkey = BCON_NEW ("region",
+                         "us-east-1",
+                         "key",
+                         "arn:aws:kms:us-east-1:579766882180:key/"
+                         "89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
+                         "endpoint",
+                         "example.com");
+   mongoc_client_encryption_datakey_opts_set_masterkey (datakey_opts,
+                                                        masterkey);
+   memset (&error, 0, sizeof (bson_error_t));
+   res = mongoc_client_encryption_create_datakey (
+      client_encryption, "aws", datakey_opts, &keyid, &error);
+   BSON_ASSERT (!res);
+   ASSERT_ERROR_CONTAINS (
+      error, MONGOC_ERROR_CLIENT_SIDE_ENCRYPTION, 1, "parse error");
+   bson_value_destroy (&keyid);
+   bson_destroy (masterkey);
+
+   bson_destroy (kms_providers);
+   mongoc_client_encryption_opts_destroy (client_encryption_opts);
+   mongoc_client_encryption_datakey_opts_destroy (datakey_opts);
+   mongoc_client_encryption_destroy (client_encryption);
+   mongoc_client_encryption_encrypt_opts_destroy (encrypt_opts);
+   mongoc_client_destroy (keyvault_client);
+}
+
+/* TODO: add skip_if_offline to tests requiring AWS */
 void
 test_client_side_encryption_install (TestSuite *suite)
 {
@@ -1119,6 +1291,13 @@ test_client_side_encryption_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/client_side_encryption/views_are_prohibited",
                       test_views_are_prohibited,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption,
+                      test_framework_skip_if_max_wire_version_less_than_8);
+   TestSuite_AddFull (suite,
+                      "/client_side_encryption/custom_endpoint",
+                      test_custom_endpoint,
                       NULL,
                       NULL,
                       test_framework_skip_if_no_client_side_encryption,

@@ -192,11 +192,15 @@ typedef struct {
    const char *db_name;
 } _state_machine_t;
 
-_state_machine_t * _state_machine_new (void) {
-   return  bson_malloc0 (sizeof (_state_machine_t));
+_state_machine_t *
+_state_machine_new (void)
+{
+   return bson_malloc0 (sizeof (_state_machine_t));
 }
 
-void _state_machine_destroy (_state_machine_t* state_machine) {
+void
+_state_machine_destroy (_state_machine_t *state_machine)
+{
    mongocrypt_ctx_destroy (state_machine->ctx);
    bson_free (state_machine);
 }
@@ -228,7 +232,8 @@ _state_need_mongo_collinfo (_state_machine_t *state_machine,
    }
 
    bson_append_document (&opts, "filter", -1, &filter_bson);
-   db = mongoc_client_get_database (state_machine->collinfo_client, state_machine->db_name);
+   db = mongoc_client_get_database (state_machine->collinfo_client,
+                                    state_machine->db_name);
    cursor = mongoc_database_find_collections_with_opts (db, &opts);
    if (mongoc_cursor_error (cursor, error)) {
       goto fail;
@@ -403,14 +408,15 @@ _get_stream (const char *endpoint,
    bool ret = false;
    mongoc_ssl_opt_t ssl_opts = {0};
    mongoc_host_list_t host;
-   char *copied_endpoint = NULL;
+   char *host_and_port = NULL;
 
    if (!strchr (endpoint, ':')) {
-      copied_endpoint = bson_strdup_printf ("%s:443", endpoint);
+      host_and_port = bson_strdup_printf ("%s:443", endpoint);
+   } else {
+      host_and_port = (char *) endpoint; /* we promise not to modify */
    }
 
-   if (!_mongoc_host_list_from_string_with_err (
-          &host, copied_endpoint ? copied_endpoint : endpoint, error)) {
+   if (!_mongoc_host_list_from_string_with_err (&host, host_and_port, error)) {
       goto fail;
    }
 
@@ -422,16 +428,18 @@ _get_stream (const char *endpoint,
    /* Wrap in a tls_stream. */
    memcpy (&ssl_opts, mongoc_ssl_opt_get_default (), sizeof ssl_opts);
    tls_stream = mongoc_stream_tls_new_with_hostname (
-      base_stream, endpoint, &ssl_opts, 1 /* client */);
+      base_stream, host.host, &ssl_opts, 1 /* client */);
 
    if (!mongoc_stream_tls_handshake_block (
-          tls_stream, endpoint, connecttimeoutms, error)) {
+          tls_stream, host.host, connecttimeoutms, error)) {
       goto fail;
    }
 
    ret = true;
 fail:
-   bson_free (copied_endpoint);
+   if (host_and_port != endpoint) {
+      bson_free (host_and_port);
+   }
    if (!ret) {
       if (tls_stream) {
          /* destroys base_stream too */
@@ -454,8 +462,9 @@ _state_need_kms (_state_machine_t *state_machine, bson_error_t *error)
    mongocrypt_binary_t *http_reply = NULL;
    const char *endpoint;
    uint32_t sockettimeout;
-   
-   sockettimeout = state_machine->keyvault_coll->client->cluster.sockettimeoutms;
+
+   sockettimeout =
+      state_machine->keyvault_coll->client->cluster.sockettimeoutms;
    kms_ctx = mongocrypt_ctx_next_kms_ctx (state_machine->ctx);
    while (kms_ctx) {
       mongoc_iovec_t iov;
@@ -472,10 +481,7 @@ _state_need_kms (_state_machine_t *state_machine, bson_error_t *error)
          goto fail;
       }
 
-      tls_stream =
-         _get_stream (endpoint,
-                      sockettimeout,
-                      error);
+      tls_stream = _get_stream (endpoint, sockettimeout, error);
       if (!tls_stream) {
          goto fail;
       }
@@ -484,11 +490,7 @@ _state_need_kms (_state_machine_t *state_machine, bson_error_t *error)
       iov.iov_len = mongocrypt_binary_len (http_req);
 
       if (!_mongoc_stream_writev_full (
-             tls_stream,
-             &iov,
-             1,
-             sockettimeout,
-             error)) {
+             tls_stream, &iov, 1, sockettimeout, error)) {
          goto fail;
       }
 
@@ -505,11 +507,7 @@ _state_need_kms (_state_machine_t *state_machine, bson_error_t *error)
          }
 
          read_ret = mongoc_stream_read (
-            tls_stream,
-            buf,
-            bytes_needed,
-            1 /* min_bytes. */,
-            sockettimeout);
+            tls_stream, buf, bytes_needed, 1 /* min_bytes. */, sockettimeout);
          if (read_ret == -1) {
             bson_set_error (error,
                             MONGOC_ERROR_STREAM,
@@ -806,8 +804,8 @@ _mongoc_crypt_auto_encrypt (_mongoc_crypt_t *crypt,
       goto fail;
    }
 
-   cmd_bin =
-      mongocrypt_binary_new_from_data ((uint8_t*)bson_get_data (cmd_in), cmd_in->len);
+   cmd_bin = mongocrypt_binary_new_from_data (
+      (uint8_t *) bson_get_data (cmd_in), cmd_in->len);
    if (!mongocrypt_ctx_encrypt_init (
           state_machine->ctx, db_name, -1, cmd_bin)) {
       _ctx_check_error (state_machine->ctx, error, true);
@@ -847,8 +845,8 @@ _mongoc_crypt_auto_decrypt (_mongoc_crypt_t *crypt,
       goto fail;
    }
 
-   doc_bin =
-      mongocrypt_binary_new_from_data ((uint8_t*)bson_get_data (doc_in), doc_in->len);
+   doc_bin = mongocrypt_binary_new_from_data (
+      (uint8_t *) bson_get_data (doc_in), doc_in->len);
    if (!mongocrypt_ctx_decrypt_init (state_machine->ctx, doc_bin)) {
       _ctx_check_error (state_machine->ctx, error, true);
       goto fail;
@@ -917,7 +915,7 @@ _mongoc_crypt_explicit_encrypt (_mongoc_crypt_t *crypt,
       }
    }
 
-   if (keyid &&  keyid->value_type == BSON_TYPE_BINARY) {
+   if (keyid && keyid->value_type == BSON_TYPE_BINARY) {
       mongocrypt_binary_t *keyid_bin;
       bool keyid_ret;
 
@@ -950,8 +948,7 @@ _mongoc_crypt_explicit_encrypt (_mongoc_crypt_t *crypt,
    }
 
    bson_destroy (&result);
-   if (!_state_machine_run (
-          state_machine, &result, error)) {
+   if (!_state_machine_run (state_machine, &result, error)) {
       goto fail;
    }
 
@@ -1039,6 +1036,7 @@ fail:
 
 bool
 _mongoc_crypt_create_datakey (_mongoc_crypt_t *crypt,
+                              mongoc_collection_t *key_vault_coll,
                               const char *kms_provider,
                               const bson_t *masterkey,
                               char **keyaltnames,
@@ -1051,6 +1049,7 @@ _mongoc_crypt_create_datakey (_mongoc_crypt_t *crypt,
 
    bson_init (doc_out);
    state_machine = _state_machine_new ();
+   state_machine->keyvault_coll = key_vault_coll;
    state_machine->ctx = mongocrypt_ctx_new (crypt->handle);
    if (!state_machine->ctx) {
       _crypt_check_error (crypt->handle, error, true);
