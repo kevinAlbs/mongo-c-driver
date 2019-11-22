@@ -531,6 +531,19 @@ _make_kms_providers (bool with_aws, bool with_local)
    return kms_providers;
 }
 
+/* Convenience helper for maybe bypassing spawning mongocryptd */
+static void
+_check_bypass (mongoc_auto_encryption_opts_t *opts)
+{
+   if (test_framework_getenv_bool ("MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN")) {
+      bson_t *extra;
+
+      extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
+      mongoc_auto_encryption_opts_set_extra (opts, extra);
+      bson_destroy (extra);
+   }
+}
+
 /* TODO Then implement a multi-threaded test. */
 /* Also test with external key vault client pool. */
 static void
@@ -846,8 +859,8 @@ test_datakey_and_double_encryption (void *unused)
 
    test_datakey_and_double_encryption_creating_and_using (
       client_encryption, client, client_encrypted, "local", &test_ctx);
-   // test_datakey_and_double_encryption_creating_and_using (client_encryption,
-   // client, client_encrypted, "aws", &test_ctx);
+   test_datakey_and_double_encryption_creating_and_using (
+      client_encryption, client, client_encrypted, "aws", &test_ctx);
 
    bson_destroy (kms_providers);
    bson_destroy (schema_map);
@@ -858,6 +871,157 @@ test_datakey_and_double_encryption (void *unused)
    mongoc_client_destroy (client_encrypted);
    mongoc_client_encryption_destroy (client_encryption);
    bson_destroy (test_ctx.last_cmd);
+}
+
+static void
+_test_key_vault (bool with_external_key_vault)
+{
+   mongoc_client_t *client;
+   mongoc_client_t *client_encrypted;
+   mongoc_client_t *client_external;
+   mongoc_client_encryption_t *client_encryption;
+   mongoc_uri_t *external_uri;
+   mongoc_collection_t *coll;
+   bson_t *datakey;
+   bson_t *kms_providers;
+   bson_error_t error;
+   mongoc_write_concern_t *wc;
+   bson_t *schema;
+   bson_t *schema_map;
+   mongoc_auto_encryption_opts_t *auto_encryption_opts;
+   mongoc_client_encryption_opts_t *client_encryption_opts;
+   mongoc_client_encryption_encrypt_opts_t *encrypt_opts;
+   bool res;
+   const bson_value_t *keyid;
+   bson_value_t value;
+   bson_value_t ciphertext;
+   bson_iter_t iter;
+
+   external_uri = test_framework_get_uri ();
+   mongoc_uri_set_username (external_uri, "fake-user");
+   mongoc_uri_set_password (external_uri, "fake-pwd");
+   client_external = mongoc_client_new_from_uri (external_uri);
+
+   /* Using client, drop the collections admin.datakeys and db.coll. */
+   client = test_framework_client_new ();
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   (void) mongoc_collection_drop (coll, NULL);
+   mongoc_collection_destroy (coll);
+   coll = mongoc_client_get_collection (client, "admin", "datakeys");
+   (void) mongoc_collection_drop (coll, NULL);
+
+   /* Insert the document external-key.json into ``admin.datakeys``. */
+   wc = mongoc_write_concern_new ();
+   mongoc_write_concern_set_wmajority (wc, 1000);
+   mongoc_collection_set_write_concern (coll, wc);
+   datakey = get_bson_from_json_file ("./src/libmongoc/tests/"
+                                      "client_side_encryption_prose/external/"
+                                      "external-key.json");
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (coll, datakey, NULL, NULL, &error), error);
+   mongoc_collection_destroy (coll);
+
+   /* Create a MongoClient configured with auto encryption. */
+   client_encrypted = test_framework_client_new ();
+   mongoc_client_set_error_api (client_encrypted, MONGOC_ERROR_API_VERSION_2);
+   auto_encryption_opts = mongoc_auto_encryption_opts_new ();
+   _check_bypass (auto_encryption_opts);
+   schema = get_bson_from_json_file ("./src/libmongoc/tests/"
+                                     "client_side_encryption_prose/external/"
+                                     "external-schema.json");
+   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT (schema));
+   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
+   mongoc_auto_encryption_opts_set_kms_providers (auto_encryption_opts,
+                                                  kms_providers);
+   mongoc_auto_encryption_opts_set_keyvault_namespace (
+      auto_encryption_opts, "admin", "datakeys");
+   mongoc_auto_encryption_opts_set_schema_map (auto_encryption_opts,
+                                               schema_map);
+   if (with_external_key_vault) {
+      mongoc_auto_encryption_opts_set_keyvault_client (auto_encryption_opts,
+                                                       client_external);
+   }
+   ASSERT_OR_PRINT (mongoc_client_enable_auto_encryption (
+                       client_encrypted, auto_encryption_opts, &error),
+                    error);
+
+   /* Create a ClientEncryption object. */
+   client_encryption_opts = mongoc_client_encryption_opts_new ();
+   mongoc_client_encryption_opts_set_kms_providers (client_encryption_opts,
+                                                    kms_providers);
+   mongoc_client_encryption_opts_set_keyvault_namespace (
+      client_encryption_opts, "admin", "datakeys");
+   if (with_external_key_vault) {
+      mongoc_client_encryption_opts_set_keyvault_client (client_encryption_opts,
+                                                         client_external);
+   } else {
+      mongoc_client_encryption_opts_set_keyvault_client (client_encryption_opts,
+                                                         client);
+   }
+   client_encryption =
+      mongoc_client_encryption_new (client_encryption_opts, &error);
+   ASSERT_OR_PRINT (client_encryption, error);
+
+   /* Use client_encrypted to insert the document {"encrypted": "test"} into
+    * db.coll. */
+   coll = mongoc_client_get_collection (client_encrypted, "db", "coll");
+   res = mongoc_collection_insert_one (
+      coll, tmp_bson ("{'encrypted': 'test'}"), NULL, NULL, &error);
+   if (with_external_key_vault) {
+      BSON_ASSERT (!res);
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_CLIENT,
+                             MONGOC_ERROR_CLIENT_AUTHENTICATE,
+                             "Authentication failed");
+   } else {
+      ASSERT_OR_PRINT (res, error);
+   }
+
+   /* Use client_encryption to explicitly encrypt the string "test" with key ID
+    * ``LOCALAAAAAAAAAAAAAAAAA==`` and deterministic algorithm. */
+   encrypt_opts = mongoc_client_encryption_encrypt_opts_new ();
+   mongoc_client_encryption_encrypt_opts_set_algorithm (
+      encrypt_opts, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic");
+   BSON_ASSERT (bson_iter_init_find (&iter, datakey, "_id"));
+   keyid = bson_iter_value (&iter);
+   mongoc_client_encryption_encrypt_opts_set_keyid (encrypt_opts, keyid);
+   value.value_type = BSON_TYPE_UTF8;
+   value.value.v_utf8.str = "test";
+   value.value.v_utf8.len = 4;
+   res = mongoc_client_encryption_encrypt (
+      client_encryption, &value, encrypt_opts, &ciphertext, &error);
+   if (with_external_key_vault) {
+      BSON_ASSERT (!res);
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_CLIENT,
+                             MONGOC_ERROR_CLIENT_AUTHENTICATE,
+                             "Authentication failed");
+   } else {
+      ASSERT_OR_PRINT (res, error);
+   }
+
+   bson_destroy (schema);
+   bson_destroy (schema_map);
+   bson_destroy (datakey);
+   bson_value_destroy (&ciphertext);
+   mongoc_write_concern_destroy (wc);
+   bson_destroy (kms_providers);
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+   mongoc_client_destroy (client_encrypted);
+   mongoc_client_destroy (client_external);
+   mongoc_uri_destroy (external_uri);
+   mongoc_auto_encryption_opts_destroy (auto_encryption_opts);
+   mongoc_client_encryption_opts_destroy (client_encryption_opts);
+   mongoc_client_encryption_destroy (client_encryption);
+   mongoc_client_encryption_encrypt_opts_destroy (encrypt_opts);
+}
+
+static void
+test_external_key_vault (void *unused)
+{
+   _test_key_vault (false /* external */);
+   _test_key_vault (true /* external */);
 }
 
 void
@@ -871,6 +1035,21 @@ test_client_side_encryption_install (TestSuite *suite)
       resolved,
       test_client_side_encryption_cb,
       test_framework_skip_if_no_client_side_encryption);
+   /* Prose tests from the spec. */
+   TestSuite_AddFull (suite,
+                      "/client_side_encryption/datakey_and_double_encryption",
+                      test_datakey_and_double_encryption,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption,
+                      test_framework_skip_if_max_wire_version_less_than_8);
+   TestSuite_AddFull (suite,
+                      "/client_side_encryption/external_key_vault",
+                      test_external_key_vault,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption,
+                      test_framework_skip_if_max_wire_version_less_than_8);
    TestSuite_AddFull (
       suite,
       "/client_side_encryption/bson_size_limits_and_batch_splitting",
@@ -879,13 +1058,7 @@ test_client_side_encryption_install (TestSuite *suite)
       NULL,
       test_framework_skip_if_no_client_side_encryption,
       test_framework_skip_if_max_wire_version_less_than_8);
-   TestSuite_AddFull (suite,
-                      "/client_side_encryption/datakey_and_double_encryption",
-                      test_datakey_and_double_encryption,
-                      NULL,
-                      NULL,
-                      test_framework_skip_if_no_client_side_encryption,
-                      test_framework_skip_if_max_wire_version_less_than_8);
+   /* Other, C driver specific, tests. */
    TestSuite_AddFull (suite,
                       "/client_side_encryption/single_and_pool_mismatches",
                       test_invalid_single_and_pool_mismatches,

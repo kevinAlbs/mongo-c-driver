@@ -146,6 +146,9 @@ mongoc_client_encryption_opts_new (void)
 void
 mongoc_client_encryption_opts_destroy (mongoc_client_encryption_opts_t *opts)
 {
+   if (!opts) {
+      return;
+   }
    bson_free (opts->keyvault_db);
    bson_free (opts->keyvault_coll);
    bson_destroy (opts->kms_providers);
@@ -395,7 +398,8 @@ mongoc_client_encryption_new (mongoc_client_encryption_opts_t *opts,
 
 void
 mongoc_client_encryption_destroy (mongoc_client_encryption_t *client_encryption)
-{ }
+{
+}
 
 bool
 mongoc_client_encryption_encrypt (mongoc_client_encryption_t *client_encryption,
@@ -1377,7 +1381,7 @@ mongoc_client_encryption_new (mongoc_client_encryption_opts_t *opts,
    wc = mongoc_write_concern_new ();
    mongoc_write_concern_set_wmajority (wc, 1000);
    mongoc_collection_set_write_concern (client_encryption->keyvault_coll, wc);
-   
+
    client_encryption->kms_providers = bson_copy (opts->kms_providers);
    client_encryption->crypt =
       _mongoc_crypt_new (opts->kms_providers, NULL /* schema_map */, error);
@@ -1398,6 +1402,9 @@ fail:
 void
 mongoc_client_encryption_destroy (mongoc_client_encryption_t *client_encryption)
 {
+   if (!client_encryption) {
+      return;
+   }
    _mongoc_crypt_destroy (client_encryption->crypt);
    mongoc_collection_destroy (client_encryption->keyvault_coll);
    bson_destroy (client_encryption->kms_providers);
@@ -1426,18 +1433,21 @@ mongoc_client_encryption_create_datakey (
 
    bson_destroy (&datakey);
    if (!_mongoc_crypt_create_datakey (client_encryption->crypt,
-                               kms_provider,
-                               opts->masterkey,
-                               opts->keyaltnames,
-                               opts->keyaltnames_count,
-                               &datakey,
-                               error)) {
+                                      kms_provider,
+                                      opts->masterkey,
+                                      opts->keyaltnames,
+                                      opts->keyaltnames_count,
+                                      &datakey,
+                                      error)) {
       goto fail;
-    }
+   }
 
    /* Insert the data key with write concern majority */
-   ret = mongoc_collection_insert_one (
-      client_encryption->keyvault_coll, &datakey, NULL /* opts */, NULL /* reply */, error);
+   ret = mongoc_collection_insert_one (client_encryption->keyvault_coll,
+                                       &datakey,
+                                       NULL /* opts */,
+                                       NULL /* reply */,
+                                       error);
    if (!ret) {
       goto fail;
    }
