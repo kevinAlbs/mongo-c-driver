@@ -376,6 +376,7 @@ _reset (mongoc_client_pool_t **pool,
    }
    bson_destroy (kms_providers);
 }
+
 static void
 test_invalid_single_and_pool_mismatches (void *unused)
 {
@@ -487,6 +488,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
 }
 
 /* Convenience helper for creating auto encryption opts */
+/* TODO: replace other manual calls to KMS construction  with this helper */
 static bson_t *
 _make_kms_providers (bool with_aws, bool with_local)
 {
@@ -532,6 +534,7 @@ _make_kms_providers (bool with_aws, bool with_local)
 }
 
 /* Convenience helper for maybe bypassing spawning mongocryptd */
+/* TODO: replace other manual instances of this with a call to this.  */
 static void
 _check_bypass (mongoc_auto_encryption_opts_t *opts)
 {
@@ -1024,6 +1027,61 @@ test_external_key_vault (void *unused)
    _test_key_vault (true /* external */);
 }
 
+static void
+test_views_are_prohibited (void *unused)
+{
+   mongoc_client_t *client;
+   mongoc_client_t *client_encrypted;
+   mongoc_collection_t *coll;
+   bool res;
+   bson_error_t error;
+
+   mongoc_auto_encryption_opts_t *auto_encryption_opts;
+   bson_t *kms_providers;
+
+   client = test_framework_client_new ();
+   /* Using client, drop and create a view named db.view with an empty pipeline.
+    * E.g. using the command { "create": "view", "viewOn": "coll" }. */
+   coll = mongoc_client_get_collection (client, "db", "view");
+   (void) mongoc_collection_drop (coll, NULL);
+   res = mongoc_client_command_simple (
+      client,
+      "db",
+      tmp_bson ("{'create': 'view', 'viewOn': 'coll'}"),
+      NULL,
+      NULL,
+      &error);
+   ASSERT_OR_PRINT (res, error);
+
+   client_encrypted = test_framework_client_new ();
+   auto_encryption_opts = mongoc_auto_encryption_opts_new ();
+   _check_bypass (auto_encryption_opts);
+   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
+   mongoc_auto_encryption_opts_set_kms_providers (auto_encryption_opts,
+                                                  kms_providers);
+   mongoc_auto_encryption_opts_set_keyvault_namespace (
+      auto_encryption_opts, "admin", "datakeys");
+   ASSERT_OR_PRINT (mongoc_client_enable_auto_encryption (
+                       client_encrypted, auto_encryption_opts, &error),
+                    error);
+
+   mongoc_collection_destroy (coll);
+   coll = mongoc_client_get_collection (client_encrypted, "db", "view");
+   res = mongoc_collection_insert_one (
+      coll, tmp_bson ("{'x': 1}"), NULL, NULL, &error);
+   BSON_ASSERT (!res);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_CLIENT_SIDE_ENCRYPTION,
+                          1,
+                          "cannot auto encrypt a view");
+
+   bson_destroy (kms_providers);
+   mongoc_collection_destroy (coll);
+   mongoc_auto_encryption_opts_destroy (auto_encryption_opts);
+   mongoc_client_destroy (client_encrypted);
+   mongoc_client_destroy (client);
+}
+
 void
 test_client_side_encryption_install (TestSuite *suite)
 {
@@ -1058,6 +1116,13 @@ test_client_side_encryption_install (TestSuite *suite)
       NULL,
       test_framework_skip_if_no_client_side_encryption,
       test_framework_skip_if_max_wire_version_less_than_8);
+   TestSuite_AddFull (suite,
+                      "/client_side_encryption/views_are_prohibited",
+                      test_views_are_prohibited,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption,
+                      test_framework_skip_if_max_wire_version_less_than_8);
    /* Other, C driver specific, tests. */
    TestSuite_AddFull (suite,
                       "/client_side_encryption/single_and_pool_mismatches",
