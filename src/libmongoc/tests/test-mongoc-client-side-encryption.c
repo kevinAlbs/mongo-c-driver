@@ -1121,9 +1121,11 @@ test_custom_endpoint (void *unused)
       encrypt_opts, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic");
 
    /* No endpoint, expect to succeed. */
-   masterkey = BCON_NEW (
-      "region", "us-east-1", "key", "arn:aws:kms:us-east-1:579766882180:key/"
-                                    "89fcc2c4-08b0-4bd9-9f25-e30687b580d0");
+   masterkey = BCON_NEW ("region",
+                         "us-east-1",
+                         "key",
+                         "arn:aws:kms:us-east-1:579766882180:key/"
+                         "89fcc2c4-08b0-4bd9-9f25-e30687b580d0");
    mongoc_client_encryption_datakey_opts_set_masterkey (datakey_opts,
                                                         masterkey);
    res = mongoc_client_encryption_create_datakey (
@@ -1253,7 +1255,299 @@ test_custom_endpoint (void *unused)
    mongoc_client_destroy (keyvault_client);
 }
 
-/* TODO: add skip_if_offline to tests requiring AWS */
+typedef struct {
+   const char *kms;
+   const char *type;
+   const char *algo;
+   const char *method;
+   const char *identifier;
+   bool allowed;
+   bson_value_t value; /* a copy */
+} corpus_field_t;
+
+static corpus_field_t *
+_corpus_field_new (bson_iter_t *top_iter)
+{
+   bson_iter_t iter;
+   corpus_field_t *field;
+
+   field = bson_malloc0 (sizeof (corpus_field_t));
+   memset (field, 0, sizeof (*field));
+   BSON_ASSERT (BSON_ITER_HOLDS_DOCUMENT (top_iter));
+   bson_iter_recurse (top_iter, &iter);
+   while (bson_iter_next (&iter)) {
+      if (0 == strcmp ("kms", bson_iter_key (&iter))) {
+         field->kms = bson_iter_utf8 (&iter, NULL);
+      } else if (0 == strcmp ("type", bson_iter_key (&iter))) {
+         field->type = bson_iter_utf8 (&iter, NULL);
+      } else if (0 == strcmp ("algo", bson_iter_key (&iter))) {
+         field->algo = bson_iter_utf8 (&iter, NULL);
+      } else if (0 == strcmp ("method", bson_iter_key (&iter))) {
+         field->method = bson_iter_utf8 (&iter, NULL);
+      } else if (0 == strcmp ("identifier", bson_iter_key (&iter))) {
+         field->identifier = bson_iter_utf8 (&iter, NULL);
+      } else if (0 == strcmp ("allowed", bson_iter_key (&iter))) {
+         field->allowed = bson_iter_bool (&iter);
+      } else if (0 == strcmp ("value", bson_iter_key (&iter))) {
+         bson_value_copy (bson_iter_value (&iter), &field->value);
+      } else {
+         fprintf (stderr, "unexpected field: %s\n", bson_iter_key (&iter));
+         BSON_ASSERT (false);
+      }
+   }
+   return field;
+}
+
+static void
+_corpus_field_destroy (corpus_field_t *field)
+{
+   if (!field) {
+      return;
+   }
+   bson_value_destroy (&field->value);
+   bson_free (field);
+}
+
+#define LOCAL_UUID \
+   "\x2c\xe0\x80\x2c\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+#define AWS_UUID \
+   "\x01\x64\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+
+static void
+_corpus_copy_field (mongoc_client_encryption_t *client_encryption,
+                    bson_iter_t *iter,
+                    bson_t *corpus_copied)
+{
+   corpus_field_t *field;
+   const char *key = bson_iter_key (iter);
+   mongoc_client_encryption_encrypt_opts_t *encrypt_opts;
+   bson_value_t ciphertext;
+   bool res;
+   bson_error_t error;
+
+   if (0 == strcmp ("_id", key) || 0 == strcmp ("altname_aws", key) ||
+       0 == strcmp ("altname_local", key)) {
+      bson_append_value (corpus_copied, key, -1, bson_iter_value (iter));
+      return;
+   }
+   field = _corpus_field_new (iter);
+
+   if (0 == strcmp ("auto", field->method)) {
+      bson_append_value (corpus_copied, key, -1, bson_iter_value (iter));
+      return;
+   }
+
+   /* Otherwise, use explicit encryption. */
+   encrypt_opts = mongoc_client_encryption_encrypt_opts_new ();
+   if (0 == strcmp ("rand", field->algo)) {
+      mongoc_client_encryption_encrypt_opts_set_algorithm (
+         encrypt_opts, "AEAD_AES_256_CBC_HMAC_SHA_512-Random");
+   } else if (0 == strcmp ("det", field->algo)) {
+      mongoc_client_encryption_encrypt_opts_set_algorithm (
+         encrypt_opts, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic");
+   }
+
+   if (0 == strcmp ("id", field->identifier)) {
+      bson_value_t uuid;
+      uuid.value_type = BSON_TYPE_BINARY;
+      uuid.value.v_binary.subtype = BSON_SUBTYPE_UUID;
+      uuid.value.v_binary.data_len = 16;
+      if (0 == strcmp ("local", field->kms)) {
+         uuid.value.v_binary.data = (uint8_t *) LOCAL_UUID;
+      } else if (0 == strcmp ("aws", field->kms)) {
+         uuid.value.v_binary.data = (uint8_t *) AWS_UUID;
+      }
+      mongoc_client_encryption_encrypt_opts_set_keyid (encrypt_opts, &uuid);
+   } else if (0 == strcmp ("altname", field->identifier)) {
+      if (0 == strcmp ("local", field->kms)) {
+         mongoc_client_encryption_encrypt_opts_set_keyaltname (encrypt_opts,
+                                                               "local");
+      } else if (0 == strcmp ("aws", field->kms)) {
+         mongoc_client_encryption_encrypt_opts_set_keyaltname (encrypt_opts,
+                                                               "aws");
+      }
+   }
+
+   res = mongoc_client_encryption_encrypt (
+      client_encryption, &field->value, encrypt_opts, &ciphertext, &error);
+
+   if (field->allowed) {
+      bson_t new_field;
+      ASSERT_OR_PRINT (res, error);
+      bson_append_document_begin (corpus_copied, key, -1, &new_field);
+      BSON_APPEND_UTF8 (&new_field, "kms", field->kms);
+      BSON_APPEND_UTF8 (&new_field, "type", field->type);
+      BSON_APPEND_UTF8 (&new_field, "algo", field->algo);
+      BSON_APPEND_UTF8 (&new_field, "method", field->method);
+      BSON_APPEND_UTF8 (&new_field, "identifier", field->identifier);
+      BSON_APPEND_BOOL (&new_field, "allowed", field->allowed);
+      BSON_APPEND_VALUE (&new_field, "value", &ciphertext);
+      bson_append_document_end (corpus_copied, &new_field);
+   } else {
+      BSON_ASSERT (!res);
+      bson_append_value (corpus_copied, key, -1, bson_iter_value (iter));
+   }
+
+   bson_value_destroy (&ciphertext);
+   mongoc_client_encryption_encrypt_opts_destroy (encrypt_opts);
+   _corpus_field_destroy (field);
+}
+
+static void
+_test_corpus (bool local_schema)
+{
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   bson_t *schema;
+   bson_t *create_cmd;
+   bson_t *datakey;
+   bool res;
+   bson_error_t error;
+   mongoc_write_concern_t *wc;
+   mongoc_client_t *client_encrypted;
+   mongoc_auto_encryption_opts_t *auto_encryption_opts;
+   bson_t *kms_providers;
+   mongoc_client_encryption_t *client_encryption;
+   mongoc_client_encryption_opts_t *client_encryption_opts;
+   bson_t *corpus;
+   bson_t corpus_copied;
+   const bson_t *corpus_decrypted;
+   /* const bson_t *corpus_encrypted_actual; */
+   bson_t *corpus_encrypted;
+   bson_iter_t iter;
+   mongoc_cursor_t *cursor;
+
+   /* Create a MongoClient without encryption enabled */
+   client = test_framework_client_new ();
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   (void) mongoc_collection_drop (coll, NULL);
+   schema = get_bson_from_json_file ("./src/libmongoc/tests/"
+                                     "client_side_encryption_prose/corpus/"
+                                     "corpus-schema.json");
+
+   if (!local_schema) {
+      /* Drop and create the collection db.coll configured with the included
+       * JSON schema corpus-schema.json */
+      create_cmd = BCON_NEW ("create",
+                             "coll",
+                             "validator",
+                             "{",
+                             "$jsonSchema",
+                             BCON_DOCUMENT (schema),
+                             "}");
+      res = mongoc_client_command_simple (
+         client, "db", create_cmd, NULL, NULL, &error);
+      ASSERT_OR_PRINT (res, error);
+   }
+
+   /* Drop the collection admin.datakeys. Insert the documents
+    * corpus/corpus-key-local.json and corpus-key-aws.json */
+   mongoc_collection_destroy (coll);
+   coll = mongoc_client_get_collection (client, "admin", "datakeys");
+   (void) mongoc_collection_drop (coll, NULL);
+   wc = mongoc_write_concern_new ();
+   mongoc_write_concern_set_wmajority (wc, 1000);
+   mongoc_collection_set_write_concern (coll, wc);
+   datakey = get_bson_from_json_file ("./src/libmongoc/tests/"
+                                      "client_side_encryption_prose/corpus/"
+                                      "corpus-key-local.json");
+   res = mongoc_collection_insert_one (coll, datakey, NULL, NULL, &error);
+   ASSERT_OR_PRINT (res, error);
+   bson_destroy (datakey);
+   datakey = get_bson_from_json_file ("./src/libmongoc/tests/"
+                                      "client_side_encryption_prose/corpus/"
+                                      "corpus-key-aws.json");
+   res = mongoc_collection_insert_one (coll, datakey, NULL, NULL, &error);
+   ASSERT_OR_PRINT (res, error);
+
+   /* Create a MongoClient configured with auto encryption */
+   client_encrypted = test_framework_client_new ();
+   auto_encryption_opts = mongoc_auto_encryption_opts_new ();
+   _check_bypass (auto_encryption_opts);
+   kms_providers = _make_kms_providers (true /* aws */, true /* local */);
+   mongoc_auto_encryption_opts_set_kms_providers (auto_encryption_opts,
+                                                  kms_providers);
+   mongoc_auto_encryption_opts_set_keyvault_namespace (
+      auto_encryption_opts, "admin", "datakeys");
+   res = mongoc_client_enable_auto_encryption (
+      client_encrypted, auto_encryption_opts, &error);
+   ASSERT_OR_PRINT (res, error);
+
+   /* Create a ClientEncryption object */
+   client_encryption_opts = mongoc_client_encryption_opts_new ();
+   mongoc_client_encryption_opts_set_kms_providers (client_encryption_opts,
+                                                    kms_providers);
+   mongoc_client_encryption_opts_set_keyvault_namespace (
+      client_encryption_opts, "admin", "datakeys");
+   mongoc_client_encryption_opts_set_keyvault_client (client_encryption_opts,
+                                                      client);
+   client_encryption =
+      mongoc_client_encryption_new (client_encryption_opts, &error);
+   ASSERT_OR_PRINT (client_encryption, error);
+
+   corpus = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/corpus/corpus.json");
+
+   /* Try each field individually */
+   bson_iter_init (&iter, corpus);
+   bson_init (&corpus_copied);
+   while (bson_iter_next (&iter)) {
+      _corpus_copy_field (client_encryption, &iter, &corpus_copied);
+   }
+
+   /* Insert corpus_copied with auto encryption  */
+   mongoc_collection_destroy (coll);
+   coll = mongoc_client_get_collection (client_encrypted, "db", "coll");
+   printf ("%s\n", bson_as_canonical_extended_json (&corpus_copied, NULL));
+   res =
+      mongoc_collection_insert_one (coll, &corpus_copied, NULL, NULL, &error);
+   ASSERT_OR_PRINT (res, error);
+
+   /* Get the automatically decrypted corpus */
+   cursor =
+      mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), NULL, NULL);
+   BSON_ASSERT (mongoc_cursor_next (cursor, &corpus_decrypted));
+
+   /* It should exactly match corpus. match_bson does a subset match, so match
+    * in  both directions */
+   BSON_ASSERT (match_bson (corpus, corpus_decrypted, false));
+   BSON_ASSERT (match_bson (corpus_decrypted, corpus, false));
+   mongoc_cursor_destroy (cursor);
+
+   /* Load corpus-encrypted.json */
+   corpus_encrypted = get_bson_from_json_file ("./src/libmongoc/tests/"
+                                               "client_side_encryption_prose/"
+                                               "corpus/corpus-encrypted.json");
+   /* Get the actual encrypted document from unencrypted client */
+   mongoc_collection_destroy (coll);
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   /* TODO: continue here. */
+   /* cursor =  */
+
+
+   bson_destroy (corpus_encrypted);
+   bson_destroy (corpus);
+   bson_destroy (&corpus_copied);
+   mongoc_auto_encryption_opts_destroy (auto_encryption_opts);
+   mongoc_client_destroy (client_encrypted);
+   mongoc_client_encryption_opts_destroy (client_encryption_opts);
+   mongoc_client_encryption_destroy (client_encryption);
+   bson_destroy (kms_providers);
+   mongoc_write_concern_destroy (wc);
+   mongoc_collection_destroy (coll);
+   bson_destroy (datakey);
+   bson_destroy (schema);
+   bson_destroy (create_cmd);
+   mongoc_client_destroy (client);
+}
+
+static void
+test_corpus (void *unused)
+{
+   _test_corpus (false /* local schema */);
+   // TODO _test_corpus (true /* local schema */);
+}
+
 void
 test_client_side_encryption_install (TestSuite *suite)
 {
@@ -1272,7 +1566,8 @@ test_client_side_encryption_install (TestSuite *suite)
                       NULL,
                       NULL,
                       test_framework_skip_if_no_client_side_encryption,
-                      test_framework_skip_if_max_wire_version_less_than_8);
+                      test_framework_skip_if_max_wire_version_less_than_8,
+                      test_framework_skip_if_offline /* requires AWS */);
    TestSuite_AddFull (suite,
                       "/client_side_encryption/external_key_vault",
                       test_external_key_vault,
@@ -1296,12 +1591,21 @@ test_client_side_encryption_install (TestSuite *suite)
                       test_framework_skip_if_no_client_side_encryption,
                       test_framework_skip_if_max_wire_version_less_than_8);
    TestSuite_AddFull (suite,
+                      "/client_side_encryption/corpus",
+                      test_corpus,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption,
+                      test_framework_skip_if_max_wire_version_less_than_8,
+                      test_framework_skip_if_offline /* requires AWS */);
+   TestSuite_AddFull (suite,
                       "/client_side_encryption/custom_endpoint",
                       test_custom_endpoint,
                       NULL,
                       NULL,
                       test_framework_skip_if_no_client_side_encryption,
-                      test_framework_skip_if_max_wire_version_less_than_8);
+                      test_framework_skip_if_max_wire_version_less_than_8,
+                      test_framework_skip_if_offline /* requires AWS */);
    /* Other, C driver specific, tests. */
    TestSuite_AddFull (suite,
                       "/client_side_encryption/single_and_pool_mismatches",
