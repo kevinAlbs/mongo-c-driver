@@ -1394,6 +1394,62 @@ _corpus_copy_field (mongoc_client_encryption_t *client_encryption,
 }
 
 static void
+_corpus_check_encrypted (mongoc_client_encryption_t* client_encryption, bson_iter_t *expected_iter, bson_iter_t *actual_iter) {
+   corpus_field_t *expected;
+   corpus_field_t *actual;
+   const char* key;
+   bson_error_t error;
+   match_ctx_t match_ctx;
+
+   memset (&match_ctx, 0, sizeof(match_ctx));
+   key = bson_iter_key (expected_iter);
+   if (0 == strcmp ("_id", key) || 0 == strcmp ("altname_aws", key) ||
+       0 == strcmp ("altname_local", key)) {
+      return;
+   }
+
+   expected = _corpus_field_new (expected_iter);
+   actual = _corpus_field_new (actual_iter);
+
+   /* If the algo is det, that the value equals the value of the corresponding field
+    * in corpus_encrypted_actual.
+    */
+   if (0 == strcmp (expected->algo, "det")) {
+      BSON_ASSERT(match_bson_value (&expected->value, &actual->value, &match_ctx));
+   }
+
+   /* If the algo is rand and allowed is true, that the value does not equal the value of the corresponding field in corpus_encrypted_actual. */
+   if (0 == strcmp (expected->algo, "rand") && expected->allowed) {
+      BSON_ASSERT(!match_bson_value (&expected->value, &actual->value, &match_ctx));
+   }
+
+   /* If allowed is true, decrypt the value with client_encryption. Decrypt the value of the corresponding field of corpus_encrypted and validate that they are both equal */
+   if (expected->allowed) {
+      bson_value_t expected_decrypted;
+      bson_value_t actual_decrypted;
+      bool res;
+
+      res = mongoc_client_encryption_decrypt (client_encryption, &expected->value, &expected_decrypted, &error);
+      ASSERT_OR_PRINT (res, error);
+
+      res = mongoc_client_encryption_decrypt (client_encryption, &actual->value, &actual_decrypted, &error);
+      ASSERT_OR_PRINT (res, error);
+
+      BSON_ASSERT(0 == match_bson_value (&expected_decrypted, &actual_decrypted, &match_ctx));
+      bson_value_destroy (&expected_decrypted);
+      bson_value_destroy (&actual_decrypted);
+   }
+
+   /* If allowed is false, validate the value exactly equals the value of the corresponding field of corpus (neither was encrypted). */
+   if (!expected->allowed) {
+      BSON_ASSERT(0 == match_bson_value (&expected->value, &actual->value, &match_ctx));
+   }
+
+   _corpus_field_destroy (expected);
+   _corpus_field_destroy (actual);
+}
+
+static void
 _test_corpus (bool local_schema)
 {
    mongoc_client_t *client;
@@ -1412,8 +1468,8 @@ _test_corpus (bool local_schema)
    bson_t *corpus;
    bson_t corpus_copied;
    const bson_t *corpus_decrypted;
-   /* const bson_t *corpus_encrypted_actual; */
-   bson_t *corpus_encrypted;
+   bson_t *corpus_encrypted_expected;
+   const bson_t *corpus_encrypted_actual;
    bson_iter_t iter;
    mongoc_cursor_t *cursor;
 
@@ -1515,17 +1571,26 @@ _test_corpus (bool local_schema)
    mongoc_cursor_destroy (cursor);
 
    /* Load corpus-encrypted.json */
-   corpus_encrypted = get_bson_from_json_file ("./src/libmongoc/tests/"
+   corpus_encrypted_expected = get_bson_from_json_file ("./src/libmongoc/tests/"
                                                "client_side_encryption_prose/"
                                                "corpus/corpus-encrypted.json");
    /* Get the actual encrypted document from unencrypted client */
    mongoc_collection_destroy (coll);
    coll = mongoc_client_get_collection (client, "db", "coll");
-   /* TODO: continue here. */
-   /* cursor =  */
+   cursor =
+      mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), NULL, NULL);
+   BSON_ASSERT (mongoc_cursor_next (cursor, &corpus_encrypted_actual));
 
+   /* Iterate over corpus_encrypted_expected, and check corpus_encrypted_actual */
+   bson_iter_init (&iter, corpus_encrypted_expected);
+   while (bson_iter_next (&iter)) {
+      bson_iter_t actual_iter;
 
-   bson_destroy (corpus_encrypted);
+      BSON_ASSERT (bson_iter_init_find (&actual_iter, corpus_encrypted_actual, bson_iter_key (&iter)));
+      _corpus_check_encrypted (client_encryption, &iter, &actual_iter);
+   }
+
+   bson_destroy (corpus_encrypted_expected);
    bson_destroy (corpus);
    bson_destroy (&corpus_copied);
    mongoc_auto_encryption_opts_destroy (auto_encryption_opts);
