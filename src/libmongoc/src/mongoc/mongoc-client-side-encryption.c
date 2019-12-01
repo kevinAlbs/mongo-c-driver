@@ -403,7 +403,7 @@ mongoc_client_encryption_destroy (mongoc_client_encryption_t *client_encryption)
 
 bool
 mongoc_client_encryption_encrypt (mongoc_client_encryption_t *client_encryption,
-                                  bson_value_t *value,
+                                  const bson_value_t *value,
                                   mongoc_client_encryption_encrypt_opts_t *opts,
                                   bson_value_t *ciphertext,
                                   bson_error_t *error)
@@ -414,7 +414,7 @@ mongoc_client_encryption_encrypt (mongoc_client_encryption_t *client_encryption,
 
 bool
 mongoc_client_encryption_decrypt (mongoc_client_encryption_t *client_encryption,
-                                  bson_value_t *ciphertext,
+                                  const bson_value_t *ciphertext,
                                   bson_value_t *value,
                                   bson_error_t *error)
 {
@@ -1480,7 +1480,7 @@ fail:
 
 bool
 mongoc_client_encryption_encrypt (mongoc_client_encryption_t *client_encryption,
-                                  bson_value_t *value,
+                                  const bson_value_t *value,
                                   mongoc_client_encryption_encrypt_opts_t *opts,
                                   bson_value_t *ciphertext,
                                   bson_error_t *error)
@@ -1511,7 +1511,7 @@ fail:
 
 bool
 mongoc_client_encryption_decrypt (mongoc_client_encryption_t *client_encryption,
-                                  bson_value_t *ciphertext,
+                                  const bson_value_t *ciphertext,
                                   bson_value_t *value,
                                   bson_error_t *error)
 {
