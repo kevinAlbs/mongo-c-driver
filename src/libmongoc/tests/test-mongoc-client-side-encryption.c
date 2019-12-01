@@ -1456,7 +1456,8 @@ _test_corpus (bool local_schema)
    mongoc_client_t *client;
    mongoc_collection_t *coll;
    bson_t *schema;
-   bson_t *create_cmd;
+   bson_t *create_cmd
+   ;
    bson_t *datakey;
    bool res;
    bson_error_t error;
@@ -1473,6 +1474,7 @@ _test_corpus (bool local_schema)
    const bson_t *corpus_encrypted_actual;
    bson_iter_t iter;
    mongoc_cursor_t *cursor;
+   bson_t *schema_map;
 
    /* Create a MongoClient without encryption enabled */
    client = test_framework_client_new ();
@@ -1481,17 +1483,18 @@ _test_corpus (bool local_schema)
    schema = get_bson_from_json_file ("./src/libmongoc/tests/"
                                      "client_side_encryption_prose/corpus/"
                                      "corpus-schema.json");
-
-   if (!local_schema) {
-      /* Drop and create the collection db.coll configured with the included
-       * JSON schema corpus-schema.json */
-      create_cmd = BCON_NEW ("create",
+   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT(schema));
+         create_cmd = BCON_NEW ("create",
                              "coll",
                              "validator",
                              "{",
                              "$jsonSchema",
                              BCON_DOCUMENT (schema),
                              "}");
+
+   if (!local_schema) {
+      /* Drop and create the collection db.coll configured with the included
+       * JSON schema corpus-schema.json */
       res = mongoc_client_command_simple (
          client, "db", create_cmd, NULL, NULL, &error);
       ASSERT_OR_PRINT (res, error);
@@ -1520,6 +1523,7 @@ _test_corpus (bool local_schema)
    /* Create a MongoClient configured with auto encryption */
    client_encrypted = test_framework_client_new ();
    auto_encryption_opts = mongoc_auto_encryption_opts_new ();
+   mongoc_auto_encryption_opts_set_schema_map (auto_encryption_opts, schema_map);
    _check_bypass (auto_encryption_opts);
    kms_providers = _make_kms_providers (true /* aws */, true /* local */);
    mongoc_auto_encryption_opts_set_kms_providers (auto_encryption_opts,
@@ -1603,6 +1607,7 @@ _test_corpus (bool local_schema)
    mongoc_collection_destroy (coll);
    bson_destroy (datakey);
    bson_destroy (schema);
+   bson_destroy (schema_map);
    bson_destroy (create_cmd);
    mongoc_client_destroy (client);
 }
@@ -1611,7 +1616,7 @@ static void
 test_corpus (void *unused)
 {
    _test_corpus (false /* local schema */);
-   // TODO _test_corpus (true /* local schema */);
+   _test_corpus (true /* local schema */);
 }
 
 void
