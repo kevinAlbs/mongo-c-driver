@@ -666,7 +666,7 @@ test_datakey_and_double_encryption_creating_and_using (
    if (0 == strcmp (kms_provider, "aws")) {
       mongoc_client_encryption_datakey_opts_set_masterkey (
          opts,
-         tmp_bson ("{ region: 'us-east-1', key: "
+         tmp_bson ("{ 'region': 'us-east-1', 'key': "
                    "'arn:aws:kms:us-east-1:579766882180:key/"
                    "89fcc2c4-08b0-4bd9-9f25-e30687b580d0' }"));
    }
