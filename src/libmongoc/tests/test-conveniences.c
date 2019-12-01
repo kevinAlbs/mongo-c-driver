@@ -1504,7 +1504,7 @@ match_bson_value (const bson_value_t *doc,
          match_err (ctx, "Decimal128 is not an exact binary match (though "
                          "numeric values may be equal)");
       }
-      abort ();
+      break;
    default:
       test_error ("unexpected value type %d: %s",
                   doc->value_type,

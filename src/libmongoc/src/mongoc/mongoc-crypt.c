@@ -1007,6 +1007,7 @@ _mongoc_crypt_explicit_decrypt (_mongoc_crypt_t *crypt,
       goto fail;
    }
 
+   bson_destroy (&result);
    if (!_state_machine_run (state_machine, &result, error)) {
       goto fail;
    }

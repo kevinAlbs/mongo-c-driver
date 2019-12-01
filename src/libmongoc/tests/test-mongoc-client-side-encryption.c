@@ -1334,6 +1334,7 @@ _corpus_copy_field (mongoc_client_encryption_t *client_encryption,
 
    if (0 == strcmp ("auto", field->method)) {
       bson_append_value (corpus_copied, key, -1, bson_iter_value (iter));
+      _corpus_field_destroy (field);
       return;
    }
 
@@ -1435,14 +1436,14 @@ _corpus_check_encrypted (mongoc_client_encryption_t* client_encryption, bson_ite
       res = mongoc_client_encryption_decrypt (client_encryption, &actual->value, &actual_decrypted, &error);
       ASSERT_OR_PRINT (res, error);
 
-      BSON_ASSERT(0 == match_bson_value (&expected_decrypted, &actual_decrypted, &match_ctx));
+      BSON_ASSERT(match_bson_value (&expected_decrypted, &actual_decrypted, &match_ctx));
       bson_value_destroy (&expected_decrypted);
       bson_value_destroy (&actual_decrypted);
    }
 
    /* If allowed is false, validate the value exactly equals the value of the corresponding field of corpus (neither was encrypted). */
    if (!expected->allowed) {
-      BSON_ASSERT(0 == match_bson_value (&expected->value, &actual->value, &match_ctx));
+      BSON_ASSERT(match_bson_value (&expected->value, &actual->value, &match_ctx));
    }
 
    _corpus_field_destroy (expected);
@@ -1554,7 +1555,6 @@ _test_corpus (bool local_schema)
    /* Insert corpus_copied with auto encryption  */
    mongoc_collection_destroy (coll);
    coll = mongoc_client_get_collection (client_encrypted, "db", "coll");
-   printf ("%s\n", bson_as_canonical_extended_json (&corpus_copied, NULL));
    res =
       mongoc_collection_insert_one (coll, &corpus_copied, NULL, NULL, &error);
    ASSERT_OR_PRINT (res, error);
@@ -1590,6 +1590,7 @@ _test_corpus (bool local_schema)
       _corpus_check_encrypted (client_encryption, &iter, &actual_iter);
    }
 
+   mongoc_cursor_destroy (cursor);
    bson_destroy (corpus_encrypted_expected);
    bson_destroy (corpus);
    bson_destroy (&corpus_copied);
