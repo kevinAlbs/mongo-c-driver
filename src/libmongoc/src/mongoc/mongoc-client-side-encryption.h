@@ -63,7 +63,6 @@ MONGOC_EXPORT (void)
 mongoc_auto_encryption_opts_set_extra (mongoc_auto_encryption_opts_t *opts,
                                        const bson_t *extra);
 
-/* TODO document that mongoc_client_encryption_t is not thread safe. */
 typedef struct _mongoc_client_encryption_opts_t mongoc_client_encryption_opts_t;
 typedef struct _mongoc_client_encryption_t mongoc_client_encryption_t;
 typedef struct _mongoc_client_encryption_encrypt_opts_t
