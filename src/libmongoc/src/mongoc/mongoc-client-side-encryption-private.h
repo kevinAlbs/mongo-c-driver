@@ -56,7 +56,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
 
 /* If this returns true, client side encryption is enabled
  * on the client (or it's parent client pool), and cannot
- * be disabled. This check is done while  holding the
+ * be disabled. This check is done while holding the
  * topology lock. So if this returns true, callers are
  * guaranteed that CSE remains enabled afterwards. */
 bool

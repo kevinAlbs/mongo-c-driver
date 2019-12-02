@@ -118,6 +118,64 @@ test_client_side_encryption_cb (bson_t *scenario)
    "\x4f\x69\x37\x36\x36\x4a\x7a\x58\x5a\x42\x64\x42\x64\x62\x64\x4d\x75\x72" \
    "\x64\x6f\x6e\x4a\x31\x64"
 
+/* Convenience helper for maybe bypassing spawning mongocryptd */
+static void
+_check_bypass (mongoc_auto_encryption_opts_t *opts)
+{
+   if (test_framework_getenv_bool ("MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN")) {
+      bson_t *extra;
+
+      extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
+      mongoc_auto_encryption_opts_set_extra (opts, extra);
+      bson_destroy (extra);
+   }
+}
+
+/* Convenience helper for creating auto encryption opts */
+static bson_t *
+_make_kms_providers (bool with_aws, bool with_local)
+{
+   bson_t *kms_providers = bson_new ();
+
+   if (with_aws) {
+      char *aws_secret_access_key;
+      char *aws_access_key_id;
+
+      aws_secret_access_key =
+         test_framework_getenv ("MONGOC_TEST_AWS_SECRET_ACCESS_KEY");
+      aws_access_key_id =
+         test_framework_getenv ("MONGOC_TEST_AWS_ACCESS_KEY_ID");
+
+      if (!aws_secret_access_key || !aws_access_key_id) {
+         fprintf (stderr,
+                  "Set MONGOC_TEST_AWS_SECRET_ACCESS_KEY and "
+                  "MONGOC_TEST_AWS_ACCESS_KEY_ID environment "
+                  "variables to run Client Side Encryption tests.");
+         abort ();
+      }
+
+      bson_concat (
+         kms_providers,
+         tmp_bson ("{ 'aws': { 'secretAccessKey': '%s', 'accessKeyId': '%s' }}",
+                   aws_secret_access_key,
+                   aws_access_key_id));
+
+      bson_free (aws_secret_access_key);
+      bson_free (aws_access_key_id);
+   }
+   if (with_local) {
+      bson_t *local = BCON_NEW ("local",
+                                "{",
+                                "key",
+                                BCON_BIN (0, (uint8_t *) LOCAL_MASTERKEY, 96),
+                                "}");
+      bson_concat (kms_providers, local);
+      bson_destroy (local);
+   }
+
+   return kms_providers;
+}
+
 typedef struct {
    int num_inserts;
 } limits_apm_ctx_t;
@@ -194,16 +252,9 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    test_framework_set_ssl_opts (client);
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
 
-   kms_providers = BCON_NEW (
-      "local", "{", "key", BCON_BIN (0, (uint8_t *) LOCAL_MASTERKEY, 96), "}");
+   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
    opts = mongoc_auto_encryption_opts_new ();
-   if (test_framework_getenv_bool ("MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN")) {
-      bson_t *extra;
-
-      extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
-      mongoc_auto_encryption_opts_set_extra (opts, extra);
-      bson_destroy (extra);
-   }
+   _check_bypass (opts);
    mongoc_auto_encryption_opts_set_keyvault_namespace (
       opts, "admin", "datakeys");
    mongoc_auto_encryption_opts_set_kms_providers (opts, kms_providers);
@@ -348,24 +399,37 @@ _reset (mongoc_client_pool_t **pool,
    bson_t *kms_providers;
    mongoc_uri_t *uri;
    bson_t *extra;
+   bson_t *schema;
+   bson_t *schema_map;
 
    mongoc_auto_encryption_opts_destroy (*opts);
    *opts = mongoc_auto_encryption_opts_new ();
    extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
    mongoc_auto_encryption_opts_set_extra (*opts, extra);
    mongoc_auto_encryption_opts_set_keyvault_namespace (*opts, "db", "keyvault");
-   kms_providers = BCON_NEW (
-      "local", "{", "key", BCON_BIN (0, (uint8_t *) LOCAL_MASTERKEY, 96), "}");
+   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
    mongoc_auto_encryption_opts_set_kms_providers (*opts, kms_providers);
+   schema = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/schema.json");
+   BSON_ASSERT (schema);
+   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT (schema));
+   mongoc_auto_encryption_opts_set_schema_map (*opts, schema_map);
 
    if (*multi_threaded_client) {
       mongoc_client_pool_push (*pool, *multi_threaded_client);
    }
 
    mongoc_client_destroy (*singled_threaded_client);
+   /* Workaround to hide unnecessary logs per CDRIVER-3322 */
+   capture_logs (true); 
    mongoc_client_pool_destroy (*pool);
+   capture_logs (false);
 
    if (recreate) {
+      mongoc_collection_t *coll;
+      bson_t *datakey;
+      bson_error_t error;
+
       uri = test_framework_get_uri ();
       *pool = mongoc_client_pool_new (uri);
       test_framework_set_pool_ssl_opts (*pool);
@@ -373,9 +437,46 @@ _reset (mongoc_client_pool_t **pool,
       test_framework_set_ssl_opts (*singled_threaded_client);
       *multi_threaded_client = mongoc_client_pool_pop (*pool);
       mongoc_uri_destroy (uri);
+
+      /* create key */
+      coll = mongoc_client_get_collection (*singled_threaded_client, "db", "keyvault");
+      (void) mongoc_collection_drop (coll, NULL);
+      datakey = get_bson_from_json_file (
+         "./src/libmongoc/tests/client_side_encryption_prose/limits-key.json");
+      BSON_ASSERT (datakey);
+      ASSERT_OR_PRINT (
+         mongoc_collection_insert_one (
+            coll, datakey, NULL /* opts */, NULL /* reply */, &error),
+      error);
+
+      bson_destroy (datakey);
+      mongoc_collection_destroy (coll);
    }
+   bson_destroy (schema);
+   bson_destroy (schema_map);
    bson_destroy (extra);
    bson_destroy (kms_providers);
+}
+
+static void
+_perform_op (mongoc_client_t *client_encrypted) {
+   bool ret;
+   bson_error_t error;
+   mongoc_collection_t *coll;
+
+   coll = mongoc_client_get_collection (client_encrypted, "db", "coll");
+   ret = mongoc_collection_insert_one (coll, tmp_bson("{'encrypted_string': 'abc'}"), NULL /* opts */, NULL /* reply */, &error);
+   ASSERT_OR_PRINT (ret, error);
+   mongoc_collection_destroy (coll);
+}
+
+static void
+_perform_op_pooled (mongoc_client_pool_t *client_pool_encrypted) {
+   mongoc_client_t *client_encrypted;
+
+   client_encrypted = mongoc_client_pool_pop (client_pool_encrypted);
+   _perform_op (client_encrypted);
+   mongoc_client_pool_push (client_pool_encrypted, client_encrypted);
 }
 
 static void
@@ -394,6 +495,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    ret = mongoc_client_enable_auto_encryption (
       single_threaded_client, opts, &error);
    ASSERT_OR_PRINT (ret, error);
+   _perform_op (single_threaded_client);
 
    /* multi threaded client, single threaded setter => bad */
    ret = mongoc_client_enable_auto_encryption (
@@ -407,6 +509,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    /* pool - pool setter */
    ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
    ASSERT_OR_PRINT (ret, error);
+   _perform_op_pooled (pool);
 
    /* single threaded client, single threaded key vault client => ok */
    _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
@@ -415,6 +518,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    ret = mongoc_client_enable_auto_encryption (
       single_threaded_client, opts, &error);
    ASSERT_OR_PRINT (ret, error);
+   _perform_op (single_threaded_client);
 
    /* single threaded client, multi threaded key vault client => ok */
    _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
@@ -423,6 +527,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    ret = mongoc_client_enable_auto_encryption (
       single_threaded_client, opts, &error);
    ASSERT_OR_PRINT (ret, error);
+   _perform_op (single_threaded_client);
 
    /* single threaded client, pool key vault client => bad */
    _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
@@ -467,6 +572,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
    ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
    ASSERT_OR_PRINT (ret, error);
+   _perform_op_pooled (pool);
 
    /* double enabling */
    _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
@@ -489,72 +595,27 @@ test_invalid_single_and_pool_mismatches (void *unused)
                           MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
                           "Automatic encryption already set");
 
+   /* single threaded, using self as key vault client => redundant, but ok */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client (opts,
+                                                    single_threaded_client);
+   ret = mongoc_client_enable_auto_encryption (
+      single_threaded_client, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   _perform_op (single_threaded_client);
+
+   /* pool, using self as key vault client pool => redundant, but ok */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   _perform_op_pooled (pool);
+
    _reset (
       &pool, &single_threaded_client, &multi_threaded_client, &opts, false);
    mongoc_auto_encryption_opts_destroy (opts);
 }
 
-/* Convenience helper for creating auto encryption opts */
-/* TODO: replace other manual calls to KMS construction  with this helper */
-static bson_t *
-_make_kms_providers (bool with_aws, bool with_local)
-{
-   bson_t *kms_providers = bson_new ();
-
-   if (with_aws) {
-      char *aws_secret_access_key;
-      char *aws_access_key_id;
-
-      aws_secret_access_key =
-         test_framework_getenv ("MONGOC_TEST_AWS_SECRET_ACCESS_KEY");
-      aws_access_key_id =
-         test_framework_getenv ("MONGOC_TEST_AWS_ACCESS_KEY_ID");
-
-      if (!aws_secret_access_key || !aws_access_key_id) {
-         fprintf (stderr,
-                  "Set MONGOC_TEST_AWS_SECRET_ACCESS_KEY and "
-                  "MONGOC_TEST_AWS_ACCESS_KEY_ID environment "
-                  "variables to run Client Side Encryption tests.");
-         abort ();
-      }
-
-      bson_concat (
-         kms_providers,
-         tmp_bson ("{ 'aws': { 'secretAccessKey': '%s', 'accessKeyId': '%s' }}",
-                   aws_secret_access_key,
-                   aws_access_key_id));
-
-      bson_free (aws_secret_access_key);
-      bson_free (aws_access_key_id);
-   }
-   if (with_local) {
-      bson_t *local = BCON_NEW ("local",
-                                "{",
-                                "key",
-                                BCON_BIN (0, (uint8_t *) LOCAL_MASTERKEY, 96),
-                                "}");
-      bson_concat (kms_providers, local);
-      bson_destroy (local);
-   }
-
-   return kms_providers;
-}
-
-/* Convenience helper for maybe bypassing spawning mongocryptd */
-/* TODO: replace other manual instances of this with a call to this.  */
-static void
-_check_bypass (mongoc_auto_encryption_opts_t *opts)
-{
-   if (test_framework_getenv_bool ("MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN")) {
-      bson_t *extra;
-
-      extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
-      mongoc_auto_encryption_opts_set_extra (opts, extra);
-      bson_destroy (extra);
-   }
-}
-
-/* TODO Then implement a multi-threaded test. */
 /* Also test with external key vault client pool. */
 static void
 test_multi_threaded (void *unused)
@@ -591,17 +652,10 @@ test_multi_threaded (void *unused)
    mongoc_client_destroy (client);
 
    /* create pool with auto encryption */
-   if (test_framework_getenv_bool ("MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN")) {
-      bson_t *extra;
-
-      extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
-      mongoc_auto_encryption_opts_set_extra (opts, extra);
-      bson_destroy (extra);
-   }
+   _check_bypass (opts);
 
    mongoc_auto_encryption_opts_set_keyvault_namespace (opts, "db", "keyvault");
-   kms_providers = BCON_NEW (
-      "local", "{", "key", BCON_BIN (0, (uint8_t *) LOCAL_MASTERKEY, 96), "}");
+   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
    mongoc_auto_encryption_opts_set_kms_providers (opts, kms_providers);
 
    schema = get_bson_from_json_file (
@@ -835,13 +889,7 @@ test_datakey_and_double_encryption (void *unused)
     * client_encrypted) */
    auto_encryption_opts = mongoc_auto_encryption_opts_new ();
    kms_providers = _make_kms_providers (true /* aws */, true /* local */);
-   if (test_framework_getenv_bool ("MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN")) {
-      bson_t *extra;
-
-      extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
-      mongoc_auto_encryption_opts_set_extra (auto_encryption_opts, extra);
-      bson_destroy (extra);
-   }
+   _check_bypass (auto_encryption_opts);
    mongoc_auto_encryption_opts_set_kms_providers (auto_encryption_opts,
                                                   kms_providers);
    mongoc_auto_encryption_opts_set_keyvault_namespace (

@@ -430,8 +430,6 @@ _mongoc_cse_is_enabled (mongoc_client_t *client)
 
 #else
 
-#include <mongocrypt/mongocrypt.h>
-
 #include "mongoc/mongoc-client-private.h"
 #include "mongoc/mongoc-stream-private.h"
 #include "mongoc/mongoc-host-list-private.h"
@@ -468,10 +466,8 @@ _prep_for_auto_encryption (const mongoc_cmd_t *cmd, bson_t *out)
 
 /* Return the mongocryptd client to use on a client with automatic encryption
  * enabled.
- * If @client_encrypted is single-threaded, the mongocryptd_client is stored on
- * it.
- * Otherwise, if multi-threaded, there is a shared mongocryptd_client_pool in
- * the topology.
+ * If @client_encrypted is single-threaded, use the client to mongocryptd.
+ * If @client_encrypted is multi-threaded, use the client pool to mongocryptd.
  */
 mongoc_client_t *
 _get_mongocryptd_client (mongoc_client_t *client_encrypted)
@@ -501,11 +497,10 @@ _release_mongocryptd_client (mongoc_client_t *client_encrypted,
  * enabled.
  * If no custom key vault client/pool is set, create a collection from the
  * @client_encrypted itself.
- * If @client_encrypted is single-threaded, create a collection from the key
- * vault client stored on it.
- * Otherwise, @client_encrypted is multi-threaded, create a collection from a
- * key vault client popped
- * from the shared key vault client topology pool.
+ * If @client_encrypted is single-threaded, use the client to mongocryptd to
+ * create the collection.
+ * If @client_encrypted is multi-threaded, use the client pool to mongocryptd
+ * to create the collection.
  */
 mongoc_collection_t *
 _get_keyvault_coll (mongoc_client_t *client_encrypted)
@@ -514,14 +509,15 @@ _get_keyvault_coll (mongoc_client_t *client_encrypted)
    const char *db;
    const char *coll;
 
+   db = client_encrypted->topology->keyvault_db;
+   coll = client_encrypted->topology->keyvault_coll;
+
    if (client_encrypted->topology->single_threaded) {
       if (client_encrypted->topology->keyvault_client) {
          keyvault_client = client_encrypted->topology->keyvault_client;
       } else {
          keyvault_client = client_encrypted;
       }
-      db = client_encrypted->topology->keyvault_db;
-      coll = client_encrypted->topology->keyvault_coll;
    } else {
       if (client_encrypted->topology->keyvault_client_pool) {
          keyvault_client = mongoc_client_pool_pop (
@@ -529,8 +525,6 @@ _get_keyvault_coll (mongoc_client_t *client_encrypted)
       } else {
          keyvault_client = client_encrypted;
       }
-      db = client_encrypted->topology->keyvault_db;
-      coll = client_encrypted->topology->keyvault_coll;
    }
    return mongoc_client_get_collection (keyvault_client, db, coll);
 }
@@ -597,7 +591,7 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client_encrypted,
    if (client_encrypted->topology->bypass_auto_encryption) {
       memcpy (encrypted_cmd, cmd, sizeof (mongoc_cmd_t));
       bson_destroy (&cmd_bson);
-      return true;
+      RETURN (true);
    }
 
    if (cmd->server_stream->sd->max_wire_version < WIRE_VERSION_CSE) {
@@ -607,7 +601,7 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client_encrypted,
          MONGOC_ERROR_PROTOCOL_BAD_WIRE_VERSION,
          "%s",
          "Auto-encryption requires a minimum MongoDB version of 4.2");
-      goto fail;
+      GOTO (fail);
    }
 
    /* Construct the command we're sending to libmongocrypt. If cmd includes a
@@ -625,7 +619,7 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client_encrypted,
                                     &cmd_bson,
                                     encrypted,
                                     error)) {
-      goto fail;
+      GOTO (fail);
    }
 
 
@@ -662,7 +656,7 @@ fail:
  *       True on success, false on error.
  *
  * Pre-conditions:
- *       FLE is enabled on client.
+ *       FLE is enabled on client or its associated client pool.
  *
  * Post-conditions:
  *       If return false, @error is set. @decrypted is always initialized.
@@ -1003,13 +997,12 @@ _spawn_mongocryptd (const char *mongocryptd_spawn_path,
    return _do_spawn (mongocryptd_spawn_path, args, error);
 }
 
-/* Initial state shared when enabling automatic encryption on pooled and single
- * threaded clients
- */
 typedef struct {
    mongoc_uri_t *mongocryptd_uri;
    bool mongocryptd_bypass_spawn;
    const char *mongocryptd_spawn_path;
+   /* an iter to the first element of the
+    * mongocryptdSpawnArgs array */
    bson_iter_t mongocryptd_spawn_args;
    bool has_spawn_args;
 } _extra_parsed_t;
@@ -1075,10 +1068,6 @@ _extra_parsed_init (const bson_t *extra,
 
 
    if (!extra_parsed->mongocryptd_uri) {
-      /* Always default to connecting to TCP, despite spec v1.0.0. Because
-         * starting mongocryptd when one is running removes the domain socket
-         * file per SERVER-41029. Connecting over TCP is more reliable.
-         */
       extra_parsed->mongocryptd_uri =
          mongoc_uri_new_with_error ("mongodb://localhost:27020", error);
 
@@ -1133,14 +1122,6 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
       GOTO (fail);
    }
 
-   if (!_cse_set_enabled (client->topology)) {
-      bson_set_error (error,
-                      MONGOC_ERROR_CLIENT,
-                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                      "Automatic encryption already set");
-      GOTO (fail);
-   }
-
    if (!opts) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
@@ -1175,6 +1156,14 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
       GOTO (fail);
    }
 
+   if (!_cse_set_enabled (client->topology)) {
+      bson_set_error (error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
+                      "Automatic encryption already set");
+      GOTO (fail);
+   }
+
    extra_parsed = _extra_parsed_new ();
    if (!_extra_parsed_init (opts->extra, extra_parsed, error)) {
       GOTO (fail);
@@ -1183,7 +1172,7 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
    client->topology->crypt =
       _mongoc_crypt_new (opts->kms_providers, opts->schema_map, error);
    if (!client->topology->crypt) {
-      goto fail;
+      GOTO (fail);
    }
 
    client->topology->bypass_auto_encryption = opts->bypass_auto_encryption;
@@ -1195,7 +1184,7 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
                                      ? &extra_parsed->mongocryptd_spawn_args
                                      : NULL,
                                   error)) {
-            goto fail;
+            GOTO (fail);
          }
       }
 
@@ -1209,7 +1198,7 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
                                           MONGOC_URI_SERVERSELECTIONTRYONCE,
                                           false)) {
          _uri_construction_error (error);
-         goto fail;
+         GOTO (fail);
       }
 
       client->topology->mongocryptd_client =
@@ -1220,7 +1209,7 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
                          MONGOC_ERROR_CLIENT,
                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
                          "Unable to create client to mongocryptd");
-         goto fail;
+         GOTO (fail);
       }
       /* Similarly, single threaded clients will by default wait for 5 second
        * cooldown period after failing to connect to a server before making
@@ -1252,20 +1241,12 @@ _mongoc_cse_client_pool_enable_auto_encryption (
    bool ret = false;
    _extra_parsed_t *extra_parsed = NULL;
 
-   if (!_cse_set_enabled (topology)) {
-      bson_set_error (error,
-                      MONGOC_ERROR_CLIENT,
-                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                      "Automatic encryption already set");
-      goto fail;
-   }
-
    if (!opts) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
                       "Auto encryption options required");
-      goto fail;
+      GOTO (fail);
    }
 
    if (opts->keyvault_client) {
@@ -1275,7 +1256,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
                       "The key vault client only applies to a single threaded "
                       "client not a single threaded client. Set a key vault "
                       "client pool");
-      goto fail;
+      GOTO (fail);
    }
 
    /* Check for required options */
@@ -1284,7 +1265,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
                       "Key vault namespace option required");
-      goto fail;
+      GOTO (fail);
    }
 
    if (!opts->kms_providers) {
@@ -1292,19 +1273,26 @@ _mongoc_cse_client_pool_enable_auto_encryption (
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
                       "KMS providers option required");
-      goto fail;
+      GOTO (fail);
    }
 
-   /* TODO: lock the mutex? */
+   if (!_cse_set_enabled (topology)) {
+      bson_set_error (error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
+                      "Automatic encryption already set");
+      GOTO (fail);
+   }
+
    extra_parsed = _extra_parsed_new ();
    if (!_extra_parsed_init (opts->extra, extra_parsed, error)) {
-      goto fail;
+      GOTO (fail);
    }
 
    topology->crypt =
       _mongoc_crypt_new (opts->kms_providers, opts->schema_map, error);
    if (!topology->crypt) {
-      goto fail;
+      GOTO (fail);
    }
 
    topology->bypass_auto_encryption = opts->bypass_auto_encryption;
@@ -1316,7 +1304,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
                                      ? &extra_parsed->mongocryptd_spawn_args
                                      : NULL,
                                   error)) {
-            goto fail;
+            GOTO (fail);
          }
       }
 
@@ -1328,7 +1316,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
                          MONGOC_ERROR_CLIENT,
                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
                          "Unable to create client pool to mongocryptd");
-         goto fail;
+         GOTO (fail);
       }
    }
 
@@ -1341,7 +1329,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
    ret = true;
 fail:
    _extra_parsed_destroy (extra_parsed);
-   return ret;
+   RETURN (ret);
 }
 
 struct _mongoc_client_encryption_t {
@@ -1444,12 +1432,11 @@ mongoc_client_encryption_create_datakey (
    }
 
    /* Insert the data key with write concern majority */
-   ret = mongoc_collection_insert_one (client_encryption->keyvault_coll,
+   if (!mongoc_collection_insert_one (client_encryption->keyvault_coll,
                                        &datakey,
                                        NULL /* opts */,
                                        NULL /* reply */,
-                                       error);
-   if (!ret) {
+                                       error)) {
       goto fail;
    }
 
