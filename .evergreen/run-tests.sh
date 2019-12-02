@@ -104,9 +104,9 @@ case "$OS" in
 
       if [ "$VALGRIND" = "on" ]; then
          . $DIR/valgrind.sh
-         run_valgrind ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS -l "/client_side_encryption/*"
+         run_valgrind ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS
       else
-         ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS -l "/client_side_encryption/*"
+         ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS
       fi
 
       ;;
