@@ -1088,21 +1088,6 @@ fail:
    RETURN (ret);
 }
 
-static bool
-_cse_set_enabled (mongoc_topology_t *topology)
-{
-   bool ret = false;
-
-   bson_mutex_lock (&topology->mutex);
-   if (!topology->cse_enabled) {
-      topology->cse_enabled = true;
-      ret = true;
-   }
-   /* Otherwise, it has already been set. */
-   bson_mutex_unlock (&topology->mutex);
-   return ret;
-}
-
 bool
 _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
                                            mongoc_auto_encryption_opts_t *opts,
@@ -1156,12 +1141,14 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
       GOTO (fail);
    }
 
-   if (!_cse_set_enabled (client->topology)) {
+   if (client->topology->cse_enabled) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
                       "Automatic encryption already set");
       GOTO (fail);
+   } else {
+      client->topology->cse_enabled = true;
    }
 
    extra_parsed = _extra_parsed_new ();
@@ -1241,6 +1228,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
    bool ret = false;
    _extra_parsed_t *extra_parsed = NULL;
 
+   bson_mutex_lock (&topology->mutex);
    if (!opts) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
@@ -1276,12 +1264,14 @@ _mongoc_cse_client_pool_enable_auto_encryption (
       GOTO (fail);
    }
 
-   if (!_cse_set_enabled (topology)) {
+   if (topology->cse_enabled) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
                       "Automatic encryption already set");
       GOTO (fail);
+   } else {
+      topology->cse_enabled = true;
    }
 
    extra_parsed = _extra_parsed_new ();
@@ -1329,6 +1319,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
    ret = true;
 fail:
    _extra_parsed_destroy (extra_parsed);
+   bson_mutex_unlock (&topology->mutex);
    RETURN (ret);
 }
 

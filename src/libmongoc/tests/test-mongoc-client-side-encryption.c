@@ -118,7 +118,7 @@ test_client_side_encryption_cb (bson_t *scenario)
    "\x4f\x69\x37\x36\x36\x4a\x7a\x58\x5a\x42\x64\x42\x64\x62\x64\x4d\x75\x72" \
    "\x64\x6f\x6e\x4a\x31\x64"
 
-/* Convenience helper for maybe bypassing spawning mongocryptd */
+/* Convenience helper to check if spawning mongocryptd should be bypassed */
 static void
 _check_bypass (mongoc_auto_encryption_opts_t *opts)
 {
@@ -131,7 +131,7 @@ _check_bypass (mongoc_auto_encryption_opts_t *opts)
    }
 }
 
-/* Convenience helper for creating auto encryption opts */
+/* Convenience helper for creating KMS providers doc */
 static bson_t *
 _make_kms_providers (bool with_aws, bool with_local)
 {
