@@ -1433,10 +1433,10 @@ mongoc_client_encryption_create_datakey (
 
    /* Insert the data key with write concern majority */
    if (!mongoc_collection_insert_one (client_encryption->keyvault_coll,
-                                       &datakey,
-                                       NULL /* opts */,
-                                       NULL /* reply */,
-                                       error)) {
+                                      &datakey,
+                                      NULL /* opts */,
+                                      NULL /* reply */,
+                                      error)) {
       goto fail;
    }
 
@@ -1510,12 +1510,21 @@ mongoc_client_encryption_decrypt (mongoc_client_encryption_t *client_encryption,
     * success. */
    value->value_type = BSON_TYPE_EOD;
 
+   if (ciphertext->value_type != BSON_TYPE_BINARY ||
+       ciphertext->value.v_binary.subtype != BSON_SUBTYPE_ENCRYPTED) {
+      bson_set_error (error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                      "ciphertext must be BSON binary subtype 6");
+      GOTO (fail);
+   }
+
    if (!_mongoc_crypt_explicit_decrypt (client_encryption->crypt,
                                         client_encryption->keyvault_coll,
                                         ciphertext,
                                         value,
                                         error)) {
-      goto fail;
+      GOTO (fail);
    }
 
    ret = true;

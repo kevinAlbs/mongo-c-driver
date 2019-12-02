@@ -388,302 +388,6 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    mongoc_auto_encryption_opts_destroy (opts);
 }
 
-
-static void
-_reset (mongoc_client_pool_t **pool,
-        mongoc_client_t **singled_threaded_client,
-        mongoc_client_t **multi_threaded_client,
-        mongoc_auto_encryption_opts_t **opts,
-        bool recreate)
-{
-   bson_t *kms_providers;
-   mongoc_uri_t *uri;
-   bson_t *extra;
-   bson_t *schema;
-   bson_t *schema_map;
-
-   mongoc_auto_encryption_opts_destroy (*opts);
-   *opts = mongoc_auto_encryption_opts_new ();
-   extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
-   mongoc_auto_encryption_opts_set_extra (*opts, extra);
-   mongoc_auto_encryption_opts_set_keyvault_namespace (*opts, "db", "keyvault");
-   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
-   mongoc_auto_encryption_opts_set_kms_providers (*opts, kms_providers);
-   schema = get_bson_from_json_file (
-      "./src/libmongoc/tests/client_side_encryption_prose/schema.json");
-   BSON_ASSERT (schema);
-   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT (schema));
-   mongoc_auto_encryption_opts_set_schema_map (*opts, schema_map);
-
-   if (*multi_threaded_client) {
-      mongoc_client_pool_push (*pool, *multi_threaded_client);
-   }
-
-   mongoc_client_destroy (*singled_threaded_client);
-   /* Workaround to hide unnecessary logs per CDRIVER-3322 */
-   capture_logs (true); 
-   mongoc_client_pool_destroy (*pool);
-   capture_logs (false);
-
-   if (recreate) {
-      mongoc_collection_t *coll;
-      bson_t *datakey;
-      bson_error_t error;
-
-      uri = test_framework_get_uri ();
-      *pool = mongoc_client_pool_new (uri);
-      test_framework_set_pool_ssl_opts (*pool);
-      *singled_threaded_client = mongoc_client_new_from_uri (uri);
-      test_framework_set_ssl_opts (*singled_threaded_client);
-      *multi_threaded_client = mongoc_client_pool_pop (*pool);
-      mongoc_uri_destroy (uri);
-
-      /* create key */
-      coll = mongoc_client_get_collection (*singled_threaded_client, "db", "keyvault");
-      (void) mongoc_collection_drop (coll, NULL);
-      datakey = get_bson_from_json_file (
-         "./src/libmongoc/tests/client_side_encryption_prose/limits-key.json");
-      BSON_ASSERT (datakey);
-      ASSERT_OR_PRINT (
-         mongoc_collection_insert_one (
-            coll, datakey, NULL /* opts */, NULL /* reply */, &error),
-      error);
-
-      bson_destroy (datakey);
-      mongoc_collection_destroy (coll);
-   }
-   bson_destroy (schema);
-   bson_destroy (schema_map);
-   bson_destroy (extra);
-   bson_destroy (kms_providers);
-}
-
-static void
-_perform_op (mongoc_client_t *client_encrypted) {
-   bool ret;
-   bson_error_t error;
-   mongoc_collection_t *coll;
-
-   coll = mongoc_client_get_collection (client_encrypted, "db", "coll");
-   ret = mongoc_collection_insert_one (coll, tmp_bson("{'encrypted_string': 'abc'}"), NULL /* opts */, NULL /* reply */, &error);
-   ASSERT_OR_PRINT (ret, error);
-   mongoc_collection_destroy (coll);
-}
-
-static void
-_perform_op_pooled (mongoc_client_pool_t *client_pool_encrypted) {
-   mongoc_client_t *client_encrypted;
-
-   client_encrypted = mongoc_client_pool_pop (client_pool_encrypted);
-   _perform_op (client_encrypted);
-   mongoc_client_pool_push (client_pool_encrypted, client_encrypted);
-}
-
-static void
-test_invalid_single_and_pool_mismatches (void *unused)
-{
-   mongoc_client_pool_t *pool = NULL;
-   mongoc_client_t *single_threaded_client = NULL;
-   mongoc_client_t *multi_threaded_client = NULL;
-   mongoc_auto_encryption_opts_t *opts = NULL;
-   bson_error_t error;
-   bool ret;
-
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-
-   /* single threaded client, single threaded setter => ok */
-   ret = mongoc_client_enable_auto_encryption (
-      single_threaded_client, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   _perform_op (single_threaded_client);
-
-   /* multi threaded client, single threaded setter => bad */
-   ret = mongoc_client_enable_auto_encryption (
-      multi_threaded_client, opts, &error);
-   BSON_ASSERT (!ret);
-   ASSERT_ERROR_CONTAINS (error,
-                          MONGOC_ERROR_CLIENT,
-                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
-                          "Cannot enable auto encryption on a pooled client");
-
-   /* pool - pool setter */
-   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   _perform_op_pooled (pool);
-
-   /* single threaded client, single threaded key vault client => ok */
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-   mongoc_auto_encryption_opts_set_keyvault_client (opts,
-                                                    single_threaded_client);
-   ret = mongoc_client_enable_auto_encryption (
-      single_threaded_client, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   _perform_op (single_threaded_client);
-
-   /* single threaded client, multi threaded key vault client => ok */
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-   mongoc_auto_encryption_opts_set_keyvault_client (opts,
-                                                    multi_threaded_client);
-   ret = mongoc_client_enable_auto_encryption (
-      single_threaded_client, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   _perform_op (single_threaded_client);
-
-   /* single threaded client, pool key vault client => bad */
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-   mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
-   ret = mongoc_client_enable_auto_encryption (
-      single_threaded_client, opts, &error);
-   BSON_ASSERT (!ret);
-   ASSERT_ERROR_CONTAINS (error,
-                          MONGOC_ERROR_CLIENT,
-                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
-                          "The key vault client pool only applies to a client "
-                          "pool, not a single threaded client");
-
-   /* pool, singled threaded key vault client => bad */
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-   mongoc_auto_encryption_opts_set_keyvault_client (opts,
-                                                    single_threaded_client);
-   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
-   BSON_ASSERT (!ret);
-   ASSERT_ERROR_CONTAINS (error,
-                          MONGOC_ERROR_CLIENT,
-                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
-                          "The key vault client only applies to a single "
-                          "threaded client not a single threaded client. Set a "
-                          "key vault client pool");
-
-   /* pool, multi threaded key vault client => bad */
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-   mongoc_auto_encryption_opts_set_keyvault_client (opts,
-                                                    multi_threaded_client);
-   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
-   BSON_ASSERT (!ret);
-   ASSERT_ERROR_CONTAINS (error,
-                          MONGOC_ERROR_CLIENT,
-                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
-                          "The key vault client only applies to a single "
-                          "threaded client not a single threaded client. Set a "
-                          "key vault client pool");
-
-   /* pool, pool key vault client => ok */
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-   mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
-   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   _perform_op_pooled (pool);
-
-   /* double enabling */
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-   ret = mongoc_client_enable_auto_encryption (
-      single_threaded_client, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   ret = mongoc_client_enable_auto_encryption (
-      single_threaded_client, opts, &error);
-   BSON_ASSERT (!ret);
-   ASSERT_ERROR_CONTAINS (error,
-                          MONGOC_ERROR_CLIENT,
-                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                          "Automatic encryption already set");
-   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
-   BSON_ASSERT (!ret);
-   ASSERT_ERROR_CONTAINS (error,
-                          MONGOC_ERROR_CLIENT,
-                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
-                          "Automatic encryption already set");
-
-   /* single threaded, using self as key vault client => redundant, but ok */
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-   mongoc_auto_encryption_opts_set_keyvault_client (opts,
-                                                    single_threaded_client);
-   ret = mongoc_client_enable_auto_encryption (
-      single_threaded_client, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   _perform_op (single_threaded_client);
-
-   /* pool, using self as key vault client pool => redundant, but ok */
-   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
-   mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
-   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   _perform_op_pooled (pool);
-
-   _reset (
-      &pool, &single_threaded_client, &multi_threaded_client, &opts, false);
-   mongoc_auto_encryption_opts_destroy (opts);
-}
-
-/* Also test with external key vault client pool. */
-static void
-test_multi_threaded (void *unused)
-{
-   mongoc_uri_t *uri;
-   mongoc_client_pool_t *pool;
-   mongoc_client_t *client;
-   mongoc_auto_encryption_opts_t *opts;
-   bson_t *datakey;
-   mongoc_collection_t *coll;
-   bson_t *schema;
-   bson_t *schema_map;
-   bool ret;
-   bson_error_t error;
-   bson_t *kms_providers;
-
-   uri = test_framework_get_uri ();
-   pool = mongoc_client_pool_new (uri);
-   test_framework_set_pool_ssl_opts (pool);
-   client = mongoc_client_new_from_uri (uri);
-   test_framework_set_ssl_opts (client);
-   opts = mongoc_auto_encryption_opts_new ();
-
-   coll = mongoc_client_get_collection (client, "db", "keyvault");
-   (void) mongoc_collection_drop (coll, NULL);
-   datakey = get_bson_from_json_file (
-      "./src/libmongoc/tests/client_side_encryption_prose/limits-key.json");
-   BSON_ASSERT (datakey);
-   ASSERT_OR_PRINT (
-      mongoc_collection_insert_one (
-         coll, datakey, NULL /* opts */, NULL /* reply */, &error),
-      error);
-
-   mongoc_client_destroy (client);
-
-   /* create pool with auto encryption */
-   _check_bypass (opts);
-
-   mongoc_auto_encryption_opts_set_keyvault_namespace (opts, "db", "keyvault");
-   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
-   mongoc_auto_encryption_opts_set_kms_providers (opts, kms_providers);
-
-   schema = get_bson_from_json_file (
-      "./src/libmongoc/tests/client_side_encryption_prose/schema.json");
-   BSON_ASSERT (schema);
-   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT (schema));
-   mongoc_auto_encryption_opts_set_schema_map (opts, schema_map);
-   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-
-   client = mongoc_client_pool_pop (pool);
-   mongoc_collection_destroy (coll);
-   coll = mongoc_client_get_collection (client, "db", "coll");
-   ret = mongoc_collection_insert_one (
-      coll, tmp_bson ("{'encrypted_string': 'abc'}"), NULL, NULL, &error);
-   ASSERT_OR_PRINT (ret, error);
-
-   mongoc_collection_destroy (coll);
-   mongoc_client_pool_push (pool, client);
-   mongoc_client_pool_destroy (pool);
-   bson_destroy (schema);
-   bson_destroy (schema_map);
-   bson_destroy (datakey);
-   mongoc_auto_encryption_opts_destroy (opts);
-   mongoc_uri_destroy (uri);
-   bson_destroy (kms_providers);
-}
-
 typedef struct {
    bson_t *last_cmd;
 } _datakey_and_double_encryption_ctx_t;
@@ -1312,7 +1016,6 @@ test_custom_endpoint (void *unused)
    mongoc_client_encryption_encrypt_opts_destroy (encrypt_opts);
    mongoc_client_destroy (keyvault_client);
 }
-
 typedef struct {
    const char *kms;
    const char *type;
@@ -1694,6 +1397,407 @@ test_corpus (void *unused)
    _test_corpus (true /* local schema */);
 }
 
+/* Begin C driver specific, non-spec tests: */
+static void
+_reset (mongoc_client_pool_t **pool,
+        mongoc_client_t **singled_threaded_client,
+        mongoc_client_t **multi_threaded_client,
+        mongoc_auto_encryption_opts_t **opts,
+        bool recreate)
+{
+   bson_t *kms_providers;
+   mongoc_uri_t *uri;
+   bson_t *extra;
+   bson_t *schema;
+   bson_t *schema_map;
+
+   mongoc_auto_encryption_opts_destroy (*opts);
+   *opts = mongoc_auto_encryption_opts_new ();
+   extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
+   mongoc_auto_encryption_opts_set_extra (*opts, extra);
+   mongoc_auto_encryption_opts_set_keyvault_namespace (*opts, "db", "keyvault");
+   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
+   mongoc_auto_encryption_opts_set_kms_providers (*opts, kms_providers);
+   schema = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/schema.json");
+   BSON_ASSERT (schema);
+   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT (schema));
+   mongoc_auto_encryption_opts_set_schema_map (*opts, schema_map);
+
+   if (*multi_threaded_client) {
+      mongoc_client_pool_push (*pool, *multi_threaded_client);
+   }
+
+   mongoc_client_destroy (*singled_threaded_client);
+   /* Workaround to hide unnecessary logs per CDRIVER-3322 */
+   capture_logs (true);
+   mongoc_client_pool_destroy (*pool);
+   capture_logs (false);
+
+   if (recreate) {
+      mongoc_collection_t *coll;
+      bson_t *datakey;
+      bson_error_t error;
+
+      uri = test_framework_get_uri ();
+      *pool = mongoc_client_pool_new (uri);
+      test_framework_set_pool_ssl_opts (*pool);
+      *singled_threaded_client = mongoc_client_new_from_uri (uri);
+      test_framework_set_ssl_opts (*singled_threaded_client);
+      *multi_threaded_client = mongoc_client_pool_pop (*pool);
+      mongoc_uri_destroy (uri);
+
+      /* create key */
+      coll = mongoc_client_get_collection (
+         *singled_threaded_client, "db", "keyvault");
+      (void) mongoc_collection_drop (coll, NULL);
+      datakey = get_bson_from_json_file (
+         "./src/libmongoc/tests/client_side_encryption_prose/limits-key.json");
+      BSON_ASSERT (datakey);
+      ASSERT_OR_PRINT (
+         mongoc_collection_insert_one (
+            coll, datakey, NULL /* opts */, NULL /* reply */, &error),
+         error);
+
+      bson_destroy (datakey);
+      mongoc_collection_destroy (coll);
+   }
+   bson_destroy (schema);
+   bson_destroy (schema_map);
+   bson_destroy (extra);
+   bson_destroy (kms_providers);
+}
+
+static void
+_perform_op (mongoc_client_t *client_encrypted)
+{
+   bool ret;
+   bson_error_t error;
+   mongoc_collection_t *coll;
+
+   coll = mongoc_client_get_collection (client_encrypted, "db", "coll");
+   ret = mongoc_collection_insert_one (coll,
+                                       tmp_bson ("{'encrypted_string': 'abc'}"),
+                                       NULL /* opts */,
+                                       NULL /* reply */,
+                                       &error);
+   ASSERT_OR_PRINT (ret, error);
+   mongoc_collection_destroy (coll);
+}
+
+static void
+_perform_op_pooled (mongoc_client_pool_t *client_pool_encrypted)
+{
+   mongoc_client_t *client_encrypted;
+
+   client_encrypted = mongoc_client_pool_pop (client_pool_encrypted);
+   _perform_op (client_encrypted);
+   mongoc_client_pool_push (client_pool_encrypted, client_encrypted);
+}
+
+static void
+test_invalid_single_and_pool_mismatches (void *unused)
+{
+   mongoc_client_pool_t *pool = NULL;
+   mongoc_client_t *single_threaded_client = NULL;
+   mongoc_client_t *multi_threaded_client = NULL;
+   mongoc_auto_encryption_opts_t *opts = NULL;
+   bson_error_t error;
+   bool ret;
+
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+
+   /* single threaded client, single threaded setter => ok */
+   ret = mongoc_client_enable_auto_encryption (
+      single_threaded_client, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   _perform_op (single_threaded_client);
+
+   /* multi threaded client, single threaded setter => bad */
+   ret = mongoc_client_enable_auto_encryption (
+      multi_threaded_client, opts, &error);
+   BSON_ASSERT (!ret);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_CLIENT,
+                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                          "Cannot enable auto encryption on a pooled client");
+
+   /* pool - pool setter */
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   _perform_op_pooled (pool);
+
+   /* single threaded client, single threaded key vault client => ok */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client (opts,
+                                                    single_threaded_client);
+   ret = mongoc_client_enable_auto_encryption (
+      single_threaded_client, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   _perform_op (single_threaded_client);
+
+   /* single threaded client, multi threaded key vault client => ok */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client (opts,
+                                                    multi_threaded_client);
+   ret = mongoc_client_enable_auto_encryption (
+      single_threaded_client, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   _perform_op (single_threaded_client);
+
+   /* single threaded client, pool key vault client => bad */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
+   ret = mongoc_client_enable_auto_encryption (
+      single_threaded_client, opts, &error);
+   BSON_ASSERT (!ret);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_CLIENT,
+                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                          "The key vault client pool only applies to a client "
+                          "pool, not a single threaded client");
+
+   /* pool, singled threaded key vault client => bad */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client (opts,
+                                                    single_threaded_client);
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   BSON_ASSERT (!ret);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_CLIENT,
+                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                          "The key vault client only applies to a single "
+                          "threaded client not a single threaded client. Set a "
+                          "key vault client pool");
+
+   /* pool, multi threaded key vault client => bad */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client (opts,
+                                                    multi_threaded_client);
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   BSON_ASSERT (!ret);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_CLIENT,
+                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                          "The key vault client only applies to a single "
+                          "threaded client not a single threaded client. Set a "
+                          "key vault client pool");
+
+   /* pool, pool key vault client => ok */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   _perform_op_pooled (pool);
+
+   /* double enabling */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   ret = mongoc_client_enable_auto_encryption (
+      single_threaded_client, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   ret = mongoc_client_enable_auto_encryption (
+      single_threaded_client, opts, &error);
+   BSON_ASSERT (!ret);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_CLIENT,
+                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
+                          "Automatic encryption already set");
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   BSON_ASSERT (!ret);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_CLIENT,
+                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
+                          "Automatic encryption already set");
+
+   /* single threaded, using self as key vault client => redundant, but ok */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client (opts,
+                                                    single_threaded_client);
+   ret = mongoc_client_enable_auto_encryption (
+      single_threaded_client, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   _perform_op (single_threaded_client);
+
+   /* pool, using self as key vault client pool => redundant, but ok */
+   _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
+   mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+   _perform_op_pooled (pool);
+
+   _reset (
+      &pool, &single_threaded_client, &multi_threaded_client, &opts, false);
+   mongoc_auto_encryption_opts_destroy (opts);
+}
+
+static void *
+_worker_thread (void *client_ptr)
+{
+   mongoc_client_t *client_encrypted;
+   mongoc_collection_t *coll;
+   mongoc_cursor_t *cursor;
+   const bson_t *doc;
+   bson_t filter = BSON_INITIALIZER;
+   bson_t *to_insert = BCON_NEW ("encrypted_string", "abc");
+   int i;
+   bool ret;
+   bson_error_t error;
+
+   client_encrypted = client_ptr;
+   coll = mongoc_client_get_collection (client_encrypted, "db", "coll");
+
+   for (i = 0; i < 100; i++) {
+      ret = mongoc_collection_insert_one (
+         coll, to_insert, NULL /* opts */, NULL /* reply */, &error);
+      ASSERT_OR_PRINT (ret, error);
+      cursor = mongoc_collection_find_with_opts (
+         coll, &filter, NULL /* opts */, NULL /* read_prefs */);
+      mongoc_cursor_next (cursor, &doc);
+      mongoc_cursor_destroy (cursor);
+   }
+   mongoc_collection_destroy (coll);
+   bson_destroy (&filter);
+   bson_destroy (to_insert);
+   return NULL;
+}
+
+static void
+_test_multi_threaded (bool external_key_vault)
+{
+   /* Spawn two threads and do repeated encryption/decryption operations. */
+   bson_thread_t threads[2];
+   mongoc_uri_t *uri;
+   mongoc_client_pool_t *pool;
+   mongoc_client_t *client;
+   mongoc_client_t *client1;
+   mongoc_client_t *client2;
+   mongoc_auto_encryption_opts_t *opts;
+   bson_t *datakey;
+   mongoc_collection_t *coll;
+   bson_t *schema;
+   bson_t *schema_map;
+   bool ret;
+   bson_error_t error;
+   bson_t *kms_providers;
+   int r;
+   int i;
+
+   uri = test_framework_get_uri ();
+   pool = mongoc_client_pool_new (uri);
+   test_framework_set_pool_ssl_opts (pool);
+   client = mongoc_client_new_from_uri (uri);
+   test_framework_set_ssl_opts (client);
+   opts = mongoc_auto_encryption_opts_new ();
+
+   /* Do setup: create a data key and configure pool for auto encryption. */
+   coll = mongoc_client_get_collection (client, "db", "keyvault");
+   (void) mongoc_collection_drop (coll, NULL);
+   datakey = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/limits-key.json");
+   BSON_ASSERT (datakey);
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (
+         coll, datakey, NULL /* opts */, NULL /* reply */, &error),
+      error);
+
+   /* create pool with auto encryption */
+   _check_bypass (opts);
+
+   mongoc_auto_encryption_opts_set_keyvault_namespace (opts, "db", "keyvault");
+   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
+   mongoc_auto_encryption_opts_set_kms_providers (opts, kms_providers);
+
+   if (external_key_vault) {
+      mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
+   }
+
+   schema = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/schema.json");
+   BSON_ASSERT (schema);
+   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT (schema));
+   mongoc_auto_encryption_opts_set_schema_map (opts, schema_map);
+   ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   ASSERT_OR_PRINT (ret, error);
+
+   client1 = mongoc_client_pool_pop (pool);
+   client2 = mongoc_client_pool_pop (pool);
+
+   r = bson_thread_create (threads, _worker_thread, client1);
+   BSON_ASSERT (r == 0);
+
+   r = bson_thread_create (threads + 1, _worker_thread, client2);
+   BSON_ASSERT (r == 0);
+
+   for (i = 0; i < 2; i++) {
+      r = bson_thread_join (threads[i]);
+      BSON_ASSERT (r == 0);
+   }
+
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+   mongoc_client_pool_push (pool, client1);
+   mongoc_client_pool_push (pool, client2);
+   mongoc_client_pool_destroy (pool);
+   bson_destroy (schema);
+   bson_destroy (schema_map);
+   bson_destroy (datakey);
+   mongoc_auto_encryption_opts_destroy (opts);
+   mongoc_uri_destroy (uri);
+   bson_destroy (kms_providers);
+}
+
+static void
+test_multi_threaded ()
+{
+   _test_multi_threaded (true);
+   _test_multi_threaded (false);
+}
+
+static void
+test_malformed_explicit (void *unused)
+{
+   mongoc_client_t *client;
+   bson_t *kms_providers;
+   mongoc_client_encryption_t *client_encryption;
+   mongoc_client_encryption_opts_t *client_encryption_opts;
+   bson_value_t value;
+   bson_value_t ciphertext;
+   bool ret;
+   bson_error_t error;
+
+   /* Create a MongoClient without encryption enabled */
+   client = test_framework_client_new ();
+   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
+
+   /* Create a ClientEncryption object */
+   client_encryption_opts = mongoc_client_encryption_opts_new ();
+   mongoc_client_encryption_opts_set_kms_providers (client_encryption_opts,
+                                                    kms_providers);
+   mongoc_client_encryption_opts_set_keyvault_namespace (
+      client_encryption_opts, "admin", "datakeys");
+   mongoc_client_encryption_opts_set_keyvault_client (client_encryption_opts,
+                                                      client);
+   client_encryption =
+      mongoc_client_encryption_new (client_encryption_opts, &error);
+   ASSERT_OR_PRINT (client_encryption, error);
+
+   /* Test attempting to decrypt a malformed value */
+   ciphertext.value_type = BSON_TYPE_DOUBLE;
+   ciphertext.value.v_double = 1.23;
+   ret = mongoc_client_encryption_decrypt (
+      client_encryption, &ciphertext, &value, &error);
+   BSON_ASSERT (!ret);
+   printf ("message=%s\n", error.message);
+   bson_value_destroy (&value);
+
+   mongoc_client_encryption_opts_destroy (client_encryption_opts);
+   mongoc_client_encryption_destroy (client_encryption);
+   bson_destroy (kms_providers);
+   mongoc_client_destroy (client);
+}
+
 void
 test_client_side_encryption_install (TestSuite *suite)
 {
@@ -1765,6 +1869,13 @@ test_client_side_encryption_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/client_side_encryption/multi_threaded",
                       test_multi_threaded,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption,
+                      test_framework_skip_if_max_wire_version_less_than_8);
+   TestSuite_AddFull (suite,
+                      "/client_side_encryption/malformed_explicit",
+                      test_malformed_explicit,
                       NULL,
                       NULL,
                       test_framework_skip_if_no_client_side_encryption,
