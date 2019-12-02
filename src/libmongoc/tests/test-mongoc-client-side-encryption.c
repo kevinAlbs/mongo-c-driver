@@ -159,6 +159,7 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    /* Drop and create db.coll configured with limits-schema.json */
    uri = test_framework_get_uri ();
    client = mongoc_client_new_from_uri (uri);
+   test_framework_set_ssl_opts (client);
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
    coll = mongoc_client_get_collection (client, "db", "coll");
    (void) mongoc_collection_drop (coll, NULL);
@@ -190,6 +191,7 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
    client = mongoc_client_new_from_uri (uri);
+   test_framework_set_ssl_opts (client);
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
 
    kms_providers = BCON_NEW (
@@ -370,7 +372,9 @@ _reset (mongoc_client_pool_t **pool,
    if (recreate) {
       uri = test_framework_get_uri ();
       *pool = mongoc_client_pool_new (uri);
+      test_framework_set_pool_ssl_opts (*pool);
       *singled_threaded_client = mongoc_client_new_from_uri (uri);
+      test_framework_set_ssl_opts (*singled_threaded_client);
       *multi_threaded_client = mongoc_client_pool_pop (*pool);
       mongoc_uri_destroy (uri);
    }
@@ -566,7 +570,9 @@ test_multi_threaded (void *unused)
 
    uri = test_framework_get_uri ();
    pool = mongoc_client_pool_new (uri);
+   test_framework_set_pool_ssl_opts (pool);
    client = mongoc_client_new_from_uri (uri);
+   test_framework_set_ssl_opts (client);
    opts = mongoc_auto_encryption_opts_new ();
 
    coll = mongoc_client_get_collection (client, "db", "keyvault");
@@ -904,6 +910,7 @@ _test_key_vault (bool with_external_key_vault)
    mongoc_uri_set_username (external_uri, "fake-user");
    mongoc_uri_set_password (external_uri, "fake-pwd");
    client_external = mongoc_client_new_from_uri (external_uri);
+   test_framework_set_ssl_opts (client_external);
 
    /* Using client, drop the collections admin.datakeys and db.coll. */
    client = test_framework_client_new ();
@@ -1638,15 +1645,15 @@ test_client_side_encryption_install (TestSuite *suite)
                       NULL,
                       test_framework_skip_if_no_client_side_encryption,
                       test_framework_skip_if_max_wire_version_less_than_8,
-                      test_framework_skip_if_offline /* requires AWS */,
-                      test_framework_skip_if_no_auth /* requires auth for error check */);
+                      test_framework_skip_if_offline /* requires AWS */);
    TestSuite_AddFull (suite,
                       "/client_side_encryption/external_key_vault",
                       test_external_key_vault,
                       NULL,
                       NULL,
                       test_framework_skip_if_no_client_side_encryption,
-                      test_framework_skip_if_max_wire_version_less_than_8);
+                      test_framework_skip_if_max_wire_version_less_than_8,
+                      test_framework_skip_if_no_auth /* requires auth for error check */);
    TestSuite_AddFull (
       suite,
       "/client_side_encryption/bson_size_limits_and_batch_splitting",
