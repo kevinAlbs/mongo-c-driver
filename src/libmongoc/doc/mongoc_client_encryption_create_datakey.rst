@@ -18,7 +18,7 @@ Synopsis
 
 Creates a new key document in the key vault collection and returns the UUID of the newly created key. The new key can be used to configure automatic encryption (see :symbol:`mongoc_client_enable_auto_encryption()` and :symbol:`mongoc_client_pool_enable_auto_encryption()`) or for explicit encryption (see :symbol:`mongoc_client_encryption_encrypt()`).
 
-The created key document is inserted into the key vault collection (identified via :symbol:`mongoc_client_encryption_opts_set_keyvault_namespace`) with majority write concern.
+The created key document is inserted into the key vault collection (identified via :symbol:`mongoc_client_encryption_opts_set_keyvault_namespace()`) with majority write concern.
 
 Parameters
 ----------

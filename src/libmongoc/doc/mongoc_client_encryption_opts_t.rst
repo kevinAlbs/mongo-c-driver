@@ -8,9 +8,9 @@ Synopsis
 
 .. code-block:: c
 
-  #include <mongoc/mongoc.h>
+   #include <mongoc/mongoc.h>
 
-  typedef struct _mongoc_client_encryption_opts_t mongoc_client_encryption_opts_t;
+   typedef struct _mongoc_client_encryption_opts_t mongoc_client_encryption_opts_t;
 
 Description
 -----------

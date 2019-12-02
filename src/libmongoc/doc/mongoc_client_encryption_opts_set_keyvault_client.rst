@@ -13,7 +13,7 @@ Synopsis
       mongoc_client_encryption_opts_t *opts,
       struct _mongoc_client_t *keyvault_client);
 
-Set the :symbol:`mongoc_client_t` to use during key creation and key lookup for encryption and decryption.
+Set the :symbol:`mongoc_client_t` to use during key creation and key lookup for encryption and decryption. This may be either a single-threaded or multi-threaded client.
 
 Parameters
 ----------

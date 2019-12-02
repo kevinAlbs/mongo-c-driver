@@ -18,8 +18,8 @@ Parameters
 ----------
 
 * ``opts``: The :symbol:`mongoc_client_encryption_opts_t`
-* ``db``: A ``const char *`` representing the database name of the key vault collection.
-* ``coll``: A ``const char *`` representing the collection name of the key vault collection.
+* ``db``: The database name of the key vault collection.
+* ``coll``: The collection name of the key vault collection.
 
 See also
 --------

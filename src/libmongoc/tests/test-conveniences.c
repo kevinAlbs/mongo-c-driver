@@ -1501,8 +1501,9 @@ match_bson_value (const bson_value_t *doc,
       ret = (doc->value.v_decimal128.low == pattern->value.v_decimal128.low &&
              doc->value.v_decimal128.high == pattern->value.v_decimal128.high);
       if (!ret) {
-         match_err (ctx, "Decimal128 is not an exact binary match (though "
-                         "numeric values may be equal)");
+         match_err (ctx,
+                    "Decimal128 is not an exact binary match (though "
+                    "numeric values may be equal)");
       }
       break;
    default:

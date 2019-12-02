@@ -8,8 +8,8 @@ Synopsis
 
 .. code-block:: c
 
-  void
-  mongoc_client_encryption_opts_destroy (mongoc_client_encryption_opts_t *opts);
+   void
+   mongoc_client_encryption_opts_destroy (mongoc_client_encryption_opts_t *opts);
 
 Description
 -----------

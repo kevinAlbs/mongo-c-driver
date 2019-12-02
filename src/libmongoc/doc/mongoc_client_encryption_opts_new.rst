@@ -8,7 +8,7 @@ Synopsis
 
 .. code-block:: c
 
-  mongoc_client_encryption_opts_t * mongoc_client_encryption_opts_new (void);
+   mongoc_client_encryption_opts_t * mongoc_client_encryption_opts_new (void);
 
 Returns
 -------

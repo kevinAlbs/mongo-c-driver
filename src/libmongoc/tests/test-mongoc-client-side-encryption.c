@@ -1405,14 +1405,17 @@ _corpus_copy_field (mongoc_client_encryption_t *client_encryption,
 }
 
 static void
-_corpus_check_encrypted (mongoc_client_encryption_t* client_encryption, bson_iter_t *expected_iter, bson_iter_t *actual_iter) {
+_corpus_check_encrypted (mongoc_client_encryption_t *client_encryption,
+                         bson_iter_t *expected_iter,
+                         bson_iter_t *actual_iter)
+{
    corpus_field_t *expected;
    corpus_field_t *actual;
-   const char* key;
+   const char *key;
    bson_error_t error;
    match_ctx_t match_ctx;
 
-   memset (&match_ctx, 0, sizeof(match_ctx));
+   memset (&match_ctx, 0, sizeof (match_ctx));
    key = bson_iter_key (expected_iter);
    if (0 == strcmp ("_id", key) || 0 == strcmp ("altname_aws", key) ||
        0 == strcmp ("altname_local", key)) {
@@ -1422,38 +1425,49 @@ _corpus_check_encrypted (mongoc_client_encryption_t* client_encryption, bson_ite
    expected = _corpus_field_new (expected_iter);
    actual = _corpus_field_new (actual_iter);
 
-   /* If the algo is det, that the value equals the value of the corresponding field
+   /* If the algo is det, that the value equals the value of the corresponding
+    * field
     * in corpus_encrypted_actual.
     */
    if (0 == strcmp (expected->algo, "det")) {
-      BSON_ASSERT(match_bson_value (&expected->value, &actual->value, &match_ctx));
+      BSON_ASSERT (
+         match_bson_value (&expected->value, &actual->value, &match_ctx));
    }
 
-   /* If the algo is rand and allowed is true, that the value does not equal the value of the corresponding field in corpus_encrypted_actual. */
+   /* If the algo is rand and allowed is true, that the value does not equal the
+    * value of the corresponding field in corpus_encrypted_actual. */
    if (0 == strcmp (expected->algo, "rand") && expected->allowed) {
-      BSON_ASSERT(!match_bson_value (&expected->value, &actual->value, &match_ctx));
+      BSON_ASSERT (
+         !match_bson_value (&expected->value, &actual->value, &match_ctx));
    }
 
-   /* If allowed is true, decrypt the value with client_encryption. Decrypt the value of the corresponding field of corpus_encrypted and validate that they are both equal */
+   /* If allowed is true, decrypt the value with client_encryption. Decrypt the
+    * value of the corresponding field of corpus_encrypted and validate that
+    * they are both equal */
    if (expected->allowed) {
       bson_value_t expected_decrypted;
       bson_value_t actual_decrypted;
       bool res;
 
-      res = mongoc_client_encryption_decrypt (client_encryption, &expected->value, &expected_decrypted, &error);
+      res = mongoc_client_encryption_decrypt (
+         client_encryption, &expected->value, &expected_decrypted, &error);
       ASSERT_OR_PRINT (res, error);
 
-      res = mongoc_client_encryption_decrypt (client_encryption, &actual->value, &actual_decrypted, &error);
+      res = mongoc_client_encryption_decrypt (
+         client_encryption, &actual->value, &actual_decrypted, &error);
       ASSERT_OR_PRINT (res, error);
 
-      BSON_ASSERT(match_bson_value (&expected_decrypted, &actual_decrypted, &match_ctx));
+      BSON_ASSERT (
+         match_bson_value (&expected_decrypted, &actual_decrypted, &match_ctx));
       bson_value_destroy (&expected_decrypted);
       bson_value_destroy (&actual_decrypted);
    }
 
-   /* If allowed is false, validate the value exactly equals the value of the corresponding field of corpus (neither was encrypted). */
+   /* If allowed is false, validate the value exactly equals the value of the
+    * corresponding field of corpus (neither was encrypted). */
    if (!expected->allowed) {
-      BSON_ASSERT(match_bson_value (&expected->value, &actual->value, &match_ctx));
+      BSON_ASSERT (
+         match_bson_value (&expected->value, &actual->value, &match_ctx));
    }
 
    _corpus_field_destroy (expected);
@@ -1466,8 +1480,7 @@ _test_corpus (bool local_schema)
    mongoc_client_t *client;
    mongoc_collection_t *coll;
    bson_t *schema;
-   bson_t *create_cmd
-   ;
+   bson_t *create_cmd;
    bson_t *datakey;
    bool res;
    bson_error_t error;
@@ -1493,14 +1506,14 @@ _test_corpus (bool local_schema)
    schema = get_bson_from_json_file ("./src/libmongoc/tests/"
                                      "client_side_encryption_prose/corpus/"
                                      "corpus-schema.json");
-   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT(schema));
-         create_cmd = BCON_NEW ("create",
-                             "coll",
-                             "validator",
-                             "{",
-                             "$jsonSchema",
-                             BCON_DOCUMENT (schema),
-                             "}");
+   schema_map = BCON_NEW ("db.coll", BCON_DOCUMENT (schema));
+   create_cmd = BCON_NEW ("create",
+                          "coll",
+                          "validator",
+                          "{",
+                          "$jsonSchema",
+                          BCON_DOCUMENT (schema),
+                          "}");
 
    if (!local_schema) {
       /* Drop and create the collection db.coll configured with the included
@@ -1533,7 +1546,8 @@ _test_corpus (bool local_schema)
    /* Create a MongoClient configured with auto encryption */
    client_encrypted = test_framework_client_new ();
    auto_encryption_opts = mongoc_auto_encryption_opts_new ();
-   mongoc_auto_encryption_opts_set_schema_map (auto_encryption_opts, schema_map);
+   mongoc_auto_encryption_opts_set_schema_map (auto_encryption_opts,
+                                               schema_map);
    _check_bypass (auto_encryption_opts);
    kms_providers = _make_kms_providers (true /* aws */, true /* local */);
    mongoc_auto_encryption_opts_set_kms_providers (auto_encryption_opts,
@@ -1585,9 +1599,10 @@ _test_corpus (bool local_schema)
    mongoc_cursor_destroy (cursor);
 
    /* Load corpus-encrypted.json */
-   corpus_encrypted_expected = get_bson_from_json_file ("./src/libmongoc/tests/"
-                                               "client_side_encryption_prose/"
-                                               "corpus/corpus-encrypted.json");
+   corpus_encrypted_expected =
+      get_bson_from_json_file ("./src/libmongoc/tests/"
+                               "client_side_encryption_prose/"
+                               "corpus/corpus-encrypted.json");
    /* Get the actual encrypted document from unencrypted client */
    mongoc_collection_destroy (coll);
    coll = mongoc_client_get_collection (client, "db", "coll");
@@ -1595,12 +1610,14 @@ _test_corpus (bool local_schema)
       mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), NULL, NULL);
    BSON_ASSERT (mongoc_cursor_next (cursor, &corpus_encrypted_actual));
 
-   /* Iterate over corpus_encrypted_expected, and check corpus_encrypted_actual */
+   /* Iterate over corpus_encrypted_expected, and check corpus_encrypted_actual
+    */
    bson_iter_init (&iter, corpus_encrypted_expected);
    while (bson_iter_next (&iter)) {
       bson_iter_t actual_iter;
 
-      BSON_ASSERT (bson_iter_init_find (&actual_iter, corpus_encrypted_actual, bson_iter_key (&iter)));
+      BSON_ASSERT (bson_iter_init_find (
+         &actual_iter, corpus_encrypted_actual, bson_iter_key (&iter)));
       _corpus_check_encrypted (client_encryption, &iter, &actual_iter);
    }
 
@@ -1649,14 +1666,15 @@ test_client_side_encryption_install (TestSuite *suite)
                       test_framework_skip_if_no_client_side_encryption,
                       test_framework_skip_if_max_wire_version_less_than_8,
                       test_framework_skip_if_offline /* requires AWS */);
-   TestSuite_AddFull (suite,
-                      "/client_side_encryption/external_key_vault",
-                      test_external_key_vault,
-                      NULL,
-                      NULL,
-                      test_framework_skip_if_no_client_side_encryption,
-                      test_framework_skip_if_max_wire_version_less_than_8,
-                      test_framework_skip_if_no_auth /* requires auth for error check */);
+   TestSuite_AddFull (
+      suite,
+      "/client_side_encryption/external_key_vault",
+      test_external_key_vault,
+      NULL,
+      NULL,
+      test_framework_skip_if_no_client_side_encryption,
+      test_framework_skip_if_max_wire_version_less_than_8,
+      test_framework_skip_if_no_auth /* requires auth for error check */);
    TestSuite_AddFull (
       suite,
       "/client_side_encryption/bson_size_limits_and_batch_splitting",
