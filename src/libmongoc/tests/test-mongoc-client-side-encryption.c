@@ -347,16 +347,12 @@ _reset (mongoc_client_pool_t **pool,
 {
    bson_t *kms_providers;
    mongoc_uri_t *uri;
+   bson_t *extra;
 
    mongoc_auto_encryption_opts_destroy (*opts);
    *opts = mongoc_auto_encryption_opts_new ();
-   if (test_framework_getenv_bool ("MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN")) {
-      bson_t *extra;
-
-      extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
-      mongoc_auto_encryption_opts_set_extra (*opts, extra);
-      bson_destroy (extra);
-   }
+   extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
+   mongoc_auto_encryption_opts_set_extra (*opts, extra);
    mongoc_auto_encryption_opts_set_keyvault_namespace (*opts, "db", "keyvault");
    kms_providers = BCON_NEW (
       "local", "{", "key", BCON_BIN (0, (uint8_t *) LOCAL_MASTERKEY, 96), "}");
@@ -378,6 +374,7 @@ _reset (mongoc_client_pool_t **pool,
       *multi_threaded_client = mongoc_client_pool_pop (*pool);
       mongoc_uri_destroy (uri);
    }
+   bson_destroy (extra);
    bson_destroy (kms_providers);
 }
 
