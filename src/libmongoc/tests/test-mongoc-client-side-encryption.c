@@ -398,6 +398,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    /* multi threaded client, single threaded setter => bad */
    ret = mongoc_client_enable_auto_encryption (
       multi_threaded_client, opts, &error);
+   BSON_ASSERT (!ret);
    ASSERT_ERROR_CONTAINS (error,
                           MONGOC_ERROR_CLIENT,
                           MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
@@ -428,6 +429,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    mongoc_auto_encryption_opts_set_keyvault_client_pool (opts, pool);
    ret = mongoc_client_enable_auto_encryption (
       single_threaded_client, opts, &error);
+   BSON_ASSERT (!ret);
    ASSERT_ERROR_CONTAINS (error,
                           MONGOC_ERROR_CLIENT,
                           MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
@@ -439,6 +441,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    mongoc_auto_encryption_opts_set_keyvault_client (opts,
                                                     single_threaded_client);
    ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   BSON_ASSERT (!ret);
    ASSERT_ERROR_CONTAINS (error,
                           MONGOC_ERROR_CLIENT,
                           MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
@@ -451,6 +454,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    mongoc_auto_encryption_opts_set_keyvault_client (opts,
                                                     multi_threaded_client);
    ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   BSON_ASSERT (!ret);
    ASSERT_ERROR_CONTAINS (error,
                           MONGOC_ERROR_CLIENT,
                           MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
@@ -471,6 +475,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    ASSERT_OR_PRINT (ret, error);
    ret = mongoc_client_enable_auto_encryption (
       single_threaded_client, opts, &error);
+   BSON_ASSERT (!ret);
    ASSERT_ERROR_CONTAINS (error,
                           MONGOC_ERROR_CLIENT,
                           MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
@@ -478,6 +483,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
    ASSERT_OR_PRINT (ret, error);
    ret = mongoc_client_pool_enable_auto_encryption (pool, opts, &error);
+   BSON_ASSERT (!ret);
    ASSERT_ERROR_CONTAINS (error,
                           MONGOC_ERROR_CLIENT,
                           MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_STATE,
