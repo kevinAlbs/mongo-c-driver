@@ -14,10 +14,7 @@ Synopsis
       char **keyaltnames,
       uint32_t keyaltnames_count);
 
-Description
------------
-
-Sets a list of string alternate names that can be used to identify a data key. Key alternate names must be unique.
+Sets a list of alternate name strings that can be used to identify a data key. Key alternate names must be unique.
 
 Parameters
 ----------

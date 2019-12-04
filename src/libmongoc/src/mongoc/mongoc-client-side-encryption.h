@@ -25,6 +25,9 @@
 struct _mongoc_client_t;
 struct _mongoc_client_pool_t;
 
+#define AEAD_AES_256_CBC_HMAC_SHA_512_RANDOM "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+#define AEAD_AES_256_CBC_HMAC_SHA_512_DETERMINISTIC "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+
 BSON_BEGIN_DECLS
 
 typedef struct _mongoc_auto_encryption_opts_t mongoc_auto_encryption_opts_t;

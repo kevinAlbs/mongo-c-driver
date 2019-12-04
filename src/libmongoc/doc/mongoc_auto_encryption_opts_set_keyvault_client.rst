@@ -10,7 +10,7 @@ Synopsis
 
    void
    mongoc_auto_encryption_opts_set_keyvault_client (
-      mongoc_auto_encryption_opts_t *opts, struct _mongoc_client_t *client);
+      mongoc_auto_encryption_opts_t *opts, mongoc_client_t *client);
 
 Set an optional separate :symbol:`mongoc_client_t` to use during key lookup for automatic encryption and decryption. Only applies to automatic encryption on a single-threaded :symbol:`mongoc_client_t`.
 

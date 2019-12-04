@@ -8,12 +8,7 @@ Synopsis
 
 .. code-block:: c
 
-  #include <mongoc/mongoc.h>
-
   typedef struct _mongoc_client_encryption_datakey_opts_t mongoc_client_encryption_datakey_opts_t;
-
-Description
------------
 
 Used to set options for :symbol:`mongoc_client_encryption_create_datakey()`.
 

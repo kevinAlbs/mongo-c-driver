@@ -12,9 +12,6 @@ Synopsis
    mongoc_client_encryption_encrypt_opts_set_keyid (
       mongoc_client_encryption_encrypt_opts_t *opts, const bson_value_t *keyid);
 
-Description
------------
-
 Identifies the data key to use for encryption. This option is mutually exclusive with :symbol:`mongoc_client_encryption_encrypt_opts_set_keyaltname()`. 
 
 Parameters

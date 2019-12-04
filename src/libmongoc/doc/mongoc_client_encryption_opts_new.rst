@@ -12,4 +12,5 @@ Synopsis
 
 Returns
 -------
+
 A new :symbol:`mongoc_client_encryption_opts_t` that must be freed with :symbol:`mongoc_client_encryption_opts_destroy()`.

@@ -18,19 +18,21 @@ Parameters
 * ``opts``: The :symbol:`mongoc_client_encryption_opts_t`
 * ``kms_providers``: A :symbol:`bson_t` containing configuration for an external Key Management Service (KMS).
 
-``kms_providers`` is a BSON document containing configuration for each KMS provider. Currently ``aws`` or ``local`` are supported. At least one must be specified. The format is as follows:
+``kms_providers`` is a BSON document containing configuration for each KMS provider. Currently ``aws`` or ``local`` are supported. At least one must be specified. The format for "aws" is as follows:
 
-.. code-block:: js
+.. code-block:: javascript
 
-   {
-      aws: {
-         accessKeyId: string,
-         secretAccessKey: string
-      }
+   aws: {
+      accessKeyId: <string>,
+      secretAccessKey: <string>
+   }
 
-      local: {
-         key: byte[96] // The master key used to encrypt/decrypt data keys.
-      }
+The format for "local" is as follows:
+
+.. code-block:: javascript
+
+   local: {
+      key: <96 byte BSON binary of subtype 0> // The master key used to encrypt/decrypt data keys.
    }
 
 
