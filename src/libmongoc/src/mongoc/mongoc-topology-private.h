@@ -88,6 +88,9 @@ typedef struct _mongoc_topology_t {
    char *keyvault_db;
    char *keyvault_coll;
    bool bypass_auto_encryption;
+   bool mongocryptd_bypass_spawn;
+   char *mongocryptd_spawn_path;
+   bson_t *mongocryptd_spawn_args;
 #endif
 } mongoc_topology_t;
 

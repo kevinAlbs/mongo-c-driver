@@ -548,6 +548,11 @@ _release_keyvault_coll (mongoc_client_t *client_encrypted,
    }
 }
 
+static bool
+_spawn_mongocryptd (const char *mongocryptd_spawn_path,
+                    const bson_t *mongocryptd_spawn_args,
+                    bson_error_t *error);
+
 /*--------------------------------------------------------------------------
  *
  * _mongoc_cse_auto_encrypt --
@@ -583,6 +588,7 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client_encrypted,
    bson_iter_t iter;
    mongoc_client_t *mongocryptd_client = NULL;
    mongoc_collection_t *keyvault_coll = NULL;
+   bool retried;
 
    ENTRY;
 
@@ -610,6 +616,8 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client_encrypted,
    _prep_for_auto_encryption (cmd, &cmd_bson);
    keyvault_coll = _get_keyvault_coll (client_encrypted);
    mongocryptd_client = _get_mongocryptd_client (client_encrypted);
+
+retry:
    bson_destroy (encrypted);
    if (!_mongoc_crypt_auto_encrypt (client_encrypted->topology->crypt,
                                     keyvault_coll,
@@ -619,6 +627,25 @@ _mongoc_cse_auto_encrypt (mongoc_client_t *client_encrypted,
                                     &cmd_bson,
                                     encrypted,
                                     error)) {
+      /* From the Client-Side Encryption spec: If spawning is necessary, the
+       * driver MUST spawn mongocryptd whenever server selection on the
+       * MongoClient to mongocryptd fails. If the MongoClient fails to connect
+       * after spawning, the server selection error is propagated to the user.
+       */
+      if (!client_encrypted->topology->mongocryptd_bypass_spawn &&
+          error->domain == MONGOC_ERROR_SERVER_SELECTION && !retried) {
+         // MONGOC_TRACE ("respawning mongocryptd");
+         if (!_spawn_mongocryptd (
+                client_encrypted->topology->mongocryptd_spawn_path,
+                client_encrypted->topology->mongocryptd_spawn_args,
+                error)) {
+            GOTO (fail);
+         }
+         /* Respawn and retry. */
+         memset (error, 0, sizeof (*error));
+         retried = true;
+         GOTO (retry);
+      }
       GOTO (fail);
    }
 
@@ -936,7 +963,7 @@ _do_spawn (const char *path, char **args, bson_error_t *error)
  */
 static bool
 _spawn_mongocryptd (const char *mongocryptd_spawn_path,
-                    const bson_iter_t *mongocryptd_spawn_args,
+                    const bson_t *mongocryptd_spawn_args,
                     bson_error_t *error)
 {
    char **args = NULL;
@@ -947,8 +974,8 @@ _spawn_mongocryptd (const char *mongocryptd_spawn_path,
 
    /* iterate once to get length and validate all are strings */
    if (mongocryptd_spawn_args) {
-      BSON_ASSERT (BSON_ITER_HOLDS_ARRAY (mongocryptd_spawn_args));
-      bson_iter_recurse (mongocryptd_spawn_args, &iter);
+      ;
+      bson_iter_init (&iter, mongocryptd_spawn_args);
       while (bson_iter_next (&iter)) {
          if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
             bson_set_error (error,
@@ -980,8 +1007,7 @@ _spawn_mongocryptd (const char *mongocryptd_spawn_path,
    args[i++] = "mongocryptd";
 
    if (mongocryptd_spawn_args) {
-      BSON_ASSERT (BSON_ITER_HOLDS_ARRAY (mongocryptd_spawn_args));
-      bson_iter_recurse (mongocryptd_spawn_args, &iter);
+      bson_iter_init (&iter, mongocryptd_spawn_args);
       while (bson_iter_next (&iter)) {
          args[i++] = (char *) bson_iter_utf8 (&iter, NULL);
       }
@@ -997,57 +1023,36 @@ _spawn_mongocryptd (const char *mongocryptd_spawn_path,
    return _do_spawn (mongocryptd_spawn_path, args, error);
 }
 
-typedef struct {
-   mongoc_uri_t *mongocryptd_uri;
-   bool mongocryptd_bypass_spawn;
-   const char *mongocryptd_spawn_path;
-   /* an iter to the first element of the
-    * mongocryptdSpawnArgs array */
-   bson_iter_t mongocryptd_spawn_args;
-   bool has_spawn_args;
-} _extra_parsed_t;
-
-static _extra_parsed_t *
-_extra_parsed_new (void)
-{
-   return bson_malloc0 (sizeof (_extra_parsed_t));
-}
-
-static void
-_extra_parsed_destroy (_extra_parsed_t *extra_parsed)
-{
-   if (!extra_parsed) {
-      return;
-   }
-   mongoc_uri_destroy (extra_parsed->mongocryptd_uri);
-   bson_free (extra_parsed);
-}
-
 static bool
-_extra_parsed_init (const bson_t *extra,
-                    _extra_parsed_t *extra_parsed,
-                    bson_error_t *error)
+_parse_extra (const bson_t *extra,
+              mongoc_topology_t *topology,
+              mongoc_uri_t **uri,
+              bson_error_t *error)
 {
    bson_iter_t iter;
    bool ret = false;
-   mongoc_uri_t *mongocryptd_uri = NULL;
 
    ENTRY;
 
+   *uri = NULL;
    if (extra) {
       if (bson_iter_init_find (&iter, extra, "mongocryptdBypassSpawn") &&
           bson_iter_as_bool (&iter)) {
-         extra_parsed->mongocryptd_bypass_spawn = true;
+         topology->mongocryptd_bypass_spawn = true;
       }
       if (bson_iter_init_find (&iter, extra, "mongocryptdSpawnPath") &&
           BSON_ITER_HOLDS_UTF8 (&iter)) {
-         extra_parsed->mongocryptd_spawn_path = bson_iter_utf8 (&iter, NULL);
+         topology->mongocryptd_spawn_path =
+            bson_strdup (bson_iter_utf8 (&iter, NULL));
       }
       if (bson_iter_init_find (&iter, extra, "mongocryptdSpawnArgs") &&
           BSON_ITER_HOLDS_ARRAY (&iter)) {
-         memcpy (
-            &extra_parsed->mongocryptd_spawn_args, &iter, sizeof (bson_iter_t));
-         extra_parsed->has_spawn_args = true;
+         uint32_t array_len;
+         const uint8_t *array_data;
+
+         bson_iter_array (&iter, &array_len, &array_data);
+         topology->mongocryptd_spawn_args =
+            bson_new_from_data (array_data, array_len);
       }
 
       if (bson_iter_init_find (&iter, extra, "mongocryptdURI")) {
@@ -1058,26 +1063,23 @@ _extra_parsed_init (const bson_t *extra,
                             "Expected string for option 'mongocryptdURI'");
             goto fail;
          }
-         extra_parsed->mongocryptd_uri =
-            mongoc_uri_new_with_error (bson_iter_utf8 (&iter, NULL), error);
-         if (!mongocryptd_uri) {
+         *uri = mongoc_uri_new_with_error (bson_iter_utf8 (&iter, NULL), error);
+         if (!*uri) {
             goto fail;
          }
       }
    }
 
 
-   if (!extra_parsed->mongocryptd_uri) {
-      extra_parsed->mongocryptd_uri =
-         mongoc_uri_new_with_error ("mongodb://localhost:27020", error);
+   if (!*uri) {
+      *uri = mongoc_uri_new_with_error ("mongodb://localhost:27020", error);
 
-      if (!extra_parsed->mongocryptd_uri) {
+      if (!*uri) {
          goto fail;
       }
 
-      if (!mongoc_uri_set_option_as_int32 (extra_parsed->mongocryptd_uri,
-                                           MONGOC_URI_SERVERSELECTIONTIMEOUTMS,
-                                           5000)) {
+      if (!mongoc_uri_set_option_as_int32 (
+             *uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 5000)) {
          _uri_construction_error (error);
          goto fail;
       }
@@ -1094,7 +1096,7 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
                                            bson_error_t *error)
 {
    bool ret = false;
-   _extra_parsed_t *extra_parsed = NULL;
+   mongoc_uri_t *mongocryptd_uri = NULL;
 
    ENTRY;
 
@@ -1151,8 +1153,7 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
       client->topology->cse_enabled = true;
    }
 
-   extra_parsed = _extra_parsed_new ();
-   if (!_extra_parsed_init (opts->extra, extra_parsed, error)) {
+   if (!_parse_extra (opts->extra, client->topology, &mongocryptd_uri, error)) {
       GOTO (fail);
    }
 
@@ -1165,11 +1166,9 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
    client->topology->bypass_auto_encryption = opts->bypass_auto_encryption;
 
    if (!client->topology->bypass_auto_encryption) {
-      if (!extra_parsed->mongocryptd_bypass_spawn) {
-         if (!_spawn_mongocryptd (extra_parsed->mongocryptd_spawn_path,
-                                  extra_parsed->has_spawn_args
-                                     ? &extra_parsed->mongocryptd_spawn_args
-                                     : NULL,
+      if (!client->topology->mongocryptd_bypass_spawn) {
+         if (!_spawn_mongocryptd (client->topology->mongocryptd_spawn_path,
+                                  client->topology->mongocryptd_spawn_args,
                                   error)) {
             GOTO (fail);
          }
@@ -1181,15 +1180,14 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
        * serverSelectionTimeoutMS expires). Override this, since the first
        * attempt to connect to mongocryptd may fail when spawning, as it
        * takes some time for mongocryptd to listen on sockets. */
-      if (!mongoc_uri_set_option_as_bool (extra_parsed->mongocryptd_uri,
-                                          MONGOC_URI_SERVERSELECTIONTRYONCE,
-                                          false)) {
+      if (!mongoc_uri_set_option_as_bool (
+             mongocryptd_uri, MONGOC_URI_SERVERSELECTIONTRYONCE, false)) {
          _uri_construction_error (error);
          GOTO (fail);
       }
 
       client->topology->mongocryptd_client =
-         mongoc_client_new_from_uri (extra_parsed->mongocryptd_uri);
+         mongoc_client_new_from_uri (mongocryptd_uri);
 
       if (!client->topology->mongocryptd_client) {
          bson_set_error (error,
@@ -1205,6 +1203,15 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
        * configurable in the URI, so override. */
       _mongoc_topology_bypass_cooldown (
          client->topology->mongocryptd_client->topology);
+
+      /* Also, since single threaded server selection can foreseeably take
+       * connectTimeoutMS (which by default is longer than 5 seconds), reduce
+       * this as well. */
+      if (!mongoc_uri_set_option_as_int32 (
+             mongocryptd_uri, MONGOC_URI_CONNECTTIMEOUTMS, 5000)) {
+         _uri_construction_error (error);
+         GOTO (fail);
+      }
    }
 
    client->topology->keyvault_db = bson_strdup (opts->keyvault_db);
@@ -1215,7 +1222,7 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
 
    ret = true;
 fail:
-   _extra_parsed_destroy (extra_parsed);
+   mongoc_uri_destroy (mongocryptd_uri);
    RETURN (ret);
 }
 
@@ -1226,7 +1233,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
    bson_error_t *error)
 {
    bool ret = false;
-   _extra_parsed_t *extra_parsed = NULL;
+   mongoc_uri_t *mongocryptd_uri = NULL;
 
    bson_mutex_lock (&topology->mutex);
    if (!opts) {
@@ -1274,8 +1281,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
       topology->cse_enabled = true;
    }
 
-   extra_parsed = _extra_parsed_new ();
-   if (!_extra_parsed_init (opts->extra, extra_parsed, error)) {
+   if (!_parse_extra (opts->extra, topology, &mongocryptd_uri, error)) {
       GOTO (fail);
    }
 
@@ -1288,18 +1294,16 @@ _mongoc_cse_client_pool_enable_auto_encryption (
    topology->bypass_auto_encryption = opts->bypass_auto_encryption;
 
    if (!topology->bypass_auto_encryption) {
-      if (!extra_parsed->mongocryptd_bypass_spawn) {
-         if (!_spawn_mongocryptd (extra_parsed->mongocryptd_spawn_path,
-                                  extra_parsed->has_spawn_args
-                                     ? &extra_parsed->mongocryptd_spawn_args
-                                     : NULL,
+      if (!topology->mongocryptd_bypass_spawn) {
+         if (!_spawn_mongocryptd (topology->mongocryptd_spawn_path,
+                                  topology->mongocryptd_spawn_args,
                                   error)) {
             GOTO (fail);
          }
       }
 
       topology->mongocryptd_client_pool =
-         mongoc_client_pool_new (extra_parsed->mongocryptd_uri);
+         mongoc_client_pool_new (mongocryptd_uri);
 
       if (!topology->mongocryptd_client_pool) {
          bson_set_error (error,
@@ -1318,7 +1322,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
 
    ret = true;
 fail:
-   _extra_parsed_destroy (extra_parsed);
+   mongoc_uri_destroy (mongocryptd_uri);
    bson_mutex_unlock (&topology->mutex);
    RETURN (ret);
 }

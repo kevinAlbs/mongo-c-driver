@@ -421,6 +421,8 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
    mongoc_client_destroy (topology->mongocryptd_client);
    mongoc_client_pool_destroy (topology->mongocryptd_client_pool);
    _mongoc_crypt_destroy (topology->crypt);
+   bson_destroy (topology->mongocryptd_spawn_args);
+   bson_free (topology->mongocryptd_spawn_path);
 #endif
 
    _mongoc_topology_background_thread_stop (topology);
