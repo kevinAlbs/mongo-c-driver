@@ -837,9 +837,12 @@ _do_spawn (const char *path, char **args, bson_error_t *error)
    int fd;
    char *to_exec;
 
+   printf ("spawning mongocryptd\n");
+
    /* Fork. The child will terminate immediately (after fork-exec'ing
     * mongocryptd). This orphans mongocryptd, and allows parent to wait on
     * child. */
+   printf ("[parent] about to fork\n");
    pid = fork ();
    if (pid < 0) {
       bson_set_error (error,
@@ -852,6 +855,7 @@ _do_spawn (const char *path, char **args, bson_error_t *error)
    } else if (pid > 0) {
       int child_status;
 
+      printf ("[parent] about to wait for child to die\n");
       /* Child will spawn mongocryptd and immediately terminate to turn
        * mongocryptd into an orphan. */
       if (waitpid (pid, &child_status, 0 /* options */) < 0) {
@@ -879,6 +883,7 @@ _do_spawn (const char *path, char **args, bson_error_t *error)
       exit (EXIT_FAILURE);
    }
 
+   printf ("[child], about to fork again\n");
    /* Fork again. Child terminates so mongocryptd gets orphaned and immedately
     * adopted by init. */
    signal (SIGHUP, SIG_IGN);
@@ -895,6 +900,7 @@ _do_spawn (const char *path, char **args, bson_error_t *error)
     * Currently pid file ends up in application's working directory. */
 
    /* Set the user file creation mask to zero. */
+   printf ("[grandchild] about to silence before exec'ing\n");
    umask (0);
 
    /* Close and reopen stdin. */

@@ -1413,7 +1413,7 @@ _reset (mongoc_client_pool_t **pool,
 
    mongoc_auto_encryption_opts_destroy (*opts);
    *opts = mongoc_auto_encryption_opts_new ();
-   extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (true));
+   extra = BCON_NEW ("mongocryptdBypassSpawn", BCON_BOOL (false));
    mongoc_auto_encryption_opts_set_extra (*opts, extra);
    mongoc_auto_encryption_opts_set_keyvault_namespace (*opts, "db", "keyvault");
    kms_providers = _make_kms_providers (false /* aws */, true /* local */);
