@@ -35,4 +35,4 @@ Setting the masterkey is required if using AWS KMS, and ``masterkey`` must have 
 
 The value of "endpoint" is a host name with optional port number separated by a colon. E.g. "kms.us-east-1.amazonaws.com" or "kms.us-east-1.amazonaws.com:443"
 
-This function is only applicable for the "aws" KMS provider not applicable for creating data keys with the "local" KMS provider (as configured in :symbol:`mongoc_client_encryption_opts_set_kms_providers()`).
+This function is only applicable for the "aws" KMS provider. It is not applicable for creating data keys with the "local" KMS provider (as configured in :symbol:`mongoc_client_encryption_opts_set_kms_providers()`).

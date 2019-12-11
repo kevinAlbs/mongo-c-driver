@@ -463,8 +463,7 @@ _state_need_kms (_state_machine_t *state_machine, bson_error_t *error)
    const char *endpoint;
    uint32_t sockettimeout;
 
-   sockettimeout =
-      state_machine->keyvault_coll->client->cluster.sockettimeoutms;
+   sockettimeout = MONGOC_DEFAULT_SOCKETTIMEOUTMS;
    kms_ctx = mongocrypt_ctx_next_kms_ctx (state_machine->ctx);
    while (kms_ctx) {
       mongoc_iovec_t iov;
@@ -1037,7 +1036,6 @@ fail:
 
 bool
 _mongoc_crypt_create_datakey (_mongoc_crypt_t *crypt,
-                              mongoc_collection_t *key_vault_coll,
                               const char *kms_provider,
                               const bson_t *masterkey,
                               char **keyaltnames,
@@ -1050,7 +1048,6 @@ _mongoc_crypt_create_datakey (_mongoc_crypt_t *crypt,
 
    bson_init (doc_out);
    state_machine = _state_machine_new ();
-   state_machine->keyvault_coll = key_vault_coll;
    state_machine->ctx = mongocrypt_ctx_new (crypt->handle);
    if (!state_machine->ctx) {
       _crypt_check_error (crypt->handle, error, true);
