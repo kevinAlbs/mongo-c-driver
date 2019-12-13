@@ -110,6 +110,10 @@ test_client_side_encryption_cb (bson_t *scenario)
    run_json_general_test (&config);
 }
 
+/* This is the hex form of the base64 encoded value:
+ * Mng0NCt4ZHVUYUJCa1kxNkVyNUR1QURhZ2h2UzR2d2RrZzh0cFBwM3R6NmdWMDFBMUN3YkQ5aXRRMkhGRGdQV09wOGVNYUMxT2k3NjZKelhaQmRCZGJkTXVyZG9uSjFk
+ * From the client side encryption spec.
+ */
 #define LOCAL_MASTERKEY                                                       \
    "\x32\x78\x34\x34\x2b\x78\x64\x75\x54\x61\x42\x42\x6b\x59\x31\x36\x45\x72" \
    "\x35\x44\x75\x41\x44\x61\x67\x68\x76\x53\x34\x76\x77\x64\x6b\x67\x38\x74" \
@@ -211,10 +215,15 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    char *as;
    limits_apm_ctx_t ctx = {0};
    mongoc_apm_callbacks_t *callbacks;
+   /* Values from the spec to test boundaries. */
+   const int size_16mib = 16777216;
+   const int size_2mib = 2097152;
+   const int exceeds_2mib_after_encryption = size_2mib - 2000;
+   const int exceeds_16mib_after_encryption = size_16mib - 2000;
 
    /* Do the test setup. */
 
-   /* Drop and create db.coll configured with limits-schema.json */
+   /* Steps 1 & 2: Drop and create db.coll configured with limits-schema.json */
    uri = test_framework_get_uri ();
    client = mongoc_client_new_from_uri (uri);
    test_framework_set_ssl_opts (client);
@@ -235,7 +244,7 @@ test_bson_size_limits_and_batch_splitting (void *unused)
          client, "db", cmd, NULL /* read prefs */, NULL /* reply */, &error),
       error);
 
-   /* Drop and create the key vault collection, admin.datakeys. */
+   /* Step 3: Drop and create the key vault collection, admin.datakeys. */
    mongoc_collection_destroy (coll);
    coll = mongoc_client_get_collection (client, "admin", "datakeys");
    (void) mongoc_collection_drop (coll, NULL);
@@ -248,6 +257,7 @@ test_bson_size_limits_and_batch_splitting (void *unused)
 
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
+   /* Step 4 */
    client = mongoc_client_new_from_uri (uri);
    test_framework_set_ssl_opts (client);
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
@@ -267,12 +277,13 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    mongoc_client_set_apm_callbacks (client, callbacks, &ctx);
 
    coll = mongoc_client_get_collection (client, "db", "coll");
+   /* End of setup */
 
    /* Insert { "_id": "over_2mib_under_16mib", "unencrypted": <the string "a"
     * repeated 2097152 times> } */
    docs[0] = BCON_NEW ("_id", "over_2mib_under_16mib");
-   as = bson_malloc (16777216);
-   memset (as, 'a', 16777216);
+   as = bson_malloc (size_16mib);
+   memset (as, 'a', size_16mib);
    bson_append_utf8 (docs[0], "unencrypted", -1, as, 2097152);
    ASSERT_OR_PRINT (
       mongoc_collection_insert_one (
@@ -286,29 +297,21 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    docs[0] = get_bson_from_json_file (
       "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[0], "_id", -1, "encryption_exceeds_2mib", -1);
-   bson_append_utf8 (docs[0], "unencrypted", -1, as, 2097152 - 2000);
+   bson_append_utf8 (
+      docs[0], "unencrypted", -1, as, exceeds_2mib_after_encryption);
    ASSERT_OR_PRINT (
       mongoc_collection_insert_one (
          coll, docs[0], NULL /* opts */, NULL /* reply */, &error),
       error);
    bson_destroy (docs[0]);
 
-   /* Bulk insert the following:
-
-   - ``{ "_id": "over_2mib_1", "unencrypted": <the string "a" repeated (2097152)
-   times> }``
-
-   - ``{ "_id": "over_2mib_2", "unencrypted": <the string "a" repeated (2097152)
-   times> }``
-
-   Expect the bulk write to succeed and split after first doc (i.e. two inserts
-   occur). This may be verified using `command monitoring
-   <https://github.com/mongodb/specifications/tree/master/source/command-monitoring/command-monitoring.rst>`_.
+   /* Insert two documents that each exceed 2MiB but no encryption occurs.
+    * Expect the bulk write to succeed and run as two separate inserts.
    */
    docs[0] = BCON_NEW ("_id", "over_2mib_1");
-   bson_append_utf8 (docs[0], "unencrypted", -1, as, 2097152);
+   bson_append_utf8 (docs[0], "unencrypted", -1, as, size_2mib);
    docs[1] = BCON_NEW ("_id", "over_2mib_2");
-   bson_append_utf8 (docs[1], "unencrypted", -1, as, 2097152);
+   bson_append_utf8 (docs[1], "unencrypted", -1, as, size_2mib);
    ctx.num_inserts = 0;
    ASSERT_OR_PRINT (mongoc_collection_insert_many (coll,
                                                    (const bson_t **) docs,
@@ -321,29 +324,20 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    bson_destroy (docs[0]);
    bson_destroy (docs[1]);
 
-   /* #. Bulk insert the following:
-
-   - The document `limits/limits-doc.json <../limits/limits-doc.json>`_
-   concatenated with ``{ "_id": "encryption_exceeds_2mib_1", "unencrypted": <
-   the string "a" repeated (2097152 - 2000) times > }``
-
-   - The document `limits/limits-doc.json <../limits/limits-doc.json>`_
-   concatenated with ``{ "_id": "encryption_exceeds_2mib_2", "unencrypted": <
-   the string "a" repeated (2097152 - 2000) times > }``
-
-   Expect the bulk write to succeed and split after first doc (i.e. two inserts
-   occur). This may be verified using `command monitoring
-   <https://github.com/mongodb/specifications/tree/master/source/command-monitoring/command-monitoring.rst>`_.
+   /* Insert two documents that each exceed 2MiB after encryption occurs. Expect
+    * the bulk write to succeed and run as two separate inserts.
    */
 
    docs[0] = get_bson_from_json_file (
       "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[0], "_id", -1, "encryption_exceeds_2mib_1", -1);
-   bson_append_utf8 (docs[0], "unencrypted", -1, as, 2097152 - 2000);
+   bson_append_utf8 (
+      docs[0], "unencrypted", -1, as, exceeds_2mib_after_encryption);
    docs[1] = get_bson_from_json_file (
       "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[1], "_id", -1, "encryption_exceeds_2mib_2", -1);
-   bson_append_utf8 (docs[1], "unencrypted", -1, as, 2097152 - 2000);
+   bson_append_utf8 (
+      docs[1], "unencrypted", -1, as, exceeds_2mib_after_encryption);
    ctx.num_inserts = 0;
    ASSERT_OR_PRINT (mongoc_collection_insert_many (coll,
                                                    (const bson_t **) docs,
@@ -359,18 +353,20 @@ test_bson_size_limits_and_batch_splitting (void *unused)
    /* Check that inserting close to, but not exceeding, 16MiB, passes */
    docs[0] = bson_new ();
    bson_append_utf8 (docs[0], "_id", -1, "under_16mib", -1);
-   bson_append_utf8 (docs[0], "unencrypted", -1, as, 16777216 - 2000);
+   bson_append_utf8 (
+      docs[0], "unencrypted", -1, as, exceeds_16mib_after_encryption);
    ASSERT_OR_PRINT (
       mongoc_collection_insert_one (
          coll, docs[0], NULL /* opts */, NULL /* reply */, &error),
       error);
    bson_destroy (docs[0]);
 
-   /* but.. */
+   /* but.. exceeding 16 MiB fails */
    docs[0] = get_bson_from_json_file (
       "./src/libmongoc/tests/client_side_encryption_prose/limits-doc.json");
    bson_append_utf8 (docs[0], "_id", -1, "under_16mib", -1);
-   bson_append_utf8 (docs[0], "unencrypted", -1, as, 16777216 - 2000);
+   bson_append_utf8 (
+      docs[0], "unencrypted", -1, as, exceeds_16mib_after_encryption);
    BSON_ASSERT (!mongoc_collection_insert_one (
       coll, docs[0], NULL /* opts */, NULL /* reply */, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 2, "too large");
@@ -802,6 +798,7 @@ test_views_are_prohibited (void *unused)
    bson_t *kms_providers;
 
    client = test_framework_client_new ();
+
    /* Using client, drop and create a view named db.view with an empty pipeline.
     * E.g. using the command { "create": "view", "viewOn": "coll" }. */
    coll = mongoc_client_get_collection (client, "db", "view");
@@ -892,6 +889,7 @@ test_custom_endpoint (void *unused)
                                                         masterkey);
    res = mongoc_client_encryption_create_datakey (
       client_encryption, "aws", datakey_opts, &keyid, &error);
+
    /* Use the returned UUID of the key to explicitly encrypt and decrypt the
     * string "test" to validate it works. */
    ASSERT_OR_PRINT (res, error);
@@ -915,6 +913,7 @@ test_custom_endpoint (void *unused)
                                                         masterkey);
    res = mongoc_client_encryption_create_datakey (
       client_encryption, "aws", datakey_opts, &keyid, &error);
+
    /* Use the returned UUID of the key to explicitly encrypt and decrypt the
     * string "test" to validate it works. */
    ASSERT_OR_PRINT (res, error);
@@ -939,6 +938,7 @@ test_custom_endpoint (void *unused)
                                                         masterkey);
    res = mongoc_client_encryption_create_datakey (
       client_encryption, "aws", datakey_opts, &keyid, &error);
+
    /* Use the returned UUID of the key to explicitly encrypt and decrypt the
     * string "test" to validate it works. */
    ASSERT_OR_PRINT (res, error);
@@ -1536,14 +1536,17 @@ test_invalid_single_and_pool_mismatches (void *unused)
    ASSERT_OR_PRINT (ret, error);
    _perform_op (single_threaded_client);
 
-   /* single threaded client, multi threaded key vault client => ok */
+   /* single threaded client, multi threaded key vault client => bad */
    _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);
    mongoc_auto_encryption_opts_set_keyvault_client (opts,
                                                     multi_threaded_client);
    ret = mongoc_client_enable_auto_encryption (
       single_threaded_client, opts, &error);
-   ASSERT_OR_PRINT (ret, error);
-   _perform_op (single_threaded_client);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_CLIENT,
+                          MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                          "The key vault client must be single threaded, not "
+                          "be from a client pool");
 
    /* single threaded client, pool key vault client => bad */
    _reset (&pool, &single_threaded_client, &multi_threaded_client, &opts, true);

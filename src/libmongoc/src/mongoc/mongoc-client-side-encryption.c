@@ -1214,6 +1214,16 @@ _mongoc_cse_client_enable_auto_encryption (mongoc_client_t *client,
       GOTO (fail);
    }
 
+   if (opts->keyvault_client &&
+       !opts->keyvault_client->topology->single_threaded) {
+      bson_set_error (error,
+                      MONGOC_ERROR_CLIENT,
+                      MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
+                      "The key vault client must be single threaded, not be "
+                      "from a client pool");
+      GOTO (fail);
+   }
+
    /* Check for required options */
    if (!opts->keyvault_db || !opts->keyvault_coll) {
       bson_set_error (error,
