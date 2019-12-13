@@ -223,7 +223,7 @@ test_bson_size_limits_and_batch_splitting (void *unused)
 
    /* Do the test setup. */
 
-   /* Steps 1 & 2: Drop and create db.coll configured with limits-schema.json */
+   /* Drop and create db.coll configured with limits-schema.json */
    uri = test_framework_get_uri ();
    client = mongoc_client_new_from_uri (uri);
    test_framework_set_ssl_opts (client);
@@ -244,7 +244,7 @@ test_bson_size_limits_and_batch_splitting (void *unused)
          client, "db", cmd, NULL /* read prefs */, NULL /* reply */, &error),
       error);
 
-   /* Step 3: Drop and create the key vault collection, admin.datakeys. */
+   /* Drop and create the key vault collection, admin.datakeys. */
    mongoc_collection_destroy (coll);
    coll = mongoc_client_get_collection (client, "admin", "datakeys");
    (void) mongoc_collection_drop (coll, NULL);
@@ -257,7 +257,7 @@ test_bson_size_limits_and_batch_splitting (void *unused)
 
    mongoc_collection_destroy (coll);
    mongoc_client_destroy (client);
-   /* Step 4 */
+
    client = mongoc_client_new_from_uri (uri);
    test_framework_set_ssl_opts (client);
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
