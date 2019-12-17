@@ -141,7 +141,7 @@ mongoc_client_encryption_encrypt_opts_set_algorithm (
    mongoc_client_encryption_encrypt_opts_t *opts, const char *algorithm);
 
 MONGOC_EXPORT (mongoc_client_encryption_datakey_opts_t *)
-mongoc_client_encryption_datakey_opts_new ();
+mongoc_client_encryption_datakey_opts_new (void);
 
 MONGOC_EXPORT (void)
 mongoc_client_encryption_datakey_opts_destroy (

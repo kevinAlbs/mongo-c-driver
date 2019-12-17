@@ -97,14 +97,10 @@ mongoc_auto_encryption_opts_set_keyvault_namespace (
    }
    bson_free (opts->keyvault_db);
    opts->keyvault_db = NULL;
-   if (db) {
-      opts->keyvault_db = bson_strdup (db);
-   }
+   opts->keyvault_db = bson_strdup (db);
    bson_free (opts->keyvault_coll);
    opts->keyvault_coll = NULL;
-   if (coll) {
-      opts->keyvault_coll = bson_strdup (coll);
-   }
+   opts->keyvault_coll = bson_strdup (coll);
 }
 
 void
@@ -209,14 +205,10 @@ mongoc_client_encryption_opts_set_keyvault_namespace (
    }
    bson_free (opts->keyvault_db);
    opts->keyvault_db = NULL;
-   if (db) {
-      opts->keyvault_db = bson_strdup (db);
-   }
+   opts->keyvault_db = bson_strdup (db);
    bson_free (opts->keyvault_coll);
    opts->keyvault_coll = NULL;
-   if (coll) {
-      opts->keyvault_coll = bson_strdup (coll);
-   }
+   opts->keyvault_coll = bson_strdup (coll);
 }
 
 void
@@ -244,7 +236,7 @@ struct _mongoc_client_encryption_datakey_opts_t {
 };
 
 mongoc_client_encryption_datakey_opts_t *
-mongoc_client_encryption_datakey_opts_new ()
+mongoc_client_encryption_datakey_opts_new (void)
 {
    return bson_malloc0 (sizeof (mongoc_client_encryption_datakey_opts_t));
 }
@@ -369,9 +361,7 @@ mongoc_client_encryption_encrypt_opts_set_keyaltname (
    }
    bson_free (opts->keyaltname);
    opts->keyaltname = NULL;
-   if (keyaltname) {
-      opts->keyaltname = bson_strdup (keyaltname);
-   }
+   opts->keyaltname = bson_strdup (keyaltname);
 }
 
 void
@@ -383,9 +373,7 @@ mongoc_client_encryption_encrypt_opts_set_algorithm (
    }
    bson_free (opts->algorithm);
    opts->algorithm = NULL;
-   if (algorithm) {
-      opts->algorithm = bson_strdup (algorithm);
-   }
+   opts->algorithm = bson_strdup (algorithm);
 }
 
 #ifndef MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION
@@ -1348,8 +1336,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_INVALID_ENCRYPTION_ARG,
                       "The key vault client only applies to a single threaded "
-                      "client not a single threaded client. Set a key vault "
-                      "client pool");
+                      "client not a client pool. Set a key vault client pool");
       GOTO (fail);
    }
 
