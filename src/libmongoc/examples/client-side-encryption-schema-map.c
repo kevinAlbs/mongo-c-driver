@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 static bool
-create_json_schema_file (bson_t *kms_providers,
+create_schema_file (bson_t *kms_providers,
                          const char *keyvault_db,
                          const char *keyvault_coll,
                          mongoc_client_t *keyvault_client,
@@ -15,8 +15,8 @@ create_json_schema_file (bson_t *kms_providers,
    bson_value_t datakey_id = {0};
    char *keyaltnames[] = {"mongoc_encryption_example_1"};
    bson_t *schema = NULL;
-   char *json_schema_string = NULL;
-   size_t json_schema_string_len;
+   char *schema_string = NULL;
+   size_t schema_string_len;
    FILE *outfile = NULL;
    bool ret = false;
 
@@ -68,12 +68,12 @@ create_json_schema_file (bson_t *kms_providers,
                       "object");
    /* Use canonical JSON so that other drivers and tools will be
     * able to parse the MongoDB extended JSON file. */
-   json_schema_string =
-      bson_as_canonical_extended_json (schema, &json_schema_string_len);
+   schema_string =
+      bson_as_canonical_extended_json (schema, &schema_string_len);
    outfile = fopen ("jsonSchema.json", "w");
    if (0 ==
        fwrite (
-          json_schema_string, sizeof (char), json_schema_string_len, outfile)) {
+          schema_string, sizeof (char), schema_string_len, outfile)) {
       fprintf (stderr, "failed to write to file\n");
       goto fail;
    }
@@ -83,8 +83,9 @@ fail:
    mongoc_client_encryption_destroy (client_encryption);
    mongoc_client_encryption_datakey_opts_destroy (datakey_opts);
    mongoc_client_encryption_opts_destroy (client_encryption_opts);
-   bson_free (json_schema_string);
+   bson_free (schema_string);
    bson_destroy (schema);
+   bson_value_destroy (&datakey_id);
    if (outfile) {
       fclose (outfile);
    }
@@ -164,14 +165,30 @@ main (int argc, char **argv)
 
    /* The MongoDB namespace (db.collection) used to store the
     * encrypted documents in this example. */
-   uint8_t *local_masterkey;
+   uint8_t *local_masterkey = NULL;
    uint32_t local_masterkey_len;
-   bson_t *kms_providers;
+   bson_t *kms_providers = NULL;
    bson_error_t error = {0};
 
+   bson_t *index_keys = NULL;
+   char *index_name = NULL;
+   bson_t *create_index_cmd = NULL;
+
+   bson_json_reader_t *reader = NULL;
+
+   bson_t schema = BSON_INITIALIZER;
+   bson_t *schema_map = NULL;
+
    /* The MongoClient used to access the key vault (keyvault_namespace). */
-   mongoc_client_t *keyvault_client;
-   mongoc_collection_t *keyvault_coll;
+   mongoc_client_t *keyvault_client = NULL;
+   mongoc_collection_t *keyvault_coll = NULL;
+
+   mongoc_auto_encryption_opts_t *auto_encryption_opts = NULL;
+   mongoc_client_t *client = NULL;
+   mongoc_collection_t *coll = NULL;
+   bson_t *to_insert = NULL;
+   mongoc_client_t *unencrypted_client = NULL;
+   mongoc_collection_t *unencrypted_coll = NULL;
 
    mongoc_init ();
 
@@ -199,9 +216,6 @@ main (int argc, char **argv)
    mongoc_collection_drop (keyvault_coll, NULL);
 
    /* Ensure that two data keys cannot share the same keyAltName. */
-   bson_t *index_keys;
-   char *index_name;
-   bson_t *create_index_cmd;
    index_keys = BCON_NEW ("keyAltNames", BCON_INT32 (1));
    index_name = mongoc_collection_keys_to_index_string (index_keys);
    create_index_cmd = BCON_NEW ("createIndexes",
@@ -236,27 +250,23 @@ main (int argc, char **argv)
       goto fail;
    }
 
-   ret = create_json_schema_file (
+   ret = create_schema_file (
       kms_providers, KEYVAULT_DB, KEYVAULT_COLL, keyvault_client, &error);
 
    if (!ret) {
       goto fail;
    }
 
-   bson_json_reader_t *reader;
    reader = bson_json_reader_new_from_file ("jsonSchema.json", &error);
    if (!reader) {
       goto fail;
    }
 
-   bson_t schema = BSON_INITIALIZER;
    bson_json_reader_read (reader, &schema, &error);
 
-   bson_t *schema_map;
    schema_map =
       BCON_NEW (ENCRYPTED_DB "." ENCRYPTED_COLL, BCON_DOCUMENT (&schema));
 
-   mongoc_auto_encryption_opts_t *auto_encryption_opts;
    auto_encryption_opts = mongoc_auto_encryption_opts_new ();
    mongoc_auto_encryption_opts_set_keyvault_client (auto_encryption_opts,
                                                     keyvault_client);
@@ -267,7 +277,6 @@ main (int argc, char **argv)
    mongoc_auto_encryption_opts_set_schema_map (auto_encryption_opts,
                                                schema_map);
 
-   mongoc_client_t *client = NULL;
    client =
       mongoc_client_new ("mongodb://localhost/?appname=client-side-encryption");
    ret = mongoc_client_enable_auto_encryption (
@@ -276,12 +285,10 @@ main (int argc, char **argv)
       goto fail;
    }
 
-   mongoc_collection_t *coll = NULL;
    coll = mongoc_client_get_collection (client, ENCRYPTED_DB, ENCRYPTED_COLL);
    /* Clear old data */
    mongoc_collection_drop (coll, NULL);
 
-   bson_t *to_insert;
    to_insert = BCON_NEW ("encryptedField", "123456789");
    ret = mongoc_collection_insert_one (
       coll, to_insert, NULL /* opts */, NULL /* reply */, &error);
@@ -293,9 +300,6 @@ main (int argc, char **argv)
       goto fail;
    }
    printf ("\n");
-
-   mongoc_client_t *unencrypted_client = NULL;
-   mongoc_collection_t *unencrypted_coll = NULL;
 
    unencrypted_client = mongoc_client_new (
       "mongodb://localhost/?appname=client-side-encryption-unencrypted");
@@ -312,6 +316,23 @@ fail:
    if (error.code) {
       fprintf (stderr, "error: %s\n", error.message);
    }
+
+   bson_free (local_masterkey);
+   bson_destroy (kms_providers);
+   mongoc_collection_destroy (keyvault_coll);
+   bson_destroy (index_keys);
+   bson_free (index_name);
+   bson_destroy (create_index_cmd);
+   bson_json_reader_destroy (reader);
+   mongoc_auto_encryption_opts_destroy (auto_encryption_opts);
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+   bson_destroy (to_insert);
+   mongoc_collection_destroy (unencrypted_coll);
+   mongoc_client_destroy (unencrypted_client);
+   mongoc_client_destroy (keyvault_client);
+   bson_destroy (&schema);
+   bson_destroy (schema_map);
    mongoc_cleanup ();
    return exit_status;
 }
