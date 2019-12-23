@@ -4,10 +4,10 @@
 
 static bool
 create_schema_file (bson_t *kms_providers,
-                         const char *keyvault_db,
-                         const char *keyvault_coll,
-                         mongoc_client_t *keyvault_client,
-                         bson_error_t *error)
+                    const char *keyvault_db,
+                    const char *keyvault_coll,
+                    mongoc_client_t *keyvault_client,
+                    bson_error_t *error)
 {
    mongoc_client_encryption_t *client_encryption = NULL;
    mongoc_client_encryption_opts_t *client_encryption_opts = NULL;
@@ -68,12 +68,9 @@ create_schema_file (bson_t *kms_providers,
                       "object");
    /* Use canonical JSON so that other drivers and tools will be
     * able to parse the MongoDB extended JSON file. */
-   schema_string =
-      bson_as_canonical_extended_json (schema, &schema_string_len);
+   schema_string = bson_as_canonical_extended_json (schema, &schema_string_len);
    outfile = fopen ("jsonSchema.json", "w");
-   if (0 ==
-       fwrite (
-          schema_string, sizeof (char), schema_string_len, outfile)) {
+   if (0 == fwrite (schema_string, sizeof (char), schema_string_len, outfile)) {
       fprintf (stderr, "failed to write to file\n");
       goto fail;
    }
@@ -152,37 +149,30 @@ fail:
 int
 main (int argc, char **argv)
 {
-/* The MongoDB namespace (db.collection) used to store
- * the encryption data keys. */
+/* The collection used to store the encryption data keys. */
 #define KEYVAULT_DB "encryption"
 #define KEYVAULT_COLL "__libmongocTestKeyVault"
-
+/* The collection used to store the encrypted documents in this example. */
 #define ENCRYPTED_DB "test"
 #define ENCRYPTED_COLL "coll"
 
    int exit_status = EXIT_FAILURE;
    bool ret;
-
    /* The MongoDB namespace (db.collection) used to store the
     * encrypted documents in this example. */
    uint8_t *local_masterkey = NULL;
    uint32_t local_masterkey_len;
    bson_t *kms_providers = NULL;
    bson_error_t error = {0};
-
    bson_t *index_keys = NULL;
    char *index_name = NULL;
    bson_t *create_index_cmd = NULL;
-
    bson_json_reader_t *reader = NULL;
-
    bson_t schema = BSON_INITIALIZER;
    bson_t *schema_map = NULL;
-
    /* The MongoClient used to access the key vault (keyvault_namespace). */
    mongoc_client_t *keyvault_client = NULL;
    mongoc_collection_t *keyvault_coll = NULL;
-
    mongoc_auto_encryption_opts_t *auto_encryption_opts = NULL;
    mongoc_client_t *client = NULL;
    mongoc_collection_t *coll = NULL;
@@ -209,6 +199,7 @@ main (int argc, char **argv)
                              BCON_BIN (0, local_masterkey, local_masterkey_len),
                              "}");
 
+   /* Set up the key vault for this example. */
    keyvault_client = mongoc_client_new (
       "mongodb://localhost/?appname=client-side-encryption-keyvault");
    keyvault_coll = mongoc_client_get_collection (
@@ -257,6 +248,7 @@ main (int argc, char **argv)
       goto fail;
    }
 
+   /* Load the JSON Schema and construct the local schema_map option. */
    reader = bson_json_reader_new_from_file ("jsonSchema.json", &error);
    if (!reader) {
       goto fail;

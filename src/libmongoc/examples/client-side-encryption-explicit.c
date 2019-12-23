@@ -62,17 +62,15 @@ fail:
 int
 main (int argc, char **argv)
 {
-/* The MongoDB namespace (db.collection) used to store
- * the encryption data keys. */
+/* The collection used to store the encryption data keys. */
 #define KEYVAULT_DB "encryption"
 #define KEYVAULT_COLL "__libmongocTestKeyVault"
+/* The collection used to store the encrypted documents in this example. */
 #define ENCRYPTED_DB "test"
 #define ENCRYPTED_COLL "coll"
 
    int exit_status = EXIT_FAILURE;
    bool ret;
-   /* The MongoDB namespace (db.collection) used to store the
-    * encrypted documents in this example. */
    uint8_t *local_masterkey = NULL;
    uint32_t local_masterkey_len;
    bson_t *kms_providers = NULL;
@@ -116,15 +114,16 @@ main (int argc, char **argv)
                              "key",
                              BCON_BIN (0, local_masterkey, local_masterkey_len),
                              "}");
-
+   /* The mongoc_client_t used to read/write application data. */
    client =
       mongoc_client_new ("mongodb://localhost/?appname=client-side-encryption");
    coll = mongoc_client_get_collection (client, ENCRYPTED_DB, ENCRYPTED_COLL);
    /* Clear old data */
    mongoc_collection_drop (coll, NULL);
 
-   keyvault_coll = mongoc_client_get_collection (
-      client, KEYVAULT_DB, KEYVAULT_COLL);
+   /* Set up the key vault for this example. */
+   keyvault_coll =
+      mongoc_client_get_collection (client, KEYVAULT_DB, KEYVAULT_COLL);
    mongoc_collection_drop (keyvault_coll, NULL);
 
    /* Ensure that two data keys cannot share the same keyAltName. */
@@ -167,6 +166,8 @@ main (int argc, char **argv)
                                                     kms_providers);
    mongoc_client_encryption_opts_set_keyvault_namespace (
       client_encryption_opts, KEYVAULT_DB, KEYVAULT_COLL);
+   /* The mongoc_client_t to use for reading/writing to the key vault. This can
+    * be the same mongoc_client_t used by the main application. */
    mongoc_client_encryption_opts_set_keyvault_client (client_encryption_opts,
                                                       client);
    client_encryption =
@@ -175,7 +176,7 @@ main (int argc, char **argv)
       goto fail;
    }
 
-   /* Create a new data key and json schema for the encryptedField.
+   /* Create a new data key for the encryptedField.
     * https://dochub.mongodb.org/core/client-side-field-level-encryption-automatic-encryption-rules
     */
    datakey_opts = mongoc_client_encryption_datakey_opts_new ();
@@ -188,15 +189,17 @@ main (int argc, char **argv)
 
    /* Explicitly encrypt a field */
    encrypt_opts = mongoc_client_encryption_encrypt_opts_new ();
-   mongoc_client_encryption_encrypt_opts_set_algorithm (encrypt_opts, AEAD_AES_256_CBC_HMAC_SHA_512_DETERMINISTIC);
+   mongoc_client_encryption_encrypt_opts_set_algorithm (
+      encrypt_opts, AEAD_AES_256_CBC_HMAC_SHA_512_DETERMINISTIC);
    mongoc_client_encryption_encrypt_opts_set_keyid (encrypt_opts, &datakey_id);
    to_encrypt.value_type = BSON_TYPE_UTF8;
    to_encrypt.value.v_utf8.str = "123456789";
    to_encrypt.value.v_utf8.len = strlen (to_encrypt.value.v_utf8.str);
 
-   ret = mongoc_client_encryption_encrypt (client_encryption, &to_encrypt, encrypt_opts, &encrypted_field, &error);
+   ret = mongoc_client_encryption_encrypt (
+      client_encryption, &to_encrypt, encrypt_opts, &encrypted_field, &error);
    if (!ret) {
-       goto fail;
+      goto fail;
    }
 
    to_insert = bson_new ();
@@ -209,14 +212,15 @@ main (int argc, char **argv)
 
    printf ("encrypted document: ");
    if (!print_one (coll, &error)) {
-       goto fail;
+      goto fail;
    }
    printf ("\n");
 
    /* Explicitly decrypt a field */
-   ret = mongoc_client_encryption_decrypt (client_encryption, &encrypted_field, &decrypted, &error);
+   ret = mongoc_client_encryption_decrypt (
+      client_encryption, &encrypted_field, &decrypted, &error);
    if (!ret) {
-       goto fail;
+      goto fail;
    }
    printf ("decrypted value: %s\n", decrypted.value.v_utf8.str);
 

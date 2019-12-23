@@ -2,12 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static bson_t*
+static bson_t *
 create_schema (bson_t *kms_providers,
-            const char *keyvault_db,
-            const char *keyvault_coll,
-            mongoc_client_t *keyvault_client,
-            bson_error_t *error)
+               const char *keyvault_db,
+               const char *keyvault_coll,
+               mongoc_client_t *keyvault_client,
+               bson_error_t *error)
 {
    mongoc_client_encryption_t *client_encryption = NULL;
    mongoc_client_encryption_opts_t *client_encryption_opts = NULL;
@@ -131,43 +131,35 @@ fail:
 int
 main (int argc, char **argv)
 {
-/* The MongoDB namespace (db.collection) used to store
- * the encryption data keys. */
+/* The collection used to store the encryption data keys. */
 #define KEYVAULT_DB "encryption"
 #define KEYVAULT_COLL "__libmongocTestKeyVault"
-
+/* The collection used to store the encrypted documents in this example. */
 #define ENCRYPTED_DB "test"
 #define ENCRYPTED_COLL "coll"
 
    int exit_status = EXIT_FAILURE;
    bool ret;
-
    /* The MongoDB namespace (db.collection) used to store the
     * encrypted documents in this example. */
    uint8_t *local_masterkey = NULL;
    uint32_t local_masterkey_len;
    bson_t *kms_providers = NULL;
    bson_error_t error = {0};
-
    bson_t *index_keys = NULL;
    char *index_name = NULL;
    bson_t *create_index_cmd = NULL;
-
    bson_json_reader_t *reader = NULL;
-
    bson_t *schema = NULL;
-
    /* The MongoClient used to access the key vault (keyvault_namespace). */
    mongoc_client_t *keyvault_client = NULL;
    mongoc_collection_t *keyvault_coll = NULL;
-
    mongoc_auto_encryption_opts_t *auto_encryption_opts = NULL;
    mongoc_client_t *client = NULL;
    mongoc_collection_t *coll = NULL;
    bson_t *to_insert = NULL;
    mongoc_client_t *unencrypted_client = NULL;
    mongoc_collection_t *unencrypted_coll = NULL;
-
    bson_t *create_cmd = NULL;
    bson_t *create_cmd_opts = NULL;
    mongoc_write_concern_t *wc = NULL;
@@ -191,6 +183,7 @@ main (int argc, char **argv)
                              BCON_BIN (0, local_masterkey, local_masterkey_len),
                              "}");
 
+   /* Set up the key vault for this example. */
    keyvault_client = mongoc_client_new (
       "mongodb://localhost/?appname=client-side-encryption-keyvault");
    keyvault_coll = mongoc_client_get_collection (
@@ -243,7 +236,7 @@ main (int argc, char **argv)
       kms_providers, KEYVAULT_DB, KEYVAULT_COLL, keyvault_client, &error);
 
    if (!schema) {
-       goto fail;
+      goto fail;
    }
 
    client =
@@ -259,14 +252,26 @@ main (int argc, char **argv)
    mongoc_collection_drop (coll, NULL);
 
    /* Create the collection with the encryption JSON Schema. */
-   create_cmd = BCON_NEW ("create", ENCRYPTED_COLL, "validator", "{", "$jsonSchema", BCON_DOCUMENT(schema), "}");
+   create_cmd = BCON_NEW ("create",
+                          ENCRYPTED_COLL,
+                          "validator",
+                          "{",
+                          "$jsonSchema",
+                          BCON_DOCUMENT (schema),
+                          "}");
    wc = mongoc_write_concern_new ();
    mongoc_write_concern_set_wmajority (wc, 0);
    create_cmd_opts = bson_new ();
    mongoc_write_concern_append (wc, create_cmd_opts);
-   ret = mongoc_client_command_with_opts (client, ENCRYPTED_DB, create_cmd, NULL /* read prefs */, create_cmd_opts, NULL /* reply */, &error);
+   ret = mongoc_client_command_with_opts (client,
+                                          ENCRYPTED_DB,
+                                          create_cmd,
+                                          NULL /* read prefs */,
+                                          create_cmd_opts,
+                                          NULL /* reply */,
+                                          &error);
    if (!ret) {
-       goto fail;
+      goto fail;
    }
 
    to_insert = BCON_NEW ("encryptedField", "123456789");
@@ -291,11 +296,13 @@ main (int argc, char **argv)
    }
    printf ("\n");
 
-   /* Expect a server-side error if inserting with the unencrypted collection. */
-   ret = mongoc_collection_insert_one (unencrypted_coll, to_insert, NULL /* opts */, NULL /* reply */, &error);
+   /* Expect a server-side error if inserting with the unencrypted collection.
+    */
+   ret = mongoc_collection_insert_one (
+      unencrypted_coll, to_insert, NULL /* opts */, NULL /* reply */, &error);
    if (!ret) {
-       printf ("insert with unencrypted collection failed: %s\n", error.message);
-       memset (&error, 0, sizeof (error));
+      printf ("insert with unencrypted collection failed: %s\n", error.message);
+      memset (&error, 0, sizeof (error));
    }
 
    exit_status = EXIT_SUCCESS;
