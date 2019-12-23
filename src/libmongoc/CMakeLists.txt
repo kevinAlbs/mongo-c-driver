@@ -963,6 +963,8 @@ if (MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION)
    mongoc_add_example (client-side-encryption-tour TRUE ${PROJECT_SOURCE_DIR}/examples/client-side-encryption-tour.c)
    mongoc_add_example (client-side-encryption-options-tour TRUE ${PROJECT_SOURCE_DIR}/examples/client-side-encryption-options-tour.c)
    mongoc_add_example (client-side-encryption-schema-map TRUE ${PROJECT_SOURCE_DIR}/examples/client-side-encryption-schema-map.c)
+   mongoc_add_example (client-side-encryption-server-schema TRUE ${PROJECT_SOURCE_DIR}/examples/client-side-encryption-server-schema.c)
+   mongoc_add_example (client-side-encryption-explicit TRUE ${PROJECT_SOURCE_DIR}/examples/client-side-encryption-explicit.c)
 endif ()
 
 file (COPY ${PROJECT_SOURCE_DIR}/tests/binary DESTINATION ${PROJECT_BINARY_DIR}/tests)
