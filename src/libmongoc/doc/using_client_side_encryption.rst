@@ -121,7 +121,7 @@ The following example shows how to setup automatic client-side field level encry
    :caption: client-side-encryption-server-schema.c
    :language: c
 
-.. explicit-client-side-encryption_
+.. _explicit-client-side-encryption:
 
 Explicit Encryption
 ```````````````````

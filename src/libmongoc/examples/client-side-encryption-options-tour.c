@@ -85,7 +85,7 @@ main (int argc, char *argv[])
                           "bsonType",
                           "string",
                           "algorithm",
-                          AEAD_AES_256_CBC_HMAC_SHA_512_DETERMINISTIC,
+                          MONGOC_AEAD_AES_256_CBC_HMAC_SHA_512_DETERMINISTIC,
                           "}",
                           "}",
                           "}",
