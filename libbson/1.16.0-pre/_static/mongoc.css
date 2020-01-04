@@ -1,0 +1,97 @@
+/*
+ * mongoc.css_t
+ * ~~~~~~~~~~~~~~
+ *
+ * Sphinx stylesheet -- MongoDB C Driver theme.
+ *
+ * Adapted from Sphinx Readable Theme, Copyright 2013 by Ignacy Sokolowski
+ * https://github.com/ignacysokolowski/sphinx-readable-theme
+ *
+ * Copyright (c) 2017 MongoDB, Inc.
+ *
+ *                               MIT LICENSE
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+
+
+@import url('basic.css');
+ 
+/* -- page layout --------------------------------------------------------- */
+
+/* make room for the big table */
+div.bodywrapper#errors {
+    margin: 0;
+}
+
+table.docutils {
+    width: 100%;
+}
+
+table.docutils.footnote {
+    width: auto;
+}
+
+table.docutils thead,
+table.docutils tfoot {
+    background: #f5f5f5;
+}
+
+table.docutils thead tr th {
+    color: #000;
+    font-weight: normal;
+    padding: 7px 5px;
+    vertical-align: middle;
+}
+
+table.docutils tbody tr th,
+table.docutils tbody tr td {
+    border-bottom: 0;
+    border-top: solid 1px #ddd;
+    padding: 7px 5px;
+    vertical-align: top;
+}
+table.docutils tbody tr:last-child th,
+table.docutils tbody tr:last-child td {
+    border-bottom: solid 1px #ddd;
+}
+
+table.docutils thead tr td p,
+table.docutils tfoot tr td p,
+table.docutils tbody tr td p,
+table.docutils thead tr td ul,
+table.docutils tfoot tr td ul,
+table.docutils tbody tr td ul,
+table.docutils thead tr td ol,
+table.docutils tfoot tr td ol,
+table.docutils tbody tr td ol {
+    margin: 0 0 .5em;
+}
+table.docutils thead tr td p.last,
+table.docutils tfoot tr td p.last,
+table.docutils tbody tr td p.last,
+table.docutils thead tr td ul.last,
+table.docutils tfoot tr td ul.last,
+table.docutils tbody tr td ul.last,
+table.docutils thead tr td ol.last,
+table.docutils tfoot tr td ol.last,
+table.docutils tbody tr td ol.last {
+    margin-bottom: 0;
+}
