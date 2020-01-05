@@ -5,15 +5,24 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><script>
-  (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push(
-      {'gtm.start': new Date().getTime(),event:'gtm.js'}
-    );var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    '//www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-JQHP');
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-7301842-14"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-7301842-14');
 </script>
-    <title>MongoDB C Driver &#8212; MongoDB C Driver 1.15.3</title>
+<!--  NPS survey -->
+<script type="text/javascript">
+  !function(e,t,r,n,a){if(!e[a]){for(var i=e[a]=[],s=0;s<r.length;s++){var c=r[s];i[c]=i[c]||function(e){return function(){var t=Array.prototype.slice.call(arguments);i.push([e,t])}}(c)}i.SNIPPET_VERSION="1.0.1";var o=t.createElement("script");o.type="text/javascript",o.async=!0,o.src="https://d2yyd1h5u9mauk.cloudfront.net/integrations/web/v1/library/"+n+"/"+a+".js";var l=t.getElementsByTagName("script")[0];l.parentNode.insertBefore(o,l)}}(window,document,["survey","reset","config","init","set","get","event","identify","track","page","screen","group","alias"],"Dk30CC86ba0nATlK","delighted");
+
+  delighted.survey();
+</script>
+
+    <title>MongoDB C Driver &#8212; MongoDB C Driver 1.16.0-pre</title>
     <link rel="stylesheet" href="_static/readable.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -34,7 +43,7 @@
     <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
       <ul>
-        <li class="nav-item nav-item-0"><a href="#">MongoDB C Driver 1.15.3</a> &#187;</li> 
+        <li class="nav-item nav-item-0"><a href="#">MongoDB C Driver 1.16.0-pre</a> &#187;</li> 
       </ul>
     </div>  
 
@@ -49,7 +58,7 @@
 <p>It depends on <a class="reference external" href="libbson/current/index.html">libbson</a> to generate and parse BSON documents, the native data format of MongoDB.</p>
 <div class="section" id="download">
 <h2>Download<a class="headerlink" href="#download" title="Permalink to this headline">¶</a></h2>
-<p>Latest release: <a class="reference external" href="https://github.com/mongodb/mongo-c-driver/releases/download/1.15.3/mongo-c-driver-1.15.3.tar.gz">mongo-c-driver-1.15.3.tar.gz</a></p>
+<p>Latest release: <a class="reference external" href="https://github.com/mongodb/mongo-c-driver/releases/download/1.16.0-pre/mongo-c-driver-1.16.0-pre.tar.gz">mongo-c-driver-1.16.0-pre.tar.gz</a></p>
 </div>
 <div class="section" id="documentation">
 <h2>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h2>
@@ -65,8 +74,8 @@
 </div>
 <div class="section" id="documentation-for-older-versions">
 <h2>Documentation for Older Versions<a class="headerlink" href="#documentation-for-older-versions" title="Permalink to this headline">¶</a></h2>
-<p><a class="reference external" href="libmongoc/index.html">libmongoc releases</a></p>
-<p><a class="reference external" href="libbson/index.html">libbson releases</a></p>
+<p><a class="reference external" href="libmongoc/current/releases.html">libmongoc releases</a></p>
+<p><a class="reference external" href="libbson/current/releases.html">libbson releases</a></p>
 </div>
 </div>
 
