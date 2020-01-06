@@ -25,7 +25,6 @@ extra_dist_generated (
    _static/up-pressed.png
    _static/up.png
    _static/websupport.js
-   genindex.html
    search.html
    searchindex.js
 )
