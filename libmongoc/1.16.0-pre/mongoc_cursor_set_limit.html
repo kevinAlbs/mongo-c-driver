@@ -118,7 +118,6 @@
 <li class="toctree-l2"><a class="reference internal" href="errors.html">Error Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lifecycle.html">Object Lifecycle</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gridfs.html">GridFS</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mongoc_version.html">Version Checks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mongoc_auto_encryption_opts_t.html">mongoc_auto_encryption_opts_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mongoc_bulk_operation_t.html">mongoc_bulk_operation_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mongoc_change_stream_t.html">mongoc_change_stream_t</a></li>
@@ -168,6 +167,7 @@
 <li class="toctree-l2"><a class="reference internal" href="mongoc_transaction_state_t.html">mongoc_transaction_state_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mongoc_update_flags_t.html">mongoc_update_flags_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mongoc_uri_t.html">mongoc_uri_t</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mongoc_version.html">Version Checks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mongoc_write_concern_t.html">mongoc_write_concern_t</a></li>
 </ul>
 </li>
@@ -175,10 +175,8 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="application-performance-monitoring.html">Application Performance Monitoring (APM)</a></li>
 </ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
-</ul>
-
+<!-- Because full_index.rst includes everything that index.rst includes, we have to exclude index.rst from the table-of-contents. This page is simply a link forced into the sidebar (in conf.py) to avoid including full_index.rst in the ToC. -->
+<ul><li class='toctree-l1'><a href="full_index.html">Index</a></li></ul>
 <div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
     <div class="searchformwrapper">

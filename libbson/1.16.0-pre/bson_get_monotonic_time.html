@@ -31,8 +31,8 @@
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="_static/language_data.js"></script>
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Character and String Routines" href="character_and_string_routines.html" />
-    <link rel="prev" title="API Reference" href="api.html" />
+    <link rel="next" title="Memory Management" href="bson_memory.html" />
+    <link rel="prev" title="bson_writer_rollback()" href="bson_writer_rollback.html" />
    
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
 
@@ -44,10 +44,10 @@
       <h3>Navigation</h3>
       <ul>
         <li class="right" style="margin-right: 10px">
-          <a href="character_and_string_routines.html" title="Character and String Routines"
+          <a href="bson_memory.html" title="Memory Management"
              accesskey="N">next</a></li>
         <li class="right" >
-          <a href="api.html" title="API Reference"
+          <a href="bson_writer_rollback.html" title="bson_writer_rollback()"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">libbson 1.16.0-pre</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="api.html" accesskey="U">API Reference</a> &#187;</li> 
@@ -101,10 +101,6 @@
 </ul>
 <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="api.html">API Reference</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">System Clock</a></li>
-<li class="toctree-l2"><a class="reference internal" href="character_and_string_routines.html">Character and String Routines</a></li>
-<li class="toctree-l2"><a class="reference internal" href="bson_memory.html">Memory Management</a></li>
-<li class="toctree-l2"><a class="reference internal" href="version.html">Libbson Versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_t.html">bson_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_context_t.html">bson_context_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_decimal128_t.html">bson_decimal128_t</a></li>
@@ -114,6 +110,7 @@
 <li class="toctree-l2"><a class="reference internal" href="bson_md5_t.html">bson_md5_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_oid_t.html">bson_oid_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_reader_t.html">bson_reader_t</a></li>
+<li class="toctree-l2"><a class="reference internal" href="character_and_string_routines.html">Character and String Routines</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_string_t.html">bson_string_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_subtype_t.html">bson_subtype_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_type_t.html">bson_type_t</a></li>
@@ -121,13 +118,14 @@
 <li class="toctree-l2"><a class="reference internal" href="bson_value_t.html">bson_value_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_visitor_t.html">bson_visitor_t</a></li>
 <li class="toctree-l2"><a class="reference internal" href="bson_writer_t.html">bson_writer_t</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">System Clock</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bson_memory.html">Memory Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="version.html">Libbson Versioning</a></li>
 </ul>
 </li>
 </ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
-</ul>
-
+<!-- Because full_index.rst includes everything that index.rst includes, we have to exclude index.rst from the table-of-contents. This page is simply a link forced into the sidebar (in conf.py) to avoid including full_index.rst in the ToC. -->
+<ul><li class='toctree-l1'><a href="full_index.html">Index</a></li></ul>
 <div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
     <div class="searchformwrapper">
