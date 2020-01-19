@@ -21,6 +21,7 @@ extra_dist_generated (
    _static/down.png
    _static/file.png
    _static/jquery.js
+   _static/language_data.js
    _static/minus.png
    _static/plus.png
    _static/pygments.css
