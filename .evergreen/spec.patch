@@ -1,0 +1,12 @@
+diff --git a/mongo-c-driver.spec.orig b/mongo-c-driver.spec.orig
+index 880c344de..2139a3ac3 100644
+--- a/mongo-c-driver.spec.orig
++++ b/mongo-c-driver.spec.orig
+@@ -38,7 +38,6 @@ BuildRequires: pkgconfig(libzstd)
+ BuildRequires: mongodb-server
+ BuildRequires: openssl
+ %endif
+-BuildRequires: cmake(mongocrypt)
+ BuildRequires: perl-interpreter
+ # From man pages
+ BuildRequires: python3
