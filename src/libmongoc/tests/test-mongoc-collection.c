@@ -1538,14 +1538,7 @@ test_index (void)
          r = mongoc_collection_drop_index_with_opts (
             collection, "hello_1", opts, &error);
          ASSERT (!r);
-
-         if (test_framework_is_replset ()) { /* replica set */
-            ASSERT_ERROR_CONTAINS (
-               error, MONGOC_ERROR_WRITE_CONCERN, 100, "Write Concern error:");
-         } else { /* standalone */
-            ASSERT_CMPINT (error.domain, ==, MONGOC_ERROR_SERVER);
-            ASSERT_CMPINT (error.code, ==, 2);
-         }
+         assert_wc_oob_error (&error);
       }
    } /* wire_version_5 */
 
@@ -1575,7 +1568,6 @@ test_index_w_write_concern ()
    bson_t *opts = NULL;
    bool result;
    bool wire_version_5;
-   bool is_replicaset = test_framework_is_replset ();
    bool is_mongos = test_framework_is_mongos ();
 
    mongoc_index_opt_init (&opt);
@@ -1644,13 +1636,7 @@ test_index_w_write_concern ()
       if (wire_version_5) {
          ASSERT (!mongoc_collection_create_index_with_opts (
             collection, &keys, &opt, opts, &reply, &error));
-         if (is_replicaset) { /* replica set */
-            ASSERT_ERROR_CONTAINS (
-               error, MONGOC_ERROR_WRITE_CONCERN, 100, "Write Concern error:");
-         } else { /* standalone */
-            ASSERT_CMPINT (error.domain, ==, MONGOC_ERROR_SERVER);
-            ASSERT_CMPINT (error.code, ==, 2);
-         }
+         assert_wc_oob_error (&error);
       } else { /* if wire version <= 4, no error */
          result = mongoc_collection_create_index_with_opts (
             collection, &keys, &opt, opts, &reply, &error);
@@ -2561,13 +2547,7 @@ test_drop (void)
          mongoc_write_concern_append_bad (bad_wc, opts);
          r = mongoc_collection_drop_with_opts (collection, opts, &error);
          ASSERT (!r);
-         if (test_framework_is_replset ()) { /* replica set */
-            ASSERT_ERROR_CONTAINS (
-               error, MONGOC_ERROR_WRITE_CONCERN, 100, "Write Concern error:");
-         } else { /* standalone */
-            ASSERT_CMPINT (error.domain, ==, MONGOC_ERROR_SERVER);
-            ASSERT_CMPINT (error.code, ==, 2);
-         }
+         assert_wc_oob_error (&error);
       }
    } /* wire_version_5 */
 
@@ -3295,13 +3275,7 @@ test_rename (void)
          /* check that collection name has not changed */
          ASSERT_CMPSTR (mongoc_collection_get_name (collection),
                         "test_rename.3");
-         if (test_framework_is_replset ()) { /* replica set */
-            ASSERT_ERROR_CONTAINS (
-               error, MONGOC_ERROR_WRITE_CONCERN, 100, "Write Concern error:");
-         } else { /* standalone */
-            ASSERT_CMPINT (error.domain, ==, MONGOC_ERROR_SERVER);
-            ASSERT_CMPINT (error.code, ==, 2);
-         }
+         assert_wc_oob_error (&error);
       }
    } /* wire_version_5 */
 
@@ -4970,12 +4944,24 @@ test_insert_one (void)
          &reply,
          &err);
       ASSERT (!ret);
-      ASSERT_CMPUINT32 (err.domain, ==, (uint32_t) MONGOC_ERROR_WRITE_CONCERN);
-      ASSERT_MATCH (&reply,
-                    "{'insertedCount': 1,"
-                    " 'writeErrors': {'$exists': false},"
-                    " 'writeConcernErrors': {'$exists': true}"
-                    "}");
+      if (test_framework_get_server_version () >=
+          test_framework_str_to_version ("4.3.3")) {
+         /* Error reporting changed in SERVER-45584 */
+         ASSERT_CMPUINT32 (err.domain, ==, (uint32_t) MONGOC_ERROR_QUERY);
+         ASSERT_MATCH (&reply,
+                       "{'insertedCount': 0,"
+                       " 'writeErrors': {'$exists': false},"
+                       " 'writeConcernErrors': {'$exists': false}"
+                       "}");
+      } else {
+         ASSERT_CMPUINT32 (
+            err.domain, ==, (uint32_t) MONGOC_ERROR_WRITE_CONCERN);
+         ASSERT_MATCH (&reply,
+                       "{'insertedCount': 1,"
+                       " 'writeErrors': {'$exists': false},"
+                       " 'writeConcernErrors': {'$exists': true}"
+                       "}");
+      }
       bson_destroy (&reply);
    }
 
@@ -5170,13 +5156,27 @@ _test_update_and_replace (bool is_replace, bool is_multi)
                 &reply,
                 &err);
       ASSERT (!ret);
-      ASSERT_CMPUINT32 (err.domain, ==, (uint32_t) MONGOC_ERROR_WRITE_CONCERN);
-      ASSERT_MATCH (&reply,
-                    "{'modifiedCount': 1,"
-                    " 'matchedCount': 1,"
-                    " 'writeErrors': {'$exists': false},"
-                    " 'writeConcernErrors': {'$exists': true}"
-                    "}");
+
+      if (test_framework_get_server_version () >=
+          test_framework_str_to_version ("4.3.3")) {
+         /* Error reporting changed in SERVER-45584 */
+         ASSERT_CMPUINT32 (err.domain, ==, (uint32_t) MONGOC_ERROR_QUERY);
+         ASSERT_MATCH (&reply,
+                       "{'modifiedCount': 0,"
+                       " 'matchedCount': 0,"
+                       " 'writeErrors': {'$exists': false},"
+                       " 'writeConcernErrors': {'$exists': false}"
+                       "}");
+      } else {
+         ASSERT_CMPUINT32 (
+            err.domain, ==, (uint32_t) MONGOC_ERROR_WRITE_CONCERN);
+         ASSERT_MATCH (&reply,
+                       "{'modifiedCount': 1,"
+                       " 'matchedCount': 1,"
+                       " 'writeErrors': {'$exists': false},"
+                       " 'writeConcernErrors': {'$exists': true}"
+                       "}");
+      }
       bson_destroy (&reply);
    }
 
@@ -5520,12 +5520,24 @@ _test_delete_one_or_many (bool is_multi)
                 &reply,
                 &err);
       ASSERT (!ret);
-      ASSERT_CMPUINT32 (err.domain, ==, (uint32_t) MONGOC_ERROR_WRITE_CONCERN);
-      ASSERT_MATCH (&reply,
-                    "{'deletedCount': 1,"
-                    " 'writeErrors': {'$exists': false},"
-                    " 'writeConcernErrors': {'$exists': true}"
-                    "}");
+      if (test_framework_get_server_version () >=
+          test_framework_str_to_version ("4.3.3")) {
+         /* Error reporting changed in SERVER-45584 */
+         ASSERT_CMPUINT32 (err.domain, ==, (uint32_t) MONGOC_ERROR_QUERY);
+         ASSERT_MATCH (&reply,
+                       "{'deletedCount': 0,"
+                       " 'writeErrors': {'$exists': false},"
+                       " 'writeConcernErrors': {'$exists': false}"
+                       "}");
+      } else {
+         ASSERT_CMPUINT32 (
+            err.domain, ==, (uint32_t) MONGOC_ERROR_WRITE_CONCERN);
+         ASSERT_MATCH (&reply,
+                       "{'deletedCount': 1,"
+                       " 'writeErrors': {'$exists': false},"
+                       " 'writeConcernErrors': {'$exists': true}"
+                       "}");
+      }
       bson_destroy (&reply);
       ASSERT_CMPINT (ctx.commands_tested, ==, 5);
    }

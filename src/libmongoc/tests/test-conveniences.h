@@ -143,5 +143,7 @@ four_mb_string ();
 
 void
 assert_no_duplicate_keys (const bson_t *doc);
+void
+assert_wc_oob_error (bson_error_t *error);
 
 #endif /* TEST_CONVENIENCES_H */
