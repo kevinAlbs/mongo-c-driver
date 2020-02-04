@@ -24,6 +24,7 @@
 #include "mongoc-cyrus-private.h"
 #include "mongoc-util-private.h"
 #include "mongoc-trace-private.h"
+#include "common-b64-private.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "CYRUS-SASL"
@@ -308,8 +309,7 @@ _mongoc_cyrus_is_failure (mongoc_cyrus_t *sasl, int status, bson_error_t *error)
 
 static bool
 _mongoc_cyrus_start (mongoc_cyrus_t *sasl,
-                     uint8_t *outbuf,
-                     uint32_t outbufmax,
+                     uint8_t **outbuf,
                      uint32_t *outbuflen,
                      bson_error_t *error)
 {
@@ -319,10 +319,11 @@ _mongoc_cyrus_start (mongoc_cyrus_t *sasl,
    const char *raw = NULL;
    unsigned raw_len = 0;
    int status;
+   int b64_ret;
+   int outbuf_capacity;
 
    BSON_ASSERT (sasl);
    BSON_ASSERT (outbuf);
-   BSON_ASSERT (outbufmax);
    BSON_ASSERT (outbuflen);
 
    if (sasl->credentials.service_name) {
@@ -365,15 +366,24 @@ _mongoc_cyrus_start (mongoc_cyrus_t *sasl,
       return false;
    }
 
+   *outbuflen = 0;
+   outbuf_capacity = bson_b64_ntop_calculate_target_size (raw_len);
+   *outbuf = bson_malloc (outbuf_capacity);
 
    _log_data ("sasl -> driver", (const uint8_t *) raw, raw_len);
-   status = sasl_encode64 (raw, raw_len, (char *) outbuf, outbufmax, outbuflen);
-   MONGOC_DEBUG ("base64 encoded sasl start");
-   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
+   b64_ret = bson_b64_ntop (
+      (uint8_t *) raw, raw_len, (char *) *outbuf, outbuf_capacity);
+   if (b64_ret == -1) {
+      bson_set_error (error,
+                      MONGOC_ERROR_SASL,
+                      MONGOC_ERROR_CLIENT_AUTHENTICATE,
+                      "Unable to base64 encode client SASL message");
       return false;
+   } else {
+      *outbuflen = b64_ret;
    }
    _log_base64 ("driver -> mongodb",
-                (const uint8_t *) (const uint8_t *) outbuf,
+                (const uint8_t *) *outbuf,
                 *outbuflen);
 
    return true;
@@ -384,17 +394,23 @@ bool
 _mongoc_cyrus_step (mongoc_cyrus_t *sasl,
                     const uint8_t *inbuf,
                     uint32_t inbuflen,
-                    uint8_t *outbuf,
-                    uint32_t outbufmax,
+                    uint8_t **outbuf,
                     uint32_t *outbuflen,
                     bson_error_t *error)
 {
    const char *raw = NULL;
    unsigned rawlen = 0;
    int status;
+   char *decoded; /* post base64 decoded data */
+   uint32_t decoded_len;
+   uint32_t decoded_capacity;
+   uint32_t outbuf_capacity;
+   int b64_ret;
 
    BSON_ASSERT (sasl);
-   BSON_ASSERT (inbuf);
+   if (sasl->step > 1) {
+      BSON_ASSERT (inbuf);
+   }
    BSON_ASSERT (outbuf);
    BSON_ASSERT (outbuflen);
 
@@ -402,7 +418,7 @@ _mongoc_cyrus_step (mongoc_cyrus_t *sasl,
    sasl->step++;
 
    if (sasl->step == 1) {
-      return _mongoc_cyrus_start (sasl, outbuf, outbufmax, outbuflen, error);
+      return _mongoc_cyrus_start (sasl, outbuf, outbuflen, error);
    } else if (sasl->step >= 10) {
       bson_set_error (error,
                       MONGOC_ERROR_SASL,
@@ -422,36 +438,58 @@ _mongoc_cyrus_step (mongoc_cyrus_t *sasl,
    }
 
    _log_data ("mongodb -> driver", (const uint8_t *) inbuf, inbuflen);
-   status = sasl_decode64 (
-      (char *) inbuf, inbuflen, (char *) outbuf, outbufmax, outbuflen);
-   MONGOC_DEBUG ("base64 decoded MongoDB response. Status: (%d) %s.",
-                 status,
-                 sasl_errstring (status, NULL, NULL));
-   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
+   decoded_len = 0;
+   decoded_capacity = bson_b64_pton_calculate_target_size (inbuflen);
+   decoded = bson_malloc (decoded_capacity);
+   b64_ret =
+      bson_b64_pton ((char *) inbuf, (uint8_t *) decoded, decoded_capacity);
+   if (b64_ret == -1) {
+      bson_set_error (error,
+                      MONGOC_ERROR_SASL,
+                      MONGOC_ERROR_CLIENT_AUTHENTICATE,
+                      "Unable to base64 decode client SASL message");
+      bson_free (decoded);
+      bson_free (*outbuf);
+      *outbuf = NULL;
       return false;
+   } else {
+      /* Set the output length to the number of bytes actually decoded to
+       * excluding the NULL. */
+      decoded_len = b64_ret;
    }
-   _log_data ("driver -> sasl", (const uint8_t *) outbuf, *outbuflen);
+   _log_data ("driver -> sasl", (const uint8_t *) decoded, decoded_len);
 
    MONGOC_DEBUG ("Running client_step");
    status = sasl_client_step (
-      sasl->conn, (char *) outbuf, *outbuflen, &sasl->interact, &raw, &rawlen);
-   MONGOC_DEBUG ("Sent a client step. Status: (%d) %s.",
-                 status,
-                 sasl_errstring (status, NULL, NULL));
+      sasl->conn, decoded, decoded_len, &sasl->interact, &raw, &rawlen);
    if (_mongoc_cyrus_is_failure (sasl, status, error)) {
+      bson_free (decoded);
       return false;
    }
 
-   status = sasl_encode64 (raw, rawlen, (char *) outbuf, outbufmax, outbuflen);
-   MONGOC_DEBUG ("base64 encoded Cyrus response. Status: (%d) %s.",
-                 status,
-                 sasl_errstring (status, NULL, NULL));
-   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
+   *outbuflen = 0;
+   outbuf_capacity = bson_b64_ntop_calculate_target_size (rawlen);
+   *outbuf = bson_malloc0 (outbuf_capacity);
+   b64_ret = bson_b64_ntop (
+      (const uint8_t *) raw, rawlen, (char *) *outbuf, outbuf_capacity);
+   if (b64_ret == -1) {
+      bson_set_error (error,
+                      MONGOC_ERROR_SASL,
+                      MONGOC_ERROR_CLIENT_AUTHENTICATE,
+                      "Unable to base64 encode client SASL message");
+      bson_free (decoded);
+      bson_free (*outbuf);
+      *outbuf = NULL;
       return false;
+   } else {
+      /* Set the output length to the number of characters written excluding the
+       * NULL. */
+      *outbuflen = b64_ret;
    }
    _log_data ("sasl -> driver", (const uint8_t *) raw, rawlen);
-   _log_base64 ("driver -> mongodb", (const uint8_t *) outbuf, *outbuflen);
+   _log_base64 ("driver -> mongodb", (const uint8_t *) *outbuf, *outbuflen);
 
+   bson_free (decoded);
    return true;
 }
 
