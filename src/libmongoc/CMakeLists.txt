@@ -702,7 +702,6 @@ endif ()
 if (MONGOC_ENABLE_MONGODB_AWS_AUTH)
    # Disable warnings on bundled kms_message source files.
    set_source_files_properties (${KMS_MESSAGE_SOURCES} PROPERTIES COMPILE_FLAGS -w)
-   set_source_files_properties (${KMS_MESSAGE_SOURCES} PROPERTIES COMPILE_DEFINITIONS KMS_MESSAGE_STATIC)
    set (SOURCES ${SOURCES} ${KMS_MESSAGE_SOURCES})
 endif ()
 
@@ -721,7 +720,7 @@ if (MONGOC_ENABLE_MONGODB_AWS_AUTH)
    endif ()
 
 endif ()
-target_compile_definitions (mongoc_shared PRIVATE MONGOC_COMPILATION)
+target_compile_definitions (mongoc_shared PRIVATE MONGOC_COMPILATION KMS_MESSAGE_STATIC)
 
 set_target_properties (mongoc_shared PROPERTIES VERSION 0.0.0 SOVERSION 0)
 set_target_properties (mongoc_shared PROPERTIES OUTPUT_NAME "${MONGOC_OUTPUT_BASENAME}-${MONGOC_API_VERSION}")
@@ -737,7 +736,7 @@ if (MONGOC_ENABLE_STATIC)
    endif ()
    target_compile_definitions (mongoc_static
       PUBLIC MONGOC_STATIC ${BSON_STATIC_PUBLIC_DEFINITIONS}
-      PRIVATE MONGOC_COMPILATION
+      PRIVATE MONGOC_COMPILATION KMS_MESSAGE_STATIC
    )
    set_target_properties (mongoc_static PROPERTIES VERSION 0.0.0)
    set_target_properties (mongoc_static PROPERTIES OUTPUT_NAME "${MONGOC_OUTPUT_BASENAME}-static-${MONGOC_API_VERSION}")

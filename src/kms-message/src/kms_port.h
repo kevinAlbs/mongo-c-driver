@@ -15,6 +15,9 @@
  * limitations under the License.
  */
 
+#ifndef KMS_PORT_H
+#define KMS_PORT_H
+
 #if defined(_WIN32)
 #define strcasecmp _stricmp
 
@@ -33,3 +36,5 @@ strndup (const char *src, size_t len)
 }
 
 #endif
+
+#endif /* KMS_PORT_H */
