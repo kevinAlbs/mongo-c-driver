@@ -273,7 +273,7 @@ if (ENABLE_MONGOC)
       add_definitions (-Wno-deprecated-declarations)
    endif ()
 
-   set (KMS_MESSAGE_SOURCES
+   set (KMS_MSG_SOURCES
       ${SOURCE_DIR}/src/kms-message/src/hexlify.c
       ${SOURCE_DIR}/src/kms-message/src/kms_b64.c
       ${SOURCE_DIR}/src/kms-message/src/kms_caller_identity_request.c

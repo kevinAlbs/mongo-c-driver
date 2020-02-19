@@ -701,8 +701,17 @@ endif ()
 
 if (MONGOC_ENABLE_MONGODB_AWS_AUTH)
    # Disable warnings on bundled kms_message source files.
-   set_source_files_properties (${KMS_MESSAGE_SOURCES} PROPERTIES COMPILE_FLAGS -w)
-   set (SOURCES ${SOURCES} ${KMS_MESSAGE_SOURCES})
+   set_source_files_properties (${KMS_MSG_SOURCES} PROPERTIES COMPILE_FLAGS -w)
+   set (SOURCES ${SOURCES} ${KMS_MSG_SOURCES})
+
+   set (KMS_MSG_DEFINITIONS KMS_MSG_STATIC KMS_MESSAGE_ENABLE_CRYPTO)
+   if (WIN32)
+      set (KMS_MSG_DEFINITIONS ${KMS_MSG_DEFINITIONS} KMS_MESSAGE_ENABLE_CRYPTO_CNG)
+   elseif (APPLE)
+      set (KMS_MSG_DEFINITIONS ${KMS_MSG_DEFINITIONS} KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO)
+   else()
+      set (KMS_MSG_DEFINITIONS ${KMS_MSG_DEFINITIONS} KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO)
+   endif()
 endif ()
 
 add_library (mongoc_shared SHARED ${SOURCES} ${HEADERS} ${HEADERS_FORWARDING})
@@ -720,7 +729,7 @@ if (MONGOC_ENABLE_MONGODB_AWS_AUTH)
    endif ()
 
 endif ()
-target_compile_definitions (mongoc_shared PRIVATE MONGOC_COMPILATION KMS_MESSAGE_STATIC)
+target_compile_definitions (mongoc_shared PRIVATE MONGOC_COMPILATION ${KMS_MSG_DEFINITIONS})
 
 set_target_properties (mongoc_shared PROPERTIES VERSION 0.0.0 SOVERSION 0)
 set_target_properties (mongoc_shared PROPERTIES OUTPUT_NAME "${MONGOC_OUTPUT_BASENAME}-${MONGOC_API_VERSION}")
@@ -736,7 +745,7 @@ if (MONGOC_ENABLE_STATIC)
    endif ()
    target_compile_definitions (mongoc_static
       PUBLIC MONGOC_STATIC ${BSON_STATIC_PUBLIC_DEFINITIONS}
-      PRIVATE MONGOC_COMPILATION KMS_MESSAGE_STATIC
+      PRIVATE MONGOC_COMPILATION ${KMS_MSG_DEFINITIONS}
    )
    set_target_properties (mongoc_static PROPERTIES VERSION 0.0.0)
    set_target_properties (mongoc_static PROPERTIES OUTPUT_NAME "${MONGOC_OUTPUT_BASENAME}-static-${MONGOC_API_VERSION}")
