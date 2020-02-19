@@ -320,7 +320,7 @@ if (ENABLE_MONGOC)
    endif ()
 
    if (MONGOC_ENABLE_MONGODB_AWS_AUTH)
-      message ("MONGODB-AWS auth supported")
+      message (STATUS "MONGODB-AWS auth supported")
    endif ()
 
    add_subdirectory (src/libmongoc)
