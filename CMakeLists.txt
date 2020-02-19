@@ -56,11 +56,7 @@ option (ENABLE_APPLE_FRAMEWORK "Build libraries as frameworks on darwin platform
 set (ENABLE_ICU AUTO CACHE STRING "Enable ICU support, necessary to use non-ASCII usernames or passwords, default AUTO.")
 option (ENABLE_UNINSTALL "Enable creation of uninstall script and associated uninstall build target." ON)
 set (ENABLE_CLIENT_SIDE_ENCRYPTION AUTO CACHE STRING "Enable Client-Side Field Level Encryption support. Requires libmongocrypt. Set to ON/AUTO/OFF, default AUTO.")
-option (ENABLE_MONGODB_AWS_AUTH
-   "Enable support for MONGODB-AWS authentication mechanism. Set to ON/AUTO/OFF,\
- default AUTO. (also requires ENABLE_SSL not set to OFF)"
-   AUTO
-)
+set (ENABLE_MONGODB_AWS_AUTH AUTO CACHE STRING "Enable support for MONGODB-AWS authentication mechanism. Set to ON/AUTO/OFF, default AUTO. (also requires ENABLE_SSL not set to OFF)")
 
 project (mongo-c-driver C)
 
@@ -277,6 +273,26 @@ if (ENABLE_MONGOC)
       add_definitions (-Wno-deprecated-declarations)
    endif ()
 
+   set (KMS_MESSAGE_SOURCES
+      ${SOURCE_DIR}/src/kms-message/src/hexlify.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_b64.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_caller_identity_request.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_crypto_apple.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_crypto_libcrypto.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_crypto_none.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_crypto_windows.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_decrypt_request.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_encrypt_request.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_kv_list.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_message.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_request.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_request_opt.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_request_str.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_response.c
+      ${SOURCE_DIR}/src/kms-message/src/kms_response_parser.c
+      ${SOURCE_DIR}/src/kms-message/src/sort.c
+   )
+
    if (NOT ENABLE_MONGODB_AWS_AUTH MATCHES "ON|OFF|AUTO")
       message (FATAL_ERROR "ENABLE_MONGODB_AWS_AUTH option must be ON, AUTO, or OFF")
    endif ()
@@ -304,14 +320,9 @@ if (ENABLE_MONGOC)
    endif ()
 
    if (MONGOC_ENABLE_MONGODB_AWS_AUTH)
-      # disable warnings on kms_message components; those are dealt with in libmongocrypt
-      set (CMAKE_C_FLAGS_OLD "${CMAKE_C_FLAGS}")
-      set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w -fPIC")
-      # EXCLUDE_FROM_ALL ensures that only explicitly required kms-message
-      # components are built and that none are installed
-      add_subdirectory (src/kms-message EXCLUDE_FROM_ALL)
-      set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS_OLD}")
+      message ("MONGODB-AWS auth supported")
    endif ()
+
    add_subdirectory (src/libmongoc)
 
    if (ENABLE_MAN_PAGES STREQUAL ON OR ENABLE_HTML_DOCS STREQUAL ON)
