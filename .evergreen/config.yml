@@ -12764,9 +12764,7 @@ buildvariants:
   - .debug-compile .sspi
   - .server .winssl .latest
   - .server .openssl .latest !.nosasl
-  - .latest .nossl
-  - .nosasl .latest .nossl
-  - .sspi .latest
+  - .latest !.test-valgrind !.test-asan !.darwinssl !.compression !.hardened
   - test-dns-winssl
   - test-dns-auth-winssl
 - name: windows-2015
