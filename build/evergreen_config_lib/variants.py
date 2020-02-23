@@ -355,7 +355,7 @@ all_variants = [
              '.debug-compile .sspi',
              '.server .winssl .latest',
              '.server .openssl .latest !.nosasl',
-             '.latest !.test-valgrind !.test-asan !.darwinssl !.compression !.hardened',
+             '.latest !.test-valgrind !.test-asan !.darwinssl !.compression !.hardened !.test-coverage',
              'test-dns-winssl',
              'test-dns-auth-winssl'],
              {'CC': 'Visual Studio 15 2017 Win64'}),
