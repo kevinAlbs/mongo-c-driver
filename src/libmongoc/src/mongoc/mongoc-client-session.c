@@ -122,7 +122,7 @@ txn_abort (mongoc_client_session_t *session, bson_t *reply, bson_error_t *error)
    /* Transactions Spec: "Drivers MUST retry the commitTransaction command once
     * after it fails with a retryable error", same for abort. Note that a
     * RetryableWriteError label has already been appended here. */
-   error_type = _mongoc_write_error_get_type (r, err_ptr, &reply_local, false);
+   error_type = _mongoc_write_error_get_type (&reply_local);
    if (error_type == MONGOC_WRITE_ERR_RETRY) {
       _mongoc_client_session_unpin (session);
       bson_destroy (&reply_local);
@@ -233,13 +233,15 @@ retry:
 
    /* will be reinitialized by mongoc_client_write_command_with_opts */
    bson_destroy (&reply_local);
+   printf ("txn_commit sending: %s\n", bson_as_canonical_extended_json (&cmd, NULL));
    r = mongoc_client_write_command_with_opts (
       session->client, "admin", &cmd, &opts, &reply_local, err_ptr);
+   printf ("txn_commit recv: %s\n", bson_as_canonical_extended_json (&reply_local, NULL));
 
    /* Transactions Spec: "Drivers MUST retry the commitTransaction command once
     * after it fails with a retryable error", same for abort. Note that a
     * RetryableWriteError label has already been appended here. */
-   error_type = _mongoc_write_error_get_type (r, err_ptr, &reply_local, false);
+   error_type = _mongoc_write_error_get_type (&reply_local);
    if (!retrying_after_error && error_type == MONGOC_WRITE_ERR_RETRY) {
       retrying_after_error = true; /* retry after error only once */
       _mongoc_client_session_unpin (session);
