@@ -317,23 +317,22 @@ _mongoc_stream_tls_secure_transport_readv (mongoc_stream_t *stream,
       iov_pos = 0;
 
       while (iov_pos < iov[i].iov_len) {
+         remaining_buf_size = iov[i].iov_len - iov_pos;
+         remaining_to_read = min_bytes - ret;
 
-	 remaining_buf_size = iov[i].iov_len - iov_pos;
-	 remaining_to_read = min_bytes - ret;
-
-	 /* The third argument passed to SSLRead is an all-or-nothing
-	    dataLength, which it will attempt to read until it succeeds or
-	    times out. If our buffer is larger than the message we expect
-	    to read, choose the smaller number of the two. */
-	 if (remaining_to_read > 0 && remaining_to_read < remaining_buf_size) {
-	    to_read = remaining_to_read;
-	 } else {
-	    to_read = remaining_buf_size;
-	 }
+         /* The third argument passed to SSLRead is an all-or-nothing
+            dataLength, which it will attempt to read until it succeeds or
+            times out. If our buffer is larger than the message we expect
+            to read, choose the smaller number of the two. */
+         if (remaining_to_read > 0 && remaining_to_read < remaining_buf_size) {
+            to_read = remaining_to_read;
+         } else {
+            to_read = remaining_buf_size;
+         }
 
          OSStatus status = SSLRead (secure_transport->ssl_ctx_ref,
                                     (char *) iov[i].iov_base + iov_pos,
-				    to_read,
+                                    to_read,
                                     &read_ret);
 
          if (status != noErr) {
@@ -417,6 +416,112 @@ _mongoc_stream_tls_secure_transport_check_closed (
    RETURN (mongoc_stream_check_closed (tls->base_stream));
 }
 
+static void
+_set_error_from_osstatus (OSStatus status,
+                          const char *prefix,
+                          bson_error_t *error)
+{
+   CFStringRef err;
+   char *err_str;
+
+   err = SecCopyErrorMessageString (status, NULL);
+   err_str = _mongoc_cfstringref_to_cstring (err);
+   bson_set_error (error,
+                   MONGOC_ERROR_STREAM,
+                   MONGOC_ERROR_STREAM_SOCKET,
+                   "%s: %s (%d)",
+                   prefix,
+                   err_str,
+                   status);
+
+   bson_free (err_str);
+   CFRelease (err);
+}
+
+/* Returns a boolean indicating success. If false is returned, then an error is
+ * set.
+ */
+static bool
+_verify_peer (mongoc_stream_t *stream, bson_error_t *error)
+{
+   CFArrayRef policies;
+   SecTrustRef trust;
+   OSStatus status;
+   CFMutableArrayRef policies_mutable;
+   SecPolicyRef rev_policy;
+   SecTrustResultType trust_result;
+   mongoc_stream_tls_t *tls = (mongoc_stream_tls_t *) stream;
+   mongoc_stream_tls_secure_transport_t *secure_transport =
+      (mongoc_stream_tls_secure_transport_t *) tls->ctx;
+
+   status = SSLCopyPeerTrust (secure_transport->ssl_ctx_ref, &trust);
+   if (status != noErr) {
+      _set_error_from_osstatus (
+         status, "Certificate validation errored", error);
+      return false;
+   }
+
+   status = SecTrustCopyPolicies (trust, &policies);
+
+   if (status != noErr) {
+      _set_error_from_osstatus (
+         status, "Certificate validation errored", error);
+      CFRelease (trust);
+      return false;
+   }
+
+   /* Add explicit OCSP revocation policy. */
+   policies_mutable = CFArrayCreateMutableCopy (NULL, 0, policies);
+
+   /* TODO: possibly disable endpoint checking by adding the flag
+    * kSecRevocationNetworkAccessDisabled once the option
+    * tlsDisableOCSPEndpointCheck is implemented. */
+   rev_policy = SecPolicyCreateRevocation (kSecRevocationOCSPMethod);
+   CFArrayAppendValue (policies_mutable, rev_policy);
+
+   status = SecTrustSetPolicies (trust, policies_mutable);
+
+   if (status != noErr) {
+      _set_error_from_osstatus (
+         status, "Certificate validation errored", error);
+      CFRelease (trust);
+      CFRelease (policies);
+      CFRelease (policies_mutable);
+      CFRelease (rev_policy);
+      return false;
+   }
+
+   status = SecTrustEvaluate (trust, &trust_result);
+   if (status != noErr) {
+      _set_error_from_osstatus (
+         status, "Certificate validation errored", error);
+      CFRelease (trust);
+      CFRelease (policies);
+      CFRelease (policies_mutable);
+      CFRelease (rev_policy);
+      return false;
+   }
+
+   if (trust_result != kSecTrustResultProceed) {
+      bson_set_error (error,
+                      MONGOC_ERROR_STREAM,
+                      MONGOC_ERROR_STREAM_SOCKET,
+                      "Certificate validation failed (%d)",
+                      trust_result);
+      CFRelease (trust);
+      CFRelease (policies);
+      CFRelease (policies_mutable);
+      CFRelease (rev_policy);
+      return false;
+   }
+
+   CFRelease (trust);
+   CFRelease (policies);
+   CFRelease (policies_mutable);
+   CFRelease (rev_policy);
+   return true;
+}
+
 bool
 mongoc_stream_tls_secure_transport_handshake (mongoc_stream_t *stream,
                                               const char *host,
@@ -424,8 +529,6 @@ mongoc_stream_tls_secure_transport_handshake (mongoc_stream_t *stream,
                                               bson_error_t *error)
 {
    OSStatus ret = 0;
-   CFStringRef err;
-   char *err_str;
    mongoc_stream_tls_t *tls = (mongoc_stream_tls_t *) stream;
    mongoc_stream_tls_secure_transport_t *secure_transport =
       (mongoc_stream_tls_secure_transport_t *) tls->ctx;
@@ -434,9 +537,13 @@ mongoc_stream_tls_secure_transport_handshake (mongoc_stream_t *stream,
    BSON_ASSERT (secure_transport);
 
    ret = SSLHandshake (secure_transport->ssl_ctx_ref);
-   /* Weak certificate validation requested, eg: none */
 
    if (ret == errSSLServerAuthCompleted) {
+      if (!tls->ssl_opts.weak_cert_validation &&
+          !_verify_peer (stream, error)) {
+         *events = 0;
+         RETURN (false);
+      }
       ret = errSSLWouldBlock;
    }
 
@@ -448,17 +555,7 @@ mongoc_stream_tls_secure_transport_handshake (mongoc_stream_t *stream,
       *events = POLLIN | POLLOUT;
    } else {
       *events = 0;
-      err = SecCopyErrorMessageString (ret, NULL);
-      err_str = _mongoc_cfstringref_to_cstring (err);
-      bson_set_error (error,
-                      MONGOC_ERROR_STREAM,
-                      MONGOC_ERROR_STREAM_SOCKET,
-                      "TLS handshake failed: %s (%d)",
-                      err_str,
-                      ret);
-
-      bson_free (err_str);
-      CFRelease (err);
+      _set_error_from_osstatus (ret, "TLS handshake failed", error);
    }
 
    RETURN (false);
@@ -557,9 +654,11 @@ mongoc_stream_tls_secure_transport_new (mongoc_stream_t *base_stream,
    tls->base_stream = base_stream;
 
    if (client) {
+      /* This option has SSL_Handshake stop before it verifies peer cert. Set
+       * this since we verify peer cert manually later. */
       SSLSetSessionOption (secure_transport->ssl_ctx_ref,
                            kSSLSessionOptionBreakOnServerAuth,
-                           opt->weak_cert_validation);
+                           true);
    } else if (!opt->allow_invalid_hostname) {
       /* used only in mock_server_t tests */
       SSLSetClientSideAuthenticate (secure_transport->ssl_ctx_ref,
