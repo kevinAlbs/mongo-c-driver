@@ -444,21 +444,22 @@ _set_error_from_osstatus (OSStatus status,
 static bool
 _verify_peer (mongoc_stream_t *stream, bson_error_t *error)
 {
-   CFArrayRef policies;
-   SecTrustRef trust;
+   CFArrayRef policies = NULL;
+   SecTrustRef trust = NULL;
    OSStatus status;
-   CFMutableArrayRef policies_mutable;
-   SecPolicyRef rev_policy;
+   CFMutableArrayRef policies_mutable = NULL;
+   SecPolicyRef rev_policy = NULL;
    SecTrustResultType trust_result;
    mongoc_stream_tls_t *tls = (mongoc_stream_tls_t *) stream;
    mongoc_stream_tls_secure_transport_t *secure_transport =
       (mongoc_stream_tls_secure_transport_t *) tls->ctx;
+   bool ret = false;
 
    status = SSLCopyPeerTrust (secure_transport->ssl_ctx_ref, &trust);
    if (status != noErr) {
       _set_error_from_osstatus (
          status, "Certificate validation errored", error);
-      return false;
+      goto fail;
    }
 
    status = SecTrustCopyPolicies (trust, &policies);
@@ -466,8 +467,7 @@ _verify_peer (mongoc_stream_t *stream, bson_error_t *error)
    if (status != noErr) {
       _set_error_from_osstatus (
          status, "Certificate validation errored", error);
-      CFRelease (trust);
-      return false;
+      goto fail;
    }
 
    /* Add explicit OCSP revocation policy. */
@@ -484,42 +484,32 @@ _verify_peer (mongoc_stream_t *stream, bson_error_t *error)
    if (status != noErr) {
       _set_error_from_osstatus (
          status, "Certificate validation errored", error);
-      CFRelease (trust);
-      CFRelease (policies);
-      CFRelease (policies_mutable);
-      CFRelease (rev_policy);
-      return false;
+      goto fail;
    }
 
    status = SecTrustEvaluate (trust, &trust_result);
    if (status != noErr) {
       _set_error_from_osstatus (
          status, "Certificate validation errored", error);
-      CFRelease (trust);
-      CFRelease (policies);
-      CFRelease (policies_mutable);
-      CFRelease (rev_policy);
-      return false;
+      goto fail;
    }
 
-   if (trust_result != kSecTrustResultProceed) {
+   if (trust_result != kSecTrustResultProceed && trust_result != kSecTrustResultUnspecified) {
       bson_set_error (error,
                       MONGOC_ERROR_STREAM,
                       MONGOC_ERROR_STREAM_SOCKET,
                       "Certificate validation failed (%d)",
                       trust_result);
-      CFRelease (trust);
-      CFRelease (policies);
-      CFRelease (policies_mutable);
-      CFRelease (rev_policy);
-      return false;
+      goto fail;
    }
 
-   CFRelease (trust);
-   CFRelease (policies);
-   CFRelease (policies_mutable);
-   CFRelease (rev_policy);
-   return true;
+   ret = true;
+fail:
+   CFReleaseSafe (trust);
+   CFReleaseSafe (policies);
+   CFReleaseSafe (policies_mutable);
+   CFReleaseSafe (rev_policy);
+   return ret;
 }
 
 bool
