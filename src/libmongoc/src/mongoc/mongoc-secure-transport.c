@@ -517,7 +517,9 @@ mongoc_secure_transport_write (SSLConnectionRef connection,
    }
 }
 
-void CFReleaseSafe (CFTypeRef cf) {
+void
+CFReleaseSafe (CFTypeRef cf)
+{
    if (cf != NULL) {
       CFRelease (cf);
    }

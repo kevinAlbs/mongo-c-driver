@@ -494,7 +494,8 @@ _verify_peer (mongoc_stream_t *stream, bson_error_t *error)
       goto fail;
    }
 
-   if (trust_result != kSecTrustResultProceed && trust_result != kSecTrustResultUnspecified) {
+   if (trust_result != kSecTrustResultProceed &&
+       trust_result != kSecTrustResultUnspecified) {
       bson_set_error (error,
                       MONGOC_ERROR_STREAM,
                       MONGOC_ERROR_STREAM_SOCKET,
