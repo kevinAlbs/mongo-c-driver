@@ -487,6 +487,9 @@ _verify_peer (mongoc_stream_t *stream, bson_error_t *error)
       goto fail;
    }
 
+   /* TODO: SecTrustEvaluate is blocking. When making Secure Transport's
+    * handshake is made non-blocking in CDRIVER-2885, this will need to be
+    * addressed. */
    status = SecTrustEvaluate (trust, &trust_result);
    if (status != noErr) {
       _set_error_from_osstatus (
