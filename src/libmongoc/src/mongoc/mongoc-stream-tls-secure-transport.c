@@ -502,7 +502,7 @@ _verify_peer (mongoc_stream_t *stream, bson_error_t *error)
       bson_set_error (error,
                       MONGOC_ERROR_STREAM,
                       MONGOC_ERROR_STREAM_SOCKET,
-                      "Certificate validation failed (%d)",
+                      "TLS handshake failed (%d)",
                       trust_result);
       goto fail;
    }
