@@ -12522,7 +12522,7 @@ tasks:
 # TODO: I removed suffix -test1-uri1-rsa for now to reduce evergreen complexity
 - name: test-ocsp-darwinssl
   depends_on:
-    name:  debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-darwinssl
   commands:
   - func: fetch build
     vars:
