@@ -35,7 +35,7 @@
 #
 
 # Fail on any command returning a non-zero exit status.
-set -o errexit
+# set -o errexit
 
 CDRIVER_ROOT=${CDRIVER_ROOT:-$(pwd)}
 CDRIVER_BUILD=${CDRIVER_BUILD:-$(pwd)}
@@ -124,7 +124,7 @@ elif [ "MALICIOUS_SERVER_TEST_1" = "$TEST_COLUMN" ]; then
 else
     RESPONDER_REQUIRED=""
 fi
-# oscrypto
+
 if [ "ON" = "$USE_DELEGATE" ]; then
     DELEGATE_TOKEN="delegate"
 fi
@@ -158,6 +158,9 @@ elif [ "URI_2" = "$TEST_ROW" ]; then
 elif [ "URI_3" = "$TEST_ROW" ]; then
     URI_OPTS="tls=true&tlsAllowInvalidCertificates=true"
 fi
+
+# Always add the tlsCAFile
+URI_OPTS="$URI_OPTS&tlsCAFile=$CDRIVER_ROOT/.evergreen/ocsp/$CERT_TYPE/ca.pem"
 
 MONGODB_URI="mongodb://localhost:$MONGODB_PORT/?$URI_OPTS"
 echo "Connecting with $MONGODB_URI"

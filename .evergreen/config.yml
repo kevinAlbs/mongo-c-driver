@@ -12519,7 +12519,8 @@ tasks:
 # uriX the row of the test matrix in the spec.
 # rsa|edcsa the certificate cipher type.
 # delegate (for tests that utilizes responder)
-- name: test-ocsp-darwinssl-test1-uri1-rsa
+# TODO: I removed suffix -test1-uri1-rsa for now to reduce evergreen complexity
+- name: test-ocsp-darwinssl
   depends_on:
     name:  debug-compile-nosasl-darwinssl
   commands:
@@ -12537,9 +12538,9 @@ tasks:
       working_dir: mongoc
       shell: bash
       script: |-
-        set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_1 TEST_ROW=URI_1 CERT_TYPE=RSA USE_DELEGATE=OFF .evergreen/run-ocsp-test.sh
+        # TODO: once the test above passes, write the remaining tests IN THIS TASK. Then finally split them up.
 buildvariants:
 - name: ocsp
   display_name: OCSP
@@ -12547,7 +12548,7 @@ buildvariants:
     - name: debug-compile-nosasl-darwinssl
       distros:
         - macos-1014
-    - name: test-ocsp-darwinssl-test1-uri1-rsa
+    - name: test-ocsp-darwinssl
       distros:
         - macos-1014
 - name: releng
