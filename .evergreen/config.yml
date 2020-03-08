@@ -12514,7 +12514,42 @@ tasks:
   - func: run aws tests
     vars:
       TESTCASE: ASSUME_ROLE
+# These tests have a lot of features. The last tokens are:
+# testX, the column of the test matrix in the spec. 
+# uriX the row of the test matrix in the spec.
+# rsa|edcsa the certificate cipher type.
+# delegate (for tests that utilizes responder)
+- name: test-ocsp-darwinssl-test1-uri1-rsa
+  depends_on:
+    name:  debug-compile-nosasl-darwinssl
+  commands:
+  - func: fetch build
+    vars:
+      BUILD_NAME: debug-compile-nosasl-darwinssl
+  - func: bootstrap mongo-orchestration
+    vars:
+      TOPOLOGY: server
+      VERSION: latest
+      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: mongoc
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o xtrace
+        TEST_COLUMN=TEST_1 TEST_ROW=URI_1 CERT_TYPE=RSA USE_DELEGATE=OFF .evergreen/run-ocsp-test.sh
 buildvariants:
+- name: ocsp
+  display_name: OCSP
+  tasks:
+    - name: debug-compile-nosasl-darwinssl
+      distros:
+        - macos-1014
+    - name: test-ocsp-darwinssl-test1-uri1-rsa
+      distros:
+        - macos-1014
 - name: releng
   display_name: '**Release Archive Creator'
   run_on: ubuntu1604-test
