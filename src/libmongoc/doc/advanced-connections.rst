@@ -146,6 +146,20 @@ To verify the server certificate against a specific CA, provide a PEM armored fi
 
 See :doc:`mongoc_ssl_opt_t` for more information on the various SSL related options.
 
+OCSP
+~~~~
+
+Secure Transport
+^^^^^^^^^^^^^^^^
+(TODO clean this up)
+
+OCSP is supported. Though revocation behavior may be controlled in keychain access, the following should be the default behavior:
+- libmongoc built with Secure Transport will connect in the case that a server with a Must-Staple certificate does not staple a response.
+- libmongoc built with Secure Transport will connect in the case that a server with a Must-Staple certificate does not staple a response and the OCSP responder is down.
+
+Secure Channel
+^^^^^^^^^^^^^^
+
 Compressing data to and from MongoDB
 ------------------------------------
 
