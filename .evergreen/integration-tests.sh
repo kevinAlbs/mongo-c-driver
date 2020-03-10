@@ -26,7 +26,7 @@ DIR=$(dirname $0)
 get_distro
 GENERIC_LINUX_URL=$(get_mongodb_download_url_for "linux-x86_64" "$MONGODB_VERSION")
 get_mongodb_download_url_for "$DISTRO" "$MONGODB_VERSION"
-if [ "$MONGODB_DOWNLOAD_URL" = $GENERIC_LINUX_URL -a ! "$SSL" = "nossl" ]; then
+if [ "$MONGODB_DOWNLOAD_URL" = "$GENERIC_LINUX_URL" -a ! "$SSL" = "nossl" ]; then
    echo "Requested a version of MongoDB with SSL, but only generic (non-SSL) Linux version available"
    exit 1;
 fi
@@ -52,7 +52,7 @@ if [ -z "$ORCHESTRATION_FILE" ]; then
       ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ipv4-only"
    fi
 
-   if [ ! -z "$AUTHSOURCE" ]; then
+   if [ -n "$AUTHSOURCE" ]; then
       ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-${AUTHSOURCE}"
    fi
 
@@ -70,9 +70,9 @@ case "$OS" in
       export MONGO_ORCHESTRATION_HOME=$(pwd)"/MO"
       ;;
 esac
-rm -rf $MONGO_ORCHESTRATION_HOME
-mkdir -p $MONGO_ORCHESTRATION_HOME/lib
-mkdir -p $MONGO_ORCHESTRATION_HOME/db
+rm -rf "$MONGO_ORCHESTRATION_HOME"
+mkdir -p "$MONGO_ORCHESTRATION_HOME/lib"
+mkdir -p "$MONGO_ORCHESTRATION_HOME/db"
 
 # Replace ABSOLUTE_PATH_REPLACEMENT_TOKEN with path to mongo-c-driver.
 FULL_PATH=$(pwd)
@@ -151,7 +151,7 @@ if [ "$AUTH" = "auth" ]; then
   MONGO_SHELL_CONNECTION_FLAGS="-ubob -ppwd123"
 fi
 
-if [ ! -z "$AUTHSOURCE" ]; then
+if [ -n "$AUTHSOURCE" ]; then
    MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --authenticationDatabase ${AUTHSOURCE}"
 fi
 
