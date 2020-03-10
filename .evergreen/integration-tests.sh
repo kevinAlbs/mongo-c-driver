@@ -1,4 +1,21 @@
-#!/bin/sh
+#! /bin/sh
+# Start up mongo-orchestration (a server to spawn mongodb clusters) and set up a cluster.
+# 
+# Specify the following environment variables:
+#
+# MONGODB_VERSION: latest, 4.2, 4.0, 3.6, 3.4, 3.2, 3.0, 2.6, 2.4
+# TOPOLOGY: server, replica_set, sharded_cluster
+# AUTH: auth, noauth
+# AUTHSOURCE
+# IPV4_ONLY: off, on
+# SSL: openssl, darwinssl, winssl, nossl
+# ORCHESTRATION_FILE: <file name in orchestration_configs/ without .json>
+#   If this is not set, the file name is constructed from other options.
+# OCSP: off, on
+#
+# This script may be run locally.
+#
+
 set -o xtrace   # Write all commands first to stderr
 set -o errexit  # Exit the script with error if any of the commands fail
 
@@ -23,11 +40,30 @@ SSL=${SSL:-nossl}
 TOPOLOGY=${TOPOLOGY:-server}
 OCSP=${OCSP:-off}
 
-# If caller of script specifies an ORCHESTRATION_FILE, do not attempt to modify it.
+# If caller of script specifies an ORCHESTRATION_FILE, do not attempt to modify it. Otherwise construct it.
 if [ -n "$ORCHESTRATION_FILE" ]; then
    ORCHESTRATION_FILE_PASSED="YES"
+else
+   ORCHESTRATION_FILE="basic"
+
+   if [ "$AUTH" = "auth" ]; then
+      ORCHESTRATION_FILE="auth"
+   fi
+
+   if [ "$IPV4_ONLY" = "on" ]; then
+      ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ipv4-only"
+   fi
+
+   if [ ! -z "$AUTHSOURCE" ]; then
+      ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-${AUTHSOURCE}"
+   fi
+
+   if [ "$SSL" != "nossl" ]; then
+      ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ssl"
+   fi
 fi
 
+# Set up mongo orchestration home.
 case "$OS" in
    cygwin*)
       export MONGO_ORCHESTRATION_HOME="c:/data/MO"
@@ -40,28 +76,6 @@ rm -rf $MONGO_ORCHESTRATION_HOME
 mkdir -p $MONGO_ORCHESTRATION_HOME/lib
 mkdir -p $MONGO_ORCHESTRATION_HOME/db
 
-if [ "$AUTH" = "auth" ]; then
-  if [ -z "$ORCHESTRATION_FILE_PASSED" ]; then
-    ORCHESTRATION_FILE="auth"
-  fi
-  MONGO_SHELL_CONNECTION_FLAGS="-ubob -ppwd123"
-fi
-
-if [ -z "$ORCHESTRATION_FILE" ]; then
-   ORCHESTRATION_FILE="basic"
-fi
-
-if [ "$IPV4_ONLY" = "on" -a -z "$ORCHESTRATION_FILE_PASSED" ]; then
-  ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ipv4-only"
-fi
-
-if [ ! -z "$AUTHSOURCE" ]; then
-   if [ -z "$ORCHESTRATION_FILE_PASSED" ]; then
-      ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-${AUTHSOURCE}"
-   fi
-   MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --authenticationDatabase ${AUTHSOURCE}"
-fi   
-
 # Replace ABSOLUTE_PATH_REPLACEMENT_TOKEN with path to mongo-c-driver.
 FULL_PATH=$(pwd)
 find orchestration_configs -name \*.json | xargs perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|$FULL_PATH|g"
@@ -71,21 +85,11 @@ cp -f src/libmongoc/tests/x509gen/* $MONGO_ORCHESTRATION_HOME/lib/
 # find print0 and xargs -0 not available on Solaris. Lets hope for good paths
 find orchestration_configs -name \*.json | xargs perl -p -i -e "s|/tmp/orchestration-home|$MONGO_ORCHESTRATION_HOME/lib|g"
 
-if [ "$OCSP" != "off" ]; then
-   MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --host localhost --tls --tlsAllowInvalidCertificates"
-elif [ "$SSL" != "nossl" ]; then
-   if [ -z "$ORCHESTRATION_FILE_PASSED" ]; then
-      ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ssl"
-   fi
-   MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --host localhost --ssl --sslCAFile=$MONGO_ORCHESTRATION_HOME/lib/ca.pem --sslPEMKeyFile=$MONGO_ORCHESTRATION_HOME/lib/client.pem"
-fi
-
 export ORCHESTRATION_FILE="orchestration_configs/${TOPOLOGY}s/${ORCHESTRATION_FILE}.json"
 export ORCHESTRATION_URL="http://localhost:8889/v1/${TOPOLOGY}s"
 
 export TMPDIR=$MONGO_ORCHESTRATION_HOME/db
 echo From shell `date` > $MONGO_ORCHESTRATION_HOME/server.log
-
 
 case "$OS" in
    cygwin*)
@@ -145,7 +149,19 @@ curl -sS --data @"$ORCHESTRATION_FILE" "$ORCHESTRATION_URL" --max-time 300 --fai
 
 sleep 15
 
-echo $MONGO_SHELL_CONNECTION_FLAGS
+if [ "$AUTH" = "auth" ]; then
+  MONGO_SHELL_CONNECTION_FLAGS="-ubob -ppwd123"
+fi
+
+if [ ! -z "$AUTHSOURCE" ]; then
+   MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --authenticationDatabase ${AUTHSOURCE}"
+fi
+
+if [ "$OCSP" != "off" ]; then
+   MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --host localhost --tls --tlsAllowInvalidCertificates"
+elif [ "$SSL" != "nossl" ]; then
+   MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --host localhost --ssl --sslCAFile=$MONGO_ORCHESTRATION_HOME/lib/ca.pem --sslPEMKeyFile=$MONGO_ORCHESTRATION_HOME/lib/client.pem"
+fi
 
 `pwd`/mongodb/bin/mongo $MONGO_SHELL_CONNECTION_FLAGS --eval 'printjson(db.serverBuildInfo())' admin
 `pwd`/mongodb/bin/mongo $MONGO_SHELL_CONNECTION_FLAGS --eval 'printjson(db.isMaster())' admin
