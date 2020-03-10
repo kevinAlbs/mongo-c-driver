@@ -22,6 +22,11 @@ AUTH=${AUTH:-noauth}
 SSL=${SSL:-nossl}
 TOPOLOGY=${TOPOLOGY:-server}
 
+# If caller of script specifies an ORCHESTRATION_FILE, do not attempt to modify it.
+if [ -n "$ORCHESTRATION_FILE" ]; then
+   ORCHESTRATION_FILE_PASSED="YES"
+fi
+
 case "$OS" in
    cygwin*)
       export MONGO_ORCHESTRATION_HOME="c:/data/MO"
@@ -35,7 +40,7 @@ mkdir -p $MONGO_ORCHESTRATION_HOME/lib
 mkdir -p $MONGO_ORCHESTRATION_HOME/db
 
 if [ "$AUTH" = "auth" ]; then
-  if [ -z $ORCHESTRATION_FILE ]; then
+  if [ -z "$ORCHESTRATION_FILE_PASSED" ]; then
     ORCHESTRATION_FILE="auth"
   fi
   MONGO_SHELL_CONNECTION_FLAGS="-ubob -ppwd123"
@@ -45,12 +50,14 @@ if [ -z "$ORCHESTRATION_FILE" ]; then
    ORCHESTRATION_FILE="basic"
 fi
 
-if [ "$IPV4_ONLY" = "on" ]; then
+if [ "$IPV4_ONLY" = "on" -a -z "$ORCHESTRATION_FILE_PASSED" ]; then
   ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ipv4-only"
 fi
 
 if [ ! -z "$AUTHSOURCE" ]; then
-   ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-${AUTHSOURCE}"
+   if [ -z "$ORCHESTRATION_FILE_PASSED" ]; then
+      ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-${AUTHSOURCE}"
+   fi
    MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --authenticationDatabase ${AUTHSOURCE}"
 fi
 
@@ -58,7 +65,9 @@ if [ "$SSL" != "nossl" ]; then
    cp -f src/libmongoc/tests/x509gen/* $MONGO_ORCHESTRATION_HOME/lib/
    # find print0 and xargs -0 not available on Solaris. Lets hope for good paths
    find orchestration_configs -name \*.json | xargs perl -p -i -e "s|/tmp/orchestration-home|$MONGO_ORCHESTRATION_HOME/lib|g"
-   ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ssl"
+   if [ -z "$ORCHESTRATION_FILE_PASSED" ]; then
+      ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ssl"
+   fi
 fi
 
 # Replace ABSOLUTE_PATH_REPLACEMENT_TOKEN with path to mongo-c-driver.
