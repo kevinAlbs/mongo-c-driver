@@ -62,7 +62,7 @@ if [ ! -z "$AUTHSOURCE" ]; then
    MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --authenticationDatabase ${AUTHSOURCE}"
 fi   
 
-if [ "$OCSP" != "off" ];
+if [ "$OCSP" != "off" ]; then
    # Replace ABSOLUTE_PATH_REPLACEMENT_TOKEN with path to mongo-c-driver.
    FULL_PATH=$(pwd)
    find orchestration_configs -name \*.json | xargs perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|$FULL_PATH|g"
@@ -75,8 +75,6 @@ elif [ "$SSL" != "nossl" ]; then
       ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ssl"
    fi
    MONGO_SHELL_CONNECTION_FLAGS="$MONGO_SHELL_CONNECTION_FLAGS --host localhost --ssl --sslCAFile=$MONGO_ORCHESTRATION_HOME/lib/ca.pem --sslPEMKeyFile=$MONGO_ORCHESTRATION_HOME/lib/client.pem"
-else
-   
 fi
 
 export ORCHESTRATION_FILE="orchestration_configs/${TOPOLOGY}s/${ORCHESTRATION_FILE}.json"
