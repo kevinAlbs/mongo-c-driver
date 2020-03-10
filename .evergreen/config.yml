@@ -12520,13 +12520,14 @@ tasks:
 # rsa|edcsa the certificate cipher type.
 # delegate (for tests that utilizes responder)
 # TODO: I removed suffix -test1-uri1-rsa for now to reduce evergreen complexity
-- name: test-ocsp-darwinssl
+- name: test-ocsp-openssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    # TODO: use darwinssl.
+    name: debug-compile-nosasl-openssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-openssl
   - func: bootstrap mongo-orchestration
     vars:
       TOPOLOGY: server
@@ -12545,12 +12546,14 @@ buildvariants:
 - name: ocsp
   display_name: OCSP
   tasks:
-    - name: debug-compile-nosasl-darwinssl
+    - name: debug-compile-nosasl-openssl
       distros:
-        - macos-1014
-    - name: test-ocsp-darwinssl
+        #- macos-1014
+        - ubuntu1804-test
+    - name: test-ocsp-openssl
       distros:
-        - macos-1014
+        #- macos-1014
+        - ubuntu1804-test
 - name: releng
   display_name: '**Release Archive Creator'
   run_on: ubuntu1604-test
