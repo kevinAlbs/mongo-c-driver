@@ -408,6 +408,7 @@ functions:
         export AUTHSOURCE=${AUTHSOURCE}
         export SSL=${SSL}
         export ORCHESTRATION_FILE=${ORCHESTRATION_FILE}
+        export OCSP=${OCSP}
         sh .evergreen/integration-tests.sh
   run tests:
   - command: shell.exec
@@ -12534,6 +12535,7 @@ tasks:
       VERSION: latest
       ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
       SSL: openssl
+      OCSP: on
   - command: shell.exec
     type: test
     params:

@@ -21,6 +21,7 @@ OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 AUTH=${AUTH:-noauth}
 SSL=${SSL:-nossl}
 TOPOLOGY=${TOPOLOGY:-server}
+OCSP=${OCSP:-off}
 
 # If caller of script specifies an ORCHESTRATION_FILE, do not attempt to modify it.
 if [ -n "$ORCHESTRATION_FILE" ]; then
@@ -70,9 +71,12 @@ if [ "$SSL" != "nossl" ]; then
    fi
 fi
 
-# Replace ABSOLUTE_PATH_REPLACEMENT_TOKEN with path to mongo-c-driver.
-FULL_PATH=$(pwd)
-find orchestration_configs -name \*.json | xargs perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|$FULL_PATH|g"
+if [ "$OCSP" != "off" ]; then
+   # Replace ABSOLUTE_PATH_REPLACEMENT_TOKEN with path to mongo-c-driver.
+   FULL_PATH=$(pwd)
+   find orchestration_configs -name \*.json | xargs perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|$FULL_PATH|g"
+   MONGO_SHELL_CONNECTION_FLAGS="--host localhost --tls --tlsAllowInvalidCertificates"
+fi
 
 export ORCHESTRATION_FILE="orchestration_configs/${TOPOLOGY}s/${ORCHESTRATION_FILE}.json"
 export ORCHESTRATION_URL="http://localhost:8889/v1/${TOPOLOGY}s"
