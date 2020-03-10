@@ -62,15 +62,17 @@ if [ ! -z "$AUTHSOURCE" ]; then
    MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --authenticationDatabase ${AUTHSOURCE}"
 fi   
 
+# Replace ABSOLUTE_PATH_REPLACEMENT_TOKEN with path to mongo-c-driver.
+FULL_PATH=$(pwd)
+find orchestration_configs -name \*.json | xargs perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|$FULL_PATH|g"
+
+cp -f src/libmongoc/tests/x509gen/* $MONGO_ORCHESTRATION_HOME/lib/
+# find print0 and xargs -0 not available on Solaris. Lets hope for good paths
+find orchestration_configs -name \*.json | xargs perl -p -i -e "s|/tmp/orchestration-home|$MONGO_ORCHESTRATION_HOME/lib|g"
+
 if [ "$OCSP" != "off" ]; then
-   # Replace ABSOLUTE_PATH_REPLACEMENT_TOKEN with path to mongo-c-driver.
-   FULL_PATH=$(pwd)
-   find orchestration_configs -name \*.json | xargs perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|$FULL_PATH|g"
    MONGO_SHELL_CONNECTION_FLAGS="$MONGO_SHELL_CONNECTION_FLAGS --host localhost --tls --tlsAllowInvalidCertificates"
 elif [ "$SSL" != "nossl" ]; then
-   cp -f src/libmongoc/tests/x509gen/* $MONGO_ORCHESTRATION_HOME/lib/
-   # find print0 and xargs -0 not available on Solaris. Lets hope for good paths
-   find orchestration_configs -name \*.json | xargs perl -p -i -e "s|/tmp/orchestration-home|$MONGO_ORCHESTRATION_HOME/lib|g"
    if [ -z "$ORCHESTRATION_FILE_PASSED" ]; then
       ORCHESTRATION_FILE="${ORCHESTRATION_FILE}-ssl"
    fi
