@@ -1,6 +1,6 @@
 #! /bin/sh
 # Start up mongo-orchestration (a server to spawn mongodb clusters) and set up a cluster.
-# 
+#
 # Specify the following environment variables:
 #
 # MONGODB_VERSION: latest, 4.2, 4.0, 3.6, 3.4, 3.2, 3.0, 2.6, 2.4
@@ -41,9 +41,7 @@ TOPOLOGY=${TOPOLOGY:-server}
 OCSP=${OCSP:-off}
 
 # If caller of script specifies an ORCHESTRATION_FILE, do not attempt to modify it. Otherwise construct it.
-if [ -n "$ORCHESTRATION_FILE" ]; then
-   ORCHESTRATION_FILE_PASSED="YES"
-else
+if [ -z "$ORCHESTRATION_FILE" ]; then
    ORCHESTRATION_FILE="basic"
 
    if [ "$AUTH" = "auth" ]; then
@@ -134,7 +132,7 @@ case "$OS" in
       fi
       pip $PIP_PARAM install .
       cd ../..
-      mongo-orchestration -f orchestration.config -e default --socket-timeout-ms=60000 --bind=127.0.0.1  --enable-majority-read-concern start > $MONGO_ORCHESTRATION_HOME/out.log | tee 2> $MONGO_ORCHESTRATION_HOME/err.log < /dev/null &
+      mongo-orchestration -f orchestration.config -e default --socket-timeout-ms=60000 --bind=127.0.0.1  --enable-majority-read-concern start > $MONGO_ORCHESTRATION_HOME/out.log 2> $MONGO_ORCHESTRATION_HOME/err.log < /dev/null &
       ;;
 esac
 
@@ -162,6 +160,8 @@ if [ "$OCSP" != "off" ]; then
 elif [ "$SSL" != "nossl" ]; then
    MONGO_SHELL_CONNECTION_FLAGS="${MONGO_SHELL_CONNECTION_FLAGS} --host localhost --ssl --sslCAFile=$MONGO_ORCHESTRATION_HOME/lib/ca.pem --sslPEMKeyFile=$MONGO_ORCHESTRATION_HOME/lib/client.pem"
 fi
+
+echo $MONGO_SHELL_CONNECTION_FLAGS
 
 `pwd`/mongodb/bin/mongo $MONGO_SHELL_CONNECTION_FLAGS --eval 'printjson(db.serverBuildInfo())' admin
 `pwd`/mongodb/bin/mongo $MONGO_SHELL_CONNECTION_FLAGS --eval 'printjson(db.isMaster())' admin
