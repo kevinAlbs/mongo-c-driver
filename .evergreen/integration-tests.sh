@@ -74,13 +74,14 @@ echo From shell `date` > $MONGO_ORCHESTRATION_HOME/server.log
 
 case "$OS" in
    cygwin*)
+      PYTHON=python.exe
       # Python has problems with unix style paths in cygwin. Must use c:\\ paths
       rm -rf /cygdrive/c/mongodb
       cp -r mongodb /cygdrive/c/mongodb
       echo "{ \"releases\": { \"default\": \"c:\\\\mongodb\\\\bin\" }}" > orchestration.config
 
       # Make sure MO is running latest version
-      python.exe -m virtualenv venv
+      $PYTHON -m virtualenv venv
       cd venv
       . Scripts/activate
       rm -rf mongo-orchestration
@@ -103,13 +104,6 @@ case "$OS" in
          PYTHON=python
       fi
 
-      PYTHON_MAJ=$(python -c 'import sys; print (sys.version_info[0])')
-      PYTHON_MIN=$(python -c 'import sys; print (sys.version_info[1])')
-      if [ "$PYTHON_MAJ" -ge "3" -a "$PYTHON_MIN" -ge "8" ]; then
-         # mongo-orchestration currently does not run with python 3.8 per PYTHON-2067. Explicitly use python 2.
-         PYTHON=python2
-      fi
-
       $PYTHON -m virtualenv venv
       cd venv
       . bin/activate
@@ -124,7 +118,7 @@ case "$OS" in
       fi
       pip $PIP_PARAM install .
       cd ../..
-      mongo-orchestration -f orchestration.config -e default --socket-timeout-ms=60000 --bind=127.0.0.1  --enable-majority-read-concern start > $MONGO_ORCHESTRATION_HOME/out.log 2> $MONGO_ORCHESTRATION_HOME/err.log < /dev/null &
+      mongo-orchestration -f orchestration.config -e default --socket-timeout-ms=60000 --bind=127.0.0.1  --enable-majority-read-concern start > $MONGO_ORCHESTRATION_HOME/out.log | tee 2> $MONGO_ORCHESTRATION_HOME/err.log < /dev/null &
       if [ "$SSL" != "nossl" ]; then
          export MONGO_SHELL_CONNECTION_FLAGS="$MONGO_SHELL_CONNECTION_FLAGS --host localhost --ssl --sslCAFile=$MONGO_ORCHESTRATION_HOME/lib/ca.pem --sslPEMKeyFile=$MONGO_ORCHESTRATION_HOME/lib/client.pem"
       fi
@@ -132,12 +126,13 @@ case "$OS" in
 esac
 
 sleep 15
-curl http://localhost:8889/ -sS --max-time 120 --fail
+echo "Checking that mongo-orchestration is running"
+curl http://localhost:8889/ -sS --max-time 120 --fail | python -m json.tool
 
 sleep 5
 
 pwd
-curl -sS --data @"$ORCHESTRATION_FILE" "$ORCHESTRATION_URL" --max-time 300 --fail
+curl -sS --data @"$ORCHESTRATION_FILE" "$ORCHESTRATION_URL" --max-time 300 --fail | python -m json.tool
 
 sleep 15
 
