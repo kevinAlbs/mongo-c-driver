@@ -12533,6 +12533,7 @@ tasks:
       TOPOLOGY: server
       VERSION: latest
       ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
+      SSL: nossl
   - command: shell.exec
     type: test
     params:
