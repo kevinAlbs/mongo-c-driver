@@ -943,7 +943,7 @@ class OCSPTask(MatrixTask):
 
         # OCSP stapling is not supported on macOS or Windows.
         if self.ssl == 'darwinssl' or self.ssl == 'winssl':
-            prohibit (self.test in ['test_1', 'test-2'])
+            prohibit (self.test in ['test_1', 'test_2'])
         if self.test == 'soft_fail_test' or self.test == 'malicicous_server_test_2':
             prohibit(self.delegate == 'delegate')
 
