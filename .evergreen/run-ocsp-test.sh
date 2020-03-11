@@ -162,9 +162,20 @@ BASE_URI="mongodb://localhost:$MONGODB_PORT/?tls=true&tlsCAFile=$CDRIVER_ROOT/.e
 MONGODB_URI="$BASE_URI"
 
 # Only a handful of cases are expected to fail.
-if [ "TEST_2" = "$TEST_COLUMN" ]; then
+if [ "TEST_1" = "$TEST_COLUMN" ]; then
+    expect_success
+elif [ "TEST_2" = "$TEST_COLUMN" ]; then
     expect_failure
-    exit 0
+elif [ "TEST_3" = "$TEST_COLUMN" ]; then
+    expect_success
+elif [ "TEST_4" = "$TEST_COLUMN" ]; then
+    expect_failure
+elif [ "SOFT_FAIL_TEST" = "$TEST_COLUMN" ]; then
+    expect_success
+elif [ "MALICIOUS_SERVER_TEST_1" = "$TEST_COLUMN" ]; then
+    expect_failure
+elif [ "MALICIOUS_SERVER_TEST_2" = "$TEST_COLUMN" ]; then
+    expect_failure
 fi
 
 # With insecure options, connection should always succeed
@@ -174,5 +185,3 @@ expect_success
 # With insecure options, connection should always succeed
 MONGODB_URI="$BASE_URI&tlsAllowInvalidCertificates=true"
 expect_success
-
-exit 0
