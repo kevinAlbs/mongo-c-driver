@@ -15,7 +15,7 @@
 #   Required. Corresponds to a row of the test matrix. Set to one of the following:
 #   URI_1, URI_2, URI_3
 # CERT_TYPE
-#   Required. Set to either RSA or EDCSA.
+#   Required. Set to either rsa or edcsa.
 # USE_DELEGATE
 #   Optional. May be ON or OFF. If a test requires use of a responder, this decides whether
 #   the responder uses a delegate certificate. Defaults to "OFF"
@@ -31,7 +31,7 @@
 #   Optional. Skip pip install for required packages for mock responder.
 #
 # Example:
-# TEST_COLUMN=TEST_1 TEST_ROW=URI_1 CERT_TYPE=RSA ./run-ocsp-test.sh
+# TEST_COLUMN=TEST_1 TEST_ROW=URI_1 CERT_TYPE=rsa ./run-ocsp-test.sh
 #
 
 # Fail on any command returning a non-zero exit status.

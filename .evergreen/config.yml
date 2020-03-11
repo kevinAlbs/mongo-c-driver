@@ -12543,7 +12543,7 @@ tasks:
       shell: bash
       script: |-
         set -o xtrace
-        TEST_COLUMN=TEST_1 TEST_ROW=URI_1 CERT_TYPE=RSA USE_DELEGATE=OFF .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=TEST_1 TEST_ROW=URI_1 CERT_TYPE=rsa USE_DELEGATE=OFF .evergreen/run-ocsp-test.sh
         # TODO: once the test above passes, write the remaining tests IN THIS TASK. Then finally split them up.
 buildvariants:
 - name: ocsp
