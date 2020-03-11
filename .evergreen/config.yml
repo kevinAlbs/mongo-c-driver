@@ -12517,40 +12517,13 @@ tasks:
       TESTCASE: ASSUME_ROLE
 - name: test-ocsp-test_1-delegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
   - func: fetch build
     vars:
       BUILD_NAME: debug-compile-nosasl-openssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_1-delegate-rsa-darwinssl
-  tags:
-  - darwinssl
-  - ocsp
-  depends_on:
-    name: debug-compile-nosasl-darwinssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -12569,40 +12542,13 @@ tasks:
         TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_1-delegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
   - func: fetch build
     vars:
       BUILD_NAME: debug-compile-nosasl-openssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_1-delegate-ecdsa-darwinssl
-  tags:
-  - darwinssl
-  - ocsp
-  depends_on:
-    name: debug-compile-nosasl-darwinssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -12621,40 +12567,13 @@ tasks:
         TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_1-nodelegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
   - func: fetch build
     vars:
       BUILD_NAME: debug-compile-nosasl-openssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_1-nodelegate-rsa-darwinssl
-  tags:
-  - darwinssl
-  - ocsp
-  depends_on:
-    name: debug-compile-nosasl-darwinssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -12673,8 +12592,7 @@ tasks:
         TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_1-nodelegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -12697,36 +12615,9 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_1-nodelegate-ecdsa-darwinssl
-  tags:
-  - darwinssl
-  - ocsp
-  depends_on:
-    name: debug-compile-nosasl-darwinssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-delegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -12751,8 +12642,7 @@ tasks:
         TEST_COLUMN=TEST_2 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-delegate-rsa-darwinssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-darwinssl
   depends_on:
     name: debug-compile-nosasl-darwinssl
   commands:
@@ -12775,10 +12665,34 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_2 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_2-delegate-rsa-winssl
+  tags:
+  - ocsp-winssl
+  depends_on:
+    name: debug-compile-nosasl-winssl
+  commands:
+  - func: fetch build
+    vars:
+      BUILD_NAME: debug-compile-nosasl-winssl
+  - func: bootstrap mongo-orchestration
+    vars:
+      OCSP: 'on'
+      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
+      SSL: ssl
+      TOPOLOGY: server
+      VERSION: latest
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: mongoc
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o xtrace
+        TEST_COLUMN=TEST_2 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-delegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -12803,8 +12717,7 @@ tasks:
         TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-delegate-ecdsa-darwinssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-darwinssl
   depends_on:
     name: debug-compile-nosasl-darwinssl
   commands:
@@ -12827,10 +12740,34 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_2-delegate-ecdsa-winssl
+  tags:
+  - ocsp-winssl
+  depends_on:
+    name: debug-compile-nosasl-winssl
+  commands:
+  - func: fetch build
+    vars:
+      BUILD_NAME: debug-compile-nosasl-winssl
+  - func: bootstrap mongo-orchestration
+    vars:
+      OCSP: 'on'
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
+      SSL: ssl
+      TOPOLOGY: server
+      VERSION: latest
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: mongoc
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o xtrace
+        TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-nodelegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -12855,8 +12792,7 @@ tasks:
         TEST_COLUMN=TEST_2 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-nodelegate-rsa-darwinssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-darwinssl
   depends_on:
     name: debug-compile-nosasl-darwinssl
   commands:
@@ -12879,10 +12815,34 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_2 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_2-nodelegate-rsa-winssl
+  tags:
+  - ocsp-winssl
+  depends_on:
+    name: debug-compile-nosasl-winssl
+  commands:
+  - func: fetch build
+    vars:
+      BUILD_NAME: debug-compile-nosasl-winssl
+  - func: bootstrap mongo-orchestration
+    vars:
+      OCSP: 'on'
+      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
+      SSL: ssl
+      TOPOLOGY: server
+      VERSION: latest
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: mongoc
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o xtrace
+        TEST_COLUMN=TEST_2 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-nodelegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -12907,8 +12867,7 @@ tasks:
         TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-nodelegate-ecdsa-darwinssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-darwinssl
   depends_on:
     name: debug-compile-nosasl-darwinssl
   commands:
@@ -12931,10 +12890,34 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_2-nodelegate-ecdsa-winssl
+  tags:
+  - ocsp-winssl
+  depends_on:
+    name: debug-compile-nosasl-winssl
+  commands:
+  - func: fetch build
+    vars:
+      BUILD_NAME: debug-compile-nosasl-winssl
+  - func: bootstrap mongo-orchestration
+    vars:
+      OCSP: 'on'
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
+      SSL: ssl
+      TOPOLOGY: server
+      VERSION: latest
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: mongoc
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o xtrace
+        TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_3-delegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -12957,16 +12940,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_3-delegate-rsa-darwinssl
+- name: test-ocsp-test_3-delegate-rsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -12985,8 +12967,7 @@ tasks:
         TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_3-delegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13009,16 +12990,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_3-delegate-ecdsa-darwinssl
+- name: test-ocsp-test_3-delegate-ecdsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13037,8 +13017,7 @@ tasks:
         TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_3-nodelegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13061,16 +13040,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_3-nodelegate-rsa-darwinssl
+- name: test-ocsp-test_3-nodelegate-rsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13089,8 +13067,7 @@ tasks:
         TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_3-nodelegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13113,16 +13090,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_3-nodelegate-ecdsa-darwinssl
+- name: test-ocsp-test_3-nodelegate-ecdsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13141,8 +13117,7 @@ tasks:
         TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_4-delegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13165,16 +13140,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_4-delegate-rsa-darwinssl
+- name: test-ocsp-test_4-delegate-rsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13193,8 +13167,7 @@ tasks:
         TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_4-delegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13217,16 +13190,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_4-delegate-ecdsa-darwinssl
+- name: test-ocsp-test_4-delegate-ecdsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13245,8 +13217,7 @@ tasks:
         TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_4-nodelegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13269,16 +13240,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_4-nodelegate-rsa-darwinssl
+- name: test-ocsp-test_4-nodelegate-rsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13297,8 +13267,7 @@ tasks:
         TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_4-nodelegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13321,16 +13290,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_4-nodelegate-ecdsa-darwinssl
+- name: test-ocsp-test_4-nodelegate-ecdsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13349,8 +13317,7 @@ tasks:
         TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-soft_fail_test-nodelegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13373,16 +13340,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-soft_fail_test-nodelegate-rsa-darwinssl
+- name: test-ocsp-soft_fail_test-nodelegate-rsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13401,8 +13367,7 @@ tasks:
         TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-soft_fail_test-nodelegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13425,16 +13390,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-soft_fail_test-nodelegate-ecdsa-darwinssl
+- name: test-ocsp-soft_fail_test-nodelegate-ecdsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13453,8 +13417,7 @@ tasks:
         TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_1-delegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13477,16 +13440,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_1-delegate-rsa-darwinssl
+- name: test-ocsp-malicious_server_test_1-delegate-rsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13505,8 +13467,7 @@ tasks:
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_1-delegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13529,16 +13490,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_1-delegate-ecdsa-darwinssl
+- name: test-ocsp-malicious_server_test_1-delegate-ecdsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13557,8 +13517,7 @@ tasks:
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_1-nodelegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13581,16 +13540,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_1-nodelegate-rsa-darwinssl
+- name: test-ocsp-malicious_server_test_1-nodelegate-rsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13609,8 +13567,7 @@ tasks:
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_1-nodelegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13633,16 +13590,15 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_1-nodelegate-ecdsa-darwinssl
+- name: test-ocsp-malicious_server_test_1-nodelegate-ecdsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13661,8 +13617,7 @@ tasks:
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_2-delegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13672,7 +13627,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13685,20 +13640,19 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_2-delegate-rsa-darwinssl
+- name: test-ocsp-malicious_server_test_2-delegate-rsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13713,8 +13667,7 @@ tasks:
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_2-delegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13724,7 +13677,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13737,20 +13690,19 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_2-delegate-ecdsa-darwinssl
+- name: test-ocsp-malicious_server_test_2-delegate-ecdsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13765,8 +13717,7 @@ tasks:
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_2-nodelegate-rsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13776,7 +13727,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13789,20 +13740,19 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_2-nodelegate-rsa-darwinssl
+- name: test-ocsp-malicious_server_test_2-nodelegate-rsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: rsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13817,8 +13767,7 @@ tasks:
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_2-nodelegate-ecdsa-openssl
   tags:
-  - ocsp
-  - openssl
+  - ocsp-openssl
   depends_on:
     name: debug-compile-nosasl-openssl
   commands:
@@ -13828,7 +13777,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13841,20 +13790,19 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_2-nodelegate-ecdsa-darwinssl
+- name: test-ocsp-malicious_server_test_2-nodelegate-ecdsa-winssl
   tags:
-  - darwinssl
-  - ocsp
+  - ocsp-winssl
   depends_on:
-    name: debug-compile-nosasl-darwinssl
+    name: debug-compile-nosasl-winssl
   commands:
   - func: fetch build
     vars:
-      BUILD_NAME: debug-compile-nosasl-darwinssl
+      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -14539,9 +14487,15 @@ buildvariants:
   - name: debug-compile-nosasl-darwinssl
     distros:
     - macos-1014
-  - name: .ocsp .openssl
+  - name: debug-compile-nosasl-winssl
+    distros:
+    - windows-64-vs2017-test
+  - name: .ocsp-openssl
     distros:
     - ubuntu1804-test
-  - name: .ocsp .darwinssl
+  - name: .ocsp-darwinssl
     distros:
     - macos-1014
+  - name: .ocsp-winssl
+    distros:
+    - windows-64-vs2017-test

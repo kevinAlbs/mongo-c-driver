@@ -901,14 +901,14 @@ class OCSPTask(MatrixTask):
     axes = OD([('test', ['test_1', 'test_2', 'test_3', 'test_4', 'soft_fail_test', 'malicious_server_test_1', 'malicious_server_test_2']),
                ('delegate', ['delegate', 'nodelegate']),
                ('cert', ['rsa', 'ecdsa']),
-               ('ssl', ['openssl', 'darwinssl'])])
+               ('ssl', ['openssl', 'darwinssl', 'winssl'])])
 
     name_prefix = 'test-ocsp'
 
     def __init__(self, *args, **kwargs):
         super(OCSPTask, self).__init__(*args, **kwargs)
         self.add_dependency('debug-compile-nosasl-%s' % (self.display('ssl')))
-        self.add_tags('ocsp', self.display('ssl'))
+        self.add_tags('ocsp-' + self.display('ssl'))
 
     @property
     def name(self):
@@ -922,13 +922,13 @@ class OCSPTask(MatrixTask):
         commands.append(
             func('fetch build', BUILD_NAME=self.depends_on['name']))
 
-        stapling = "mustStaple"
-        if self.test in [ "test_3", "test_4", "soft_fail_test"]:
-            stapling = "disableStapling"
-        if self.test in [ "malicious_server_test_1", "malicous_server_test_2" ]:
-            stapling = "mustStaple-disableStapling"
+        stapling = 'mustStaple'
+        if self.test in [ 'test_3', 'test_4', 'soft_fail_test']:
+            stapling = 'disableStapling'
+        if self.test in [ 'malicious_server_test_1', 'malicious_server_test_2' ]:
+            stapling = 'mustStaple-disableStapling'
 
-        orchestration_file = "%s-basic-tls-ocsp-%s" % (self.cert, stapling)
+        orchestration_file = '%s-basic-tls-ocsp-%s' % (self.cert, stapling)
         orchestration = bootstrap(TOPOLOGY='server', SSL='ssl', OCSP='on', ORCHESTRATION_FILE=orchestration_file)
 
         commands.append(orchestration)
@@ -937,8 +937,15 @@ class OCSPTask(MatrixTask):
         return task
 
     def _check_allowed(self):
+        # Current latest macOS does not support the disableStapling failpoint
+        if self.ssl == 'darwinssl':
+            # TODO: remove this when macOS latest download is updated
+            prohibit (self.test in [ 'test_3', 'test_4', 'soft_fail_test', 'malicious_server_test_1', 'malicious_server_test_2'])
+
+
         # OCSP stapling is not supported on macOS or Windows.
-        if self.test in 
+        if self.ssl == 'darwinssl' or self.ssl == 'winssl':
+            prohibit (self.test in ['test_1', 'test-2'])
         if self.test == 'soft_fail_test' or self.test == 'malicicous_server_test_2':
             prohibit(self.delegate == 'delegate')
 
