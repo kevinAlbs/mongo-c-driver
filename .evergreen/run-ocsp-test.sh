@@ -144,11 +144,11 @@ if [ -n "$RESPONDER_REQUIRED" ]; then
     cd -
 fi
 
-echo "Clearing OCSP cache"
+echo "Clearing OCSP cache for macOS/Windows"
 if [ "$OS" = "MACOS" ]; then
     find ~/profile/Library/Keychains -name 'ocspcache.sqlite3' -exec sqlite3 "{}" 'DELETE FROM responses' \;
-else
-    exit 1
+elif [ "$OS" = "WINDOWS" ]; then
+    certutil -urlcache * delete
 fi
 
 # Construct the MONGODB_URI
