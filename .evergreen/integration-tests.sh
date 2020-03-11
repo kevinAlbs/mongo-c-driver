@@ -65,9 +65,11 @@ fi
 case "$OS" in
    cygwin*)
       export MONGO_ORCHESTRATION_HOME="c:/data/MO"
+      FULL_PATH=$(cygpath -w -a .)
       ;;
    *)
       export MONGO_ORCHESTRATION_HOME=$(pwd)"/MO"
+      FULL_PATH=$(pwd)
       ;;
 esac
 rm -rf "$MONGO_ORCHESTRATION_HOME"
@@ -75,7 +77,6 @@ mkdir -p "$MONGO_ORCHESTRATION_HOME/lib"
 mkdir -p "$MONGO_ORCHESTRATION_HOME/db"
 
 # Replace ABSOLUTE_PATH_REPLACEMENT_TOKEN with path to mongo-c-driver.
-FULL_PATH=$(pwd)
 find orchestration_configs -name \*.json | xargs perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|$FULL_PATH|g"
 
 # mongo-orchestration expects client.pem to be in MONGO_ORCHESTRATION_HOME. So always copy it.
