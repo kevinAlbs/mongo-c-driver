@@ -36,6 +36,7 @@
 
 # Fail on any command returning a non-zero exit status.
 # set -o errexit
+set -o xtrace
 
 CDRIVER_ROOT=${CDRIVER_ROOT:-$(pwd)}
 CDRIVER_BUILD=${CDRIVER_BUILD:-$(pwd)}
@@ -134,9 +135,9 @@ if [ -n "$RESPONDER_REQUIRED" ]; then
     if [ -z "$SKIP_PIP_INSTALL" ]; then
         echo "Installing python dependencies"
         # Installing dependencies.
-        python3 -m venv ./venv
+        /opt/mongodbtoolchain/v3/bin/python3 -m venv ./venv
         . ./venv/bin/activate
-        pip install oscrypto bottle
+        pip install oscrypto bottle asn1crypto
     fi
     cd "$CDRIVER_ROOT/.evergreen/ocsp/$CERT_TYPE"
     ./mock-$DELEGATE_TOKEN$RESPONDER_REQUIRED.sh > $CDRIVER_BUILD/responder.logs 2>&1 &
