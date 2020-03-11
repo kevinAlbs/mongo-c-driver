@@ -12790,31 +12790,6 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: ocsp-winssl-test_3-ecdsa-delegate
-  tags:
-  - ocsp-winssl
-  depends_on:
-    name: debug-compile-nosasl-winssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-winssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-test_3-rsa-nodelegate
   tags:
   - ocsp-openssl
@@ -12874,31 +12849,6 @@ tasks:
   - func: fetch build
     vars:
       BUILD_NAME: debug-compile-nosasl-openssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: ocsp-winssl-test_3-ecdsa-nodelegate
-  tags:
-  - ocsp-winssl
-  depends_on:
-    name: debug-compile-nosasl-winssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -12990,31 +12940,6 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: ocsp-winssl-test_4-ecdsa-delegate
-  tags:
-  - ocsp-winssl
-  depends_on:
-    name: debug-compile-nosasl-winssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-winssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-test_4-rsa-nodelegate
   tags:
   - ocsp-openssl
@@ -13074,31 +12999,6 @@ tasks:
   - func: fetch build
     vars:
       BUILD_NAME: debug-compile-nosasl-openssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: ocsp-winssl-test_4-ecdsa-nodelegate
-  tags:
-  - ocsp-winssl
-  depends_on:
-    name: debug-compile-nosasl-winssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13190,31 +13090,6 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: ocsp-winssl-soft_fail_test-ecdsa-nodelegate
-  tags:
-  - ocsp-winssl
-  depends_on:
-    name: debug-compile-nosasl-winssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-winssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-malicious_server_test_1-rsa-delegate
   tags:
   - ocsp-openssl
@@ -13274,31 +13149,6 @@ tasks:
   - func: fetch build
     vars:
       BUILD_NAME: debug-compile-nosasl-openssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: ocsp-winssl-malicious_server_test_1-ecdsa-delegate
-  tags:
-  - ocsp-winssl
-  depends_on:
-    name: debug-compile-nosasl-winssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
@@ -13390,31 +13240,6 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: ocsp-winssl-malicious_server_test_1-ecdsa-nodelegate
-  tags:
-  - ocsp-winssl
-  depends_on:
-    name: debug-compile-nosasl-winssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-winssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-malicious_server_test_2-rsa-delegate
   tags:
   - ocsp-openssl
@@ -13490,31 +13315,6 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: ocsp-winssl-malicious_server_test_2-ecdsa-delegate
-  tags:
-  - ocsp-winssl
-  depends_on:
-    name: debug-compile-nosasl-winssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-winssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-malicious_server_test_2-rsa-nodelegate
   tags:
   - ocsp-openssl
@@ -13574,31 +13374,6 @@ tasks:
   - func: fetch build
     vars:
       BUILD_NAME: debug-compile-nosasl-openssl
-  - func: bootstrap mongo-orchestration
-    vars:
-      OCSP: 'on'
-      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
-      SSL: ssl
-      TOPOLOGY: server
-      VERSION: latest
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: mongoc
-      shell: bash
-      script: |-
-        set -o errexit
-        set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: ocsp-winssl-malicious_server_test_2-ecdsa-nodelegate
-  tags:
-  - ocsp-winssl
-  depends_on:
-    name: debug-compile-nosasl-winssl
-  commands:
-  - func: fetch build
-    vars:
-      BUILD_NAME: debug-compile-nosasl-winssl
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'

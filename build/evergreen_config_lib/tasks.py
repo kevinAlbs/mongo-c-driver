@@ -940,6 +940,9 @@ class OCSPTask(MatrixTask):
             # TODO: remove this when macOS latest download is updated
             prohibit (self.test in [ 'test_3', 'test_4', 'soft_fail_test', 'malicious_server_test_1', 'malicious_server_test_2'])
 
+        # ECDSA certs don't need to be tested on Windows/macOS
+        if self.ssl == 'darwinssl' or self.ssl == 'winssl':
+            prohibit (self.cert == 'ecdsa')
 
         # OCSP stapling is not supported on macOS or Windows.
         if self.ssl == 'darwinssl' or self.ssl == 'winssl':
