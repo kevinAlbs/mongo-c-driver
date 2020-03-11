@@ -601,5 +601,11 @@ all_variants = [
         'test-aws-openssl-ecs',
         'test-aws-openssl-assume_role',
         'test-aws-openssl-lambda'
-    ], {'CC': 'clang'})
+    ], {'CC': 'clang'}),
+    Variant ('ocsp', 'OCSP tests', 'ubuntu1804-test', [
+        OD([('name', 'debug-compile-nosasl-openssl'), ('distros', ['ubuntu1804-test'])]),
+        OD([('name', 'debug-compile-nosasl-darwinssl'), ('distros', ['macos-1014'])]),
+        OD([('name', '.ocsp .openssl'), ('distros', ['ubuntu1804-test'])]),
+        OD([('name', '.ocsp .darwinssl'), ('distros', ['macos-1014'])])
+    ])
 ]

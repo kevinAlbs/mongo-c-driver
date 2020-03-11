@@ -11,9 +11,6 @@
 # TEST_COLUMN
 #   Required. Corresponds to a column of the test matrix. Set to one of the following:
 #   TEST_1, TEST_2, TEST_3, TEST_4, SOFT_FAIL_TEST, MALICIOUS_SERVER_TEST_1, MALICIOUS_SERVER_TEST_2
-# TEST_ROW
-#   Required. Corresponds to a row of the test matrix. Set to one of the following:
-#   URI_1, URI_2, URI_3
 # CERT_TYPE
 #   Required. Set to either rsa or edcsa.
 # USE_DELEGATE
@@ -31,7 +28,7 @@
 #   Optional. Skip pip install for required packages for mock responder.
 #
 # Example:
-# TEST_COLUMN=TEST_1 TEST_ROW=URI_1 CERT_TYPE=rsa ./run-ocsp-test.sh
+# TEST_COLUMN=TEST_1 CERT_TYPE=rsa ./run-ocsp-test.sh
 #
 
 # Fail on any command returning a non-zero exit status.
@@ -43,12 +40,11 @@ CDRIVER_BUILD=${CDRIVER_BUILD:-$(pwd)}
 MONGODB_PORT=${MONGODB_PORT-"27017"}
 USE_DELEGATE=${USE_DELEGATE:-OFF}
 
-if [ -z "$TEST_COLUMN" -o -z "$TEST_ROW" -o -z "$CERT_TYPE" ]; then
+if [ -z "$TEST_COLUMN" -o -z "$CERT_TYPE" ]; then
     echo "Required environment variable unset. See file comments for help."
     exit 1;
 fi
 echo "TEST_COLUMN=$TEST_COLUMN"
-echo "TEST_ROW=$TEST_ROW"
 echo "CERT_TYPE=$CERT_TYPE"
 echo "USE_DELEGATE=$USE_DELEGATE"
 echo "CDRIVER_ROOT=$CDRIVER_ROOT"
@@ -161,26 +157,22 @@ elif [ "$OS" = "WINDOWS" ]; then
     certutil -urlcache * delete
 fi
 
-# Construct the MONGODB_URI
-if [ "URI_1" = "$TEST_ROW" ]; then
-    URI_OPTS="tls=true"
-elif [ "URI_2" = "$TEST_ROW" ]; then
-    URI_OPTS="tls=true&tlsInsecure=true"
-elif [ "URI_3" = "$TEST_ROW" ]; then
-    URI_OPTS="tls=true&tlsAllowInvalidCertificates=true"
-fi
-
 # Always add the tlsCAFile
-URI_OPTS="$URI_OPTS&tlsCAFile=$CDRIVER_ROOT/.evergreen/ocsp/$CERT_TYPE/ca.pem"
-
-MONGODB_URI="mongodb://localhost:$MONGODB_PORT/?$URI_OPTS"
-echo "Connecting with $MONGODB_URI"
+BASE_URI="mongodb://localhost:$MONGODB_PORT/?tls=true&tlsCAFile=$CDRIVER_ROOT/.evergreen/ocsp/$CERT_TYPE/ca.pem"
+MONGODB_URI="$BASE_URI"
 
 # Only a handful of cases are expected to fail.
-if [ "TEST_2" = "$TEST_COLUMN" -a "URI_1" = "$TEST_ROW" ]; then
+if [ "TEST_2" = "$TEST_COLUMN" ]; then
     expect_failure
     exit 0
 fi
 
+# With insecure options, connection should always succeed
+MONGODB_URI="$BASE_URI&tlsInsecure=true"
 expect_success
+
+# With insecure options, connection should always succeed
+MONGODB_URI="$BASE_URI&tlsAllowInvalidCertificates=true"
+expect_success
+
 exit 0

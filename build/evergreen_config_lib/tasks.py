@@ -895,4 +895,53 @@ class AWSTestTask(MatrixTask):
         return '-'.join([self.name_prefix, self.testcase])
 
 all_tasks = chain(all_tasks, AWSTestTask.matrix())
+
+
+class OCSPTask(MatrixTask):
+    axes = OD([('test', ['test_1', 'test_2', 'test_3', 'test_4', 'soft_fail_test', 'malicious_server_test_1', 'malicious_server_test_2']),
+               ('delegate', ['delegate', 'nodelegate']),
+               ('cert', ['rsa', 'edcsa']),
+               ('ssl', ['openssl', 'darwinssl'])])
+
+    name_prefix = 'test-ocsp'
+
+    def __init__(self, *args, **kwargs):
+        super(OCSPTask, self).__init__(*args, **kwargs)
+        self.add_dependency('debug-compile-nosasl-%s' % (self.display('ssl')))
+        self.add_tags('ocsp', self.display('ssl'))
+
+    @property
+    def name(self):
+        return self.name_prefix + '-' + '-'.join(
+            self.display(axis_name) for axis_name in self.axes
+            if getattr(self, axis_name))
+
+    def to_dict(self):
+        task = super(MatrixTask, self).to_dict()
+        commands = task['commands']
+        commands.append(
+            func('fetch build', BUILD_NAME=self.depends_on['name']))
+
+        stapling = "mustStaple"
+        if self.test in [ "test_3", "test_4", "soft_fail_test"]:
+            stapling = "disableStapling"
+        if self.test in [ "malicious_server_test_1", "malicous_server_test_2" ]:
+            stapling = "mustStaple-disableStapling"
+
+        orchestration_file = "%s-basic-tls-ocsp-%s" % (self.cert, stapling)
+        orchestration = bootstrap(TOPOLOGY='server', SSL='ssl', OCSP='on', ORCHESTRATION_FILE=orchestration_file)
+
+        commands.append(orchestration)
+        commands.append(shell_mongoc('TEST_COLUMN=%s CERT_TYPE=%s USE_DELEGATE=%s .evergreen/run-ocsp-test.sh' % (self.test.upper(), self.cert, 'on' if self.delegate == 'delegate' else 'off')))
+
+        return task
+
+    def _check_allowed(self):
+        if self.test == 'soft_fail_test' or self.test == 'malicicous_server_test_2':
+            prohibit(self.delegate == 'delegate')
+
+
+all_tasks = chain(all_tasks, OCSPTask.matrix())
+
+
 all_tasks = list(all_tasks)
