@@ -951,6 +951,10 @@ class OCSPTask(MatrixTask):
             prohibit (self.test in ['test_1', 'test_2'])
         if self.test == 'soft_fail_test' or self.test == 'malicious_server_test_2':
             prohibit(self.delegate == 'delegate')
+
+        # Until soft-fail is supported on Windows, skip test.
+        if self.ssl == 'winssl':
+            prohibit (self.test == 'soft_fail_test')
         
         # Until OCSP is supported in OpenSSL, skip tests that expect to be revoked.
         if self.ssl == 'openssl':
