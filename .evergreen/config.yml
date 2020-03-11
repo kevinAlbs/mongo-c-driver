@@ -14064,10 +14064,10 @@ buildvariants:
     - macos-1014
   - name: debug-compile-nosasl-winssl
     distros:
-    - windows-64-vs2015-test
+    - windows-64-vs2017-test
   - name: .ocsp-openssl
     distros:
     - ubuntu1804-test
   - name: .ocsp-winssl
     distros:
-    - windows-64-vs2015-test
+    - windows-64-vs2017-test
