@@ -78,6 +78,16 @@ on_exit () {
 trap on_exit EXIT
 
 MONGOC_PING=$CDRIVER_BUILD/src/libmongoc/mongoc-ping
+# Add libmongoc-1.0 and libbson-1.0 to library path, so mongoc-ping can find them at runtime.
+if [ "$OS" = "WINDOWS" ]; then
+    export PATH=$PATH:$CDRIVER_BUILD/src/libmongoc/Debug:$CDRIVER_BUILD/src/libbson/Debug
+    chmod +x src/libmongoc/Debug/* src/libbson/Debug/* || true
+    MONGOC_PING=$CDRIVER_BUILD/src/libmongoc/Debug/mongoc-ping.exe
+elif [ "$OS" = "MACOS" ]; then
+    export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$CDRIVER_BUILD/src/libmongoc:$CDRIVER_BUILD/src/libbson
+elif [ "$OS" = "LINUX" ]; then
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CDRIVER_BUILD/src/libmongoc:$CDRIVER_BUILD/src/libbson
+fi
 
 expect_success () {
     echo "Should succeed:"
