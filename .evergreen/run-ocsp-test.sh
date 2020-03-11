@@ -12,7 +12,7 @@
 #   Required. Corresponds to a column of the test matrix. Set to one of the following:
 #   TEST_1, TEST_2, TEST_3, TEST_4, SOFT_FAIL_TEST, MALICIOUS_SERVER_TEST_1, MALICIOUS_SERVER_TEST_2
 # CERT_TYPE
-#   Required. Set to either rsa or edcsa.
+#   Required. Set to either rsa or ecdsa.
 # USE_DELEGATE
 #   Optional. May be ON or OFF. If a test requires use of a responder, this decides whether
 #   the responder uses a delegate certificate. Defaults to "OFF"

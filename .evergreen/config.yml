@@ -12567,7 +12567,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_1-delegate-edcsa-openssl
+- name: test-ocsp-test_1-delegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -12580,7 +12580,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -12592,8 +12592,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_1-delegate-edcsa-darwinssl
+        TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_1-delegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -12606,7 +12606,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -12618,7 +12618,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_1-nodelegate-rsa-openssl
   tags:
   - ocsp
@@ -12671,7 +12671,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_1-nodelegate-edcsa-openssl
+- name: test-ocsp-test_1-nodelegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -12684,7 +12684,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -12696,8 +12696,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_1-nodelegate-edcsa-darwinssl
+        TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_1-nodelegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -12710,7 +12710,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -12722,7 +12722,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-delegate-rsa-openssl
   tags:
   - ocsp
@@ -12775,7 +12775,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_2 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_2-delegate-edcsa-openssl
+- name: test-ocsp-test_2-delegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -12788,7 +12788,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -12800,8 +12800,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_2 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_2-delegate-edcsa-darwinssl
+        TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_2-delegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -12814,7 +12814,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -12826,7 +12826,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_2 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_2-nodelegate-rsa-openssl
   tags:
   - ocsp
@@ -12879,7 +12879,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_2 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_2-nodelegate-edcsa-openssl
+- name: test-ocsp-test_2-nodelegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -12892,7 +12892,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -12904,8 +12904,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_2 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_2-nodelegate-edcsa-darwinssl
+        TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_2-nodelegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -12918,7 +12918,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -12930,7 +12930,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_2 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_3-delegate-rsa-openssl
   tags:
   - ocsp
@@ -12983,7 +12983,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_3-delegate-edcsa-openssl
+- name: test-ocsp-test_3-delegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -12996,7 +12996,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13008,8 +13008,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_3-delegate-edcsa-darwinssl
+        TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_3-delegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -13022,7 +13022,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13034,7 +13034,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_3-nodelegate-rsa-openssl
   tags:
   - ocsp
@@ -13087,7 +13087,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_3-nodelegate-edcsa-openssl
+- name: test-ocsp-test_3-nodelegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -13100,7 +13100,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13112,8 +13112,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_3-nodelegate-edcsa-darwinssl
+        TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_3-nodelegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -13126,7 +13126,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13138,7 +13138,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_4-delegate-rsa-openssl
   tags:
   - ocsp
@@ -13191,7 +13191,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_4-delegate-edcsa-openssl
+- name: test-ocsp-test_4-delegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -13204,7 +13204,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13216,8 +13216,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_4 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_4-delegate-edcsa-darwinssl
+        TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_4-delegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -13230,7 +13230,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13242,7 +13242,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_4 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-test_4-nodelegate-rsa-openssl
   tags:
   - ocsp
@@ -13295,7 +13295,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_4-nodelegate-edcsa-openssl
+- name: test-ocsp-test_4-nodelegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -13308,7 +13308,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13320,8 +13320,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_4 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-test_4-nodelegate-edcsa-darwinssl
+        TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+- name: test-ocsp-test_4-nodelegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -13334,7 +13334,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13346,7 +13346,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_4 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=TEST_4 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-soft_fail_test-nodelegate-rsa-openssl
   tags:
   - ocsp
@@ -13399,7 +13399,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-soft_fail_test-nodelegate-edcsa-openssl
+- name: test-ocsp-soft_fail_test-nodelegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -13412,7 +13412,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13424,8 +13424,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-soft_fail_test-nodelegate-edcsa-darwinssl
+        TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+- name: test-ocsp-soft_fail_test-nodelegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -13438,7 +13438,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13450,7 +13450,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_1-delegate-rsa-openssl
   tags:
   - ocsp
@@ -13503,7 +13503,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_1-delegate-edcsa-openssl
+- name: test-ocsp-malicious_server_test_1-delegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -13516,7 +13516,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13528,8 +13528,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_1-delegate-edcsa-darwinssl
+        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+- name: test-ocsp-malicious_server_test_1-delegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -13542,7 +13542,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13554,7 +13554,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_1-nodelegate-rsa-openssl
   tags:
   - ocsp
@@ -13607,7 +13607,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_1-nodelegate-edcsa-openssl
+- name: test-ocsp-malicious_server_test_1-nodelegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -13620,7 +13620,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13632,8 +13632,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_1-nodelegate-edcsa-darwinssl
+        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+- name: test-ocsp-malicious_server_test_1-nodelegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -13646,7 +13646,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple-disableStapling
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple-disableStapling
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13658,7 +13658,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_2-delegate-rsa-openssl
   tags:
   - ocsp
@@ -13711,7 +13711,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_2-delegate-edcsa-openssl
+- name: test-ocsp-malicious_server_test_2-delegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -13724,7 +13724,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13736,8 +13736,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_2-delegate-edcsa-darwinssl
+        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+- name: test-ocsp-malicious_server_test_2-delegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -13750,7 +13750,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13762,7 +13762,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=edcsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: test-ocsp-malicious_server_test_2-nodelegate-rsa-openssl
   tags:
   - ocsp
@@ -13815,7 +13815,7 @@ tasks:
         set -o errexit
         set -o xtrace
         TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_2-nodelegate-edcsa-openssl
+- name: test-ocsp-malicious_server_test_2-nodelegate-ecdsa-openssl
   tags:
   - ocsp
   - openssl
@@ -13828,7 +13828,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13840,8 +13840,8 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
-- name: test-ocsp-malicious_server_test_2-nodelegate-edcsa-darwinssl
+        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+- name: test-ocsp-malicious_server_test_2-nodelegate-ecdsa-darwinssl
   tags:
   - darwinssl
   - ocsp
@@ -13854,7 +13854,7 @@ tasks:
   - func: bootstrap mongo-orchestration
     vars:
       OCSP: 'on'
-      ORCHESTRATION_FILE: edcsa-basic-tls-ocsp-mustStaple
+      ORCHESTRATION_FILE: ecdsa-basic-tls-ocsp-mustStaple
       SSL: ssl
       TOPOLOGY: server
       VERSION: latest
@@ -13866,7 +13866,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=edcsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 buildvariants:
 - name: releng
   display_name: '**Release Archive Creator'

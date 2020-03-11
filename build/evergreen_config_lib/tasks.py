@@ -900,7 +900,7 @@ all_tasks = chain(all_tasks, AWSTestTask.matrix())
 class OCSPTask(MatrixTask):
     axes = OD([('test', ['test_1', 'test_2', 'test_3', 'test_4', 'soft_fail_test', 'malicious_server_test_1', 'malicious_server_test_2']),
                ('delegate', ['delegate', 'nodelegate']),
-               ('cert', ['rsa', 'edcsa']),
+               ('cert', ['rsa', 'ecdsa']),
                ('ssl', ['openssl', 'darwinssl'])])
 
     name_prefix = 'test-ocsp'
@@ -937,6 +937,8 @@ class OCSPTask(MatrixTask):
         return task
 
     def _check_allowed(self):
+        # OCSP stapling is not supported on macOS or Windows.
+        if self.test in 
         if self.test == 'soft_fail_test' or self.test == 'malicicous_server_test_2':
             prohibit(self.delegate == 'delegate')
 
