@@ -912,9 +912,7 @@ class OCSPTask(MatrixTask):
 
     @property
     def name(self):
-        return self.name_prefix + '-' + '-'.join(
-            self.display(axis_name) for axis_name in self.axes
-            if getattr(self, axis_name))
+        return 'ocsp-' + self.display('ssl') + '-' + self.display('test') + '-' + self.display('cert') + '-' + self.display ('delegate')
 
     def to_dict(self):
         task = super(MatrixTask, self).to_dict()
