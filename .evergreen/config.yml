@@ -12539,7 +12539,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-test_1-ecdsa-delegate
   tags:
   - ocsp-openssl
@@ -12564,7 +12564,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-test_1-rsa-nodelegate
   tags:
   - ocsp-openssl
@@ -12589,7 +12589,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-test_1-ecdsa-nodelegate
   tags:
   - ocsp-openssl
@@ -12614,7 +12614,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_1 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-test_3-rsa-delegate
   tags:
   - ocsp-openssl
@@ -12639,7 +12639,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-winssl-test_3-rsa-delegate
   tags:
   - ocsp-winssl
@@ -12664,7 +12664,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-test_3-ecdsa-delegate
   tags:
   - ocsp-openssl
@@ -12689,7 +12689,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-test_3-rsa-nodelegate
   tags:
   - ocsp-openssl
@@ -12714,7 +12714,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-winssl-test_3-rsa-nodelegate
   tags:
   - ocsp-winssl
@@ -12739,7 +12739,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_3 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-test_3-ecdsa-nodelegate
   tags:
   - ocsp-openssl
@@ -12764,7 +12764,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_3 CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-winssl-test_4-rsa-delegate
   tags:
   - ocsp-winssl
@@ -12789,7 +12789,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-winssl-test_4-rsa-nodelegate
   tags:
   - ocsp-winssl
@@ -12814,7 +12814,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=TEST_4 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-soft_fail_test-rsa-nodelegate
   tags:
   - ocsp-openssl
@@ -12839,7 +12839,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-openssl-soft_fail_test-ecdsa-nodelegate
   tags:
   - ocsp-openssl
@@ -12864,7 +12864,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=SOFT_FAIL_TEST CERT_TYPE=ecdsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-winssl-malicious_server_test_1-rsa-delegate
   tags:
   - ocsp-winssl
@@ -12889,7 +12889,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=on .evergreen/run-ocsp-test.sh
 - name: ocsp-winssl-malicious_server_test_1-rsa-nodelegate
   tags:
   - ocsp-winssl
@@ -12914,7 +12914,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=MALICIOUS_SERVER_TEST_1 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 - name: ocsp-winssl-malicious_server_test_2-rsa-nodelegate
   tags:
   - ocsp-winssl
@@ -12939,7 +12939,7 @@ tasks:
       script: |-
         set -o errexit
         set -o xtrace
-        TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
+        sh TEST_COLUMN=MALICIOUS_SERVER_TEST_2 CERT_TYPE=rsa USE_DELEGATE=off .evergreen/run-ocsp-test.sh
 buildvariants:
 - name: releng
   display_name: '**Release Archive Creator'

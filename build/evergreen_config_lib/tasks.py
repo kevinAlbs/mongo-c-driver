@@ -930,7 +930,7 @@ class OCSPTask(MatrixTask):
         orchestration = bootstrap(TOPOLOGY='server', SSL='ssl', OCSP='on', ORCHESTRATION_FILE=orchestration_file)
 
         commands.append(orchestration)
-        commands.append(shell_mongoc('TEST_COLUMN=%s CERT_TYPE=%s USE_DELEGATE=%s .evergreen/run-ocsp-test.sh' % (self.test.upper(), self.cert, 'on' if self.delegate == 'delegate' else 'off')))
+        commands.append(shell_mongoc('sh TEST_COLUMN=%s CERT_TYPE=%s USE_DELEGATE=%s .evergreen/run-ocsp-test.sh' % (self.test.upper(), self.cert, 'on' if self.delegate == 'delegate' else 'off')))
 
         return task
 
