@@ -65,7 +65,7 @@ fi
 case "$OS" in
    cygwin*)
       export MONGO_ORCHESTRATION_HOME="c:/data/MO"
-      FULL_PATH=$(cygpath -w -a .)
+      FULL_PATH=$(cygpath -m -a .)
       ;;
    *)
       export MONGO_ORCHESTRATION_HOME=$(pwd)"/MO"
