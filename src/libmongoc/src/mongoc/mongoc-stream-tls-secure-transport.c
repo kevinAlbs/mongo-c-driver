@@ -520,11 +520,8 @@ done:
 static bool
 _verify_peer (mongoc_stream_t *stream, bson_error_t *error)
 {
-   CFArrayRef policies = NULL;
    SecTrustRef trust = NULL;
    OSStatus status;
-   CFMutableArrayRef policies_mutable = NULL;
-   SecPolicyRef rev_policy = NULL;
    SecTrustResultType trust_result;
    mongoc_stream_tls_t *tls = (mongoc_stream_tls_t *) stream;
    mongoc_stream_tls_secure_transport_t *secure_transport =
@@ -532,31 +529,6 @@ _verify_peer (mongoc_stream_t *stream, bson_error_t *error)
    bool ret = false;
 
    status = SSLCopyPeerTrust (secure_transport->ssl_ctx_ref, &trust);
-   if (status != noErr) {
-      _set_error_from_osstatus (
-         status, "Certificate validation errored", error);
-      goto fail;
-   }
-
-   status = SecTrustCopyPolicies (trust, &policies);
-
-   if (status != noErr) {
-      _set_error_from_osstatus (
-         status, "Certificate validation errored", error);
-      goto fail;
-   }
-
-   /* Add explicit OCSP revocation policy. */
-   policies_mutable = CFArrayCreateMutableCopy (NULL, 0, policies);
-
-   /* TODO: possibly disable endpoint checking by adding the flag
-    * kSecRevocationNetworkAccessDisabled once the option
-    * tlsDisableOCSPEndpointCheck is implemented. */
-   rev_policy = SecPolicyCreateRevocation (kSecRevocationOCSPMethod);
-   CFArrayAppendValue (policies_mutable, rev_policy);
-
-   status = SecTrustSetPolicies (trust, policies_mutable);
-
    if (status != noErr) {
       _set_error_from_osstatus (
          status, "Certificate validation errored", error);
@@ -588,9 +560,6 @@ _verify_peer (mongoc_stream_t *stream, bson_error_t *error)
    ret = true;
 fail:
    CFReleaseSafe (trust);
-   CFReleaseSafe (policies);
-   CFReleaseSafe (policies_mutable);
-   CFReleaseSafe (rev_policy);
    return ret;
 }
 
