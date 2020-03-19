@@ -157,5 +157,26 @@ _mongoc_ssl_opts_cleanup (mongoc_ssl_opt_t *opt, bool free_internal)
    }
 }
 
+bool
+_mongoc_ssl_opts_disable_certificate_revocation_check (
+   const mongoc_ssl_opt_t *ssl_opt)
+{
+   if (!ssl_opt->internal) {
+      return false;
+   }
+   return ((_mongoc_internal_tls_opts_t *) ssl_opt->internal)
+      ->tls_disable_certificate_revocation_check;
+}
+
+bool
+_mongoc_ssl_opts_disable_ocsp_endpoint_check (const mongoc_ssl_opt_t *ssl_opt)
+{
+   if (!ssl_opt->internal) {
+      return false;
+   }
+   return ((_mongoc_internal_tls_opts_t *) ssl_opt->internal)
+      ->tls_disable_ocsp_endpoint_check;
+}
+
 
 #endif
