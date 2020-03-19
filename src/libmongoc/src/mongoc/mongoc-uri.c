@@ -271,7 +271,6 @@ scan_to_unichar (const char *str,
    return NULL;
 }
 
-
 /*
  *--------------------------------------------------------------------------
  *
@@ -741,6 +740,8 @@ mongoc_uri_option_is_bool (const char *key)
           !strcasecmp (key, MONGOC_URI_TLSINSECURE) ||
           !strcasecmp (key, MONGOC_URI_TLSALLOWINVALIDCERTIFICATES) ||
           !strcasecmp (key, MONGOC_URI_TLSALLOWINVALIDHOSTNAMES) ||
+          !strcasecmp (key, MONGOC_URI_TLSDISABLECERTIFICATEREVOCATIONCHECK) ||
+          !strcasecmp (key, MONGOC_URI_TLSDISABLEOCSPENDPOINTCHECK) ||
           /* deprecated options */
           !strcasecmp (key, MONGOC_URI_SSL) ||
           !strcasecmp (key, MONGOC_URI_SSLALLOWINVALIDCERTIFICATES) ||
