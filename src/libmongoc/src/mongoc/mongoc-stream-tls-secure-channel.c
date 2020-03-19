@@ -63,6 +63,7 @@
 #include "mongoc-stream-tls-secure-channel-private.h"
 #include "mongoc-secure-channel-private.h"
 #include "mongoc-ssl.h"
+#include "mongoc-ssl-private.h"
 #include "mongoc-error.h"
 #include "mongoc-counters-private.h"
 #include "mongoc-errno-private.h"
@@ -978,7 +979,7 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream,
                                SCH_CRED_IGNORE_NO_REVOCATION_CHECK |
                                SCH_CRED_IGNORE_REVOCATION_OFFLINE;
       TRACE ("disabled server certificate checks");
-   } else if (opt->internal.tls_disable_certificate_revocation_check) {
+   } else if (_mongoc_ssl_opts_disable_certificate_revocation_check (opt)) {
       schannel_cred.dwFlags |= SCH_CRED_IGNORE_NO_REVOCATION_CHECK |
                                SCH_CRED_IGNORE_REVOCATION_OFFLINE;
       TRACE ("disabled server certificate revocation checks");
