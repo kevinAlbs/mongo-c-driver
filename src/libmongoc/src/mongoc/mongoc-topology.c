@@ -794,7 +794,7 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
    ts = topology->scanner;
 
    if (topology->single_threaded) {
-      mongoc_awaiter_check (topology->awaiter);
+      mongoc_awaiter_check (topology->awaiter, topology);
    }
 
    bson_mutex_lock (&topology->mutex);

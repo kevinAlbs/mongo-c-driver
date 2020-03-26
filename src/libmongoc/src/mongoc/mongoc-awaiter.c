@@ -13,7 +13,6 @@
 #define SOCKET_TIMEOUT 60000
 
 typedef struct {
-   uint32_t server_id;
    mongoc_stream_t *stream;
    mongoc_host_list_t host;
    bson_t topology_version;
@@ -175,7 +174,7 @@ mongoc_awaiter_reconcile_w_lock (
          node = mongoc_awaiter_node_new (awaiter, &sd->host);
          mongoc_set_add (awaiter->nodes, id, node);
       }
-      
+
       bson_destroy (&node->topology_version);
       bson_copy_to (&sd->topology_version, &node->topology_version);
    }
@@ -199,7 +198,7 @@ mongoc_awaiter_reconcile_w_lock (
 }
 
 void
-mongoc_awaiter_check (mongoc_awaiter_t *awaiter)
+mongoc_awaiter_check (mongoc_awaiter_t *awaiter, void* context)
 {
    int i;
    bson_t reply;
@@ -227,18 +226,21 @@ mongoc_awaiter_check (mongoc_awaiter_t *awaiter)
    /* Poll all nodes. */
    for (i = 0; i < awaiter->nodes->items_len; i++) {
       mongoc_awaiter_node_t *node;
+      bson_error_t error = {0};
       char *reply_str;
+      uint32_t id;
 
       if ( (poller[i].revents & POLLIN) == 0) {
          continue;
       }
 
-      node = (mongoc_awaiter_node_t *) mongoc_set_get_item (awaiter->nodes, i);
+      node = (mongoc_awaiter_node_t *) mongoc_set_get_item_and_id(awaiter->nodes, i, &id);
       MONGOC_DEBUG ("node %s replying", node->host.host_and_port);
       
       _recv_reply (node->stream, &reply);
       reply_str = bson_as_json (&reply, NULL);
-      MONGOC_DEBUG ("node %d replied: %s", node->server_id, reply_str);
+      MONGOC_DEBUG ("node %d replied: %s", id, reply_str);
+      awaiter->ismaster_callback (id, &reply, 1 /* RTT */, context, &error);
       /* TODO:  awaiter->ismaster_callback () */
       
       _send_ismaster (awaiter, node);

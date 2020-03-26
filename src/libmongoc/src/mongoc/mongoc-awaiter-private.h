@@ -25,8 +25,10 @@ mongoc_awaiter_t * mongoc_awaiter_new (ismaster_callback_t ismaster_cb);
  */
 void mongoc_awaiter_reconcile_w_lock (mongoc_awaiter_t *awaiter, const mongoc_topology_description_t *description);
 
-/* Called every time for server selection. Polls all streams. */
-void mongoc_awaiter_check (mongoc_awaiter_t *awaiter);
+/* Called every time for server selection. Polls all streams.
+ * Pass the topology as the callback context.
+ */
+void mongoc_awaiter_check (mongoc_awaiter_t *awaiter, void *context);
 
 void mongoc_awaiter_destroy (mongoc_awaiter_t *awaiter);
 
