@@ -90,6 +90,7 @@ mongoc_topology_description_init (mongoc_topology_description_t *description,
    description->rand_seed = (unsigned int) bson_get_monotonic_time ();
    bson_init (&description->cluster_time);
    description->session_timeout_minutes = MONGOC_NO_SESSIONS;
+   bson_init (&description->topology_version);
 
    EXIT;
 }
@@ -154,6 +155,7 @@ _mongoc_topology_description_copy_to (const mongoc_topology_description_t *src,
    dst->apm_context = src->apm_context;
 
    bson_copy_to (&src->cluster_time, &dst->cluster_time);
+   bson_copy_to (&src->topology_version, &dst->topology_version);
 
    dst->session_timeout_minutes = src->session_timeout_minutes;
 
@@ -191,6 +193,7 @@ mongoc_topology_description_destroy (mongoc_topology_description_t *description)
    }
 
    bson_destroy (&description->cluster_time);
+   bson_destroy (&description->topology_version);
 
    EXIT;
 }
@@ -1984,6 +1987,24 @@ mongoc_topology_description_handle_ismaster (
     * description */
    if (sd_changed) {
       _mongoc_topology_description_monitor_changed (prev_td, topology);
+   }
+
+   /* TODO: handle proper comparison */
+   if (!bson_equal (&sd->topology_version, &topology->topology_version)) {
+      bson_iter_t a, b;
+      bool should_overwrite = true;
+
+      if (bson_iter_init_find (&a, &sd->topology_version, "counter") &&
+         bson_iter_init_find (&b, &topology->topology_version, "counter")) {
+            if (bson_iter_as_int64 (&a) < bson_iter_as_int64 (&b)) {
+               should_overwrite = false;
+            }
+      }
+
+      if (should_overwrite) {
+         bson_destroy (&topology->topology_version);
+         bson_copy_to (&sd->topology_version, &topology->topology_version);
+      }
    }
 
    if (prev_td) {

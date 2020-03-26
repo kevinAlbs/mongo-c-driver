@@ -476,6 +476,7 @@ set (SOURCES ${SOURCES}
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-array.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-async.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-async-cmd.c
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-awaiter.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-buffer.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-bulk-operation.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-change-stream.c

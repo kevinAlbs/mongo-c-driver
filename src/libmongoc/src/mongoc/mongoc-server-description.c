@@ -47,6 +47,7 @@ mongoc_server_description_cleanup (mongoc_server_description_t *sd)
    bson_destroy (&sd->arbiters);
    bson_destroy (&sd->tags);
    bson_destroy (&sd->compressors);
+   bson_destroy (&sd->topology_version);
 }
 
 /* Reset fields inside this sd, but keep same id, host information, and RTT,
@@ -79,12 +80,14 @@ mongoc_server_description_reset (mongoc_server_description_t *sd)
    bson_destroy (&sd->arbiters);
    bson_destroy (&sd->tags);
    bson_destroy (&sd->compressors);
+   bson_destroy (&sd->topology_version);
 
    bson_init (&sd->hosts);
    bson_init (&sd->passives);
    bson_init (&sd->arbiters);
    bson_init (&sd->tags);
    bson_init (&sd->compressors);
+   bson_init (&sd->topology_version);
 
    sd->me = NULL;
    sd->current_primary = NULL;
@@ -133,6 +136,7 @@ mongoc_server_description_init (mongoc_server_description_t *sd,
    bson_init (&sd->arbiters);
    bson_init (&sd->tags);
    bson_init (&sd->compressors);
+   bson_init (&sd->topology_version);
 
    mongoc_server_description_reset (sd);
 
@@ -664,6 +668,13 @@ mongoc_server_description_handle_ismaster (mongoc_server_description_t *sd,
          bson_iter_array (&iter, &len, &bytes);
          bson_destroy (&sd->compressors);
          BSON_ASSERT (bson_init_static (&sd->compressors, bytes, len));
+      } else if (strcmp ("topologyVersion", bson_iter_key (&iter)) == 0) {
+         if (!BSON_ITER_HOLDS_DOCUMENT (&iter)) {
+            goto failure;
+         }
+         bson_iter_document (&iter, &len, &bytes);
+         bson_destroy (&sd->topology_version);
+         BSON_ASSERT (bson_init_static (&sd->topology_version, bytes, len));
       }
    }
 
@@ -738,6 +749,7 @@ mongoc_server_description_new_copy (
    bson_init (&copy->arbiters);
    bson_init (&copy->tags);
    bson_init (&copy->compressors);
+   bson_init (&copy->topology_version);
 
    if (description->has_is_master) {
       /* calls mongoc_server_description_reset */

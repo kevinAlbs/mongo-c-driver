@@ -75,6 +75,8 @@ mongoc_topology_reconcile (mongoc_topology_t *topology)
          mongoc_topology_scanner_node_retire (ele);
       }
    }
+
+   mongoc_awaiter_reconcile_w_lock (topology->awaiter, description);
 }
 
 
@@ -357,6 +359,10 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
 
       hl = hl->next;
    }
+   
+   topology->awaiter = mongoc_awaiter_new (_mongoc_topology_scanner_cb);
+   /* Special case: don't need to lock since only one thread is creating the client pool. */
+   mongoc_awaiter_reconcile_w_lock (topology->awaiter, &topology->description);
 
    return topology;
 }
@@ -585,6 +591,7 @@ mongoc_topology_scan_once (mongoc_topology_t *topology, bool obey_cooldown)
     * members and create scanner nodes for new ones. */
    mongoc_topology_reconcile (topology);
    mongoc_topology_scanner_start (topology->scanner, obey_cooldown);
+   mongoc_awaiter_reconcile_w_lock (topology->awaiter, &topology->description);
 
    /* scanning locks and unlocks the mutex itself until the scan is done */
    bson_mutex_unlock (&topology->mutex);
@@ -785,6 +792,10 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
 
    BSON_ASSERT (topology);
    ts = topology->scanner;
+
+   if (topology->single_threaded) {
+      mongoc_awaiter_check (topology->awaiter);
+   }
 
    bson_mutex_lock (&topology->mutex);
    /* It isn't strictly necessary to lock here, because if the topology

@@ -27,6 +27,7 @@
 #include "mongoc-uri.h"
 #include "mongoc-client-session-private.h"
 #include "mongoc-crypt-private.h"
+#include "mongoc-awaiter-private.h"
 
 #define MONGOC_TOPOLOGY_MIN_HEARTBEAT_FREQUENCY_MS 500
 #define MONGOC_TOPOLOGY_SOCKET_CHECK_INTERVAL_MS 5000
@@ -92,6 +93,8 @@ typedef struct _mongoc_topology_t {
    char *mongocryptd_spawn_path;
    bson_t *mongocryptd_spawn_args;
 #endif
+
+   mongoc_awaiter_t *awaiter;
 } mongoc_topology_t;
 
 mongoc_topology_t *

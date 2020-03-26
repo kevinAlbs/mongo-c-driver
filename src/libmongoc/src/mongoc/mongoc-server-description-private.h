@@ -96,6 +96,7 @@ struct _mongoc_server_description_t {
    int64_t last_write_date_ms;
 
    bson_t compressors;
+   bson_t topology_version;
 };
 
 void

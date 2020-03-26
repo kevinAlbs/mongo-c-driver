@@ -59,6 +59,8 @@ struct _mongoc_topology_description_t {
 
    mongoc_apm_callbacks_t apm_callbacks;
    void *apm_context;
+
+   bson_t topology_version; /* TODO: server specific, not topology specific dummy */
 };
 
 typedef enum { MONGOC_SS_READ, MONGOC_SS_WRITE } mongoc_ss_optype_t;
