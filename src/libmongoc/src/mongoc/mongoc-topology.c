@@ -1266,11 +1266,14 @@ _mongoc_topology_run_background (void *data)
          /* if someone's specifically asked for a scan, use a shorter interval
           */
          if (topology->scan_requested) {
+            MONGOC_DEBUG ("topology scan requested");
             force_timeout = topology->min_heartbeat_frequency_msec -
                             ((now - last_scan) / 1000);
 
             timeout = BSON_MIN (timeout, force_timeout);
          }
+
+         MONGOC_DEBUG ("timeout is: %lld", timeout);
 
          /* if we can start scanning, do so immediately */
          if (timeout <= 0) {
