@@ -90,6 +90,7 @@ mongoc_topology_description_init (mongoc_topology_description_t *description,
    description->rand_seed = (unsigned int) bson_get_monotonic_time ();
    bson_init (&description->cluster_time);
    description->session_timeout_minutes = MONGOC_NO_SESSIONS;
+   description->counter = 1;
 
    EXIT;
 }
@@ -156,6 +157,8 @@ _mongoc_topology_description_copy_to (const mongoc_topology_description_t *src,
    bson_copy_to (&src->cluster_time, &dst->cluster_time);
 
    dst->session_timeout_minutes = src->session_timeout_minutes;
+
+   dst->counter = src->counter;
 
    EXIT;
 }
@@ -1964,6 +1967,8 @@ mongoc_topology_description_handle_ismaster (
       prev_sd = mongoc_server_description_new_copy (sd);
    }
 
+   topology->counter++;
+
    /* pass the current error in */
    mongoc_server_description_handle_ismaster (
       sd, ismaster_response, rtt_msec, error);
@@ -1980,15 +1985,17 @@ mongoc_topology_description_handle_ismaster (
    }
 
    if (gSDAMTransitionTable[sd->type][topology->type]) {
-      TRACE ("Transitioning to %s for %s",
-             _mongoc_topology_description_type (topology),
-             mongoc_server_description_type (sd));
+      MONGOC_DEBUG ("Transitioning to %s for %s",
+                    mongoc_topology_description_type (topology),
+                    mongoc_server_description_type (sd));
       gSDAMTransitionTable[sd->type][topology->type](topology, sd);
    } else {
-      TRACE ("No transition entry to %s for %s",
-             _mongoc_topology_description_type (topology),
-             mongoc_server_description_type (sd));
+      MONGOC_DEBUG ("No transition entry to %s for %s",
+                    mongoc_topology_description_type (topology),
+                    mongoc_server_description_type (sd));
    }
+
+   mongoc_topology_description_dump (topology);
 
    _mongoc_topology_description_update_session_timeout (topology);
 
@@ -2151,4 +2158,53 @@ mongoc_topology_description_get_servers (
    }
 
    return sds;
+}
+
+static const char *
+sd_type (mongoc_server_description_t *sd)
+{
+   switch (sd->type) {
+   case MONGOC_SERVER_RS_PRIMARY:
+      return "MONGOC_SERVER_RS_PRIMARY";
+   case MONGOC_SERVER_RS_SECONDARY:
+      return "MONGOC_SERVER_RS_SECONDARY";
+   case MONGOC_SERVER_STANDALONE:
+      return "MONGOC_SERVER_STANDALONE";
+   case MONGOC_SERVER_MONGOS:
+      return "MONGOC_SERVER_MONGOS";
+   case MONGOC_SERVER_POSSIBLE_PRIMARY:
+      return "MONGOC_SERVER_POSSIBLE_PRIMARY";
+   case MONGOC_SERVER_RS_ARBITER:
+      return "MONGOC_SERVER_RS_ARBITER";
+   case MONGOC_SERVER_RS_OTHER:
+      return "MONGOC_SERVER_RS_OTHER";
+   case MONGOC_SERVER_RS_GHOST:
+      return "MONGOC_SERVER_RS_GHOST";
+   case MONGOC_SERVER_UNKNOWN:
+      return "MONGOC_SERVER_UNKNOWN";
+   case MONGOC_SERVER_DESCRIPTION_TYPES:
+   default:
+      return "??";
+   }
+   return "??";
+}
+void
+mongoc_topology_description_dump (mongoc_topology_description_t *td)
+{
+   int i;
+   mongoc_set_t *set;
+   mongoc_server_description_t *sd;
+
+   set = td->servers;
+
+   MONGOC_DEBUG ("Topology description dump (%s):",
+                 mongoc_topology_description_type (td));
+
+   for (i = 0; i < set->items_len; ++i) {
+      mongoc_host_list_t *host;
+      sd = (mongoc_server_description_t *) mongoc_set_get_item (set, (int) i);
+
+      host = mongoc_server_description_host (sd);
+      printf ("- %s, %s\n", host->host_and_port, sd_type (sd));
+   }
 }

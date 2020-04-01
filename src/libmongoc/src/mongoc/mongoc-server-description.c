@@ -1114,6 +1114,8 @@ _mongoc_server_description_equal (mongoc_server_description_t *sd1,
       return false;
    }
 
+   /* TODO: compare topology version ? */
+
    return true;
 }
 

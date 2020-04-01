@@ -734,52 +734,31 @@ mongoc_client_connect_unix (const mongoc_host_list_t *host, bson_error_t *error)
 #endif
 }
 
-
-/*
- *--------------------------------------------------------------------------
- *
- * mongoc_client_default_stream_initiator --
- *
- *       A mongoc_stream_initiator_t that will handle the various type
- *       of supported sockets by MongoDB including TCP and UNIX.
- *
- *       Language binding authors may want to implement an alternate
- *       version of this method to use their native stream format.
- *
- * Returns:
- *       A mongoc_stream_t if successful; otherwise NULL and @error is set.
- *
- * Side effects:
- *       @error is set if return value is NULL.
- *
- *--------------------------------------------------------------------------
- */
-
 mongoc_stream_t *
-mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
-                                        const mongoc_host_list_t *host,
-                                        void *user_data,
-                                        bson_error_t *error)
+mongoc_client_connect (mongoc_ssl_opt_t *ssl_opts,
+                       const mongoc_uri_t *uri,
+                       const mongoc_host_list_t *host,
+                       bson_error_t *error)
 {
    mongoc_stream_t *base_stream = NULL;
    int32_t connecttimeoutms;
-#ifdef MONGOC_ENABLE_SSL
-   mongoc_client_t *client = (mongoc_client_t *) user_data;
    const char *mechanism;
-#endif
+   bool use_tls = false;
 
    BSON_ASSERT (uri);
    BSON_ASSERT (host);
 
+   if (ssl_opts || mongoc_uri_get_tls (uri)) {
 #ifndef MONGOC_ENABLE_SSL
-   if (mongoc_uri_get_tls (uri)) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_NO_ACCEPTABLE_PEER,
-                      "SSL is not enabled in this build of mongo-c-driver.");
+                      "TLS is not enabled in this build of mongo-c-driver.");
       return NULL;
-   }
 #endif
+      MONGOC_DEBUG ("we're going to use TLS");
+      use_tls = true;
+   }
 
    connecttimeoutms = mongoc_uri_get_option_as_int32 (
       uri, MONGOC_URI_CONNECTTIMEOUTMS, MONGOC_DEFAULT_CONNECTTIMEOUTMS);
@@ -808,12 +787,11 @@ mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
    if (base_stream) {
       mechanism = mongoc_uri_get_auth_mechanism (uri);
 
-      if (client->use_ssl ||
-          (mechanism && (0 == strcmp (mechanism, "MONGODB-X509")))) {
+      if (use_tls || (mechanism && (0 == strcmp (mechanism, "MONGODB-X509")))) {
          mongoc_stream_t *original = base_stream;
 
          base_stream = mongoc_stream_tls_new_with_hostname (
-            base_stream, host->host, &client->ssl_opts, true);
+            base_stream, host->host, ssl_opts, true);
 
          if (!base_stream) {
             mongoc_stream_destroy (original);
@@ -834,6 +812,44 @@ mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
 #endif
 
    return base_stream ? mongoc_stream_buffered_new (base_stream, 1024) : NULL;
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * mongoc_client_default_stream_initiator --
+ *
+ *       A mongoc_stream_initiator_t that will handle the various type
+ *       of supported sockets by MongoDB including TCP and UNIX.
+ *
+ *       Language binding authors may want to implement an alternate
+ *       version of this method to use their native stream format.
+ *
+ * Returns:
+ *       A mongoc_stream_t if successful; otherwise NULL and @error is set.
+ *
+ * Side effects:
+ *       @error is set if return value is NULL.
+ *
+ *--------------------------------------------------------------------------
+ */
+
+mongoc_stream_t *
+mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
+                                        const mongoc_host_list_t *host,
+                                        void *user_data,
+                                        bson_error_t *error)
+{
+   mongoc_ssl_opt_t *ssl_opts = NULL;
+   mongoc_client_t *client = (mongoc_client_t *) user_data;
+
+#ifdef MONGOC_ENABLE_SSL
+   if (client->use_ssl) {
+      ssl_opts = &client->ssl_opts;
+   }
+#endif
+
+   return mongoc_client_connect (ssl_opts, uri, host, error);
 }
 
 

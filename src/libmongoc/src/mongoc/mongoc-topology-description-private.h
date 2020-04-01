@@ -59,6 +59,7 @@ struct _mongoc_topology_description_t {
 
    mongoc_apm_callbacks_t apm_callbacks;
    void *apm_context;
+   int64_t counter;
 };
 
 typedef enum { MONGOC_SS_READ, MONGOC_SS_WRITE } mongoc_ss_optype_t;
@@ -134,5 +135,8 @@ mongoc_topology_description_add_server (mongoc_topology_description_t *topology,
 void
 mongoc_topology_description_update_cluster_time (
    mongoc_topology_description_t *td, const bson_t *reply);
+
+void
+mongoc_topology_description_dump (mongoc_topology_description_t *td);
 
 #endif /* MONGOC_TOPOLOGY_DESCRIPTION_PRIVATE_H */

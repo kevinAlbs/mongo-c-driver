@@ -404,6 +404,8 @@ log_handler (mongoc_log_level_t log_level,
       if (!suite->silent) {
          mongoc_log_default_handler (log_level, log_domain, message, NULL);
       }
+   } else if (test_suite_debug_output ()) {
+      mongoc_log_default_handler (log_level, log_domain, message, NULL);
    }
 }
 

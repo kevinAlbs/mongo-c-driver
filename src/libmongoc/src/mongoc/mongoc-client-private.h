@@ -231,6 +231,12 @@ mongoc_stream_t *
 mongoc_client_connect_tcp (int32_t connecttimeoutms,
                            const mongoc_host_list_t *host,
                            bson_error_t *error);
+
+mongoc_stream_t *
+mongoc_client_connect (mongoc_ssl_opt_t *ssl_opts,
+                       const mongoc_uri_t *uri,
+                       const mongoc_host_list_t *host,
+                       bson_error_t *error);
 BSON_END_DECLS
 
 #endif /* MONGOC_CLIENT_PRIVATE_H */

@@ -544,6 +544,11 @@ request_matches_msg (const request_t *request,
    bool is_command_doc;
    int i;
 
+   if (!request) {
+      if (n_docs > 0) {
+         printf ("%s", bson_as_json (docs[0], NULL));
+      }
+   }
    BSON_ASSERT (request);
    if (request->opcode != MONGOC_OPCODE_MSG) {
       test_error ("%s", "request's opcode does not match OP_MSG");
@@ -809,6 +814,7 @@ request_from_query (request_t *request, const mongoc_rpc_t *rpc)
 
    str = bson_as_json (query, NULL);
    bson_string_append (query_as_str, str);
+   bson_string_truncate (query_as_str, 1024);
    bson_free (str);
 
    if (rpc->query.fields) {
