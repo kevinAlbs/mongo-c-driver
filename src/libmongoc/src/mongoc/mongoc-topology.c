@@ -1241,6 +1241,26 @@ static int64_t time_due_for_scan (mongoc_topology_t *topology) {
 
    return BSON_MAX (timeout, 0);
 }
+
+static void wait_for_scan_or_notification (mongoc_topology_t *topology, int64_t scan_due) {
+   int ret;
+   /* Wait until a scan is due or cond_server is signaled.
+      * cond_server is signaled when app thread requests a scan or is terminating the background thread.
+      */
+      ret = mongoc_cond_timedwait (
+         &topology->cond_server, &topology->mutex, scan_due);
+
+#ifdef _WIN32
+      if (!(ret == 0 || ret== WSAETIMEDOUT)) {
+#else
+      if (!(ret == 0 || ret == ETIMEDOUT)) {
+#endif
+         bson_mutex_unlock (&topology->mutex);
+         /* handle errors */
+      }
+}
+
+
 /*
  *--------------------------------------------------------------------------
  *
@@ -1256,7 +1276,7 @@ static void *
 _mongoc_topology_run_background (void *data)
 {
    mongoc_topology_t *topology;
-   int64_t due;
+   int64_t scan_due;
    bool scanning = false;
 
    BSON_ASSERT (data);
@@ -1276,13 +1296,17 @@ _mongoc_topology_run_background (void *data)
          goto done;
       }
 
-      due = time_due_for_scan (topology);
+      scan_due = time_due_for_scan (topology);
 
-      if (!scanning && due == 0) {
-         MONGOC_DEBUG ("due, starting scan");
-         mongoc_topology_scanner_start (topology->scanner, false);
-         scanning = true;
-         topology->scan_requested = false;
+      if (!scanning) {
+         if (scan_due == 0) {
+            MONGOC_DEBUG ("due, starting scan");
+            mongoc_topology_scanner_start (topology->scanner, false);
+            scanning = true;
+            topology->scan_requested = false;
+         } else {
+            wait_for_scan_or_notification (topology, scan_due);
+         }
       }
 
       bson_mutex_unlock (&topology->mutex);
@@ -1301,8 +1325,9 @@ _mongoc_topology_run_background (void *data)
       bson_mutex_lock (&topology->mutex);
 
       /* members may be added or removed from the topology description based on
-      * ismaster responses received. retire scanner nodes for removed
-      * members and create scanner nodes for new ones. */
+       * ismaster responses received. retire scanner nodes for removed
+       * members and create scanner nodes for new ones.
+       */
       MONGOC_DEBUG ("reconcile");
       mongoc_topology_reconcile (topology);
 
@@ -1317,8 +1342,8 @@ _mongoc_topology_run_background (void *data)
       }
       bson_mutex_unlock (&topology->mutex);
 
-      /* sleep for one second for now. */
-      _mongoc_usleep (1000 * 1000);
+      /* sleep for one second for now to make behavior easier to observe. */
+      //_mongoc_usleep (1000 * 1000);
    }
 
 done:
