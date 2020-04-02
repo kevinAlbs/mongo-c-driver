@@ -62,7 +62,10 @@ void
 mongoc_async_destroy (mongoc_async_t *async);
 
 void
-mongoc_async_run (mongoc_async_t *async);
+mongoc_async_iterate (mongoc_async_t *async);
+
+void
+mongoc_async_run_to_completion (mongoc_async_t *async);
 
 BSON_END_DECLS
 
