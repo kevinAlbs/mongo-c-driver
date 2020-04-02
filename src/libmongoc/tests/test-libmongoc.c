@@ -390,7 +390,7 @@ log_handler (mongoc_log_level_t log_level,
 
    suite = (TestSuite *) user_data;
 
-   if (log_level < MONGOC_LOG_LEVEL_INFO) {
+   //if (log_level < MONGOC_LOG_LEVEL_INFO) {
       if (capturing_logs) {
          log_entry = log_entry_create (log_level, message);
          bson_mutex_lock (&captured_logs_mutex);
@@ -402,7 +402,7 @@ log_handler (mongoc_log_level_t log_level,
       if (!suite->silent) {
          mongoc_log_default_handler (log_level, log_domain, message, NULL);
       }
-   }
+   ///Client/rs_seeds_reconnect/pooled}
 }
 
 

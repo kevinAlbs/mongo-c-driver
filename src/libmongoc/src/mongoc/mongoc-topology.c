@@ -1240,6 +1240,7 @@ time_due_for_scan (mongoc_topology_t *topology)
       force_timeout = min_heartbeat_msec - ((now - topology->last_scan) / 1000);
 
       timeout = BSON_MIN (timeout, force_timeout);
+      MONGOC_DEBUG ("scan was requested");
    }
 
    return BSON_MAX (timeout, 0);
@@ -1294,8 +1295,7 @@ _mongoc_topology_run_background (void *data)
 
       /* Shutdown state is entered when topology is destroyed.
        * The background thread currently notified with cond_server. In the
-       * future, it will
-       * be done with a file descriptor. */
+       * future, it will be done with a file descriptor. */
       if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
          MONGOC_DEBUG ("shutting down");
          bson_mutex_unlock (&topology->mutex);
@@ -1308,8 +1308,7 @@ _mongoc_topology_run_background (void *data)
          if (scan_due == 0) {
             MONGOC_DEBUG ("due, starting scan");
             /* TODO: I put SRV record scanning here for now. This blocks.
-             * I think we could improve this by placing in a separate thread.
-             */
+             * I think we could improve this by placing in a separate thread. */
             mongoc_topology_rescan_srv (topology);
 
             mongoc_topology_scanner_start (topology->scanner, false);

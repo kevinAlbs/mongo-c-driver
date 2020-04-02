@@ -803,11 +803,14 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node,
    _mongoc_topology_scanner_monitor_heartbeat_started (node->ts, &node->host);
    start = bson_get_monotonic_time ();
 
+   MONGOC_DEBUG ("setting up scanner node for: %s", node->host.host_and_port);
+
    /* if there is already a working stream, push it back to be re-scanned. */
    if (node->stream) {
       _begin_ismaster_cmd (
          node, node->stream, true /* is_setup_done */, NULL, 0);
       node->stream = NULL;
+      node->scanning = true;
       return;
    }
 
