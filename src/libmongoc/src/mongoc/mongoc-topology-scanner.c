@@ -456,6 +456,8 @@ _async_success (mongoc_async_cmd_t *acmd,
    mongoc_stream_t *stream = acmd->stream;
    mongoc_topology_scanner_t *ts = node->ts;
 
+   node->scanning = false;
+
    if (node->retired) {
       if (stream) {
          mongoc_stream_failed (stream);
@@ -507,12 +509,14 @@ _async_error_or_timeout (mongoc_async_cmd_t *acmd,
    }
 
    if (node->retired) {
+      node->scanning = false;
       return;
    }
 
    node->last_used = now;
 
    if (!node->stream && _count_acmds (node) == 1) {
+      node->scanning = false;
       /* there are no remaining streams, connecting has failed. */
       node->last_failed = now;
       if (error->code) {
@@ -837,6 +841,7 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node,
 
    node->has_auth = false;
    node->timestamp = bson_get_monotonic_time ();
+   node->scanning = true;
 }
 
 /*
@@ -948,7 +953,6 @@ mongoc_topology_scanner_start (mongoc_topology_scanner_t *ts,
       }
    }
 }
-
 /*
  *--------------------------------------------------------------------------
  *
@@ -1022,7 +1026,7 @@ mongoc_topology_scanner_run_to_completion (mongoc_topology_scanner_t *ts)
 void
 mongoc_topology_scanner_iterate (mongoc_topology_scanner_t *ts)
 {
-   /* mongoc_async_iterate (ts->async); */
+   mongoc_async_iterate (ts->async);
 }
 
 /*
@@ -1190,4 +1194,18 @@ _jumpstart_other_acmds (mongoc_topology_scanner_node_t *node,
             BSON_MAX (iter->initiate_delay_ms - HAPPY_EYEBALLS_DELAY_MS, 0);
       }
    }
+}
+
+bool mongoc_topology_scanner_is_scanning (mongoc_topology_scanner_t *ts) {
+   mongoc_topology_scanner_node_t *node, *tmp;
+
+   BSON_ASSERT (ts);
+
+   DL_FOREACH_SAFE (ts->nodes, node, tmp)
+   {
+      if (node->scanning) {
+         return  true;
+      }
+   }
+   return  false;
 }

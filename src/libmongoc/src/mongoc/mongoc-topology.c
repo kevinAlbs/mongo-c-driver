@@ -1209,6 +1209,38 @@ _mongoc_topology_get_type (mongoc_topology_t *topology)
    return td_type;
 }
 
+/* Returns the next time (in ms from now) we're due for a "scan". I.e. when we should fan out to do:
+ * - short poll ismasters
+ * - RTT pings
+ * 
+ * Returns 0 to scan immediately, > 0 to indicate number of ms to wait.
+ */
+static int64_t time_due_for_scan (mongoc_topology_t *topology) {
+   int64_t now;
+   int64_t timeout;
+   int64_t heartbeat_msec = topology->description.heartbeat_msec;
+   int64_t min_heartbeat_msec = topology->min_heartbeat_frequency_msec;
+
+   now = bson_get_monotonic_time ();
+
+   if (topology->last_scan == 0) {
+      /* First time, scan immediately. */
+      return 0;
+   }
+
+   timeout = heartbeat_msec - ((now - topology->last_scan) / 1000);
+
+   /* if a scan was requested, then the delay should be min */
+   if (topology->scan_requested) {
+      int64_t force_timeout;
+
+      force_timeout = min_heartbeat_msec - ((now - topology->last_scan) / 1000);
+
+      timeout = BSON_MIN (timeout, force_timeout);
+   }
+
+   return BSON_MAX (timeout, 0);
+}
 /*
  *--------------------------------------------------------------------------
  *
@@ -1222,6 +1254,90 @@ _mongoc_topology_get_type (mongoc_topology_t *topology)
  */
 static void *
 _mongoc_topology_run_background (void *data)
+{
+   mongoc_topology_t *topology;
+   int64_t due;
+   bool scanning = false;
+
+   BSON_ASSERT (data);
+
+   topology = (mongoc_topology_t *) data;
+
+   /* TODO: add back SRV record scanning. It blocks. It could be placed in a separate thread. */
+
+   for (;;) {
+      bson_mutex_lock (&topology->mutex);
+
+      /* Shutdown state is entered when topology is destroyed.
+       * The background thread is notified with cond_server, but will now be signaled
+       * with a file descriptor. */
+      if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
+         bson_mutex_unlock (&topology->mutex);
+         goto done;
+      }
+
+      due = time_due_for_scan (topology);
+
+      if (!scanning && due == 0) {
+         MONGOC_DEBUG ("due, starting scan");
+         mongoc_topology_scanner_start (topology->scanner, false);
+         scanning = true;
+         topology->scan_requested = false;
+      }
+
+      bson_mutex_unlock (&topology->mutex);
+
+      /* TODO set a cap on the poll timeout based on the time due for the next scan.
+       * It may be shortened within the async loop if there are short-polls/pings
+       * in flight with individual timeouts.
+       * 
+       * The poll may also be interrupted if a scan is requested.
+       */
+
+      /* Scanning locks and unlocks the mutex as ismaster replies are received and processed. */
+      MONGOC_DEBUG ("iterate");
+      mongoc_topology_scanner_iterate (topology->scanner);
+
+      bson_mutex_lock (&topology->mutex);
+
+      /* members may be added or removed from the topology description based on
+      * ismaster responses received. retire scanner nodes for removed
+      * members and create scanner nodes for new ones. */
+      MONGOC_DEBUG ("reconcile");
+      mongoc_topology_reconcile (topology);
+
+      if (scanning && !mongoc_topology_scanner_is_scanning (topology->scanner)) {
+         MONGOC_DEBUG ("scanning finished");
+         /* A scan just finished. */
+         scanning = false;
+         topology->last_scan = bson_get_monotonic_time ();
+         topology->stale = false;
+         /* summarize errors, delete retired nodes. */
+         _mongoc_topology_scanner_finish (topology->scanner);
+      }
+      bson_mutex_unlock (&topology->mutex);
+
+      /* sleep for one second for now. */
+      _mongoc_usleep (1000 * 1000);
+   }
+
+done:
+   return NULL;
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * _mongoc_topology_run_background --
+ *
+ *       The background topology monitoring thread runs in this loop.
+ *
+ *       NOTE: this method uses @topology's mutex.
+ *
+ *--------------------------------------------------------------------------
+ */
+static void *
+_mongoc_topology_run_background_old (void *data)
 {
    mongoc_topology_t *topology;
    int64_t now;

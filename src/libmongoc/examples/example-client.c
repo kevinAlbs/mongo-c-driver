@@ -10,6 +10,7 @@
 int
 main (int argc, char *argv[])
 {
+   mongoc_client_pool_t *pool;
    mongoc_client_t *client;
    mongoc_collection_t *collection;
    mongoc_cursor_t *cursor;
@@ -40,7 +41,8 @@ main (int argc, char *argv[])
       return EXIT_FAILURE;
    }
 
-   client = mongoc_client_new_from_uri (uri);
+   pool = mongoc_client_pool_new (uri);
+   client = mongoc_client_pool_pop (pool);
    if (!client) {
       return EXIT_FAILURE;
    }
@@ -70,7 +72,8 @@ main (int argc, char *argv[])
    mongoc_cursor_destroy (cursor);
    mongoc_collection_destroy (collection);
    mongoc_uri_destroy (uri);
-   mongoc_client_destroy (client);
+   mongoc_client_pool_push (pool, client);
+   mongoc_client_pool_destroy (pool);
    mongoc_cleanup ();
 
    return EXIT_SUCCESS;

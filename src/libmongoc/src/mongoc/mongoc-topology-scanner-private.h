@@ -77,6 +77,8 @@ typedef struct mongoc_topology_scanner_node {
     * node. */
    mongoc_handshake_sasl_supported_mechs_t sasl_supported_mechs;
    bool negotiated_sasl_supported_mechs;
+
+   bool scanning;
 } mongoc_topology_scanner_node_t;
 
 typedef struct mongoc_topology_scanner {
@@ -155,7 +157,10 @@ mongoc_topology_scanner_start (mongoc_topology_scanner_t *ts,
                                bool obey_cooldown);
 
 void
-mongoc_topology_scanner_work (mongoc_topology_scanner_t *ts);
+mongoc_topology_scanner_iterate (mongoc_topology_scanner_t *ts);
+
+void
+mongoc_topology_scanner_run_to_completion (mongoc_topology_scanner_t *ts);
 
 void
 _mongoc_topology_scanner_finish (mongoc_topology_scanner_t *ts);
@@ -205,6 +210,8 @@ mongoc_topology_scanner_set_ssl_opts (mongoc_topology_scanner_t *ts,
 bool
 mongoc_topology_scanner_node_in_cooldown (mongoc_topology_scanner_node_t *node,
                                           int64_t when);
+
+bool mongoc_topology_scanner_is_scanning (mongoc_topology_scanner_t *ts);
 
 /* for testing. */
 mongoc_stream_t *
