@@ -904,7 +904,7 @@ mongoc_topology_scanner_in_cooldown (mongoc_topology_scanner_t *ts,
  * mongoc_topology_scanner_start --
  *
  *      Initializes the scanner and begins a full topology check. This
- *      should be called once before calling mongoc_topology_scanner_work()
+ *      should be called once before calling mongoc_topology_scanner_run_to_completion()
  *      to complete the scan.
  *
  *      The topology mutex must be held by the caller.
@@ -995,20 +995,34 @@ _mongoc_topology_scanner_finish (mongoc_topology_scanner_t *ts)
 /*
  *--------------------------------------------------------------------------
  *
- * mongoc_topology_scanner_work --
+ * mongoc_topology_scanner_run_to_completion --
  *
- *      Crank the knob on the topology scanner state machine. This should
- *      be called only after mongoc_topology_scanner_start() has been used
- *      to begin the scan.
+ *      Run the async loop to completion, completing the scan on all nodes.
  *
  *--------------------------------------------------------------------------
  */
 
 void
-mongoc_topology_scanner_work (mongoc_topology_scanner_t *ts)
+mongoc_topology_scanner_run_to_completion (mongoc_topology_scanner_t *ts)
 {
-   mongoc_async_run (ts->async);
+   mongoc_async_run_to_completion (ts->async);
    BSON_ASSERT (ts->async->ncmds == 0);
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * mongoc_topology_scanner_iterate --
+ *
+ *      Crank the knob on the scanner. Polls all streams once.
+ *
+ *--------------------------------------------------------------------------
+ */
+
+void
+mongoc_topology_scanner_iterate (mongoc_topology_scanner_t *ts)
+{
+   /* mongoc_async_iterate (ts->async); */
 }
 
 /*

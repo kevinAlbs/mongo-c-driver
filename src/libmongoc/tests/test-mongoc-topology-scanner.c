@@ -97,7 +97,7 @@ _test_topology_scanner (bool with_ssl)
 
    for (i = 0; i < 3; i++) {
       mongoc_topology_scanner_start (topology_scanner, false);
-      mongoc_topology_scanner_work (topology_scanner);
+      mongoc_topology_scanner_run_to_completion (topology_scanner);
    }
 
    BSON_ASSERT (finished == 0);
@@ -497,7 +497,7 @@ test_topology_scanner_dns_testcase (dns_testcase_t *testcase)
    mongoc_topology_scanner_add (ts, &host, 1);
    mongoc_topology_scanner_scan (ts, 1 /* any server id is ok. */);
    ASSERT_CMPINT ((int) (ts->async->ncmds), ==, testcase->expected_ncmds);
-   mongoc_topology_scanner_work (ts);
+   mongoc_topology_scanner_run_to_completion (ts);
    node = mongoc_topology_scanner_get_node (ts, 1);
 
    /* check the socket that the scanner found. */
@@ -611,7 +611,7 @@ test_topology_retired_fails_to_initiate (void)
       scanner->async->cmds->initiator = null_initiator;
    }
 
-   mongoc_topology_scanner_work (scanner);
+   mongoc_topology_scanner_run_to_completion (scanner);
    /* we expect the scanner callback not to get called. */
 
    mongoc_topology_scanner_destroy (scanner);

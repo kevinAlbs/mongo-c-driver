@@ -50,7 +50,7 @@ mongoc_async_destroy (mongoc_async_t *async)
 }
 
 void
-mongoc_async_run (mongoc_async_t *async)
+mongoc_async_run_to_completion (mongoc_async_t *async)
 {
    mongoc_async_cmd_t *acmd, *tmp;
    mongoc_async_cmd_t **acmds_polled = NULL;
@@ -109,6 +109,7 @@ mongoc_async_run (mongoc_async_t *async)
             poller[nstreams].stream = acmd->stream;
             poller[nstreams].events = acmd->events;
             poller[nstreams].revents = 0;
+            MONGOC_DEBUG ("timing out async command after %lld ms", acmd->timeout_msec);
             expire_at = BSON_MIN (
                expire_at, acmd->connect_started + acmd->timeout_msec * 1000);
             ++nstreams;

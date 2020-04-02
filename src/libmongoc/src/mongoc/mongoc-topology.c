@@ -588,7 +588,7 @@ mongoc_topology_scan_once (mongoc_topology_t *topology, bool obey_cooldown)
 
    /* scanning locks and unlocks the mutex itself until the scan is done */
    bson_mutex_unlock (&topology->mutex);
-   mongoc_topology_scanner_work (topology->scanner);
+   mongoc_topology_scanner_run_to_completion (topology->scanner);
 
    bson_mutex_lock (&topology->mutex);
 

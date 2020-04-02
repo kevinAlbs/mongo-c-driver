@@ -291,7 +291,7 @@ test_large_ismaster (void *ctx)
                          NULL,
                          TIMEOUT);
 
-   mongoc_async_run (async);
+   mongoc_async_run_to_completion (async);
    mongoc_async_destroy (async);
    mongoc_stream_destroy (sock_stream);
    bson_destroy (&q);
@@ -349,7 +349,7 @@ test_ismaster_delay ()
                          &stream_with_result,
                          TIMEOUT);
 
-   mongoc_async_run (async);
+   mongoc_async_run_to_completion (async);
 
    /* it should have taken at least 100ms to finish. */
    ASSERT_CMPINT64 (

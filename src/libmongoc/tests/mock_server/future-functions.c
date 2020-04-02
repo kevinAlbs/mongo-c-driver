@@ -27,14 +27,14 @@
 
 
 static void *
-background_mongoc_async_run (void *data)
+background_mongoc_async_run_to_completion (void *data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
 
    return_value.type = future_value_void_type;
 
-   mongoc_async_run (
+   mongoc_async_run_to_completion (
       future_value_get_mongoc_async_ptr (future_get_param (future, 0)));
 
    future_resolve (future, return_value);
@@ -1321,7 +1321,7 @@ future_async_run (
    future_value_set_mongoc_async_ptr (
       future_get_param (future, 0), async);
    
-   future_start (future, background_mongoc_async_run);
+   future_start (future, background_mongoc_async_run_to_completion);
    return future;
 }
 

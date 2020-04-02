@@ -312,7 +312,7 @@ _testcase_run (he_testcase_t *testcase)
       iter->initiator = _mock_initiator;
    }
 
-   mongoc_topology_scanner_work (ts);
+   mongoc_topology_scanner_run_to_completion (ts);
 
    duration_ms = (bson_get_monotonic_time () - testcase->state.start) / (1000);
 
