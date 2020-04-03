@@ -43,11 +43,23 @@ int create_socket (void) {
         return -1;
     }
 
+    /* Set the read timeout of 30 seconds. */
+#ifdef _WIN32
+    DWORD timeout = 30;
+    setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof (timeout));
+#else
+    struct timeval tv;
+    tv.tv_sec = 30;
+    tv.tv_usec = 0;
+    setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof (struct timeval));
+#endif
+
     return sock;
 }
 
 void * background_thread_fn (void* ctx) {
     thread_ctx_t *thread_ctx = (thread_ctx_t*) ctx;
+    uint8_t buf[1];
 
     /* Don't send anything, just poll for reading / error to wait indefinitely. */
     #define NFDS 2
@@ -58,6 +70,11 @@ void * background_thread_fn (void* ctx) {
     }
     pfd[0].fd = thread_ctx->sock;
     pfd[1].fd = thread_ctx->pipe_read_fd;
+
+    MONGOC_DEBUG ("recv begin");
+    int recv_ret = recv (thread_ctx->sock, buf, 1, 0);
+    MONGOC_DEBUG ("recv returned %d", recv_ret);
+    MONGOC_DEBUG ("recv end");
 
     MONGOC_DEBUG ("poll begin, timeout of 30s");
     int poll_ret = poll (pfd, NFDS, 30000);
