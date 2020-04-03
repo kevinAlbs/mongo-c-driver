@@ -1018,6 +1018,7 @@ if (MONGOC_ENABLE_CLIENT_SIDE_ENCRYPTION)
 endif ()
 
 mongoc_add_example (example-awaitable TRUE ${PROJECT_SOURCE_DIR}/examples/example-awaitable.c)
+mongoc_add_example (example-interrupt TRUE ${PROJECT_SOURCE_DIR}/examples/example-interrupt.c)
 
 file (COPY ${PROJECT_SOURCE_DIR}/tests/binary DESTINATION ${PROJECT_BINARY_DIR}/tests)
 file (COPY ${PROJECT_SOURCE_DIR}/tests/json DESTINATION ${PROJECT_BINARY_DIR}/tests)
