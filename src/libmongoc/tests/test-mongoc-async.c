@@ -9,6 +9,7 @@
 #include "mock_server/future-functions.h"
 #include "mongoc/mongoc-errno-private.h"
 #include "test-libmongoc.h"
+#include "mongoc/mongoc-host-list-private.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "async-test"
@@ -362,6 +363,98 @@ test_ismaster_delay ()
    mock_server_destroy (server);
 }
 
+
+/* TODO: put this in a future function. */
+static void *
+iterate_async_in_bg (void *async_void)
+{
+   mongoc_async_t *async;
+
+   async = (mongoc_async_t *) async_void;
+   mongoc_async_iterate (async); /*  Once for connected. */
+   mongoc_async_iterate (async);
+   return NULL;
+}
+
+static void
+_reply_cb (mongoc_async_cmd_t *acmd,
+           mongoc_async_cmd_result_t result,
+           const bson_t *ismaster_reply,
+           int64_t duration_usec)
+{
+   MONGOC_DEBUG ("_reply_cb: %d", (int) result);
+}
+
+/* Test interruptibility:
+ * - an async loop polling on I/O can be interrupted.
+ * - an async loop "sleeping" when there is no I/O waiting can be interrupted.
+ */
+static void
+test_async_interrupt (void)
+{
+   mock_server_t *server;
+   mongoc_stream_t *stream;
+   mongoc_async_t *async;
+   mongoc_async_cmd_t *ismaster;
+   const char *host_and_port;
+   mongoc_host_list_t host;
+   bson_error_t error;
+   bson_t ismaster_bson = BSON_INITIALIZER;
+   bson_thread_t bg_thread;
+   request_t *req;
+
+   /* Establish a stream to the mock server. */
+   server = mock_server_new ();
+   mock_server_run (server);
+   host_and_port = mock_server_get_host_and_port (server);
+   _mongoc_host_list_from_string (&host, host_and_port);
+   stream = mongoc_client_connect_tcp (1000, &host, &error);
+   ASSERT_OR_PRINT (stream, error);
+
+   BCON_APPEND (&ismaster_bson, "ismaster", BCON_INT32 (1));
+
+   /* Start an async loop, with one async command on the stream. */
+   async = mongoc_async_new ();
+   mongoc_async_make_interruptible (async);
+
+   ismaster = mongoc_async_cmd_new (async,
+                                    stream,
+                                    true,
+                                    NULL,
+                                    NULL,
+                                    0 /* delay */,
+                                    NULL,
+                                    NULL,
+                                    "admin",
+                                    &ismaster_bson,
+                                    _reply_cb,
+                                    NULL,
+                                    5000);
+
+   bson_thread_create (&bg_thread, iterate_async_in_bg, async);
+
+   req = mock_server_receives_request (server);
+   /* Don't reply to it. */
+
+   mongoc_async_interrupt (async);
+
+   bson_thread_join (bg_thread);
+
+   request_destroy (req);
+   //mongoc_async_cmd_destroy (ismaster);
+   mongoc_async_destroy (async);
+   mock_server_destroy (server);
+   bson_destroy (&ismaster_bson);
+}
+
+// static void
+// test_async_streaming_ismaster (void)
+// {
+//    /* Test that streaming ismaster can be read.
+//     * - test both one and two replies queued up
+//     */
+// }
+
 void
 test_async_install (TestSuite *suite)
 {
@@ -381,4 +474,7 @@ test_async_install (TestSuite *suite)
                       test_framework_skip_if_windows);
 #endif
    TestSuite_AddMockServerTest (suite, "/Async/delay", test_ismaster_delay);
+
+   TestSuite_AddMockServerTest (
+      suite, "/Async/interrupt", test_async_interrupt);
 }

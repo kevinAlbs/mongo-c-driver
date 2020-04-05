@@ -1006,11 +1006,11 @@ mongoc_socket_new (int domain,   /* IN */
       RETURN (NULL);
    }
 
-   if (!_mongoc_socket_setflags (sd)) {
+   if (type != SOCK_DGRAM && !_mongoc_socket_setflags (sd)) {
       GOTO (fail);
    }
 
-   if (domain != AF_UNIX) {
+   if (type != SOCK_DGRAM && domain != AF_UNIX) {
       if (!_mongoc_socket_setnodelay (sd)) {
          MONGOC_WARNING ("Failed to enable TCP_NODELAY.");
       }

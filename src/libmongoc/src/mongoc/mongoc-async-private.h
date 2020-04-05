@@ -30,6 +30,13 @@ typedef struct _mongoc_async {
    struct _mongoc_async_cmd *cmds;
    size_t ncmds;
    uint32_t request_id;
+
+   bool interruptible;
+   int pipe_fds[2];
+   
+   mongoc_socket_t *interrupt_socket_read, *interrupt_socket_write;
+   mongoc_stream_t *interrupt_stream_read, *interrupt_stream_write;
+   struct sockaddr_in interrupt_read_addr, interrupt_write_addr;
 } mongoc_async_t;
 
 typedef enum {
@@ -66,6 +73,16 @@ mongoc_async_iterate (mongoc_async_t *async);
 
 void
 mongoc_async_run_to_completion (mongoc_async_t *async);
+
+/* Enable interruption.
+ * This enables mongoc_async_interrupt to be called while the
+ * async loop is polling.
+ */
+bool
+mongoc_async_make_interruptible (mongoc_async_t *async);
+
+void
+mongoc_async_interrupt (mongoc_async_t *async);
 
 BSON_END_DECLS
 

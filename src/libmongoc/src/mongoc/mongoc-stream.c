@@ -360,6 +360,7 @@ mongoc_stream_poll (mongoc_stream_poll_t *streams,
       if (i == 0) {
          last_type = poller[i].stream->type;
       } else if (last_type != poller[i].stream->type) {
+         MONGOC_DEBUG ("oops");
          errno = EINVAL;
          goto CLEANUP;
       }

@@ -46,6 +46,10 @@ mongoc_async_destroy (mongoc_async_t *async)
       mongoc_async_cmd_destroy (acmd);
    }
 
+   if (async->interruptible) {
+      /* TODO: close pipe? */
+   }
+
    bson_free (async);
 }
 
@@ -64,14 +68,15 @@ mongoc_async_iterate (mongoc_async_t *async)
 
    now = bson_get_monotonic_time ();
    poll_size = 0;
+   /* Store this off of async, so we don't need to alloc every iteration. */
    /* ncmds grows if we discover a replica & start calling ismaster on it */
-   if (poll_size < async->ncmds) {
-      poller = (mongoc_stream_poll_t *) bson_realloc (
-         poller, sizeof (*poller) * async->ncmds);
-      acmds_polled = (mongoc_async_cmd_t **) bson_realloc (
-         acmds_polled, sizeof (*acmds_polled) * async->ncmds);
-      poll_size = async->ncmds;
+   poll_size = async->ncmds;
+   if (async->interruptible) {
+      poll_size += 1;
    }
+   poller = (mongoc_stream_poll_t *) bson_malloc (sizeof (*poller) * poll_size);
+   acmds_polled = (mongoc_async_cmd_t **) bson_malloc (sizeof (*acmds_polled) *
+                                                       async->ncmds);
 
    expire_at = INT64_MAX;
    nstreams = 0;
@@ -115,10 +120,20 @@ mongoc_async_iterate (mongoc_async_t *async)
    poll_timeout_msec = BSON_MAX (0, (expire_at - now) / 1000);
    BSON_ASSERT (poll_timeout_msec < INT32_MAX);
 
+   /* If interruptible, add our special stream. */
+   if (async->interruptible) {
+      poller[nstreams].events = POLLIN;
+      poller[nstreams].revents = 0;
+      poller[nstreams].stream = async->interrupt_stream_read;
+      ++nstreams;
+   }
+
    if (nstreams > 0) {
       /* we need at least one stream to poll. */
+      MONGOC_DEBUG ("poll begin");
       nactive =
          mongoc_stream_poll (poller, nstreams, (int32_t) poll_timeout_msec);
+      MONGOC_DEBUG ("poll end");
    } else {
       /* currently this does not get hit. we always have at least one command
        * initialized with a stream. */
@@ -127,7 +142,24 @@ mongoc_async_iterate (mongoc_async_t *async)
 
    if (nactive > 0) {
       for (i = 0; i < nstreams; i++) {
-         mongoc_async_cmd_t *iter = acmds_polled[i];
+         mongoc_async_cmd_t *iter;
+
+         if (i == nstreams - 1 && async->interruptible) {
+            /* Special case, this is the pipe. */
+            if (poller[i].revents & POLLIN) {
+#ifndef _WIN32
+               char tmp_buf[1];
+               /* read the one byte in a blocking fashion. */
+               /* TODO timeout? */
+               mongoc_stream_read (
+                  async->interrupt_stream_read, (void *) tmp_buf, 1, 1, 1000);
+               MONGOC_DEBUG ("interrupt read stream got %c", tmp_buf[0]);
+#endif
+            }
+            break;
+         }
+
+         iter = acmds_polled[i];
          if (poller[i].revents & (POLLERR | POLLHUP)) {
             int hup = poller[i].revents & POLLHUP;
             if (iter->state == MONGOC_ASYNC_CMD_SEND) {
@@ -199,8 +231,9 @@ void
 mongoc_async_run_to_completion (mongoc_async_t *async)
 {
    int64_t now;
-   now = bson_get_monotonic_time ();
    mongoc_async_cmd_t *acmd;
+
+   now = bson_get_monotonic_time ();
 
    /* TODO: I'll need to figure out how to fit this in. */
    /* CDRIVER-1571 reset start times in case a stream initiator was slow */
@@ -212,4 +245,63 @@ mongoc_async_run_to_completion (mongoc_async_t *async)
    while (async->ncmds) {
       mongoc_async_iterate (async);
    }
+}
+
+static mongoc_socket_t *
+_create_udp_socket (struct sockaddr_in *out_addr)
+{
+   mongoc_socket_t *sock;
+   mongoc_socklen_t out_len;
+   int ret;
+   
+   out_len = sizeof (struct sockaddr_in);
+
+   memset (out_addr, 0, sizeof (struct sockaddr_in));
+   out_addr->sin_family = AF_INET;
+   out_addr->sin_addr.s_addr = INADDR_ANY;
+   out_addr->sin_port = 0;
+   
+   sock = mongoc_socket_new (AF_INET, SOCK_DGRAM, 0);
+   ret = mongoc_socket_bind (
+      sock, (struct sockaddr *) out_addr, sizeof (struct sockaddr_in));
+   mongoc_socket_getsockname (sock, (struct sockaddr *) out_addr, &out_len);
+   return sock;
+}
+
+bool
+mongoc_async_make_interruptible (mongoc_async_t *async)
+{
+   async->interruptible = true;
+   int ret;
+
+   async->interrupt_socket_read =
+      _create_udp_socket (&async->interrupt_read_addr);
+
+   async->interrupt_socket_write =
+      _create_udp_socket (&async->interrupt_write_addr);
+
+   ret =
+      mongoc_socket_connect (async->interrupt_socket_read,
+                             (struct sockaddr *) &async->interrupt_write_addr,
+                             sizeof (struct sockaddr_in),
+                             1000);
+   MONGOC_DEBUG ("connect read => write = %d", ret);
+   ret = mongoc_socket_connect (async->interrupt_socket_write,
+                                (struct sockaddr *) &async->interrupt_read_addr,
+                                sizeof (struct sockaddr_in),
+                                1000);
+   MONGOC_DEBUG ("connect write => read = %d", ret);
+
+   async->interrupt_stream_read =
+      mongoc_stream_socket_new (async->interrupt_socket_read);
+   async->interrupt_stream_write =
+      mongoc_stream_socket_new (async->interrupt_socket_write);
+   return true;
+}
+
+void
+mongoc_async_interrupt (mongoc_async_t *async)
+{
+   BSON_ASSERT (async->interruptible);
+   mongoc_stream_write (async->interrupt_stream_write, "x", 1, 1000);
 }

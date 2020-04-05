@@ -1319,6 +1319,13 @@ _mongoc_topology_run_background (void *data)
          }
       }
 
+      /* TODO: if a scanner node has switched state
+       * (short-polling => long-polling or vice versa)
+       * then update here:
+       * - add async command for long polling
+       * - cancel async command for long polling
+       */
+
       bson_mutex_unlock (&topology->mutex);
 
       /* TODO set a cap on the poll timeout based on the time due for the next
@@ -1374,98 +1381,98 @@ done:
  *
  *--------------------------------------------------------------------------
  */
-static void *
-_mongoc_topology_run_background_old (void *data)
-{
-   mongoc_topology_t *topology;
-   int64_t now;
-   int64_t last_scan;
-   int64_t timeout;
-   int64_t force_timeout;
-   int64_t heartbeat_msec;
-   int r;
+// static void *
+// _mongoc_topology_run_background_old (void *data)
+// {
+//    mongoc_topology_t *topology;
+//    int64_t now;
+//    int64_t last_scan;
+//    int64_t timeout;
+//    int64_t force_timeout;
+//    int64_t heartbeat_msec;
+//    int r;
 
-   BSON_ASSERT (data);
+//    BSON_ASSERT (data);
 
-   last_scan = 0;
-   topology = (mongoc_topology_t *) data;
-   heartbeat_msec = topology->description.heartbeat_msec;
+//    last_scan = 0;
+//    topology = (mongoc_topology_t *) data;
+//    heartbeat_msec = topology->description.heartbeat_msec;
 
-   /* we exit this loop when shutting down, or on error */
-   for (;;) {
-      /* unlocked after starting a scan or after breaking out of the loop */
-      bson_mutex_lock (&topology->mutex);
-      if (!mongoc_topology_scanner_valid (topology->scanner)) {
-         bson_mutex_unlock (&topology->mutex);
-         goto DONE;
-      }
+//    /* we exit this loop when shutting down, or on error */
+//    for (;;) {
+//       /* unlocked after starting a scan or after breaking out of the loop */
+//       bson_mutex_lock (&topology->mutex);
+//       if (!mongoc_topology_scanner_valid (topology->scanner)) {
+//          bson_mutex_unlock (&topology->mutex);
+//          goto DONE;
+//       }
 
-      /* we exit this loop on error, or when we should scan immediately */
-      for (;;) {
-         if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
-            bson_mutex_unlock (&topology->mutex);
-            goto DONE;
-         }
+//       /* we exit this loop on error, or when we should scan immediately */
+//       for (;;) {
+//          if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
+//             bson_mutex_unlock (&topology->mutex);
+//             goto DONE;
+//          }
 
-         now = bson_get_monotonic_time ();
+//          now = bson_get_monotonic_time ();
 
-         if (last_scan == 0) {
-            /* set up the "last scan" as exactly long enough to force an
-             * immediate scan on the first pass */
-            last_scan = now - (heartbeat_msec * 1000);
-         }
+//          if (last_scan == 0) {
+//             /* set up the "last scan" as exactly long enough to force an
+//              * immediate scan on the first pass */
+//             last_scan = now - (heartbeat_msec * 1000);
+//          }
 
-         timeout = heartbeat_msec - ((now - last_scan) / 1000);
+//          timeout = heartbeat_msec - ((now - last_scan) / 1000);
 
-         /* if someone's specifically asked for a scan, use a shorter interval
-          */
-         if (topology->scan_requested) {
-            MONGOC_DEBUG ("topology scan requested");
-            force_timeout = topology->min_heartbeat_frequency_msec -
-                            ((now - last_scan) / 1000);
+//          /* if someone's specifically asked for a scan, use a shorter interval
+//           */
+//          if (topology->scan_requested) {
+//             MONGOC_DEBUG ("topology scan requested");
+//             force_timeout = topology->min_heartbeat_frequency_msec -
+//                             ((now - last_scan) / 1000);
 
-            timeout = BSON_MIN (timeout, force_timeout);
-         }
+//             timeout = BSON_MIN (timeout, force_timeout);
+//          }
 
-         MONGOC_DEBUG ("timeout is: %lld", timeout);
+//          MONGOC_DEBUG ("timeout is: %lld", timeout);
 
-         /* if we can start scanning, do so immediately */
-         if (timeout <= 0) {
-            break;
-         } else {
-            /* otherwise wait until someone:
-             *   o requests a scan
-             *   o we time out
-             *   o requests a shutdown
-             */
-            r = mongoc_cond_timedwait (
-               &topology->cond_server, &topology->mutex, timeout);
+//          /* if we can start scanning, do so immediately */
+//          if (timeout <= 0) {
+//             break;
+//          } else {
+//             /* otherwise wait until someone:
+//              *   o requests a scan
+//              *   o we time out
+//              *   o requests a shutdown
+//              */
+//             r = mongoc_cond_timedwait (
+//                &topology->cond_server, &topology->mutex, timeout);
 
-#ifdef _WIN32
-            if (!(r == 0 || r == WSAETIMEDOUT)) {
-#else
-            if (!(r == 0 || r == ETIMEDOUT)) {
-#endif
-               bson_mutex_unlock (&topology->mutex);
-               /* handle errors */
-               goto DONE;
-            }
+// #ifdef _WIN32
+//             if (!(r == 0 || r == WSAETIMEDOUT)) {
+// #else
+//             if (!(r == 0 || r == ETIMEDOUT)) {
+// #endif
+//                bson_mutex_unlock (&topology->mutex);
+//                /* handle errors */
+//                goto DONE;
+//             }
 
-            /* if we timed out, or were woken up, check if it's time to scan
-             * again, or bail out */
-         }
-      }
+//             /* if we timed out, or were woken up, check if it's time to scan
+//              * again, or bail out */
+//          }
+//       }
 
-      topology->scan_requested = false;
-      mongoc_topology_scan_once (topology, false /* obey cooldown */);
-      bson_mutex_unlock (&topology->mutex);
+//       topology->scan_requested = false;
+//       mongoc_topology_scan_once (topology, false /* obey cooldown */);
+//       bson_mutex_unlock (&topology->mutex);
 
-      last_scan = bson_get_monotonic_time ();
-   }
+//       last_scan = bson_get_monotonic_time ();
+//    }
 
-DONE:
-   return NULL;
-}
+// DONE:
+//    return NULL;
+// }
 
 /*
  *--------------------------------------------------------------------------
