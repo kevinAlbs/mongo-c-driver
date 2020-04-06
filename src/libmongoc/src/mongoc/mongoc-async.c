@@ -47,7 +47,7 @@ mongoc_async_destroy (mongoc_async_t *async)
    }
 
    if (async->interruptible) {
-      /* TODO: close pipe? */
+      /* TODO: close sockets */
    }
 
    bson_free (async);
@@ -196,6 +196,7 @@ mongoc_async_iterate (mongoc_async_t *async)
       bool remove_cmd = false;
       mongoc_async_cmd_result_t result;
 
+      /* TODO: I think the async loop should not be inspecting the state of the async cmd. */
       /* check if an initiated cmd has passed the connection timeout.  */
       if (acmd->state != MONGOC_ASYNC_CMD_INITIATE &&
           now > acmd->connect_started + acmd->timeout_msec * 1000) {
