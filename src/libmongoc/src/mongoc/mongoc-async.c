@@ -196,7 +196,8 @@ mongoc_async_iterate (mongoc_async_t *async)
       bool remove_cmd = false;
       mongoc_async_cmd_result_t result;
 
-      /* TODO: I think the async loop should not be inspecting the state of the async cmd. */
+      /* TODO: I think the async loop should not be inspecting the state of the
+       * async cmd. */
       /* check if an initiated cmd has passed the connection timeout.  */
       if (acmd->state != MONGOC_ASYNC_CMD_INITIATE &&
           now > acmd->connect_started + acmd->timeout_msec * 1000) {
@@ -254,14 +255,14 @@ _create_udp_socket (struct sockaddr_in *out_addr)
    mongoc_socket_t *sock;
    mongoc_socklen_t out_len;
    int ret;
-   
+
    out_len = sizeof (struct sockaddr_in);
 
    memset (out_addr, 0, sizeof (struct sockaddr_in));
    out_addr->sin_family = AF_INET;
    out_addr->sin_addr.s_addr = INADDR_ANY;
    out_addr->sin_port = 0;
-   
+
    sock = mongoc_socket_new (AF_INET, SOCK_DGRAM, 0);
    ret = mongoc_socket_bind (
       sock, (struct sockaddr *) out_addr, sizeof (struct sockaddr_in));

@@ -211,7 +211,8 @@ bool
 mongoc_topology_scanner_node_in_cooldown (mongoc_topology_scanner_node_t *node,
                                           int64_t when);
 
-bool mongoc_topology_scanner_is_scanning (mongoc_topology_scanner_t *ts);
+bool
+mongoc_topology_scanner_is_scanning (mongoc_topology_scanner_t *ts);
 
 /* for testing. */
 mongoc_stream_t *

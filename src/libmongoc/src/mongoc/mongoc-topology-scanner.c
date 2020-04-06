@@ -912,7 +912,8 @@ mongoc_topology_scanner_in_cooldown (mongoc_topology_scanner_t *ts,
  * mongoc_topology_scanner_start --
  *
  *      Initializes the scanner and begins a full topology check. This
- *      should be called once before calling mongoc_topology_scanner_run_to_completion()
+ *      should be called once before calling
+ *mongoc_topology_scanner_run_to_completion()
  *      to complete the scan.
  *
  *      The topology mutex must be held by the caller.
@@ -1199,7 +1200,9 @@ _jumpstart_other_acmds (mongoc_topology_scanner_node_t *node,
    }
 }
 
-bool mongoc_topology_scanner_is_scanning (mongoc_topology_scanner_t *ts) {
+bool
+mongoc_topology_scanner_is_scanning (mongoc_topology_scanner_t *ts)
+{
    mongoc_topology_scanner_node_t *node, *tmp;
 
    BSON_ASSERT (ts);
@@ -1207,8 +1210,8 @@ bool mongoc_topology_scanner_is_scanning (mongoc_topology_scanner_t *ts) {
    DL_FOREACH_SAFE (ts->nodes, node, tmp)
    {
       if (node->scanning) {
-         return  true;
+         return true;
       }
    }
-   return  false;
+   return false;
 }

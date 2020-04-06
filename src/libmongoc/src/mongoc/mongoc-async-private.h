@@ -33,7 +33,7 @@ typedef struct _mongoc_async {
 
    bool interruptible;
    int pipe_fds[2];
-   
+
    mongoc_socket_t *interrupt_socket_read, *interrupt_socket_write;
    mongoc_stream_t *interrupt_stream_read, *interrupt_stream_write;
    struct sockaddr_in interrupt_read_addr, interrupt_write_addr;

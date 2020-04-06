@@ -1409,7 +1409,8 @@ done:
 
 //       /* we exit this loop on error, or when we should scan immediately */
 //       for (;;) {
-//          if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
+//          if (topology->scanner_state ==
+//          MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
 //             bson_mutex_unlock (&topology->mutex);
 //             goto DONE;
 //          }
@@ -1424,7 +1425,8 @@ done:
 
 //          timeout = heartbeat_msec - ((now - last_scan) / 1000);
 
-//          /* if someone's specifically asked for a scan, use a shorter interval
+//          /* if someone's specifically asked for a scan, use a shorter
+//          interval
 //           */
 //          if (topology->scan_requested) {
 //             MONGOC_DEBUG ("topology scan requested");
