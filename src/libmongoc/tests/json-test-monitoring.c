@@ -152,6 +152,10 @@ succeeded_cb (const mongoc_apm_command_succeeded_t *event)
       bson_free (reply_json);
    }
 
+   if (ctx->config->command_started_events_only) {
+      return;
+   }
+
    BSON_ASSERT (mongoc_apm_command_succeeded_get_request_id (event) > 0);
    BSON_ASSERT (mongoc_apm_command_succeeded_get_server_id (event) > 0);
    assert_host_in_uri (event->host, ctx->test_framework_uri);
@@ -190,6 +194,10 @@ failed_cb (const mongoc_apm_command_failed_t *event)
       fflush (stdout);
    }
 
+   if (ctx->config->command_started_events_only) {
+      return;
+   }
+
    BSON_ASSERT (mongoc_apm_command_failed_get_request_id (event) > 0);
    BSON_ASSERT (mongoc_apm_command_failed_get_server_id (event) > 0);
    assert_host_in_uri (event->host, ctx->test_framework_uri);
@@ -220,10 +228,8 @@ set_apm_callbacks (json_test_ctx_t *ctx, mongoc_client_t *client)
    callbacks = mongoc_apm_callbacks_new ();
    mongoc_apm_set_command_started_cb (callbacks, started_cb);
 
-   if (!ctx->config->command_started_events_only) {
-      mongoc_apm_set_command_succeeded_cb (callbacks, succeeded_cb);
-      mongoc_apm_set_command_failed_cb (callbacks, failed_cb);
-   }
+   mongoc_apm_set_command_succeeded_cb (callbacks, succeeded_cb);
+   mongoc_apm_set_command_failed_cb (callbacks, failed_cb);
 
    mongoc_client_set_apm_callbacks (client, callbacks, ctx);
    mongoc_apm_callbacks_destroy (callbacks);
