@@ -94,14 +94,9 @@ case "$OS" in
 
       nohup mongocryptd --logpath ./mongocryptd.logs &
       chmod +x src/libmongoc/Debug/test-libmongoc.exe
-      i=0
-      for i in $(seq 1 10);
-      do
-         echo "Run $i"
-         export MONGOC_TEST_MONITORING_VERBOSE="on"
-         export MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN="on"
-         ./src/libmongoc/Debug/test-libmongoc.exe $TEST_ARGS -l "/client_side_encryption/*" --no-fork
-      done
+      export MONGOC_TEST_MONITORING_VERBOSE="on"
+      export MONGOC_TEST_MONGOCRYPTD_BYPASS_SPAWN="on"
+      ./src/libmongoc/Debug/test-libmongoc.exe $TEST_ARGS -l "/client_side_encryption/*" --no-fork
       ;;
 
    *)
