@@ -93,7 +93,13 @@ case "$OS" in
       check_mongocryptd
 
       chmod +x src/libmongoc/Debug/test-libmongoc.exe
-      ./src/libmongoc/Debug/test-libmongoc.exe $TEST_ARGS
+      i=0
+      for i in $(seq 1 10);
+      do
+         echo "Run $i"
+         export MONGOC_TEST_MONITORING_VERBOSE="on"
+         ./src/libmongoc/Debug/test-libmongoc.exe $TEST_ARGS -l "/client_side_encryption/basic" --no-fork
+      done
       ;;
 
    *)

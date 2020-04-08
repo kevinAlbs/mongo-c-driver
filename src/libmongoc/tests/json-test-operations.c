@@ -844,6 +844,12 @@ single_write (mongoc_collection_t *collection,
       abort ();
    }
 
+   if (!r) {
+      char *op = bson_as_json (operation, NULL);
+      MONGOC_ERROR ("operation %s failed with error: %s", op, error.message);
+      bson_free (op);
+   }
+
    value_init_from_doc (&value, reply);
    check_result (test, operation, r, &value, &error);
    bson_value_destroy (&value);
