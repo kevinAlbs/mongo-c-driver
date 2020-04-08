@@ -92,7 +92,7 @@ case "$OS" in
       export PATH=$PATH:/cygdrive/c/mongodb/bin:/cygdrive/c/libmongocrypt/bin
       check_mongocryptd
 
-      mongocryptd --logpath ./mongocryptd.logs --fork --pidfilepath="$(pwd)/mongocryptd.pid"
+      start /b mongocryptd --logpath ./mongocryptd.logs --pidfilepath="$(pwd)/mongocryptd.pid"
       chmod +x src/libmongoc/Debug/test-libmongoc.exe
       i=0
       for i in $(seq 1 10);
