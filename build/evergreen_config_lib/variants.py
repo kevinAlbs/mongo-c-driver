@@ -355,7 +355,7 @@ all_variants = [
              {'CC': 'Visual Studio 15 2017 Win64'}),
     Variant('windows-2015',
             'Windows (VS 2015)',
-            'windows-64-vs2015-compile',
+            'windows-64-vs2015-test',
             ['.compression !.snappy !.zstd !.latest',
              'release-compile',
              'debug-compile-nosasl-nossl',

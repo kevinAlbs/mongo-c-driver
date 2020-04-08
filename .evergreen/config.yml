@@ -13518,7 +13518,7 @@ buildvariants:
   display_name: Windows (VS 2015)
   expansions:
     CC: Visual Studio 14 2015 Win64
-  run_on: windows-64-vs2015-compile
+  run_on: windows-64-vs2015-test
   tasks:
   - .compression !.snappy !.zstd !.latest
   - release-compile
