@@ -43,6 +43,7 @@
 #define MONGOC_SSL_DEFAULT_TRUST_DIR NULL
 #endif
 
+/* Are the rest of these zeroed out? */
 static mongoc_ssl_opt_t gMongocSslOptDefault = {
    NULL, NULL, MONGOC_SSL_DEFAULT_TRUST_FILE, MONGOC_SSL_DEFAULT_TRUST_DIR,
 };

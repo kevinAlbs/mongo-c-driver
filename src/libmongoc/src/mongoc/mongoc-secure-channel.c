@@ -231,7 +231,7 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
       0,                            /* dwFlags */
       (const void *) provider);     /* pvData */
    if (success) {
-      TRACE ("%s", "Successfully loaded client certificate");
+      MONGOC_DEBUG ("%s", "Successfully loaded client certificate");
       return cert;
    }
 
@@ -389,7 +389,7 @@ mongoc_secure_channel_setup_ca (
 
    if (CertAddCertificateContextToStore (
           cert_store, cert, CERT_STORE_ADD_USE_EXISTING, NULL)) {
-      TRACE ("%s", "Added the certificate !");
+      MONGOC_DEBUG ("%s", "Added the certificate !");
       CertCloseStore (cert_store, 0);
       return true;
    }
@@ -455,7 +455,7 @@ mongoc_secure_channel_setup_crl (
 
    if (CertAddCertificateContextToStore (
           cert_store, cert, CERT_STORE_ADD_USE_EXISTING, NULL)) {
-      TRACE ("%s", "Added the certificate !");
+      MONGOC_DEBUG ("%s", "Added the certificate !");
       CertFreeCertificateContext (cert);
       CertCloseStore (cert_store, 0);
       return true;
@@ -476,7 +476,7 @@ mongoc_secure_channel_read (mongoc_stream_tls_t *tls,
    ssize_t length;
 
    errno = 0;
-   TRACE ("Wanting to read: %d, timeout is %d", data_length, tls->timeout_msec);
+   MONGOC_DEBUG ("Wanting to read: %d, timeout is %d", data_length, tls->timeout_msec);
    /* 4th argument is minimum bytes, while the data_length is the
     * size of the buffer. We are totally fine with just one TLS record (few
     *bytes)
@@ -484,7 +484,7 @@ mongoc_secure_channel_read (mongoc_stream_tls_t *tls,
    length = mongoc_stream_read (
       tls->base_stream, data, data_length, 0, tls->timeout_msec);
 
-   TRACE ("Got %d", length);
+   MONGOC_DEBUG ("Got %d", length);
 
    if (length > 0) {
       return length;
@@ -501,10 +501,10 @@ mongoc_secure_channel_write (mongoc_stream_tls_t *tls,
    ssize_t length;
 
    errno = 0;
-   TRACE ("Wanting to write: %d", data_length);
+   MONGOC_DEBUG ("Wanting to write: %d", data_length);
    length = mongoc_stream_write (
       tls->base_stream, (void *) data, data_length, tls->timeout_msec);
-   TRACE ("Wrote: %d", length);
+   MONGOC_DEBUG ("Wrote: %d", length);
 
 
    return length;
@@ -582,7 +582,7 @@ mongoc_secure_channel_handshake_step_1 (mongoc_stream_tls_t *tls,
    mongoc_stream_tls_secure_channel_t *secure_channel =
       (mongoc_stream_tls_secure_channel_t *) tls->ctx;
 
-   TRACE ("SSL/TLS connection with '%s' (step 1/3)", hostname);
+   MONGOC_DEBUG ("SSL/TLS connection with '%s' (step 1/3)", hostname);
 
    /* setup output buffer */
    _mongoc_secure_channel_init_sec_buffer (&outbuf, SECBUFFER_EMPTY, NULL, 0);
@@ -619,7 +619,7 @@ mongoc_secure_channel_handshake_step_1 (mongoc_stream_tls_t *tls,
       return false;
    }
 
-   TRACE ("sending initial handshake data: sending %lu bytes...",
+   MONGOC_DEBUG ("sending initial handshake data: sending %lu bytes...",
           outbuf.cbBuffer);
 
    /* send initial handshake data which is now stored in output buffer */
@@ -635,7 +635,7 @@ mongoc_secure_channel_handshake_step_1 (mongoc_stream_tls_t *tls,
       return false;
    }
 
-   TRACE ("sent initial handshake data: sent %zd bytes", written);
+   MONGOC_DEBUG ("sent initial handshake data: sent %zd bytes", written);
 
    secure_channel->recv_unrecoverable_err = 0;
    secure_channel->recv_sspi_close_notify = false;
@@ -665,7 +665,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
    doread = (secure_channel->connecting_state != ssl_connect_2_writing) ? true
                                                                         : false;
 
-   TRACE ("%s", "SSL/TLS connection with endpoint (step 2/3)");
+   MONGOC_DEBUG ("%s", "SSL/TLS connection with endpoint (step 2/3)");
 
    if (!secure_channel->cred || !secure_channel->ctxt) {
       return false;
@@ -693,7 +693,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
                   secure_channel->connecting_state = ssl_connect_2_reading;
                }
 
-               TRACE ("%s", "failed to receive handshake, need more data");
+               MONGOC_DEBUG ("%s", "failed to receive handshake, need more data");
                return true;
             }
 
@@ -706,7 +706,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
          secure_channel->encdata_offset += nread;
       }
 
-      TRACE ("encrypted data buffer: offset %d length %d",
+      MONGOC_DEBUG ("encrypted data buffer: offset %d length %d",
              (int) secure_channel->encdata_offset,
              (int) secure_channel->encdata_length);
 
@@ -762,7 +762,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
       /* check if the handshake was incomplete */
       if (sspi_status == SEC_E_INCOMPLETE_MESSAGE) {
          secure_channel->connecting_state = ssl_connect_2_reading;
-         TRACE ("%s", "received incomplete message, need more data");
+         MONGOC_DEBUG ("%s", "received incomplete message, need more data");
          return true;
       }
 
@@ -773,7 +773,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
           !(secure_channel->req_flags & ISC_REQ_USE_SUPPLIED_CREDS)) {
          secure_channel->req_flags |= ISC_REQ_USE_SUPPLIED_CREDS;
          secure_channel->connecting_state = ssl_connect_2_writing;
-         TRACE ("%s", "A client certificate has been requested");
+         MONGOC_DEBUG ("%s", "A client certificate has been requested");
          return true;
       }
 
@@ -783,7 +783,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
             /* search for handshake tokens that need to be send */
             if (outbuf[i].BufferType == SECBUFFER_TOKEN &&
                 outbuf[i].cbBuffer > 0) {
-               TRACE ("sending next handshake data: sending %lu bytes...",
+               MONGOC_DEBUG ("sending next handshake data: sending %lu bytes...",
                       outbuf[i].cbBuffer);
 
                /* send handshake token to server */
@@ -854,7 +854,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
                            (LPTSTR) &msg,
                            0,
                            NULL);
-            MONGOC_ERROR ("Failed to initialize security context, error code: "
+            MONGOC_ERROR ("2. Failed to initialize security context, error code: "
                           "0x%04X%04X: %s",
                           (sspi_status >> 16) & 0xffff,
                           sspi_status & 0xffff,
@@ -867,7 +867,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
 
       /* check if there was additional remaining encrypted data */
       if (inbuf[1].BufferType == SECBUFFER_EXTRA && inbuf[1].cbBuffer > 0) {
-         TRACE ("encrypted data length: %lu", inbuf[1].cbBuffer);
+         MONGOC_DEBUG ("encrypted data length: %lu", inbuf[1].cbBuffer);
 
          /*
           * There are two cases where we could be getting extra data here:
@@ -910,7 +910,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
    /* check if the handshake is complete */
    if (sspi_status == SEC_E_OK) {
       secure_channel->connecting_state = ssl_connect_3;
-      TRACE ("%s", "SSL/TLS handshake complete");
+      MONGOC_DEBUG ("%s", "SSL/TLS handshake complete");
    }
 
    return true;
@@ -925,7 +925,7 @@ mongoc_secure_channel_handshake_step_3 (mongoc_stream_tls_t *tls,
 
    BSON_ASSERT (ssl_connect_3 == secure_channel->connecting_state);
 
-   TRACE ("SSL/TLS connection with %s (step 3/3)", hostname);
+   MONGOC_DEBUG ("SSL/TLS connection with %s (step 3/3)", hostname);
 
    if (!secure_channel->cred) {
       return false;

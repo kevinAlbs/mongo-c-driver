@@ -416,6 +416,8 @@ _get_stream (const char *endpoint,
       host_and_port = (char *) endpoint; /* we promise not to modify */
    }
 
+   MONGOC_DEBUG ("KMS connecting to %s", endpoint);
+
    if (!_mongoc_host_list_from_string_with_err (&host, host_and_port, error)) {
       goto fail;
    }
@@ -425,13 +427,18 @@ _get_stream (const char *endpoint,
       goto fail;
    }
 
+   MONGOC_DEBUG ("TCP connection successful, used timeout of %d", (int)connecttimeoutms);
+
    /* Wrap in a tls_stream. */
    memcpy (&ssl_opts, mongoc_ssl_opt_get_default (), sizeof ssl_opts);
    tls_stream = mongoc_stream_tls_new_with_hostname (
       base_stream, host.host, &ssl_opts, 1 /* client */);
 
+   MONGOC_DEBUG ("TCP performing handshake");
+
    if (!mongoc_stream_tls_handshake_block (
           tls_stream, host.host, connecttimeoutms, error)) {
+      MONGOC_DEBUG ("Handshake failed: %s", error->message);
       goto fail;
    }
 

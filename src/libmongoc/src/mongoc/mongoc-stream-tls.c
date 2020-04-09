@@ -99,6 +99,7 @@ mongoc_stream_tls_handshake_block (mongoc_stream_t *stream,
    do {
       events = 0;
 
+      MONGOC_DEBUG ("handshake step...");
       if (mongoc_stream_tls_handshake (
              stream, host, timeout_msec, &events, error)) {
          return true;
@@ -121,7 +122,9 @@ mongoc_stream_tls_handshake_block (mongoc_stream_t *stream,
                timeout_msec = (expire - now) / 1000L;
             }
          }
+         MONGOC_DEBUG ("poll begin");
          ret = mongoc_stream_poll (&poller, 1, timeout_msec);
+         MONGOC_DEBUG ("poll end");
       }
    } while (events && ret > 0);
 
