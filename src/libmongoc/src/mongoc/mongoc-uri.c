@@ -1055,7 +1055,7 @@ mongoc_uri_apply_options (mongoc_uri_t *uri,
             }
 
             if (!_mongoc_uri_set_option_as_int64_with_error (
-                  uri, canon, v_int64, error)) {
+                   uri, canon, v_int64, error)) {
                return false;
             }
          } else {
@@ -1068,7 +1068,7 @@ mongoc_uri_apply_options (mongoc_uri_t *uri,
             }
 
             if (!_mongoc_uri_set_option_as_int32_with_error (
-                  uri, canon, v_int, error)) {
+                   uri, canon, v_int, error)) {
                return false;
             }
          } else {
@@ -1093,24 +1093,25 @@ mongoc_uri_apply_options (mongoc_uri_t *uri,
             } else if (0 == strcasecmp (value, "false")) {
                bval = false;
             } else if ((0 == strcmp (value, "1")) ||
-                     (0 == strcasecmp (value, "yes")) ||
-                     (0 == strcasecmp (value, "y")) ||
-                     (0 == strcasecmp (value, "t"))) {
+                       (0 == strcasecmp (value, "yes")) ||
+                       (0 == strcasecmp (value, "y")) ||
+                       (0 == strcasecmp (value, "t"))) {
                MONGOC_WARNING ("Deprecated boolean value for \"%s\": \"%s\", "
-                              "please update to \"%s=true\"",
-                              key,
-                              value,
-                              key);
+                               "please update to \"%s=true\"",
+                               key,
+                               value,
+                               key);
                bval = true;
             } else if ((0 == strcasecmp (value, "0")) ||
-                     (0 == strcasecmp (value, "-1")) ||
-                     (0 == strcmp (value, "no")) || (0 == strcmp (value, "n")) ||
-                     (0 == strcmp (value, "f"))) {
+                       (0 == strcasecmp (value, "-1")) ||
+                       (0 == strcmp (value, "no")) ||
+                       (0 == strcmp (value, "n")) ||
+                       (0 == strcmp (value, "f"))) {
                MONGOC_WARNING ("Deprecated boolean value for \"%s\": \"%s\", "
-                              "please update to \"%s=false\"",
-                              key,
-                              value,
-                              key);
+                               "please update to \"%s=false\"",
+                               key,
+                               value,
+                               key);
                bval = false;
             } else {
                goto UNSUPPORTED_VALUE;
@@ -1431,7 +1432,6 @@ mongoc_uri_finalize_directconnection (mongoc_uri_t *uri, bson_error_t *error)
    }
 
    return true;
-
 }
 
 static bool
@@ -3036,4 +3036,34 @@ _mongoc_uri_copy_and_replace_host_list (const mongoc_uri_t *original,
    uri->hosts = bson_malloc0 (sizeof (mongoc_host_list_t));
    _mongoc_host_list_from_string (uri->hosts, host);
    return uri;
+}
+
+bool
+mongoc_uri_reconcile_with_srv_host_list (mongoc_uri_t *uri,
+                                         mongoc_host_list_t *host_list,
+                                         bson_error_t *error)
+{
+   mongoc_host_list_t *host;
+   mongoc_host_list_t *extraneous;
+   bool ret;
+
+   ret = false;
+   extraneous = _mongoc_host_list_copy_all (uri->hosts);
+
+   for (host = host_list; host; host = host->next) {
+      if (!mongoc_uri_upsert_host_and_port (uri, host->host_and_port, error)) {
+         goto done;
+      }
+      _mongoc_host_list_remove_host (&extraneous, host->host, host->port);
+   }
+
+   /* Remove hosts in the URI that were not returned in SRV results. */
+   for (host = extraneous; host; host = host->next) {
+      mongoc_uri_remove_host (uri, host->host, host->port);
+   }
+
+   ret = true;
+done:
+   _mongoc_host_list_destroy_all (extraneous);
+   return ret;
 }

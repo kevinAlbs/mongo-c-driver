@@ -301,7 +301,7 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
       }
    }
 
-   topology_valid = true;
+   topology_valid = false;
    service = mongoc_uri_get_service (uri);
    if (service) {
       memset (&rr_data, 0, sizeof (mongoc_rr_data_t));
@@ -310,22 +310,40 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
       prefixed_service = bson_strdup_printf ("_mongodb._tcp.%s", service);
       if (!_mongoc_client_get_rr (prefixed_service,
                                   MONGOC_RR_SRV,
-                                  topology->uri,
                                   &rr_data,
-                                  &topology->scanner->error) ||
-          !_mongoc_client_get_rr (service,
-                                  MONGOC_RR_TXT,
-                                  topology->uri,
-                                  NULL,
                                   &topology->scanner->error)) {
-         topology_valid = false;
-      } else {
-         topology->last_srv_scan = bson_get_monotonic_time ();
-         topology->rescanSRVIntervalMS = BSON_MAX (
-            rr_data.min_ttl * 1000, MONGOC_TOPOLOGY_MIN_RESCAN_SRV_INTERVAL_MS);
+         GOTO (srv_fail);
       }
 
+      if (!_mongoc_client_get_rr (
+             service, MONGOC_RR_TXT, &rr_data, &topology->scanner->error)) {
+         GOTO (srv_fail);
+      }
+
+      /* Use rr_data to update the topology's URI. */
+      if (rr_data.opts &&
+          !mongoc_uri_parse_options (topology->uri,
+                                     rr_data.opts,
+                                     true /* from_dns */,
+                                     &topology->scanner->error)) {
+         GOTO (srv_fail);
+      }
+
+      if (!mongoc_uri_reconcile_with_srv_host_list (
+             topology->uri, rr_data.hosts, &topology->scanner->error)) {
+         GOTO (srv_fail);
+      }
+
+      topology->last_srv_scan = bson_get_monotonic_time ();
+      topology->rescanSRVIntervalMS = BSON_MAX (
+         rr_data.min_ttl * 1000, MONGOC_TOPOLOGY_MIN_RESCAN_SRV_INTERVAL_MS);
+
+      topology_valid = true;
+   srv_fail:
+      bson_free (rr_data.opts);
       bson_free (prefixed_service);
+   } else {
+      topology_valid = true;
    }
 
    /*
@@ -341,9 +359,10 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
     *     - otherwise, if the seed list has a single host, initialize to SINGLE
     *   - everything else gets initialized to UNKNOWN
     */
-   has_directconnection = mongoc_uri_has_option (
-      uri, MONGOC_URI_DIRECTCONNECTION);
-   directconnection = has_directconnection &&
+   has_directconnection =
+      mongoc_uri_has_option (uri, MONGOC_URI_DIRECTCONNECTION);
+   directconnection =
+      has_directconnection &&
       mongoc_uri_get_option_as_bool (uri, MONGOC_URI_DIRECTCONNECTION, false);
    hl = mongoc_uri_get_hosts (topology->uri);
    if (service && !has_directconnection) {
@@ -381,6 +400,10 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
       mongoc_topology_scanner_add (topology->scanner, hl, id);
 
       hl = hl->next;
+   }
+
+   if (service) {
+      topology->srv_uri = mongoc_uri_copy (topology->uri);
    }
 
    return topology;
@@ -514,7 +537,6 @@ static void
 mongoc_topology_rescan_srv (mongoc_topology_t *topology)
 {
    mongoc_rr_data_t rr_data = {0};
-   mongoc_host_list_t *h = NULL;
    const char *service;
    char *prefixed_service = NULL;
    int64_t scan_time;
@@ -538,17 +560,14 @@ mongoc_topology_rescan_srv (mongoc_topology_t *topology)
    }
 
    /* Go forth and query... */
-   rr_data.hosts =
-      _mongoc_host_list_copy (mongoc_uri_get_hosts (topology->uri), NULL);
-
    prefixed_service = bson_strdup_printf ("_mongodb._tcp.%s", service);
    if (!_mongoc_client_get_rr (prefixed_service,
                                MONGOC_RR_SRV,
-                               topology->uri,
                                &rr_data,
                                &topology->scanner->error)) {
       /* Failed querying, soldier on and try again next time. */
       topology->rescanSRVIntervalMS = topology->description.heartbeat_msec;
+      MONGOC_ERROR ("SRV polling error: %s", topology->scanner->error.message);
       GOTO (done);
    }
 
@@ -568,16 +587,17 @@ mongoc_topology_rescan_srv (mongoc_topology_t *topology)
       GOTO (done);
    }
 
-   /* rr_data.hosts was initialized to the current set of known hosts
-    * on entry, and mongoc_client_get_rr will have stripped it down to
-    * only include hosts which were NOT included in the most recent query.
-    * Remove those hosts and we're left with only active servers.
-    */
-   for (h = rr_data.hosts; h; h = rr_data.hosts) {
-      rr_data.hosts = h->next;
-      mongoc_uri_remove_host (topology->uri, h->host, h->port);
-      bson_free (h);
+   /* rr_data.hosts is set to the hosts returned in the query.
+    * Reconcile with the topology URI for validation.
+    * Reconcile with the topology description to add to monitoring. */
+   if (!mongoc_uri_reconcile_with_srv_host_list (
+          topology->srv_uri, rr_data.hosts, &topology->scanner->error)) {
+      MONGOC_ERROR ("SRV polling error: %s", topology->scanner->error.message);
+      GOTO (done);
    }
+   mongoc_topology_description_reconcile (
+      &topology->description,
+      (mongoc_host_list_t *) mongoc_uri_get_hosts (topology->uri));
 
 done:
    bson_free (prefixed_service);

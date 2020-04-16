@@ -35,7 +35,7 @@
 #define MONGOC_TOPOLOGY_SERVER_SELECTION_TIMEOUT_MS 30000
 #define MONGOC_TOPOLOGY_HEARTBEAT_FREQUENCY_MS_MULTI_THREADED 10000
 #define MONGOC_TOPOLOGY_HEARTBEAT_FREQUENCY_MS_SINGLE_THREADED 60000
-#define MONGOC_TOPOLOGY_MIN_RESCAN_SRV_INTERVAL_MS 60000
+#define MONGOC_TOPOLOGY_MIN_RESCAN_SRV_INTERVAL_MS 1000
 
 typedef enum {
    MONGOC_TOPOLOGY_SCANNER_OFF,
@@ -48,7 +48,13 @@ struct _mongoc_client_pool_t;
 
 typedef struct _mongoc_topology_t {
    mongoc_topology_description_t description;
+   /* This URI is constant after initial seedlist discovery. It is shared with
+    * the topology scanner and copied in pooled clients. */
    mongoc_uri_t *uri;
+
+   /* This URI is updated with SRV polling to ensure the hosts are valid. It is
+    * not shared. */
+   mongoc_uri_t *srv_uri;
    mongoc_topology_scanner_t *scanner;
    bool server_selection_try_once;
 

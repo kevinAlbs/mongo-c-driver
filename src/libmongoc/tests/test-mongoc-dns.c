@@ -254,8 +254,9 @@ _test_dns_maybe_pooled (bson_t *test, bool pooled)
    if (!mongoc_uri_get_hosts (client->uri)) {
       ASSERT (!mongoc_uri_get_hosts (client->topology->uri));
    } else {
-      _mongoc_host_list_equal (mongoc_uri_get_hosts (client->uri),
-                               mongoc_uri_get_hosts (client->topology->uri));
+      _mongoc_host_list_compare_one (
+         mongoc_uri_get_hosts (client->uri),
+         mongoc_uri_get_hosts (client->topology->uri));
    }
 
    if (pooled) {
