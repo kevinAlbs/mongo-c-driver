@@ -570,6 +570,19 @@ _mongoc_secure_channel_init_sec_buffer_desc (SecBufferDesc *desc,
    desc->cBuffers = buffer_count;
 }
 
+void explain_sec_buffer (SecBuffer *buffer) {
+   /* See https://docs.microsoft.com/en-us/windows/win32/api/sspi/ns-sspi-secbuffer */
+   MONGOC_DEBUG ("Buffer type: %02x, length: %d", buffer->BufferType, buffer->cbBuffer);
+}
+
+void explain_sec_buffer_desc (SecBufferDesc *desc) {
+   MONGOC_DEBUG ("explain_sec_buf_desc - begin");
+   for (int i = 0; i < desc->cBuffers; i++) {
+      explain_sec_buffer (desc->pBuffers + i);
+   }
+   MONGOC_DEBUG ("explain_sec_buf_desc - end");
+}
+
 
 bool
 mongoc_secure_channel_handshake_step_1 (mongoc_stream_tls_t *tls,
@@ -621,6 +634,8 @@ mongoc_secure_channel_handshake_step_1 (mongoc_stream_tls_t *tls,
 
    MONGOC_DEBUG ("sending initial handshake data: sending %lu bytes...",
           outbuf.cbBuffer);
+
+   explain_sec_buffer (&outbuf);
 
    /* send initial handshake data which is now stored in output buffer */
    written =
@@ -681,11 +696,13 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
    for (;;) {
       if (doread) {
          /* read encrypted handshake data from socket */
+         MONGOC_DEBUG ("read - begin");
          nread = mongoc_secure_channel_read (
             tls,
             (char *) (secure_channel->encdata_buffer +
                       secure_channel->encdata_offset),
             secure_channel->encdata_length - secure_channel->encdata_offset);
+         MONGOC_DEBUG ("read - end");
 
          if (!nread) {
             if (MONGOC_ERRNO_IS_AGAIN (errno)) {
@@ -742,6 +759,8 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
 
       /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa375924.aspx
        */
+      MONGOC_DEBUG ("suspect - begin");
+      explain_sec_buffer_desc (&inbuf_desc);
       sspi_status =
          InitializeSecurityContext (&secure_channel->cred->cred_handle,
                                     &secure_channel->ctxt->ctxt_handle,
@@ -755,7 +774,8 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls,
                                     &outbuf_desc,
                                     &secure_channel->ret_flags,
                                     &secure_channel->ctxt->time_stamp);
-
+      explain_sec_buffer_desc (&outbuf_desc);
+      MONGOC_DEBUG ("suspect - end");
       /* free buffer for received handshake data */
       free (inbuf[0].pvBuffer);
 
