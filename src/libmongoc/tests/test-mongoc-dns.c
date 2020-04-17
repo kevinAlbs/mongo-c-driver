@@ -445,6 +445,7 @@ test_srv_polling_mocked (void *unused)
     */
    expected = MAKE_HOSTS ("x.test.com", "y.test.com");
    ret = mongoc_topology_apply_scanned_srv_hosts (uri, &td, NULL, &error);
+   BSON_ASSERT (!ret);
    ASSERT_ERROR_CONTAINS (error,
                           MONGOC_ERROR_STREAM,
                           MONGOC_ERROR_STREAM_NAME_RESOLUTION,

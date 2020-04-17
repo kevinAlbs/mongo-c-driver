@@ -315,6 +315,9 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
          GOTO (srv_fail);
       }
 
+      /* Failure to find TXT records will not return an error (since it is only
+       * for options). But check anyway, in case _mongoc_client_get_rr failed
+       * for another reason. */
       if (!_mongoc_client_get_rr (
              service, MONGOC_RR_TXT, &rr_data, &topology->scanner->error)) {
          GOTO (srv_fail);
@@ -528,8 +531,7 @@ mongoc_topology_apply_scanned_srv_hosts (mongoc_uri_t *uri,
    mongoc_host_list_t *valid_hosts = NULL;
    bool had_valid_hosts = false;
 
-   /* rr_data.hosts is set to the hosts returned in the query.
-   * Validate that the hosts have a matching domain.
+   /* Validate that the hosts have a matching domain.
    * If validation fails, log it.
    * If no valid hosts remain, do not update the topology description.
    */

@@ -158,19 +158,20 @@ txt_callback (const char *service,
  * _mongoc_get_rr_dnsapi --
  *
  *       Fetch SRV or TXT resource records using the Windows DNS API and
- *       update @uri.
+ *       put results in @rr_data.
  *
  * Returns:
  *       Success or failure.
  *
  *       For an SRV lookup, returns false if there is any error.
  *
- *       For TXT lookup, ignores any error fetching the resource record, but
- *       returns false if the resource record is found and there is an error
- *       reading its contents as URI options.
+ *       For TXT lookup, ignores any error fetching the resource record and
+ *       always returns true.
  *
  * Side effects:
  *       @error is set if there is a failure.
+ *       @rr_data->hosts may be set if querying SRV. Caller must destroy.
+ *       @rr_data->opts may be set if querying TXT. Caller must free.
  *
  *--------------------------------------------------------------------------
  */
@@ -385,19 +386,21 @@ done:
  *
  * _mongoc_get_rr_search --
  *
- *       Fetch SRV or TXT resource records using libresolv and update @uri.
+ *       Fetch SRV or TXT resource records using libresolv and put results in
+ *       @rr_data.
  *
  * Returns:
  *       Success or failure.
  *
  *       For an SRV lookup, returns false if there is any error.
  *
- *       For TXT lookup, ignores any error fetching the resource record, but
- *       returns false if the resource record is found and there is an error
- *       reading its contents as URI options.
+ *       For TXT lookup, ignores any error fetching the resource record and
+ *       always returns true.
  *
  * Side effects:
  *       @error is set if there is a failure.
+ *       @rr_data->hosts may be set if querying SRV. Caller must destroy.
+ *       @rr_data->opts may be set if querying TXT. Caller must free.
  *
  *--------------------------------------------------------------------------
  */
@@ -491,7 +494,7 @@ _mongoc_get_rr_search (const char *service,
                     strerror (h_errno));
       }
 
-      /* Skip records that don't match the ones we requested. CDRIVER-XYZW shows
+      /* Skip records that don't match the ones we requested. CDRIVER-3628 shows
        * that we can receive records that were not requested. */
       if (rr_type == MONGOC_RR_TXT) {
          if (ns_rr_type (resource_record) != ns_t_txt) {
@@ -553,14 +556,21 @@ done:
  *
  * _mongoc_client_get_rr --
  *
- *       Fetch an SRV or TXT resource record and update @uri. See RFCs 1464
- *       and 2782, and MongoDB's Initial DNS Seedlist Discovery Spec.
+ *       Fetch an SRV or TXT resource record and update put results in
+ *       @rr_data.
+ * 
+ *       See RFCs 1464 and 2782, MongoDB's "Initial DNS Seedlist Discovery"
+ *       spec, and MongoDB's "Polling SRV Records for Mongos Discovery"
+ *       spec.
  *
  * Returns:
  *       Success or failure.
  *
  * Side effects:
- *       @error is set if there is a failure.
+ *       @error is set if there is a failure. Errors fetching TXT are
+ *       ignored.
+ *       @rr_data->hosts may be set if querying SRV. Caller must destroy.
+ *       @rr_data->opts may be set if querying TXT. Caller must free.
  *
  *--------------------------------------------------------------------------
  */
