@@ -134,7 +134,10 @@ valid_hostname (const char *s)
 }
 
 
-bool mongoc_uri_validate_srv_result (const mongoc_uri_t *uri, const char *host, bson_error_t *error)
+bool
+mongoc_uri_validate_srv_result (const mongoc_uri_t *uri,
+                                const char *host,
+                                bson_error_t *error)
 {
    const char *service;
    const char *service_root;
@@ -163,14 +166,14 @@ bool mongoc_uri_validate_srv_result (const mongoc_uri_t *uri, const char *host, 
    return true;
 }
 
-/* upsert @host into @uri's host list. Side effect: modifies host->next when
- * inserting. */
+/* copy and upsert @host into @uri's host list. */
 static bool
 _upsert_into_host_list (mongoc_uri_t *uri,
                         mongoc_host_list_t *host,
                         bson_error_t *error)
 {
-   if (uri->is_srv && !mongoc_uri_validate_srv_result (uri, host->host, error)) {
+   if (uri->is_srv &&
+       !mongoc_uri_validate_srv_result (uri, host->host, error)) {
       return false;
    }
 
@@ -1431,7 +1434,6 @@ mongoc_uri_finalize_directconnection (mongoc_uri_t *uri, bson_error_t *error)
    }
 
    return true;
-
 }
 
 static bool

@@ -155,7 +155,7 @@ main (int argc, char *argv[])
       sleep (1);
 
       bson_mutex_lock (&client->topology->mutex);
-      _host_list_dump (client->topology->srv_uri->hosts);
+      //_host_list_dump (client->topology->srv_uri->hosts);
       _topology_description_dump (&client->topology->description);
       bson_mutex_unlock (&client->topology->mutex);
 

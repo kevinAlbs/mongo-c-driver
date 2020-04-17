@@ -75,22 +75,20 @@ _mongoc_host_list_find_host_and_port (mongoc_host_list_t *hosts,
  *
  * _mongoc_host_list_upsert --
  *
- *       If new_host is not already in list, add it to the end of list.
+ *       If new_host is not already in list, copy and add it to the end of list.
  *       If *list == NULL, then it will be set to a new host.
  *
  * Returns:
  *       Nothing.
  *
- * Side effects:
- *       Modifies new_host->next when inserting.
- *
  *--------------------------------------------------------------------------
  */
 void
 _mongoc_host_list_upsert (mongoc_host_list_t **list,
-                          mongoc_host_list_t *new_host)
+                          const mongoc_host_list_t *new_host)
 {
    mongoc_host_list_t *link = NULL;
+   mongoc_host_list_t *next_link = NULL;
 
    BSON_ASSERT (list);
    if (!new_host) {
@@ -104,10 +102,11 @@ _mongoc_host_list_upsert (mongoc_host_list_t **list,
       LL_APPEND (*list, link);
    } else {
       /* Make sure linking is preserved when copying data into final. */
-      new_host->next = link->next;
+      next_link = link->next;
    }
 
    memcpy (link, new_host, sizeof (mongoc_host_list_t));
+   link->next = next_link;
 }
 
 

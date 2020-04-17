@@ -32,7 +32,7 @@ _mongoc_host_list_push (const char *host,
 
 void
 _mongoc_host_list_upsert (mongoc_host_list_t **list,
-                          mongoc_host_list_t *new_host);
+                          const mongoc_host_list_t *new_host);
 
 mongoc_host_list_t *
 _mongoc_host_list_copy_all (const mongoc_host_list_t *src);

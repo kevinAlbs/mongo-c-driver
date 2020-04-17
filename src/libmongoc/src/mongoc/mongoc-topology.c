@@ -517,6 +517,46 @@ _mongoc_topology_clear_session_pool (mongoc_topology_t *topology)
    topology->session_pool = NULL;
 }
 
+/* Exposed for unit testing. Returns false if no valid hosts existed. */
+bool
+mongoc_topology_apply_scanned_srv_hosts (mongoc_uri_t *uri,
+                                         mongoc_topology_description_t *td,
+                                         mongoc_host_list_t *hosts,
+                                         bson_error_t *error)
+{
+   mongoc_host_list_t *host;
+   mongoc_host_list_t *valid_hosts = NULL;
+   bool had_valid_hosts = false;
+
+   /* rr_data.hosts is set to the hosts returned in the query.
+   * Validate that the hosts have a matching domain. If validation fails, log
+   * it.
+   * If no valid hosts remain, do not update the topology description.
+   */
+   for (host = hosts; host; host = host->next) {
+      if (mongoc_uri_validate_srv_result (uri, host->host, error)) {
+         _mongoc_host_list_upsert (&valid_hosts, host);
+      } else {
+         MONGOC_ERROR ("Invalid host returned by SRV: %s", host->host_and_port);
+         /* Continue on, there may still be valid hosts returned. */
+      }
+   }
+
+   if (valid_hosts) {
+      /* Reconcile with the topology description. Newly found servers will start
+       * getting monitored and are eligible to be used by clients. */
+      mongoc_topology_description_reconcile (td, valid_hosts);
+      had_valid_hosts = true;
+   } else {
+      bson_set_error (error,
+                      MONGOC_ERROR_STREAM,
+                      MONGOC_ERROR_STREAM_NAME_RESOLUTION,
+                      "SRV response did not contain any valid hosts");
+   }
+
+   _mongoc_host_list_destroy_all (valid_hosts);
+   return had_valid_hosts;
+}
 
 /*
  *--------------------------------------------------------------------------
@@ -536,8 +576,6 @@ mongoc_topology_rescan_srv (mongoc_topology_t *topology)
    const char *service;
    char *prefixed_service = NULL;
    int64_t scan_time;
-   mongoc_host_list_t *valid_hosts = NULL;
-   mongoc_host_list_t *host;
 
    if ((topology->description.type != MONGOC_TOPOLOGY_SHARDED) &&
        (topology->description.type != MONGOC_TOPOLOGY_UNKNOWN)) {
@@ -573,22 +611,13 @@ mongoc_topology_rescan_srv (mongoc_topology_t *topology)
    topology->rescanSRVIntervalMS = BSON_MAX (
       rr_data.min_ttl * 1000, MONGOC_TOPOLOGY_MIN_RESCAN_SRV_INTERVAL_MS);
 
-   /* rr_data.hosts is set to the hosts returned in the query.
-    * Validate that the hosts have a matching domain. If validation fails, log it.
-    * If no valid hosts remain, do not update the topology description.
-    */
-   for (host = rr_data.hosts; host; host = host->next) {
-      if (mongoc_uri_validate_srv_result (topology->uri, host->host, &topology->scanner->error)) {
-         _mongoc_host_list_upsert (&valid_hosts, host);
-      } else {
-         MONGOC_ERROR ("Invalid host returned by SRV: %s", host->host_and_port);
-         /* Continue on, there may still be valid hosts returned. */
-      }
-   }
-   
-   if (!valid_hosts) {
-      MONGOC_ERROR ("SRV polling found no valid results");
-      /* Special case when DNS returns zero records successfully or no valid hosts exist.
+   if (!mongoc_topology_apply_scanned_srv_hosts (topology->uri,
+                                                 &topology->description,
+                                                 rr_data.hosts,
+                                                 &topology->scanner->error)) {
+      MONGOC_ERROR ("%s", topology->scanner->error.message);
+      /* Special case when DNS returns zero records successfully or no valid
+       * hosts exist.
        * Leave the toplogy alone and perform another scan at the next interval
        * rather than removing all records and having nothing to connect to.
        * For no verified hosts drivers "MUST temporarily set rescanSRVIntervalMS
@@ -599,13 +628,9 @@ mongoc_topology_rescan_srv (mongoc_topology_t *topology)
       GOTO (done);
    }
 
-   /* Reconcile with the topology description. Newly found servers will start getting monitored and are eligible to be used by clients. */
-   mongoc_topology_description_reconcile (&topology->description, (mongoc_host_list_t *) mongoc_uri_get_hosts (topology->uri));
-
 done:
    bson_free (prefixed_service);
    _mongoc_host_list_destroy_all (rr_data.hosts);
-   _mongoc_host_list_destroy_all (valid_hosts);
 }
 
 
