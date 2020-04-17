@@ -3046,12 +3046,9 @@ mongoc_uri_init_with_srv_host_list (mongoc_uri_t *uri,
                                     bson_error_t *error)
 {
    mongoc_host_list_t *host;
-   bool ret;
 
    BSON_ASSERT (uri->is_srv);
    BSON_ASSERT (!uri->hosts);
-
-   ret = false;
 
    for (host = host_list; host; host = host->next) {
       if (!mongoc_uri_upsert_host_and_port (uri, host->host_and_port, error)) {

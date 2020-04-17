@@ -517,7 +517,7 @@ _mongoc_topology_clear_session_pool (mongoc_topology_t *topology)
    topology->session_pool = NULL;
 }
 
-/* Exposed for unit testing. Returns false if no valid hosts existed. */
+/* Returns false if none of the hosts were valid. */
 bool
 mongoc_topology_apply_scanned_srv_hosts (mongoc_uri_t *uri,
                                          mongoc_topology_description_t *td,
@@ -529,8 +529,8 @@ mongoc_topology_apply_scanned_srv_hosts (mongoc_uri_t *uri,
    bool had_valid_hosts = false;
 
    /* rr_data.hosts is set to the hosts returned in the query.
-   * Validate that the hosts have a matching domain. If validation fails, log
-   * it.
+   * Validate that the hosts have a matching domain.
+   * If validation fails, log it.
    * If no valid hosts remain, do not update the topology description.
    */
    for (host = hosts; host; host = host->next) {
