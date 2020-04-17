@@ -134,8 +134,7 @@ valid_hostname (const char *s)
 }
 
 
-static bool
-validate_srv_result (mongoc_uri_t *uri, const char *host, bson_error_t *error)
+bool mongoc_uri_validate_srv_result (const mongoc_uri_t *uri, const char *host, bson_error_t *error)
 {
    const char *service;
    const char *service_root;
@@ -171,7 +170,7 @@ _upsert_into_host_list (mongoc_uri_t *uri,
                         mongoc_host_list_t *host,
                         bson_error_t *error)
 {
-   if (uri->is_srv && !validate_srv_result (uri, host->host, error)) {
+   if (uri->is_srv && !mongoc_uri_validate_srv_result (uri, host->host, error)) {
       return false;
    }
 
@@ -1432,6 +1431,7 @@ mongoc_uri_finalize_directconnection (mongoc_uri_t *uri, bson_error_t *error)
    }
 
    return true;
+
 }
 
 static bool
@@ -3039,31 +3039,23 @@ _mongoc_uri_copy_and_replace_host_list (const mongoc_uri_t *original,
 }
 
 bool
-mongoc_uri_reconcile_with_srv_host_list (mongoc_uri_t *uri,
-                                         mongoc_host_list_t *host_list,
-                                         bson_error_t *error)
+mongoc_uri_init_with_srv_host_list (mongoc_uri_t *uri,
+                                    mongoc_host_list_t *host_list,
+                                    bson_error_t *error)
 {
    mongoc_host_list_t *host;
-   mongoc_host_list_t *extraneous;
    bool ret;
 
+   BSON_ASSERT (uri->is_srv);
+   BSON_ASSERT (!uri->hosts);
+
    ret = false;
-   extraneous = _mongoc_host_list_copy_all (uri->hosts);
 
    for (host = host_list; host; host = host->next) {
       if (!mongoc_uri_upsert_host_and_port (uri, host->host_and_port, error)) {
-         goto done;
+         return false;
       }
-      _mongoc_host_list_remove_host (&extraneous, host->host, host->port);
    }
 
-   /* Remove hosts in the URI that were not returned in SRV results. */
-   for (host = extraneous; host; host = host->next) {
-      mongoc_uri_remove_host (uri, host->host, host->port);
-   }
-
-   ret = true;
-done:
-   _mongoc_host_list_destroy_all (extraneous);
-   return ret;
+   return true;
 }

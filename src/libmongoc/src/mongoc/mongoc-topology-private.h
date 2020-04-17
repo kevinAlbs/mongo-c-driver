@@ -51,10 +51,6 @@ typedef struct _mongoc_topology_t {
    /* This URI is constant after initial seedlist discovery. It is shared with
     * the topology scanner and copied in pooled clients. */
    mongoc_uri_t *uri;
-
-   /* This URI is updated with SRV polling to ensure the hosts are valid. It is
-    * not shared. */
-   mongoc_uri_t *srv_uri;
    mongoc_topology_scanner_t *scanner;
    bool server_selection_try_once;
 

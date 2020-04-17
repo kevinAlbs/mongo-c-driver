@@ -329,7 +329,7 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
          GOTO (srv_fail);
       }
 
-      if (!mongoc_uri_reconcile_with_srv_host_list (
+      if (!mongoc_uri_init_with_srv_host_list (
              topology->uri, rr_data.hosts, &topology->scanner->error)) {
          GOTO (srv_fail);
       }
@@ -400,10 +400,6 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
       mongoc_topology_scanner_add (topology->scanner, hl, id);
 
       hl = hl->next;
-   }
-
-   if (service) {
-      topology->srv_uri = mongoc_uri_copy (topology->uri);
    }
 
    return topology;
@@ -540,6 +536,8 @@ mongoc_topology_rescan_srv (mongoc_topology_t *topology)
    const char *service;
    char *prefixed_service = NULL;
    int64_t scan_time;
+   mongoc_host_list_t *valid_hosts = NULL;
+   mongoc_host_list_t *host;
 
    if ((topology->description.type != MONGOC_TOPOLOGY_SHARDED) &&
        (topology->description.type != MONGOC_TOPOLOGY_UNKNOWN)) {
@@ -575,8 +573,22 @@ mongoc_topology_rescan_srv (mongoc_topology_t *topology)
    topology->rescanSRVIntervalMS = BSON_MAX (
       rr_data.min_ttl * 1000, MONGOC_TOPOLOGY_MIN_RESCAN_SRV_INTERVAL_MS);
 
-   if (rr_data.count == 0) {
-      /* Special case when DNS returns zero records successfully.
+   /* rr_data.hosts is set to the hosts returned in the query.
+    * Validate that the hosts have a matching domain. If validation fails, log it.
+    * If no valid hosts remain, do not update the topology description.
+    */
+   for (host = rr_data.hosts; host; host = host->next) {
+      if (mongoc_uri_validate_srv_result (topology->uri, host->host, &topology->scanner->error)) {
+         _mongoc_host_list_upsert (&valid_hosts, host);
+      } else {
+         MONGOC_ERROR ("Invalid host returned by SRV: %s", host->host_and_port);
+         /* Continue on, there may still be valid hosts returned. */
+      }
+   }
+   
+   if (!valid_hosts) {
+      MONGOC_ERROR ("SRV polling found no valid results");
+      /* Special case when DNS returns zero records successfully or no valid hosts exist.
        * Leave the toplogy alone and perform another scan at the next interval
        * rather than removing all records and having nothing to connect to.
        * For no verified hosts drivers "MUST temporarily set rescanSRVIntervalMS
@@ -587,21 +599,13 @@ mongoc_topology_rescan_srv (mongoc_topology_t *topology)
       GOTO (done);
    }
 
-   /* rr_data.hosts is set to the hosts returned in the query.
-    * Reconcile with the topology URI for validation.
-    * Reconcile with the topology description to add to monitoring. */
-   if (!mongoc_uri_reconcile_with_srv_host_list (
-          topology->srv_uri, rr_data.hosts, &topology->scanner->error)) {
-      MONGOC_ERROR ("SRV polling error: %s", topology->scanner->error.message);
-      GOTO (done);
-   }
-   mongoc_topology_description_reconcile (
-      &topology->description,
-      (mongoc_host_list_t *) mongoc_uri_get_hosts (topology->uri));
+   /* Reconcile with the topology description. Newly found servers will start getting monitored and are eligible to be used by clients. */
+   mongoc_topology_description_reconcile (&topology->description, (mongoc_host_list_t *) mongoc_uri_get_hosts (topology->uri));
 
 done:
    bson_free (prefixed_service);
    _mongoc_host_list_destroy_all (rr_data.hosts);
+   _mongoc_host_list_destroy_all (valid_hosts);
 }
 
 
