@@ -3,7 +3,9 @@
 #include "mongoc-util-private.h"
 #include "mongoc-client-private.h"
 #include "mongoc-stream-private.h"
+#ifdef MONGOC_ENABLE_SSL
 #include "mongoc-ssl-private.h"
+#endif
 #include "mongoc-topology-background-monitor-private.h"
 
 #undef MONGOC_LOG_DOMAIN
@@ -45,7 +47,9 @@ typedef struct {
     * could be passed to both topology scanner and topology monitor on startup.
     */
    bool use_tls;
+#ifdef MONGOC_ENABLE_SSL
    mongoc_ssl_opt_t *ssl_opts;
+#endif
    mongoc_uri_t *uri;
    mongoc_apm_callbacks_t apm_callbacks;
    void *apm_context;
@@ -280,8 +284,6 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
    bson_init (&reply);
    rtt_us = 0;
    for (attempts = 0; attempts < 2; attempts++) {
-      bool needs_handshake;
-
       if (attempts == 1) {
          mongoc_server_description_t *existing_sd;
          bool should_retry;
@@ -322,10 +324,8 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
 
       bson_reinit (&cmd);
       BCON_APPEND (&cmd, "isMaster", BCON_INT32 (1));
-      needs_handshake = false;
 
       if (!server_monitor->stream) {
-         needs_handshake = true;
          bson_destroy (&cmd);
          bson_mutex_lock (&server_monitor->topology->mutex);
          bson_copy_to (_mongoc_topology_scanner_get_ismaster (
@@ -342,9 +342,14 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
                                           server_monitor->initiator_context,
                                           &error);
          } else {
+            void *ssl_opts_void = NULL;
+
+#ifdef MONGOC_ENABLE_SSL
+            ssl_opts_void = server_monitor->ssl_opts;
+#endif
             MONGOC_DEBUG ("sm NOT using custom initiator");
             server_monitor->stream =
-               mongoc_client_connect (server_monitor->ssl_opts,
+               mongoc_client_connect (ssl_opts_void,
                                       server_monitor->uri,
                                       &server_monitor->host,
                                       &error);
@@ -386,6 +391,7 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
          _server_monitor_heartbeat_succeeded (server_monitor, &reply, rtt_us);
          break;
       } else {
+         MONGOC_DEBUG ("ismaster failed, closing and null'ing stream");
          mongoc_stream_destroy (server_monitor->stream);
          server_monitor->stream = NULL;
          _server_monitor_heartbeat_failed (server_monitor, &error, rtt_us);
@@ -426,33 +432,34 @@ _server_monitor_run (void *server_monitor_void)
          server_monitor->last_scan_ms = bson_get_monotonic_time () / 1000;
          server_monitor->scan_due_ms = server_monitor->last_scan_ms +
                                        server_monitor->heartbeat_frequency_ms;
-         MONGOC_DEBUG ("sm (%d) last scan: %llu",
-                       server_monitor->server_id,
-                       server_monitor->last_scan_ms);
-         MONGOC_DEBUG ("sm (%d) scan due: %llu",
-                       server_monitor->server_id,
-                       server_monitor->scan_due_ms);
+         MONGOC_DEBUG ("sm (%d) last scan: %d",
+                       (int) server_monitor->server_id,
+                       (int) server_monitor->last_scan_ms);
+         MONGOC_DEBUG ("sm (%d) scan due: %d",
+                       (int) server_monitor->server_id,
+                       (int) server_monitor->scan_due_ms);
       }
 
       /* Check shared state. */
       bson_mutex_lock (&server_monitor->shared.mutex);
-      if (server_monitor->shared.scan_requested) {
-         MONGOC_DEBUG ("sm (%d) scan requested", server_monitor->server_id);
-         MONGOC_DEBUG ("sm (%d) last scan: %llu",
-                       server_monitor->server_id,
-                       server_monitor->last_scan_ms);
-         MONGOC_DEBUG ("sm (%d) scan due: %llu",
-                       server_monitor->server_id,
-                       server_monitor->scan_due_ms);
-         server_monitor->scan_due_ms =
-            server_monitor->last_scan_ms +
-            server_monitor->min_heartbeat_frequency_ms;
-      }
       if (server_monitor->shared.shutting_down) {
          MONGOC_DEBUG ("sm (%d) shutting down", server_monitor->server_id);
          server_monitor->shared.is_shutdown = true;
          bson_mutex_unlock (&server_monitor->shared.mutex);
          break;
+      }
+
+      if (server_monitor->shared.scan_requested) {
+         MONGOC_DEBUG ("sm (%d) scan requested", server_monitor->server_id);
+         MONGOC_DEBUG ("sm (%d) last scan: %d",
+                       (int) server_monitor->server_id,
+                       (int) server_monitor->last_scan_ms);
+         MONGOC_DEBUG ("sm (%d) scan due: %d",
+                       (int) server_monitor->server_id,
+                       (int) server_monitor->scan_due_ms);
+         server_monitor->scan_due_ms =
+            server_monitor->last_scan_ms +
+            server_monitor->min_heartbeat_frequency_ms;
       }
 
       MONGOC_DEBUG (
@@ -480,10 +487,12 @@ _server_monitor_destroy (mongoc_server_monitor_t *server_monitor)
    mongoc_uri_destroy (server_monitor->uri);
    mongoc_cond_destroy (&server_monitor->shared.cond);
    bson_mutex_destroy (&server_monitor->shared.mutex);
+#ifdef MONGOC_ENABLE_SSL
    if (server_monitor->ssl_opts) {
       _mongoc_ssl_opts_cleanup (server_monitor->ssl_opts, true);
       bson_free (server_monitor->ssl_opts);
    }
+#endif
    bson_free (server_monitor);
 }
 
@@ -620,164 +629,6 @@ _background_monitor_reconcile_server_monitor (
 
    LOGEXIT;
 }
-
-/* Called only from background monitor thread.
- * Caller must not hold locks.
- * Locks topology->mutex when creating server monitors to fetch fields.
- * Locks server_monitor->mutex when shutting down a server monitor.
- */
-// static void
-// _background_monitor_sync_server_monitors (
-//    mongoc_background_monitor_t *background_monitor,
-//    const mongoc_topology_description_t *td,
-//    bool scan_requested)
-// {
-//    mongoc_set_t *server_descriptions;
-//    mongoc_set_t *server_monitors;
-//    int i;
-
-//    server_descriptions = td->servers;
-//    server_monitors = background_monitor->server_monitors;
-
-//    /* Add newly discovered server monitors, and update existing ones. */
-//    for (i = 0; i < server_descriptions->items_len; i++) {
-//       mongoc_server_description_t *sd;
-
-//       sd = mongoc_set_get_item (server_descriptions, i);
-//       _background_monitor_sync_one_server_monitor (
-//          background_monitor, sd, scan_requested);
-//    }
-
-//    /* Remove server monitors that scanning servers no longer in the topology
-//     * description. */
-//    for (i = 0; i < server_monitors->items_len; i++) {
-//       mongoc_server_monitor_t *server_monitor;
-//       uint32_t id;
-
-//       server_monitor = mongoc_set_get_item_and_id (server_monitors, i, &id);
-//       if (!mongoc_set_get (server_descriptions, id)) {
-//          _server_monitor_shutdown (server_monitor);
-//          mongoc_set_rm (server_monitors, id);
-//       }
-//    }
-// }
-
-/* The background monitor thread.
- *
- * Runs continuously. Manages a server moniter per server in the topology
- * description and synchronizes it with the shared topology description.
- * Checks for changes of shared state:
- * - the topology description
- * - a request for immediate scan
- * - or a request for shutdown
- *
- * Shared state for the monitoring thread is protected with topology->mutex.
- *
- */
-// void *
-// mongoc_topology_background_monitor_run (void *topology_void)
-// {
-//    /* When a change of shared state is detected, the state is copied. This
-//     * permits taking a short lock on the topology mutex. Since application
-//     * threads lock the topology mutex (to inspect the topology description on
-//     * server selection) this avoids contention with application threads. */
-//    mongoc_topology_t *topology;
-//    mongoc_topology_scanner_state_t copied_scanner_state;
-//    mongoc_topology_description_t copied_topology_description;
-//    bool copied_scan_requested;
-//    int64_t copied_topology_description_counter;
-//    mongoc_background_monitor_t *background_monitor;
-//    mongoc_set_t *server_monitors;
-
-//    topology = topology_void;
-//    copied_scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;
-//    mongoc_topology_description_init (&copied_topology_description, 0);
-//    copied_topology_description_counter = 0;
-
-//    background_monitor = bson_malloc0 (sizeof (mongoc_background_monitor_t));
-//    background_monitor->topology = topology;
-//    server_monitors = mongoc_set_new (1, NULL, NULL);
-//    background_monitor->server_monitors = server_monitors;
-//    topology->background_monitor = background_monitor;
-
-//    while (true) {
-//       bool state_changed;
-
-//       state_changed = false;
-//       copied_scan_requested = false;
-
-//       /* Wait until some shared state changes that we care about.
-//        * - Topology change (via scanning, handshake, or SRV polling)
-//        * - A scan is requested.
-//        * - The monitoring thread is being shutdown.
-//        */
-//       bson_mutex_lock (&topology->mutex);
-
-//       while (!state_changed) {
-//          state_changed = false;
-//          if (copied_scanner_state != topology->scanner_state) {
-//             MONGOC_DEBUG ("bm detected change in topology->scanner_state");
-//             state_changed = true;
-//             copied_scanner_state = topology->scanner_state;
-//          }
-
-//          if (copied_topology_description_counter !=
-//              topology->description.counter) {
-//             state_changed = true;
-//             MONGOC_DEBUG ("bm detected change in topology description");
-//             mongoc_topology_description_destroy
-//             (&copied_topology_description);
-//             _mongoc_topology_description_copy_to (&topology->description,
-//                                                   &copied_topology_description);
-//             copied_topology_description_counter =
-//             topology->description.counter;
-//          }
-
-//          if (copied_scan_requested != topology->scan_requested) {
-//             state_changed = true;
-//             copied_scan_requested = topology->scan_requested;
-//             topology->scan_requested = false;
-//             MONGOC_DEBUG ("bm detected a scan request");
-//          }
-
-//          if (!state_changed) {
-//             /* No shared state has changed. Sleep. */
-//             MONGOC_DEBUG ("bm about to sleep");
-//             mongoc_cond_wait (&topology->cond_server, &topology->mutex);
-//             MONGOC_DEBUG ("bm woken up");
-//          }
-//       }
-
-//       bson_mutex_unlock (&topology->mutex);
-
-//       if (copied_scanner_state == MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
-//          mongoc_server_monitor_t *server_monitor;
-//          int i;
-
-//          MONGOC_DEBUG ("bm shutting down");
-//          for (i = 0; i < server_monitors->items_len; i++) {
-//             server_monitor = server_monitors->items[i].item;
-//             /* A server monitor may need the topology lock before it finishes
-//              * shutting down. Spin lock until it is shut down. */
-//             _server_monitor_shutdown (server_monitor);
-//          }
-//          break;
-//       }
-
-//       /* Sync up state between topology description and server monitors. */
-//       _background_monitor_sync_server_monitors (background_monitor,
-//                                                 &copied_topology_description,
-//                                                 copied_scan_requested);
-//       copied_scan_requested = false;
-//    }
-
-//    MONGOC_DEBUG ("bm shutdown complete");
-//    mongoc_topology_description_destroy (&copied_topology_description);
-//    mongoc_set_destroy (server_monitors);
-//    bson_free (background_monitor);
-//    return NULL;
-// }
-
 
 /* Called from application threads
  * Caller must hold topology lock.
@@ -924,6 +775,7 @@ mongoc_topology_background_monitor_reconcile (
    for (i = 0; i < n_server_monitor_ids_to_remove; i++) {
       mongoc_set_rm (server_monitors, server_monitor_ids_to_remove[i]);
    }
+   bson_free (server_monitor_ids_to_remove);
 }
 
 /* Request all server monitors to scan.
@@ -935,13 +787,11 @@ void
 mongoc_topology_background_monitor_request_scan (
    mongoc_background_monitor_t *background_monitor)
 {
-   mongoc_topology_t *topology;
    mongoc_set_t *server_monitors;
    int i;
 
    LOGENTER;
 
-   topology = background_monitor->topology;
    server_monitors = background_monitor->server_monitors;
 
    for (i = 0; i < server_monitors->items_len; i++) {

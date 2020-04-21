@@ -1853,7 +1853,7 @@ test_seed_list (bool rs, connection_option_t connection_option, bool pooled)
                                                      primary_pref,
                                                      &reply,
                                                      &error),
-                       error);
+                       error); /* this be the failure */
 
       bson_destroy (&reply);
 

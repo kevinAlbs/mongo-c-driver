@@ -735,20 +735,19 @@ mongoc_client_connect_unix (const mongoc_host_list_t *host, bson_error_t *error)
 }
 
 mongoc_stream_t *
-mongoc_client_connect (mongoc_ssl_opt_t *ssl_opts,
+mongoc_client_connect (void *ssl_opts_void,
                        const mongoc_uri_t *uri,
                        const mongoc_host_list_t *host,
                        bson_error_t *error)
 {
    mongoc_stream_t *base_stream = NULL;
    int32_t connecttimeoutms;
-   const char *mechanism;
    bool use_tls = false;
 
    BSON_ASSERT (uri);
    BSON_ASSERT (host);
 
-   if (ssl_opts || mongoc_uri_get_tls (uri)) {
+   if (ssl_opts_void || mongoc_uri_get_tls (uri)) {
 #ifndef MONGOC_ENABLE_SSL
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
@@ -784,6 +783,10 @@ mongoc_client_connect (mongoc_ssl_opt_t *ssl_opts,
 
 #ifdef MONGOC_ENABLE_SSL
    if (base_stream) {
+      mongoc_ssl_opt_t *ssl_opts;
+      const char *mechanism;
+
+      ssl_opts = (mongoc_ssl_opt_t *) ssl_opts_void;
       mechanism = mongoc_uri_get_auth_mechanism (uri);
 
       if (use_tls || (mechanism && (0 == strcmp (mechanism, "MONGODB-X509")))) {
@@ -839,16 +842,16 @@ mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
                                         void *user_data,
                                         bson_error_t *error)
 {
-   mongoc_ssl_opt_t *ssl_opts = NULL;
+   void *ssl_opts_void = NULL;
+#ifdef MONGOC_ENABLE_SSL
    mongoc_client_t *client = (mongoc_client_t *) user_data;
 
-#ifdef MONGOC_ENABLE_SSL
    if (client->use_ssl) {
-      ssl_opts = &client->ssl_opts;
+      ssl_opts_void = (void *) &client->ssl_opts;
    }
 #endif
 
-   return mongoc_client_connect (ssl_opts, uri, host, error);
+   return mongoc_client_connect (ssl_opts_void, uri, host, error);
 }
 
 

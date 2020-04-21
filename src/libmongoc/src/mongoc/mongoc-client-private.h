@@ -233,7 +233,7 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
                            bson_error_t *error);
 
 mongoc_stream_t *
-mongoc_client_connect (mongoc_ssl_opt_t *ssl_opts,
+mongoc_client_connect (void *ssl_opts_void,
                        const mongoc_uri_t *uri,
                        const mongoc_host_list_t *host,
                        bson_error_t *error);
