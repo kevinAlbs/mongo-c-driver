@@ -9,8 +9,6 @@
 #include "mock_server/future-functions.h"
 #include "mongoc/mongoc-errno-private.h"
 #include "test-libmongoc.h"
-#include "mongoc/mongoc-host-list-private.h"
-#include "test-conveniences.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "async-test"
@@ -364,97 +362,6 @@ test_ismaster_delay ()
    mock_server_destroy (server);
 }
 
-static void
-get_topology_version (bson_t *topology_version)
-{
-   mongoc_client_t *client;
-   bson_error_t error;
-   bool ret;
-   bson_t reply;
-   bson_t tmp;
-
-   client = test_framework_client_new ();
-   ret = mongoc_client_command_simple (
-      client, "admin", tmp_bson ("{'ismaster': 1}"), NULL, &reply, &error);
-   ASSERT_OR_PRINT (ret, error);
-   bson_lookup_doc (&reply, "topologyVersion", &tmp);
-   bson_copy_to (&tmp, topology_version);
-   mongoc_client_destroy (client);
-   bson_destroy (&reply);
-}
-
-static void
-_reply_cb (mongoc_async_cmd_t *acmd,
-           mongoc_async_cmd_result_t result,
-           const bson_t *ismaster_reply,
-           int64_t duration_usec)
-{
-   char *ismaster_reply_str;
-
-   MONGOC_DEBUG ("_reply_cb: %d", (int) result);
-
-   if (result == MONGOC_ASYNC_CMD_SUCCESS) {
-      ismaster_reply_str = bson_as_json (ismaster_reply, NULL);
-      MONGOC_DEBUG ("_reply_cb: %s", ismaster_reply_str);
-      bson_free (ismaster_reply_str);
-   }
-}
-
-/* Test interruptibility:
- * - an async loop polling on I/O can be interrupted.
- * - an async loop "sleeping" when there is no I/O waiting can be interrupted.
- */
-
-
-static void
-test_async_awaitable_ismaster (void *unused)
-{
-   /* Test that streaming ismaster can be read.
-    * - test both one and two replies queued up
-    */
-   mongoc_stream_t *stream;
-   mongoc_host_list_t host;
-   bson_error_t error;
-   mongoc_async_t *loop;
-   bson_t ismaster_cmd = BSON_INITIALIZER;
-   bson_t topology_version;
-   int64_t start, finish;
-
-   _mongoc_host_list_from_string (&host, test_framework_get_host_and_port ());
-   stream = mongoc_client_connect_tcp (1000, &host, &error);
-   ASSERT_OR_PRINT (stream, error);
-
-   get_topology_version (&topology_version);
-   BCON_APPEND (&ismaster_cmd,
-                "ismaster",
-                BCON_INT32 (1),
-                "topologyVersion",
-                BCON_DOCUMENT (&topology_version),
-                "maxAwaitTimeMS",
-                BCON_INT32 (1000));
-
-   loop = mongoc_async_new ();
-   mongoc_async_cmd_new (loop,
-                         stream,
-                         true,
-                         NULL,
-                         NULL,
-                         0,
-                         NULL,
-                         NULL,
-                         "admin",
-                         &ismaster_cmd,
-                         _reply_cb,
-                         NULL,
-                         30000);
-   start = bson_get_monotonic_time ();
-   mongoc_async_run (loop);
-   finish = bson_get_monotonic_time ();
-   MONGOC_DEBUG ("duration: %d", (int) (finish - start));
-   BSON_ASSERT (finish - start > 1000 * 1000);
-   BSON_ASSERT (finish - start < 10000 * 1000);
-}
-
 void
 test_async_install (TestSuite *suite)
 {
@@ -474,11 +381,4 @@ test_async_install (TestSuite *suite)
                       test_framework_skip_if_windows);
 #endif
    TestSuite_AddMockServerTest (suite, "/Async/delay", test_ismaster_delay);
-
-   TestSuite_AddFull (suite,
-                      "/Async/awaitable_ismaster",
-                      test_async_awaitable_ismaster,
-                      NULL,
-                      NULL,
-                      test_framework_skip_if_max_wire_version_less_than_9);
 }

@@ -756,7 +756,6 @@ mongoc_client_connect (mongoc_ssl_opt_t *ssl_opts,
                       "TLS is not enabled in this build of mongo-c-driver.");
       return NULL;
 #endif
-      MONGOC_DEBUG ("we're going to use TLS");
       use_tls = true;
    }
 

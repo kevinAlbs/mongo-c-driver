@@ -59,7 +59,6 @@ struct _mongoc_topology_description_t {
 
    mongoc_apm_callbacks_t apm_callbacks;
    void *apm_context;
-   int64_t counter;
 };
 
 typedef enum { MONGOC_SS_READ, MONGOC_SS_WRITE } mongoc_ss_optype_t;

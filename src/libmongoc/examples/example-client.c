@@ -10,7 +10,6 @@
 int
 main (int argc, char *argv[])
 {
-   mongoc_client_pool_t *pool;
    mongoc_client_t *client;
    mongoc_collection_t *collection;
    mongoc_cursor_t *cursor;
@@ -21,7 +20,6 @@ main (int argc, char *argv[])
    char *str;
    const char *uri_string = "mongodb://127.0.0.1/?appname=client-example";
    mongoc_uri_t *uri;
-   int64_t start;
 
    mongoc_init ();
    if (argc > 1) {
@@ -42,45 +40,37 @@ main (int argc, char *argv[])
       return EXIT_FAILURE;
    }
 
-   pool = mongoc_client_pool_new (uri);
-   client = mongoc_client_pool_pop (pool);
+   client = mongoc_client_new_from_uri (uri);
    if (!client) {
       return EXIT_FAILURE;
    }
 
    mongoc_client_set_error_api (client, 2);
-   start = bson_get_monotonic_time ();
-   while (bson_get_monotonic_time () - start < 1000 * 1000 * 30) {
-      MONGOC_DEBUG ("example-client tick");
-      bson_init (&query);
-      collection =
-         mongoc_client_get_collection (client, "test", collection_name);
-      cursor = mongoc_collection_find_with_opts (
-         collection,
-         &query,
-         NULL,  /* additional options */
-         NULL); /* read prefs, NULL for default */
 
-      while (mongoc_cursor_next (cursor, &doc)) {
-         str = bson_as_canonical_extended_json (doc, NULL);
-         fprintf (stdout, "%s\n", str);
-         bson_free (str);
-      }
+   bson_init (&query);
+   collection = mongoc_client_get_collection (client, "test", collection_name);
+   cursor = mongoc_collection_find_with_opts (
+      collection,
+      &query,
+      NULL,  /* additional options */
+      NULL); /* read prefs, NULL for default */
 
-      if (mongoc_cursor_error (cursor, &error)) {
-         fprintf (stderr, "Cursor Failure: %s\n", error.message);
-         return EXIT_FAILURE;
-      }
-
-      bson_destroy (&query);
-      mongoc_cursor_destroy (cursor);
-      mongoc_collection_destroy (collection);
-      sleep (1);
+   while (mongoc_cursor_next (cursor, &doc)) {
+      str = bson_as_canonical_extended_json (doc, NULL);
+      fprintf (stdout, "%s\n", str);
+      bson_free (str);
    }
 
+   if (mongoc_cursor_error (cursor, &error)) {
+      fprintf (stderr, "Cursor Failure: %s\n", error.message);
+      return EXIT_FAILURE;
+   }
+
+   bson_destroy (&query);
+   mongoc_cursor_destroy (cursor);
+   mongoc_collection_destroy (collection);
    mongoc_uri_destroy (uri);
-   mongoc_client_pool_push (pool, client);
-   mongoc_client_pool_destroy (pool);
+   mongoc_client_destroy (client);
    mongoc_cleanup ();
 
    return EXIT_SUCCESS;

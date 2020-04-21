@@ -22,23 +22,31 @@
 
 struct _mongoc_background_monitor_t;
 
-struct _mongoc_background_monitor_t * mongoc_topology_background_monitor_new (mongoc_topology_t *topology);
+struct _mongoc_background_monitor_t *
+mongoc_topology_background_monitor_new (mongoc_topology_t *topology);
 
 /* Topology has changed. */
 void
-mongoc_topology_background_monitor_reconcile (struct _mongoc_background_monitor_t *background_monitor);
+mongoc_topology_background_monitor_reconcile (
+   struct _mongoc_background_monitor_t *background_monitor);
 
 /* Server selection or something else needs immediate scan. */
 void
-mongoc_topology_background_monitor_request_scan (struct _mongoc_background_monitor_t *background_monitor);
+mongoc_topology_background_monitor_request_scan (
+   struct _mongoc_background_monitor_t *background_monitor);
 
 /* Grab all errors from the topology description. */
 void
-mongoc_topology_background_monitor_collect_errors (struct _mongoc_background_monitor_t *background_monitor, bson_error_t *error);
+mongoc_topology_background_monitor_collect_errors (
+   struct _mongoc_background_monitor_t *background_monitor,
+   bson_error_t *error);
 
 void
-mongoc_topology_background_monitor_shutdown (struct _mongoc_background_monitor_t *background_monitor);
+mongoc_topology_background_monitor_shutdown (
+   struct _mongoc_background_monitor_t *background_monitor);
 
-void mongoc_topology_background_monitor_destroy (struct _mongoc_background_monitor_t *background_monitor);
+void
+mongoc_topology_background_monitor_destroy (
+   struct _mongoc_background_monitor_t *background_monitor);
 
 #endif

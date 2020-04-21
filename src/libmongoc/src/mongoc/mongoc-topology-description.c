@@ -90,7 +90,6 @@ mongoc_topology_description_init (mongoc_topology_description_t *description,
    description->rand_seed = (unsigned int) bson_get_monotonic_time ();
    bson_init (&description->cluster_time);
    description->session_timeout_minutes = MONGOC_NO_SESSIONS;
-   description->counter = 1;
 
    EXIT;
 }
@@ -157,8 +156,6 @@ _mongoc_topology_description_copy_to (const mongoc_topology_description_t *src,
    bson_copy_to (&src->cluster_time, &dst->cluster_time);
 
    dst->session_timeout_minutes = src->session_timeout_minutes;
-
-   dst->counter = src->counter;
 
    EXIT;
 }
@@ -1967,8 +1964,6 @@ mongoc_topology_description_handle_ismaster (
       prev_sd = mongoc_server_description_new_copy (sd);
    }
 
-   topology->counter++;
-
    /* pass the current error in */
    mongoc_server_description_handle_ismaster (
       sd, ismaster_response, rtt_msec, error);
@@ -1989,13 +1984,12 @@ mongoc_topology_description_handle_ismaster (
                     mongoc_topology_description_type (topology),
                     mongoc_server_description_type (sd));
       gSDAMTransitionTable[sd->type][topology->type](topology, sd);
+      mongoc_topology_description_dump (topology);
    } else {
       MONGOC_DEBUG ("No transition entry to %s for %s",
                     mongoc_topology_description_type (topology),
                     mongoc_server_description_type (sd));
    }
-
-   mongoc_topology_description_dump (topology);
 
    _mongoc_topology_description_update_session_timeout (topology);
 

@@ -104,6 +104,7 @@ case "$OS" in
 
       if [ "$VALGRIND" = "on" ]; then
          . $DIR/valgrind.sh
+         export MONGOC_TEST_SERVER_LOG=stdout
          run_valgrind ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS
       else
          ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS

@@ -833,13 +833,10 @@ _test_heartbeat_fails_dns (bool pooled)
       client, "admin", tmp_bson ("{'foo': 1}"), NULL, NULL, &error);
 
    ASSERT (!r);
-   if (!pooled) {
-      /* TODO: should pooled generate the same error? */
       ASSERT_ERROR_CONTAINS (error,
                              MONGOC_ERROR_SERVER_SELECTION,
                              MONGOC_ERROR_SERVER_SELECTION_FAILURE,
                              "Failed to resolve");
-   }
 
    duration = bson_get_monotonic_time () - start;
 

@@ -544,11 +544,6 @@ request_matches_msg (const request_t *request,
    bool is_command_doc;
    int i;
 
-   if (!request) {
-      if (n_docs > 0) {
-         printf ("%s", bson_as_json (docs[0], NULL));
-      }
-   }
    BSON_ASSERT (request);
    if (request->opcode != MONGOC_OPCODE_MSG) {
       test_error ("%s", "request's opcode does not match OP_MSG");

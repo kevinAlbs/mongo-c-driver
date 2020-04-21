@@ -1203,7 +1203,7 @@ static void
 check_started (const mongoc_apm_server_heartbeat_started_t *event)
 {
    checks_t *c;
-   const mongoc_host_list_t* host;
+   const mongoc_host_list_t *host;
 
    host = mongoc_apm_server_heartbeat_started_get_host (event);
    c = (checks_t *) mongoc_apm_server_heartbeat_started_get_context (event);
@@ -1217,7 +1217,7 @@ static void
 check_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
 {
    checks_t *c;
-   const mongoc_host_list_t* host;
+   const mongoc_host_list_t *host;
 
    host = mongoc_apm_server_heartbeat_succeeded_get_host (event);
 
@@ -1231,7 +1231,7 @@ static void
 check_failed (const mongoc_apm_server_heartbeat_failed_t *event)
 {
    checks_t *c;
-   const mongoc_host_list_t* host;
+   const mongoc_host_list_t *host;
 
    host = mongoc_apm_server_heartbeat_failed_get_host (event);
    MONGOC_DEBUG ("heartbeat failed on server %s", host->host_and_port);
@@ -1240,7 +1240,8 @@ check_failed (const mongoc_apm_server_heartbeat_failed_t *event)
 }
 
 static void
-server_changed_callback (const mongoc_apm_server_changed_t *event) {
+server_changed_callback (const mongoc_apm_server_changed_t *event)
+{
    checks_t *c;
    const mongoc_server_description_t *sd;
 
@@ -1819,7 +1820,8 @@ _test_request_scan_on_error (bool pooled,
    sd = mongoc_client_get_server_description (client, primary_id);
    if (should_mark_unknown) {
       WAIT_UNTIL (ctx.n_unknowns == 1);
-      /* background monitoring may have already overwritten the unknown server description if the scan was requested. */
+      /* background monitoring may have already overwritten the unknown server
+       * description if the scan was requested. */
       if (pooled) {
          if (sd->type == MONGOC_SERVER_UNKNOWN) {
             if (server_err) {
@@ -1831,7 +1833,8 @@ _test_request_scan_on_error (bool pooled,
             * have been marked as unknown. */
          BSON_ASSERT (sd->type == MONGOC_SERVER_UNKNOWN);
          ASSERT_CMPINT (sd->last_update_time_usec, >=, ping_started_usec);
-         ASSERT_CMPINT (sd->last_update_time_usec, <=, bson_get_monotonic_time ());
+         ASSERT_CMPINT (
+            sd->last_update_time_usec, <=, bson_get_monotonic_time ());
          /* check that the error on the server description matches the error
          * message in the response. */
          if (server_err) {

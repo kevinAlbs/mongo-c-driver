@@ -28,12 +28,6 @@ typedef struct {
       bool shutting_down;
       bool is_shutdown;
       bool scan_requested;
-      /*
-      As an alternative, scan_requested could be a time.
-      This may permit removing some duplicate scan requests.
-      If a scan_requested comes in between scan_start + minHBMS, then we can
-      ignore it?
-      */
    } shared;
 
    uint64_t last_scan_ms; /* time of last scan in milliseconds. */

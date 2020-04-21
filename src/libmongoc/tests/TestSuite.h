@@ -598,7 +598,18 @@ _test_error (const char *format, ...) BSON_GNUC_PRINTF (1, 2);
 
 #define WAIT_UNTIL(_pred)                                              \
    do {                                                                \
+      int64_t _start = bson_get_monotonic_time ();                     \
       while (!(_pred)) {                                               \
+         if (bson_get_monotonic_time () - _start > 10 * 1000 * 1000) { \
+            fprintf (stderr,                                           \
+                     "Predicate \"%s\" timed out\n"                    \
+                     "   %s:%d  %s()\n",                               \
+                     #_pred,                                           \
+                     __FILE__,                                         \
+                     __LINE__,                                         \
+                     BSON_FUNC);                                       \
+            abort ();                                                  \
+         }                                                             \
          _mongoc_usleep (10 * 1000);                                   \
       }                                                                \
    } while (0)

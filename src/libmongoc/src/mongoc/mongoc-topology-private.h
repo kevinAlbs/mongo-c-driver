@@ -195,5 +195,4 @@ _mongoc_topology_request_scan (mongoc_topology_t *topology);
 
 void
 _mongoc_topology_bypass_cooldown (mongoc_topology_t *topology);
-
 #endif
