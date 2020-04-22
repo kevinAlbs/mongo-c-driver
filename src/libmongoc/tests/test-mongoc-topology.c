@@ -1938,10 +1938,9 @@ test_request_scan_on_error ()
 #define TEST_POOLED(msg, should_scan, should_mark_unknown, server_err) \
    _test_request_scan_on_error (                                       \
       true, msg, should_scan, should_mark_unknown, server_err)
-// #define TEST_SINGLE(msg, should_scan, should_mark_unknown, server_err) \
-//    _test_request_scan_on_error (                                       \
-//       false, msg, should_scan, should_mark_unknown, server_err)
-#define TEST_SINGLE(msg, should_scan, should_mark_unknown, server_err)
+#define TEST_SINGLE(msg, should_scan, should_mark_unknown, server_err) \
+   _test_request_scan_on_error (                                       \
+      false, msg, should_scan, should_mark_unknown, server_err)
 #define TEST_BOTH(msg, should_scan, should_mark_unknown, server_err) \
    TEST_POOLED (msg, should_scan, should_mark_unknown, server_err);  \
    TEST_SINGLE (msg, should_scan, should_mark_unknown, server_err)
