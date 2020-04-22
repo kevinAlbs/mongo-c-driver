@@ -1192,10 +1192,10 @@ test_add_and_scan_failure (void)
 
 
 typedef struct {
-   int n_started;
-   int n_succeeded;
-   int n_failed;
-   int n_unknowns;
+   volatile int32_t n_started;
+   volatile int32_t n_succeeded;
+   volatile int32_t n_failed;
+   volatile int32_t n_unknowns;
 } checks_t;
 
 
@@ -1209,7 +1209,7 @@ check_started (const mongoc_apm_server_heartbeat_started_t *event)
    c = (checks_t *) mongoc_apm_server_heartbeat_started_get_context (event);
 
    MONGOC_DEBUG ("heartbeat started on server %s", host->host_and_port);
-   c->n_started++;
+   bson_atomic_int_add (&c->n_started, 1);
 }
 
 
@@ -1223,7 +1223,7 @@ check_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
 
    c = (checks_t *) mongoc_apm_server_heartbeat_succeeded_get_context (event);
    MONGOC_DEBUG ("heartbeat succeeded on server %s", host->host_and_port);
-   c->n_succeeded++;
+   bson_atomic_int_add (&c->n_succeeded, 1);
 }
 
 
@@ -1236,7 +1236,7 @@ check_failed (const mongoc_apm_server_heartbeat_failed_t *event)
    host = mongoc_apm_server_heartbeat_failed_get_host (event);
    MONGOC_DEBUG ("heartbeat failed on server %s", host->host_and_port);
    c = (checks_t *) mongoc_apm_server_heartbeat_failed_get_context (event);
-   c->n_failed++;
+   bson_atomic_int_add (&c->n_failed, 1);
 }
 
 static void
@@ -1248,7 +1248,7 @@ server_changed_callback (const mongoc_apm_server_changed_t *event)
    c = (checks_t *) mongoc_apm_server_changed_get_context (event);
    sd = mongoc_apm_server_changed_get_new_description (event);
    if (sd->type == MONGOC_SERVER_UNKNOWN) {
-      c->n_unknowns++;
+      bson_atomic_int_add (&c->n_unknowns, 1);
    }
 }
 
@@ -2005,7 +2005,111 @@ test_request_scan_on_error ()
 #undef TEST_SINGLE
 }
 
+/* Test that the issue described in CDRIVER-3625 is fixed.
+ * A slow-to-respond server should not block the scan of other servers
+ * in background monitoring.
+ */
+static void
+test_slow_server_pooled (void)
+{
+   mock_server_t *primary;
+   mock_server_t *secondary;
+   char *ismaster_common;
+   char *ismaster_primary;
+   char *ismaster_secondary;
+   mongoc_read_prefs_t *prefs_secondary;
+   mongoc_client_pool_t *pool;
+   mongoc_client_t *client;
+   mongoc_uri_t *uri;
+   mongoc_apm_callbacks_t *callbacks;
+   request_t *request;
+   checks_t ctx = {0};
+   bool ret;
+   bson_error_t error;
 
+   primary = mock_server_new ();
+   secondary = mock_server_new ();
+
+   mock_server_run (primary);
+   mock_server_run (secondary);
+
+   mock_server_autoresponds (primary, auto_ping, NULL, NULL);
+   mock_server_autoresponds (secondary, auto_ping, NULL, NULL);
+
+   ismaster_common = bson_strdup_printf (
+      "{'ok': 1, 'setName': 'rs', 'hosts': ['%s', '%s'], 'maxWireVersion': %d",
+      mock_server_get_host_and_port (primary),
+      mock_server_get_host_and_port (secondary),
+      WIRE_VERSION_MAX);
+   ismaster_primary = bson_strdup_printf (
+      "%s, 'ismaster': true, 'secondary': false }", ismaster_common);
+   ismaster_secondary = bson_strdup_printf (
+      "%s, 'ismaster': false, 'secondary': true }", ismaster_common);
+
+   /* Primary response immediately, but secondary does not. */
+   mock_server_auto_ismaster (primary, ismaster_primary);
+
+   uri = mongoc_uri_copy (mock_server_get_uri (primary));
+   /* Do not connect as topology type Single, so the client pool discovers the
+    * secondary. */
+   mongoc_uri_set_option_as_bool (uri, MONGOC_URI_DIRECTCONNECTION, false);
+   mongoc_uri_set_option_as_int32 (
+      uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 500);
+
+   pool = mongoc_client_pool_new (uri);
+   callbacks = heartbeat_callbacks ();
+   mongoc_client_pool_set_apm_callbacks (pool, callbacks, &ctx);
+
+   /* Set a shorter heartbeat frequencies for faster responses. */
+   _mongoc_client_pool_get_topology (pool)->description.heartbeat_msec = 10;
+   _mongoc_client_pool_get_topology (pool)->min_heartbeat_frequency_msec = 10;
+
+   client = mongoc_client_pool_pop (pool);
+   /* As soon as a client is popped, background scanning starts.
+    * Wait for two scans of the primary. */
+   WAIT_UNTIL (ctx.n_started >= 2);
+
+   request = mock_server_receives_ismaster (secondary);
+
+   /* A command to the primary succeeds. */
+   ret = mongoc_client_command_simple (
+      client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
+   ASSERT_OR_PRINT (ret, error);
+
+   /* A command to the secondary fails. */
+   prefs_secondary = mongoc_read_prefs_new (MONGOC_READ_SECONDARY);
+   ret = mongoc_client_command_simple (
+      client, "admin", tmp_bson ("{'ping': 1}"), prefs_secondary, NULL, &error);
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_SERVER_SELECTION,
+                          MONGOC_ERROR_SERVER_SELECTION_FAILURE,
+                          "expired");
+   BSON_ASSERT (!ret);
+
+   /* Set up an auto responder so future ismasters on the secondary does not
+    * block until connectTimeoutMS. Otherwise, the shutdown sequence will be
+    * blocked for connectTimeoutMS. */
+   mock_server_auto_ismaster (secondary, ismaster_secondary);
+   /* Respond to the first ismaster. */
+   mock_server_replies_simple (request, ismaster_secondary);
+   request_destroy (request);
+
+   /* Now a command to the secondary succeeds. */
+   ret = mongoc_client_command_simple (
+      client, "admin", tmp_bson ("{'ping': 1}"), prefs_secondary, NULL, &error);
+   ASSERT_OR_PRINT (ret, error);
+
+   mongoc_read_prefs_destroy (prefs_secondary);
+   mongoc_client_pool_push (pool, client);
+   mongoc_apm_callbacks_destroy (callbacks);
+   mongoc_client_pool_destroy (pool);
+   mongoc_uri_destroy (uri);
+   bson_free (ismaster_secondary);
+   bson_free (ismaster_primary);
+   bson_free (ismaster_common);
+   mock_server_destroy (secondary);
+   mock_server_destroy (primary);
+}
 void
 test_topology_install (TestSuite *suite)
 {
@@ -2158,4 +2262,6 @@ test_topology_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite,
                                 "/Topology/last_server_removed_warning",
                                 test_last_server_removed_warning);
+   TestSuite_AddMockServerTest (
+      suite, "/Topology/slow_server/pooled", test_slow_server_pooled);
 }
