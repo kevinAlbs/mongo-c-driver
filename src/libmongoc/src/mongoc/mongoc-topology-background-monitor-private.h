@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#include "mongoc-prelude.h"
+
 #ifndef MONGOC_TOPOLOGY_BACKGROUND_MONITOR_PRIVATE_H
 #define MONGOC_TOPOLOGY_BACKGROUND_MONITOR_PRIVATE_H
 

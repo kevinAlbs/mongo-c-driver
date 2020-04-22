@@ -423,9 +423,10 @@ _server_monitor_run (void *server_monitor_void)
 
    while (true) {
       int64_t now_ms;
+      int64_t sleep_duration;
 
       now_ms = bson_get_monotonic_time () / 1000;
-      if (now_ms > server_monitor->scan_due_ms) {
+      if (now_ms >= server_monitor->scan_due_ms) {
          MONGOC_DEBUG ("sm (%d) scan is due", server_monitor->server_id);
 
          _server_monitor_regular_ismaster (server_monitor);
@@ -462,14 +463,16 @@ _server_monitor_run (void *server_monitor_void)
             server_monitor->min_heartbeat_frequency_ms;
       }
 
-      MONGOC_DEBUG (
-         "sm (%d) sleeping for %d",
-         server_monitor->server_id,
-         (int) (server_monitor->scan_due_ms - server_monitor->last_scan_ms));
-      mongoc_cond_timedwait (&server_monitor->shared.cond,
-                             &server_monitor->shared.mutex,
-                             server_monitor->scan_due_ms -
-                                server_monitor->last_scan_ms);
+      sleep_duration = BSON_MAX (0, server_monitor->scan_due_ms - now_ms);
+      MONGOC_DEBUG ("sm (%d) sleeping for %d",
+                    server_monitor->server_id,
+                    (int) (sleep_duration));
+
+      if (sleep_duration) {
+         mongoc_cond_timedwait (&server_monitor->shared.cond,
+                                &server_monitor->shared.mutex,
+                                sleep_duration);
+      }
       MONGOC_DEBUG ("sm (%d) woken up", server_monitor->server_id);
       bson_mutex_unlock (&server_monitor->shared.mutex);
    }

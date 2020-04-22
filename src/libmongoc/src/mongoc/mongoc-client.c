@@ -742,21 +742,19 @@ mongoc_client_connect (void *ssl_opts_void,
 {
    mongoc_stream_t *base_stream = NULL;
    int32_t connecttimeoutms;
-   bool use_tls = false;
 
    BSON_ASSERT (uri);
    BSON_ASSERT (host);
 
-   if (ssl_opts_void || mongoc_uri_get_tls (uri)) {
 #ifndef MONGOC_ENABLE_SSL
+   if (ssl_opts_void || mongoc_uri_get_tls (uri)) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
                       MONGOC_ERROR_CLIENT_NO_ACCEPTABLE_PEER,
                       "TLS is not enabled in this build of mongo-c-driver.");
       return NULL;
-#endif
-      use_tls = true;
    }
+#endif
 
    connecttimeoutms = mongoc_uri_get_option_as_int32 (
       uri, MONGOC_URI_CONNECTTIMEOUTMS, MONGOC_DEFAULT_CONNECTTIMEOUTMS);
@@ -789,7 +787,8 @@ mongoc_client_connect (void *ssl_opts_void,
       ssl_opts = (mongoc_ssl_opt_t *) ssl_opts_void;
       mechanism = mongoc_uri_get_auth_mechanism (uri);
 
-      if (use_tls || (mechanism && (0 == strcmp (mechanism, "MONGODB-X509")))) {
+      if (ssl_opts || mongoc_uri_get_tls (uri) ||
+          (mechanism && (0 == strcmp (mechanism, "MONGODB-X509")))) {
          mongoc_stream_t *original = base_stream;
 
          base_stream = mongoc_stream_tls_new_with_hostname (
@@ -811,6 +810,8 @@ mongoc_client_connect (void *ssl_opts_void,
          }
       }
    }
+#else
+   if ()
 #endif
 
    return base_stream ? mongoc_stream_buffered_new (base_stream, 1024) : NULL;
