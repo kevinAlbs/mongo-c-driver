@@ -463,12 +463,12 @@ _server_monitor_run (void *server_monitor_void)
             server_monitor->min_heartbeat_frequency_ms;
       }
 
-      sleep_duration = BSON_MAX (0, server_monitor->scan_due_ms - now_ms);
+      sleep_duration = BSON_MAX (0, (int64_t)server_monitor->scan_due_ms - now_ms);
       MONGOC_DEBUG ("sm (%d) sleeping for %d",
                     server_monitor->server_id,
                     (int) (sleep_duration));
 
-      if (sleep_duration) {
+      if (sleep_duration > 0) {
          mongoc_cond_timedwait (&server_monitor->shared.cond,
                                 &server_monitor->shared.mutex,
                                 sleep_duration);

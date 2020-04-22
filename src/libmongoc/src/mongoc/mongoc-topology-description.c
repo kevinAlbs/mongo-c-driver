@@ -2199,6 +2199,6 @@ mongoc_topology_description_dump (mongoc_topology_description_t *td)
       sd = (mongoc_server_description_t *) mongoc_set_get_item (set, (int) i);
 
       host = mongoc_server_description_host (sd);
-      printf ("- %s, %s\n", host->host_and_port, sd_type (sd));
+      MONGOC_DEBUG ("- %s, %s\n", host->host_and_port, sd_type (sd));
    }
 }

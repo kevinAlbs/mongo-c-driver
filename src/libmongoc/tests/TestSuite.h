@@ -601,7 +601,7 @@ _test_error (const char *format, ...) BSON_GNUC_PRINTF (1, 2);
       int64_t _start = bson_get_monotonic_time ();                     \
       while (!(_pred)) {                                               \
          if (bson_get_monotonic_time () - _start > 10 * 1000 * 1000) { \
-            fprintf (stderr,                                           \
+            MONGOC_DEBUG (                                             \
                      "Predicate \"%s\" timed out\n"                    \
                      "   %s:%d  %s()\n",                               \
                      #_pred,                                           \
