@@ -810,8 +810,6 @@ mongoc_client_connect (void *ssl_opts_void,
          }
       }
    }
-#else
-   if ()
 #endif
 
    return base_stream ? mongoc_stream_buffered_new (base_stream, 1024) : NULL;
