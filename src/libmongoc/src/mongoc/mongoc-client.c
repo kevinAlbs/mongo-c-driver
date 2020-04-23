@@ -600,7 +600,6 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
    int64_t expire_at;
    char portstr[8];
    int s;
-   int count = 0;
 
    ENTRY;
 
@@ -630,7 +629,6 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
    mongoc_counter_dns_success_inc ();
 
    for (rp = result; rp; rp = rp->ai_next) {
-      count++;
       /*
        * Create a new non-blocking socket.
        */

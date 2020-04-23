@@ -916,8 +916,8 @@ _mock_server_receives_msg (mock_server_t *server, uint32_t flags, ...)
  *
  * mock_server_receives_ismaster --
  *
- *       Pop a client non-streaming ismaster call if one is enqueued, or wait up
- *to request_timeout_ms for the client to send a request.
+ *       Pop a client non-streaming ismaster call if one is enqueued,
+ *       or wait up to request_timeout_ms for the client to send a request.
  *
  * Returns:
  *       A request you must request_destroy, or NULL if the current

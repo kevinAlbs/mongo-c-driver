@@ -857,21 +857,12 @@ TestSuite_RunSerial (TestSuite *suite) /* IN */
    Test *test;
    int count = 0;
    int status = 0;
-   int offset = 0;
 
    for (test = suite->tests; test; test = test->next) {
-      // if (0 == strcmp(test->name,
-      // "/server_discovery_and_monitoring/monitoring/heartbeat/pooled/dns")) {
-      //    offset = count;
-      // }
       count++;
    }
 
    for (test = suite->tests; test; test = test->next) {
-      if (offset > 0) {
-         offset--;
-         continue;
-      }
       status += TestSuite_RunTest (suite, test, &count);
       count--;
    }

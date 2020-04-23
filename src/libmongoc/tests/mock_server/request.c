@@ -809,7 +809,6 @@ request_from_query (request_t *request, const mongoc_rpc_t *rpc)
 
    str = bson_as_json (query, NULL);
    bson_string_append (query_as_str, str);
-   bson_string_truncate (query_as_str, 1024);
    bson_free (str);
 
    if (rpc->query.fields) {
