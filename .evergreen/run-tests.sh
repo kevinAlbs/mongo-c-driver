@@ -93,7 +93,7 @@ case "$OS" in
       check_mongocryptd
 
       chmod +x src/libmongoc/Debug/test-libmongoc.exe
-      ./src/libmongoc/Debug/test-libmongoc.exe $TEST_ARGS
+      ./src/libmongoc/Debug/test-libmongoc.exe $TEST_ARGS -d --no-fork
       ;;
 
    *)
@@ -104,9 +104,10 @@ case "$OS" in
 
       if [ "$VALGRIND" = "on" ]; then
          . $DIR/valgrind.sh
-         run_valgrind ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS
+         export MONGOC_TEST_SERVER_LOG=stdout
+         run_valgrind ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS -d
       else
-         ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS
+         ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS -d
       fi
 
       ;;

@@ -1980,14 +1980,7 @@ mongoc_topology_description_handle_ismaster (
    }
 
    if (gSDAMTransitionTable[sd->type][topology->type]) {
-      TRACE ("Transitioning to %s for %s",
-             _mongoc_topology_description_type (topology),
-             mongoc_server_description_type (sd));
       gSDAMTransitionTable[sd->type][topology->type](topology, sd);
-   } else {
-      TRACE ("No transition entry to %s for %s",
-             _mongoc_topology_description_type (topology),
-             mongoc_server_description_type (sd));
    }
 
    _mongoc_topology_description_update_session_timeout (topology);

@@ -44,6 +44,7 @@ typedef enum {
    MONGOC_TOPOLOGY_SCANNER_SINGLE_THREADED,
 } mongoc_topology_scanner_state_t;
 
+struct _mongoc_background_monitor_t;
 struct _mongoc_client_pool_t;
 
 typedef struct _mongoc_topology_t {
@@ -92,6 +93,10 @@ typedef struct _mongoc_topology_t {
    char *mongocryptd_spawn_path;
    bson_t *mongocryptd_spawn_args;
 #endif
+
+   struct _mongoc_background_monitor_t *background_monitor;
+   bson_mutex_t apm_mutex;
+
 } mongoc_topology_t;
 
 mongoc_topology_t *

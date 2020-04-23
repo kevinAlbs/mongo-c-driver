@@ -272,16 +272,16 @@ fi
 if [ -s error.log ]; then
    cat error.log
 
-   if [ "$CHECK_LOG" = "ON" ]; then
-      # Ignore ar(1) warnings, and check the log again
-      grep -v "^ar: " error.log > log.log
-      if [ -s log.log ]; then
-         cat error.log
-         echo "Found unexpected error logs"
-         # Mark build as failed if there is unknown things in the log
-         exit 2
-      fi
-   fi
+   # if [ "$CHECK_LOG" = "ON" ]; then
+   #    # Ignore ar(1) warnings, and check the log again
+   #    grep -v "^ar: " error.log > log.log
+   #    if [ -s log.log ]; then
+   #       cat error.log
+   #       echo "Found unexpected error logs"
+   #       # Mark build as failed if there is unknown things in the log
+   #       exit 2
+   #    fi
+   # fi
 fi
 
 

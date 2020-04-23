@@ -1853,7 +1853,7 @@ test_seed_list (bool rs, connection_option_t connection_option, bool pooled)
                                                      primary_pref,
                                                      &reply,
                                                      &error),
-                       error);
+                       error); /* this be the failure */
 
       bson_destroy (&reply);
 
@@ -2456,7 +2456,8 @@ test_mongoc_client_descriptions (void)
    start = bson_get_monotonic_time ();
    do {
       _mongoc_usleep (1000);
-      if (bson_get_monotonic_time () - start > 1000 * 1000) {
+      /* Windows IPv4 tasks may take longer to connect since initial getaddrinfo fails. */
+      if (bson_get_monotonic_time () - start > 3 * 1000 * 1000) {
          test_error ("still have %d descriptions, not expected %d, after 1 sec",
                      (int) n,
                      (int) expected_n);
@@ -2565,7 +2566,7 @@ _test_mongoc_client_select_server_error (bool pooled)
 
    if (pooled) {
       uri = test_framework_get_uri ();
-      mongoc_uri_set_option_as_int32 (uri, "serverSelectionTimeoutMS", 1000);
+      mongoc_uri_set_option_as_int32 (uri, "serverSelectionTimeoutMS", 3000);
       pool = mongoc_client_pool_new (uri);
       test_framework_set_pool_ssl_opts (pool);
       client = mongoc_client_pool_pop (pool);
