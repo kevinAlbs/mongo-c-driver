@@ -589,6 +589,15 @@ _mongoc_client_get_rr (const char *service,
  *--------------------------------------------------------------------------
  */
 
+static void _dump_addrinfo (struct addrinfo *rp) {
+   MONGOC_DEBUG ("addrinfo dump");
+   if (rp->ai_family == AF_INET) {
+      MONGOC_DEBUG ("- AF_INET");
+   } else if (rp->ai_family == AF_INET6) {
+      MONGOC_DEBUG ("- AF_INET6");
+   }
+}
+
 mongoc_stream_t *
 mongoc_client_connect_tcp (int32_t connecttimeoutms,
                            const mongoc_host_list_t *host,
@@ -614,7 +623,9 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
    hints.ai_flags = 0;
    hints.ai_protocol = 0;
 
+   MONGOC_DEBUG ("getaddrinfo - begin");
    s = getaddrinfo (host->host, portstr, &hints, &result);
+   MONGOC_DEBUG ("getaddrinfo - end");
 
    if (s != 0) {
       mongoc_counter_dns_failure_inc ();
@@ -629,6 +640,8 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
    mongoc_counter_dns_success_inc ();
 
    for (rp = result; rp; rp = rp->ai_next) {
+      MONGOC_DEBUG ("connect iteration");
+      _dump_addrinfo (rp);
       /*
        * Create a new non-blocking socket.
        */
@@ -641,13 +654,16 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
        * Try to connect to the peer.
        */
       expire_at = bson_get_monotonic_time () + (connecttimeoutms * 1000L);
+      MONGOC_DEBUG ("connect start");
       if (0 !=
           mongoc_socket_connect (
              sock, rp->ai_addr, (mongoc_socklen_t) rp->ai_addrlen, expire_at)) {
          mongoc_socket_destroy (sock);
          sock = NULL;
+         MONGOC_DEBUG ("connect fail");
          continue;
       }
+      MONGOC_DEBUG ("connect succeed");
 
       break;
    }

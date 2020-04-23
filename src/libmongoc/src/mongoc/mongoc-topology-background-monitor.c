@@ -355,8 +355,11 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
                                       &error);
          }
          if (!server_monitor->stream) {
+            MONGOC_DEBUG ("connection failed: %s", error.message);
             _server_monitor_heartbeat_failed (server_monitor, &error, rtt_us);
             continue;
+         } else {
+            MONGOC_DEBUG ("connection succeeded");
          }
       }
 

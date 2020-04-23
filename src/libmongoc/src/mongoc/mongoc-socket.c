@@ -65,7 +65,7 @@ _mongoc_socket_capture_errno (mongoc_socket_t *sock) /* IN */
 #else
    sock->errno_ = errno;
 #endif
-   TRACE ("setting errno: %d %s", sock->errno_, strerror (sock->errno_));
+   MONGOC_DEBUG ("setting errno: %d %s", sock->errno_, strerror (sock->errno_));
 }
 
 
@@ -203,8 +203,10 @@ _mongoc_socket_wait (mongoc_socket_t *sock, /* IN */
       } else {
          timeout_tv.tv_sec = timeout / 1000;
          timeout_tv.tv_usec = (timeout % 1000) * 1000;
+         MONGOC_DEBUG ("select - start");
          ret = select (
             0 /*unused*/, &read_fds, &write_fds, &error_fds, &timeout_tv);
+         MONGOC_DEBUG ("select - end");
       }
       if (ret == SOCKET_ERROR) {
          _mongoc_socket_capture_errno (sock);
@@ -628,7 +630,7 @@ mongoc_socket_errno (mongoc_socket_t *sock) /* IN */
 static bool
 _mongoc_socket_errno_is_again (mongoc_socket_t *sock) /* IN */
 {
-   TRACE ("errno is: %d", sock->errno_);
+   MONGOC_DEBUG ("errno is: %d", sock->errno_);
    return MONGOC_ERRNO_IS_AGAIN (sock->errno_);
 }
 
@@ -863,7 +865,9 @@ mongoc_socket_connect (mongoc_socket_t *sock,       /* IN */
    BSON_ASSERT (addr);
    BSON_ASSERT (addrlen);
 
+   MONGOC_DEBUG ("connect - begin");
    ret = connect (sock->sd, addr, addrlen);
+   MONGOC_DEBUG ("connect - end");
 
 #ifdef _WIN32
    if (ret == SOCKET_ERROR) {
@@ -874,10 +878,12 @@ mongoc_socket_connect (mongoc_socket_t *sock,       /* IN */
 
       failed = true;
       try_again = _mongoc_socket_errno_is_again (sock);
+      MONGOC_DEBUG ("try again? %d", try_again);
    }
 
    if (failed && try_again) {
-      if (_mongoc_socket_wait (sock, POLLOUT, expire_at)) {
+      MONGOC_DEBUG ("waiting for %d", (expire_at - bson_get_monotonic_time()));
+      if (_mongoc_socket_wait (sock, POLLOUT | POLLERR | POLLHUP, expire_at)) {
          optval = -1;
          ret = getsockopt (
             sock->sd, SOL_SOCKET, SO_ERROR, (char *) &optval, &optlen);
