@@ -34,6 +34,10 @@
 #include <strings.h>
 #endif
 
+#ifdef _WIN32
+#include <errhandlingapi.h>
+#include <DbgHelp.h>
+#endif
 /* libbson */
 
 
@@ -2091,7 +2095,6 @@ test_version_cmp (void)
    server_version_t v3_0_1 = 103100101100;
    server_version_t v3_0_10 = 103100110100;
    server_version_t v3_2_0_rc1_pre = 103102100051;
-
    ASSERT (v2_6_12 == test_framework_str_to_version ("2.6.12"));
    ASSERT (v2_6_12 == _parse_server_version (
                          tmp_bson ("{'versionArray': [2, 6, 12, 0]}")));
@@ -2376,12 +2379,93 @@ test_framework_skip_if_time_sensitive (void)
 
 static char MONGOC_TEST_UNIQUE[32];
 
+#ifdef _WIN32
+LONG windows_exception_handler (EXCEPTION_POINTERS *pExceptionInfo) {
+    HANDLE process = GetCurrentProcess();
+
+    fprintf (stderr, "entering windows exception handler\n");
+    SymInitialize(process, NULL, TRUE);
+
+    /* Shamelessly stolen from https://stackoverflow.com/a/28115589 */
+
+    /* StackWalk64() may modify context record passed to it, so we will
+     use a copy.
+     */
+    CONTEXT context_record = *pExceptionInfo->ContextRecord;
+    /* Initialize stack walking. */
+    STACKFRAME64 stack_frame;
+    memset(&stack_frame, 0, sizeof(stack_frame));
+    #if defined(_WIN64)
+    int machine_type = IMAGE_FILE_MACHINE_AMD64;
+    stack_frame.AddrPC.Offset = context_record.Rip;
+    stack_frame.AddrFrame.Offset = context_record.Rbp;
+    stack_frame.AddrStack.Offset = context_record.Rsp;
+    #else
+    int machine_type = IMAGE_FILE_MACHINE_I386;
+    stack_frame.AddrPC.Offset = context_record.Eip;
+    stack_frame.AddrFrame.Offset = context_record.Ebp;
+    stack_frame.AddrStack.Offset = context_record.Esp;
+    #endif
+    stack_frame.AddrPC.Mode = AddrModeFlat;
+    stack_frame.AddrFrame.Mode = AddrModeFlat;
+    stack_frame.AddrStack.Mode = AddrModeFlat;
+
+    SYMBOL_INFO* symbol;
+    symbol = calloc(sizeof(SYMBOL_INFO) + 256, 1);
+    symbol->MaxNameLen = 255;
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+
+    fprintf (stderr, "begin stack trace\n");
+    while (StackWalk64(machine_type,
+        GetCurrentProcess(),
+        GetCurrentThread(),
+        &stack_frame,
+        &context_record,
+        NULL,
+        &SymFunctionTableAccess64,
+        &SymGetModuleBase64,
+        NULL)) {
+
+        DWORD64 displacement = 0;
+
+        if (SymFromAddr(process, (DWORD64)stack_frame.AddrPC.Offset, &displacement, symbol))
+        {
+            IMAGEHLP_MODULE64 moduleInfo;
+            memset (&moduleInfo, 0, sizeof (moduleInfo));
+            moduleInfo.SizeOfStruct = sizeof(moduleInfo);
+
+            if (SymGetModuleInfo64(process, symbol->ModBase, &moduleInfo))
+                fprintf (stderr, "%s : ", moduleInfo.ModuleName);
+
+            fprintf (stderr, "%s", symbol->Name);
+        }
+
+        IMAGEHLP_LINE line;
+        line.SizeOfStruct = sizeof(IMAGEHLP_LINE);
+         
+         DWORD offset_ln = 0;
+         if (SymGetLineFromAddr(process, (DWORD64) stack_frame.AddrPC.Offset, &offset_ln, &line))
+         {
+            fprintf (stderr, " %s:%d ", line.FileName, line.LineNumber);
+         }
+        
+        fprintf (stderr, "\n");
+    }
+    fprintf (stderr, "end stack trace\n");
+    fflush (stderr);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+#endif
+
 int
 main (int argc, char *argv[])
 {
    TestSuite suite;
    int ret;
 
+#ifdef _WIN32
+   SetUnhandledExceptionFilter (windows_exception_handler);
+#endif
    mongoc_init ();
 
    bson_snprintf (MONGOC_TEST_UNIQUE,
