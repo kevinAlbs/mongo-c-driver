@@ -401,7 +401,7 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
 }
 
 static void
-_server_monitor_connect (mongoc_server_monitor_t *server_monitor)
+_server_monitor_connect_and_ismaster (mongoc_server_monitor_t *server_monitor)
 {
    bson_error_t error;
    if (!server_monitor->stream) {
@@ -431,7 +431,26 @@ _server_monitor_connect (mongoc_server_monitor_t *server_monitor)
       }
 
       if (!server_monitor->stream) {
-         MONGOC_DEBUG ("sm (%d) failed to created stream");
+         MONGOC_DEBUG ("sm (%d) failed to created stream", server_monitor->server_id);
+      } else {
+         bool ret;
+         bson_t cmd;
+         bson_t reply;
+
+         bson_init (&cmd);
+         BCON_APPEND (&cmd, "ismaster", BCON_INT32(1));
+         ret = _server_monitor_cmd_send (server_monitor, &cmd, &reply, &error);
+         if (!ret) {
+            MONGOC_DEBUG ("sm (%d) failed to send ismaster: %s", server_monitor->server_id, error.message);
+         } else {
+            char *ismaster;
+            
+            ismaster = bson_as_json (&reply, NULL);
+            MONGOC_DEBUG ("sm (%d) got ismaster reply: %s", server_monitor->server_id, ismaster);
+            bson_free (ismaster);
+         }
+         bson_destroy (&reply);
+         bson_destroy (&cmd);
       }
    } else {
       MONGOC_DEBUG ("stream already set");
@@ -464,7 +483,7 @@ _server_monitor_run (void *server_monitor_void)
       if (now_ms >= server_monitor->scan_due_ms) {
          // CHANGEBACK
          MONGOC_DEBUG ("sm (%d) connecting, but not sending ismaster", server_monitor->server_id);
-         _server_monitor_connect (server_monitor);
+         _server_monitor_connect_and_ismaster (server_monitor);
          // _server_monitor_regular_ismaster (server_monitor);
          server_monitor->last_scan_ms = bson_get_monotonic_time () / 1000;
          server_monitor->scan_due_ms = server_monitor->last_scan_ms +
