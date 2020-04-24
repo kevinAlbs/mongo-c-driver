@@ -489,10 +489,8 @@ _server_monitor_run (void *server_monitor_void)
 
       now_ms = bson_get_monotonic_time () / 1000;
       if (now_ms >= server_monitor->scan_due_ms) {
-         // CHANGEBACK
-         MONGOC_DEBUG ("sm (%d) connecting, but not sending ismaster", server_monitor->server_id);
-         _server_monitor_connect_and_ismaster (server_monitor);
-         // _server_monitor_regular_ismaster (server_monitor);
+         MONGOC_DEBUG ("sm (%d) sending ismaster", server_monitor->server_id);
+         _server_monitor_regular_ismaster (server_monitor);
          server_monitor->last_scan_ms = bson_get_monotonic_time () / 1000;
          server_monitor->scan_due_ms = server_monitor->last_scan_ms +
                                        server_monitor->heartbeat_frequency_ms;
