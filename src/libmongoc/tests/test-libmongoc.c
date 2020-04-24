@@ -408,6 +408,8 @@ log_handler (mongoc_log_level_t log_level,
       if (!suite->silent) {
          mongoc_log_default_handler (log_level, log_domain, message, NULL);
       }
+   } else if (log_level == MONGOC_LOG_LEVEL_DEBUG && test_suite_debug_output()) {
+      mongoc_log_default_handler (log_level, log_domain, message, NULL);
    }
 }
 
@@ -1919,9 +1921,9 @@ int
 test_framework_skip_if_windows (void)
 {
 #ifdef _WIN32
-   return false;
+   return 0;
 #else
-   return true;
+   return 1;
 #endif
 }
 

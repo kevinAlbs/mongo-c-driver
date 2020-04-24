@@ -424,8 +424,9 @@ _server_monitor_run (void *server_monitor_void)
 
       now_ms = bson_get_monotonic_time () / 1000;
       if (now_ms >= server_monitor->scan_due_ms) {
-
-         _server_monitor_regular_ismaster (server_monitor);
+         // CHANGEBACK
+         // _server_monitor_regular_ismaster (server_monitor);
+         MONGOC_DEBUG ("sm (%d) pretending to send ismaster", server_monitor->server_id);
          server_monitor->last_scan_ms = bson_get_monotonic_time () / 1000;
          server_monitor->scan_due_ms = server_monitor->last_scan_ms +
                                        server_monitor->heartbeat_frequency_ms;
@@ -503,7 +504,9 @@ _server_monitor_try_shutdown_and_destroy (
     * will join.
     */
    if (is_shutdown) {
+      MONGOC_DEBUG ("sm (%d) try join start", server_monitor->server_id);
       bson_thread_join (server_monitor->thread);
+      MONGOC_DEBUG ("sm (%d) try join end", server_monitor->server_id);
       _server_monitor_destroy (server_monitor);
       return true;
    }
@@ -524,7 +527,9 @@ _server_monitor_wait_for_shutdown_and_destroy (
    bson_mutex_unlock (&server_monitor->shared.mutex);
 
    /* Wait for the thread to shutdown. */
+   MONGOC_DEBUG ("sm (%d) join start", server_monitor->server_id);
    bson_thread_join (server_monitor->thread);
+   MONGOC_DEBUG ("sm (%d) join end", server_monitor->server_id);
    _server_monitor_destroy (server_monitor);
 }
 
@@ -783,20 +788,18 @@ mongoc_topology_background_monitor_shutdown (
    mongoc_topology_t *topology;
    int i;
 
-   
-
    topology = background_monitor->topology;
 
-   if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_BG_RUNNING) {
-      /* if background threads are running, request a shutdown and signal all
-       * server monitors to start shutting down. */
-      topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN;
-      /* TODO: for a faster shutdown, signal shutdown to all servers. */
+   // if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_BG_RUNNING) {
+   //    /* if background threads are running, request a shutdown and signal all
+   //     * server monitors to start shutting down. */
+   //    topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN;
+   //    /* TODO: for a faster shutdown, signal shutdown to all servers. */
 
-   } else {
-      /* nothing to do if it's already off */
-      return;
-   }
+   // } else {
+   //    /* nothing to do if it's already off */
+   //    return;
+   // }
 
    bson_mutex_unlock (&topology->mutex);
 
@@ -812,8 +815,8 @@ mongoc_topology_background_monitor_shutdown (
    background_monitor->server_monitors = mongoc_set_new (1, NULL, NULL);
 
    bson_mutex_lock (&topology->mutex);
-   topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;
-   mongoc_cond_broadcast (&topology->cond_client);
+   // topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;
+   // mongoc_cond_broadcast (&topology->cond_client);
 
    
 }

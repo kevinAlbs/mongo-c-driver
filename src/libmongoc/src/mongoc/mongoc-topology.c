@@ -1404,7 +1404,7 @@ _mongoc_topology_start_background_scanner (mongoc_topology_t *topology)
 
    /* The first reconcile. */
    // CHANGEBACK
-   // mongoc_topology_background_monitor_reconcile (topology->background_monitor);
+   mongoc_topology_background_monitor_reconcile (topology->background_monitor);
 
    bson_mutex_unlock (&topology->mutex);
 
@@ -1458,7 +1458,7 @@ _mongoc_topology_background_thread_stop (mongoc_topology_t *topology)
       bson_mutex_lock (&topology->mutex);
       topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;
       // CHANGEBACK
-      // mongoc_topology_background_monitor_shutdown (topology->background_monitor);
+      mongoc_topology_background_monitor_shutdown (topology->background_monitor);
       bson_mutex_unlock (&topology->mutex);
 
       mongoc_cond_broadcast (&topology->cond_client);
