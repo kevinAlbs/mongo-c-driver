@@ -444,10 +444,18 @@ _server_monitor_connect_and_ismaster (mongoc_server_monitor_t *server_monitor)
             MONGOC_DEBUG ("sm (%d) failed to send ismaster: %s", server_monitor->server_id, error.message);
          } else {
             char *ismaster;
+            mongoc_topology_t *topology;
             
             ismaster = bson_as_json (&reply, NULL);
             MONGOC_DEBUG ("sm (%d) got ismaster reply: %s", server_monitor->server_id, ismaster);
             bson_free (ismaster);
+
+            MONGOC_DEBUG ("sm (%d) calling reconcile", server_monitor->server_id);
+            
+            topology = server_monitor->topology;
+            bson_mutex_lock (&server_monitor->topology->mutex);
+            mongoc_topology_background_monitor_reconcile (topology->background_monitor);
+            bson_mutex_unlock (&server_monitor->topology->mutex);
          }
          bson_destroy (&reply);
          bson_destroy (&cmd);
