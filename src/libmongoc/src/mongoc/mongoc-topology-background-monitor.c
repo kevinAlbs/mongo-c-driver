@@ -400,6 +400,44 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
    bson_destroy (&reply);
 }
 
+static void
+_server_monitor_connect (mongoc_server_monitor_t *server_monitor)
+{
+   bson_error_t error;
+   if (!server_monitor->stream) {
+      /* Using an initiator isn't really necessary. Users can't set them on
+         * pools. But it is used for tests. */
+      if (server_monitor->initiator) {
+         MONGOC_DEBUG ("sm (%d) creating stream with initializer", server_monitor->server_id);
+         server_monitor->stream =
+            server_monitor->initiator (server_monitor->uri,
+                                       &server_monitor->host,
+                                       server_monitor->initiator_context,
+                                       &error);
+      } else {
+         void *ssl_opts_void = NULL;
+
+#ifdef MONGOC_ENABLE_SSL
+         ssl_opts_void = server_monitor->ssl_opts;
+#endif
+         MONGOC_DEBUG ("sm (%d) creating stream. SSL opts set? %d", server_monitor->server_id, ssl_opts_void != NULL);
+         server_monitor->stream =
+            mongoc_client_connect (false,
+                                    ssl_opts_void != NULL,
+                                    ssl_opts_void,
+                                    server_monitor->uri,
+                                    &server_monitor->host,
+                                    &error);
+      }
+
+      if (!server_monitor->stream) {
+         MONGOC_DEBUG ("sm (%d) failed to created stream");
+      }
+   } else {
+      MONGOC_DEBUG ("stream already set");
+   }
+}
+
 /* The server monitor thread
  *
  * Runs continuously.
@@ -425,8 +463,9 @@ _server_monitor_run (void *server_monitor_void)
       now_ms = bson_get_monotonic_time () / 1000;
       if (now_ms >= server_monitor->scan_due_ms) {
          // CHANGEBACK
+         MONGOC_DEBUG ("sm (%d) connecting, but not sending ismaster", server_monitor->server_id);
+         _server_monitor_connect (server_monitor);
          // _server_monitor_regular_ismaster (server_monitor);
-         MONGOC_DEBUG ("sm (%d) pretending to send ismaster", server_monitor->server_id);
          server_monitor->last_scan_ms = bson_get_monotonic_time () / 1000;
          server_monitor->scan_due_ms = server_monitor->last_scan_ms +
                                        server_monitor->heartbeat_frequency_ms;
