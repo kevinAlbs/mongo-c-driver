@@ -185,6 +185,10 @@ _mongoc_topology_scanner_cb (uint32_t id,
       mongoc_cond_broadcast (&topology->cond_client);
    }
 
+   if (!topology->single_threaded) {
+      mongoc_topology_background_monitor_reconcile (topology->background_monitor);
+   }
+
    bson_mutex_unlock (&topology->mutex);
 }
 
@@ -1158,7 +1162,7 @@ _mongoc_topology_update_from_handshake (mongoc_topology_t *topology,
    mongoc_cond_broadcast (&topology->cond_client);
    /* Update background monitoring. */
    // CHANGEBACK
-   // mongoc_topology_background_monitor_reconcile (topology->background_monitor);
+   mongoc_topology_background_monitor_reconcile (topology->background_monitor);
    bson_mutex_unlock (&topology->mutex);
 
    return has_server;
