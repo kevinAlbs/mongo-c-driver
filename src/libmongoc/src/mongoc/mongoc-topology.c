@@ -1220,8 +1220,8 @@ _mongoc_topology_get_type (mongoc_topology_t *topology)
  *
  *--------------------------------------------------------------------------
  */
-static void *
-_mongoc_topology_run_background (void *data)
+static
+BSON_THREAD_FUN (_mongoc_topology_run_background, data)
 {
    mongoc_topology_t *topology;
    int64_t now;
@@ -1349,8 +1349,10 @@ _mongoc_topology_start_background_scanner (mongoc_topology_t *topology)
    _mongoc_handshake_freeze ();
    _mongoc_topology_description_monitor_opening (&topology->description);
 
+   MONGOC_DEBUG ("start thread - start");
    r = bson_thread_create (
       &topology->thread, _mongoc_topology_run_background, topology);
+   MONGOC_DEBUG ("start thread - end");
 
    if (r != 0) {
       MONGOC_ERROR ("could not start topology scanner thread: %s",
@@ -1405,7 +1407,9 @@ _mongoc_topology_background_thread_stop (mongoc_topology_t *topology)
    if (join_thread) {
       /* if we're joining the thread, wait for it to come back and broadcast
        * all listeners */
+      MONGOC_DEBUG ("join start");
       bson_thread_join (topology->thread);
+      MONGOC_DEBUG ("join end");
 
       bson_mutex_lock (&topology->mutex);
       topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;

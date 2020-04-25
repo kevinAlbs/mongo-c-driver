@@ -197,6 +197,7 @@ _mongoc_socket_wait (mongoc_socket_t *sock, /* IN */
       }
 
 #ifdef _WIN32
+      MONGOC_DEBUG ("select - start");
       if (timeout == -1) {
          /* not WSAPoll: daniel.haxx.se/blog/2012/10/10/wsapoll-is-broken */
          ret = select (0 /*unused*/, &read_fds, &write_fds, &error_fds, NULL);
@@ -206,6 +207,7 @@ _mongoc_socket_wait (mongoc_socket_t *sock, /* IN */
          ret = select (
             0 /*unused*/, &read_fds, &write_fds, &error_fds, &timeout_tv);
       }
+      MONGOC_DEBUG ("select - end");
       if (ret == SOCKET_ERROR) {
          _mongoc_socket_capture_errno (sock);
          ret = -1;
