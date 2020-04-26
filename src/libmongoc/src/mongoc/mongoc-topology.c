@@ -1374,8 +1374,6 @@ DONE:
 bool
 _mongoc_topology_start_background_scanner (mongoc_topology_t *topology)
 {
-   //int r;
-
    if (topology->single_threaded) {
       return false;
    }
@@ -1393,15 +1391,6 @@ _mongoc_topology_start_background_scanner (mongoc_topology_t *topology)
 
    _mongoc_handshake_freeze ();
    _mongoc_topology_description_monitor_opening (&topology->description);
-
-   // r = bson_thread_create (
-   //    &topology->thread, _mongoc_topology_run_background, topology);
-
-   // if (r != 0) {
-   //    MONGOC_ERROR ("could not start topology scanner thread: %s",
-   //                  strerror (r));
-   //    abort ();
-   // }
 
    /* The first reconcile. */
    mongoc_topology_background_monitor_reconcile (topology->background_monitor);
@@ -1442,7 +1431,6 @@ _mongoc_topology_background_thread_stop (mongoc_topology_t *topology)
       /* if the background thread is running, request a shutdown and signal the
        * thread */
       topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN;
-      // mongoc_cond_signal (&topology->cond_server);
       join_thread = true;
    } else {
       /* nothing to do if it's already off */
@@ -1453,11 +1441,10 @@ _mongoc_topology_background_thread_stop (mongoc_topology_t *topology)
    if (join_thread) {
       /* if we're joining the thread, wait for it to come back and broadcast
        * all listeners */
-      // bson_thread_join (topology->thread);
 
       bson_mutex_lock (&topology->mutex);
-      topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;
       mongoc_topology_background_monitor_shutdown (topology->background_monitor);
+      topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;
       bson_mutex_unlock (&topology->mutex);
 
       mongoc_cond_broadcast (&topology->cond_client);
