@@ -40,8 +40,7 @@
 typedef enum {
    MONGOC_TOPOLOGY_SCANNER_OFF,
    MONGOC_TOPOLOGY_SCANNER_BG_RUNNING,
-   MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN,
-   MONGOC_TOPOLOGY_SCANNER_SINGLE_THREADED,
+   MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN
 } mongoc_topology_scanner_state_t;
 
 struct _mongoc_background_monitor_t;
@@ -67,11 +66,8 @@ typedef struct _mongoc_topology_t {
 
    bson_mutex_t mutex;
    mongoc_cond_t cond_client;
-   mongoc_cond_t cond_server;
-   bson_thread_t thread;
-
    mongoc_topology_scanner_state_t scanner_state;
-   bool scan_requested;
+
    bool single_threaded;
    bool stale;
 
