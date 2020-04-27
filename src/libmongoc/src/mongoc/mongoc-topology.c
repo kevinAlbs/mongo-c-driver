@@ -382,10 +382,9 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
    topology->description.type = init_type;
 
    if (!topology->single_threaded) {
-      topology->background_monitor =
-         mongoc_topology_background_monitor_new (topology);
+      topology->server_monitors = mongoc_set_new (1, NULL, NULL);
+      bson_mutex_init (&topology->apm_mutex);
    }
-   bson_mutex_init (&topology->apm_mutex);
 
    if (!topology_valid) {
       /* add no nodes */
@@ -475,8 +474,11 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
    mongoc_uri_destroy (topology->uri);
    mongoc_topology_description_destroy (&topology->description);
    mongoc_topology_scanner_destroy (topology->scanner);
-   mongoc_topology_background_monitor_destroy (topology->background_monitor);
-   bson_mutex_destroy (&topology->apm_mutex);
+   if (!topology->single_threaded) {
+      BSON_ASSERT (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_OFF);
+      mongoc_set_destroy (topology->server_monitors);
+      bson_mutex_destroy (&topology->apm_mutex);
+   }
 
    /* If we are single-threaded, the client will try to call
       _mongoc_topology_end_sessions_cmd when it dies. This removes
@@ -962,7 +964,7 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
 
          // mongoc_topology_scanner_get_error (ts, &scanner_error);
          mongoc_topology_background_monitor_collect_errors (
-            topology->background_monitor, &scanner_error);
+            topology, &scanner_error);
 
          bson_mutex_unlock (&topology->mutex);
 
@@ -1097,8 +1099,7 @@ _mongoc_topology_host_by_id (mongoc_topology_t *topology,
 void
 _mongoc_topology_request_scan (mongoc_topology_t *topology)
 {
-   mongoc_topology_background_monitor_request_scan (
-      topology->background_monitor);
+   mongoc_topology_background_monitor_request_scan (topology);
 }
 
 /*
@@ -1155,7 +1156,7 @@ _mongoc_topology_update_from_handshake (mongoc_topology_t *topology,
    /* if pooled, wake threads waiting in mongoc_topology_server_by_id */
    mongoc_cond_broadcast (&topology->cond_client);
    /* Update background monitoring. */
-   mongoc_topology_background_monitor_reconcile (topology->background_monitor);
+   mongoc_topology_background_monitor_reconcile (topology);
    bson_mutex_unlock (&topology->mutex);
 
    return has_server;
@@ -1248,103 +1249,6 @@ _mongoc_topology_get_type (mongoc_topology_t *topology)
    bson_mutex_unlock (&topology->mutex);
 
    return td_type;
-}
-
-/*
- *--------------------------------------------------------------------------
- *
- * mongoc_topology_start_background_scanner
- *
- *       Start the topology background thread running. This should only be
- *       called once per pool. If clients are created separately (not
- *       through a pool) the SDAM logic will not be run in a background
- *       thread. Returns whether or not the scanner is running on termination
- *       of the function.
- *
- *       NOTE: this method uses @topology's mutex.
- *
- *--------------------------------------------------------------------------
- */
-
-bool
-_mongoc_topology_start_background_scanner (mongoc_topology_t *topology)
-{
-   if (topology->single_threaded) {
-      return false;
-   }
-
-   bson_mutex_lock (&topology->mutex);
-
-   if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_BG_RUNNING) {
-      bson_mutex_unlock (&topology->mutex);
-      return true;
-   }
-
-   BSON_ASSERT (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_OFF);
-
-   topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_BG_RUNNING;
-
-   _mongoc_handshake_freeze ();
-   _mongoc_topology_description_monitor_opening (&topology->description);
-
-   /* The first reconcile. */
-   mongoc_topology_background_monitor_reconcile (topology->background_monitor);
-
-   bson_mutex_unlock (&topology->mutex);
-
-   return true;
-}
-
-/*
- *--------------------------------------------------------------------------
- *
- * mongoc_topology_background_thread_stop --
- *
- *       Stop the topology background thread. Called by the owning pool at
- *       its destruction.
- *
- *       NOTE: this method uses @topology's mutex.
- *
- *--------------------------------------------------------------------------
- */
-
-void
-_mongoc_topology_background_thread_stop (mongoc_topology_t *topology)
-{
-   bool join_thread = false;
-
-   if (topology->single_threaded) {
-      return;
-   }
-
-   bson_mutex_lock (&topology->mutex);
-
-   BSON_ASSERT (topology->scanner_state !=
-                MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN);
-
-   if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_BG_RUNNING) {
-      /* if the background thread is running, request a shutdown and signal the
-       * thread */
-      topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN;
-      join_thread = true;
-   } else {
-      /* nothing to do if it's already off */
-   }
-
-   bson_mutex_unlock (&topology->mutex);
-
-   if (join_thread) {
-      /* if we're joining the thread, wait for it to come back and broadcast
-       * all listeners */
-
-      bson_mutex_lock (&topology->mutex);
-      mongoc_topology_background_monitor_shutdown (
-         topology->background_monitor);
-      topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;
-      bson_mutex_unlock (&topology->mutex);
-
-      mongoc_cond_broadcast (&topology->cond_client);
-   }
 }
 
 bool

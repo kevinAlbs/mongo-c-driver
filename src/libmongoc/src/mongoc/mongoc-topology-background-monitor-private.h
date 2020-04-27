@@ -20,35 +20,24 @@
 #ifndef MONGOC_TOPOLOGY_BACKGROUND_MONITOR_PRIVATE_H
 #define MONGOC_TOPOLOGY_BACKGROUND_MONITOR_PRIVATE_H
 
-#include <bson/bson.h>
+#include <mongoc/mongoc.h>
 
-struct _mongoc_background_monitor_t;
+/* Functions related to background monitoring. */
 
-struct _mongoc_background_monitor_t *
-mongoc_topology_background_monitor_new (mongoc_topology_t *topology);
+bool
+_mongoc_topology_background_monitor_start (mongoc_topology_t *topology);
 
-/* Topology has changed. */
 void
-mongoc_topology_background_monitor_reconcile (
-   struct _mongoc_background_monitor_t *background_monitor);
+mongoc_topology_background_monitor_reconcile (mongoc_topology_t *topology);
 
 /* Server selection or something else needs immediate scan. */
 void
-mongoc_topology_background_monitor_request_scan (
-   struct _mongoc_background_monitor_t *background_monitor);
-
-/* Grab all errors from the topology description. */
-void
-mongoc_topology_background_monitor_collect_errors (
-   struct _mongoc_background_monitor_t *background_monitor,
-   bson_error_t *error);
+mongoc_topology_background_monitor_request_scan (mongoc_topology_t *topology);
 
 void
-mongoc_topology_background_monitor_shutdown (
-   struct _mongoc_background_monitor_t *background_monitor);
+mongoc_topology_background_monitor_collect_errors (mongoc_topology_t *topology, bson_error_t *error);
 
 void
-mongoc_topology_background_monitor_destroy (
-   struct _mongoc_background_monitor_t *background_monitor);
+mongoc_topology_background_monitor_shutdown (mongoc_topology_t *topology);
 
 #endif

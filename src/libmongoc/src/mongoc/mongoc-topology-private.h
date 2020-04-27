@@ -90,7 +90,8 @@ typedef struct _mongoc_topology_t {
    bson_t *mongocryptd_spawn_args;
 #endif
 
-   struct _mongoc_background_monitor_t *background_monitor;
+   /* For background monitoring. */
+   mongoc_set_t *server_monitors;
    bson_mutex_t apm_mutex;
 
 } mongoc_topology_t;
@@ -154,12 +155,6 @@ mongoc_topology_server_timestamp (mongoc_topology_t *topology, uint32_t id);
 
 mongoc_topology_description_type_t
 _mongoc_topology_get_type (mongoc_topology_t *topology);
-
-bool
-_mongoc_topology_start_background_scanner (mongoc_topology_t *topology);
-
-void
-_mongoc_topology_background_thread_stop (mongoc_topology_t *topology);
 
 bool
 _mongoc_topology_set_appname (mongoc_topology_t *topology, const char *appname);

@@ -1,3 +1,21 @@
+/*
+ * Copyright 2020-present MongoDB, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* Code related to background monitoring. */
+
 #include "mongoc-topology-private.h"
 #include "mongoc-log-private.h"
 #include "mongoc-util-private.h"
@@ -10,13 +28,6 @@
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "bg_monitor"
-
-/* TODO:
- * Clean up mongoc_topology_t
- * move shared things from topology into shared struct
- * move read_only things into readonly struct
- * I _think_ that's everything?
- */
 
 /* TODO: replace these with traces */
 
@@ -54,13 +65,6 @@ typedef struct {
    mongoc_stream_initiator_t initiator;
    void *initiator_context;
 } mongoc_server_monitor_t;
-
-/* mongoc_background_monitor_t is an extension of mongoc_topology_t. */
-typedef struct _mongoc_background_monitor_t {
-   mongoc_topology_t *topology;
-   mongoc_set_t *server_monitors;
-   /* TODO: error queue. */
-} mongoc_background_monitor_t;
 
 
 /* Called only from server monitor thread.
@@ -354,11 +358,7 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
          }
 
          bson_destroy (&cmd);
-         bson_mutex_lock (&server_monitor->topology->mutex);
-         bson_copy_to (_mongoc_topology_scanner_get_ismaster (
-                          server_monitor->topology->scanner),
-                       &cmd);
-         bson_mutex_unlock (&server_monitor->topology->mutex);
+         bson_copy_to (_mongoc_topology_get_ismaster (server_monitor->topology), &cmd);
 
       }
 
@@ -534,16 +534,14 @@ _server_monitor_request_scan (mongoc_server_monitor_t *server_monitor)
  */
 static void
 _background_monitor_reconcile_server_monitor (
-   mongoc_background_monitor_t *background_monitor,
+   mongoc_topology_t *topology,
    mongoc_server_description_t *sd)
 {
    mongoc_set_t *server_monitors;
    mongoc_server_monitor_t *server_monitor;
-   mongoc_topology_t *topology;
 
 
-   topology = background_monitor->topology;
-   server_monitors = background_monitor->server_monitors;
+   server_monitors = topology->server_monitors;
    server_monitor = mongoc_set_get (server_monitors, sd->id);
 
    if (!server_monitor) {
@@ -585,18 +583,17 @@ _background_monitor_reconcile_server_monitor (
 /* Called from application threads
  * Caller must hold topology lock.
  * Locks topology description mutex to copy out server description errors.
+ * CLEANUP: this has nothing to do with background monitoring. Move to mongoc-topology.c.
  */
 void
 mongoc_topology_background_monitor_collect_errors (
-   mongoc_background_monitor_t *background_monitor, bson_error_t *error_out)
+   mongoc_topology_t *topology, bson_error_t *error_out)
 {
-   mongoc_topology_t *topology;
    mongoc_topology_description_t *topology_description;
    mongoc_server_description_t *server_description;
    bson_string_t *error_message;
    int i;
 
-   topology = background_monitor->topology;
    topology_description = &topology->description;
    memset (error_out, 0, sizeof (bson_error_t));
    error_message = bson_string_new ("");
@@ -673,8 +670,7 @@ quite yet.
  * May join / remove server monitors that have completed shutdown.
  */
 void
-mongoc_topology_background_monitor_reconcile (
-   mongoc_background_monitor_t *background_monitor)
+mongoc_topology_background_monitor_reconcile (mongoc_topology_t *topology)
 {
    mongoc_topology_t *topology;
    mongoc_topology_description_t *td;
@@ -684,10 +680,9 @@ mongoc_topology_background_monitor_reconcile (
    uint32_t n_server_monitor_ids_to_remove = 0;
    int i;
 
-   topology = background_monitor->topology;
    td = &topology->description;
    server_descriptions = td->servers;
-   server_monitors = background_monitor->server_monitors;
+   server_monitors = topology->server_monitors;
 
    if (topology->scanner_state != MONGOC_TOPOLOGY_SCANNER_BG_RUNNING) {
       return;
@@ -698,7 +693,7 @@ mongoc_topology_background_monitor_reconcile (
       mongoc_server_description_t *sd;
 
       sd = mongoc_set_get_item (server_descriptions, i);
-      _background_monitor_reconcile_server_monitor (background_monitor, sd);
+      _background_monitor_reconcile_server_monitor (topology, sd);
    }
 
    /* Signal shutdown to server monitors no longer in the topology description.
@@ -732,16 +727,16 @@ mongoc_topology_background_monitor_reconcile (
  */
 void
 mongoc_topology_background_monitor_request_scan (
-   mongoc_background_monitor_t *background_monitor)
+   mongoc_topology_t *topology)
 {
    mongoc_set_t *server_monitors;
    int i;
 
-   if (background_monitor->topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
+   if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
       return;
    }
 
-   server_monitors = background_monitor->server_monitors;
+   server_monitors = topology->server_monitors;
 
    for (i = 0; i < server_monitors->items_len; i++) {
       mongoc_server_monitor_t *server_monitor;
@@ -754,6 +749,52 @@ mongoc_topology_background_monitor_request_scan (
 }
 
 /*
+ *--------------------------------------------------------------------------
+ *
+ * mongoc_topology_start_background_scanner
+ *
+ *       Start the topology background thread running. This should only be
+ *       called once per pool. If clients are created separately (not
+ *       through a pool) the SDAM logic will not be run in a background
+ *       thread. Returns whether or not the scanner is running on termination
+ *       of the function.
+ *
+ *       NOTE: this method uses @topology's mutex.
+ *
+ *--------------------------------------------------------------------------
+ */
+
+bool
+mongoc_topology_background_monitor_start (mongoc_topology_t *topology)
+{
+   if (topology->single_threaded) {
+      return false;
+   }
+
+   bson_mutex_lock (&topology->mutex);
+
+   if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_BG_RUNNING) {
+      bson_mutex_unlock (&topology->mutex);
+      return true;
+   }
+
+   BSON_ASSERT (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_OFF);
+
+   topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_BG_RUNNING;
+
+   _mongoc_handshake_freeze ();
+   _mongoc_topology_description_monitor_opening (&topology->description);
+
+   /* The first reconcile. */
+   mongoc_topology_background_monitor_reconcile (topology);
+
+   bson_mutex_unlock (&topology->mutex);
+
+   return true;
+}
+
+
+/*
  * Robust against being called by multiple threads. But in practice, only
  * expected to be called by one application thread only (because
  * mongoc_client_pool_destroy is not thread-safe). Caller must have topology
@@ -762,18 +803,44 @@ mongoc_topology_background_monitor_request_scan (
  * on exit.
  */
 void
-mongoc_topology_background_monitor_shutdown (
-   struct _mongoc_background_monitor_t *background_monitor)
+mongoc_topology_background_monitor_shutdown (mongoc_topology_t *topology)
 {
+   bool join_thread = false;
+
+   if (topology->single_threaded) {
+      return;
+   }
+
+   bson_mutex_lock (&topology->mutex);
+
+   BSON_ASSERT (topology->scanner_state !=
+                MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN);
+
+   if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_BG_RUNNING) {
+      /* if the background thread is running, request a shutdown and signal the
+       * thread */
+      topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN;
+      join_thread = true;
+   } else {
+      /* nothing to do if it's already off */
+   }
+
+   bson_mutex_unlock (&topology->mutex);
+
+   if (join_thread) {
+      /* if we're joining the thread, wait for it to come back and broadcast
+       * all listeners */
+
+      bson_mutex_lock (&topology->mutex);
+
+
    mongoc_topology_t *topology;
    mongoc_server_monitor_t *server_monitor;
    int i;
 
-   topology = background_monitor->topology;
-
    /* Signal all server monitors to shut down. */
-   for (i = 0; i < background_monitor->server_monitors->items_len; i++) {
-      server_monitor = mongoc_set_get_item (background_monitor->server_monitors, i);
+   for (i = 0; i < topology->server_monitors->items_len; i++) {
+      server_monitor = mongoc_set_get_item (topology->server_monitors, i);
       bson_mutex_lock (&server_monitor->shared.mutex);
       server_monitor->shared.shutting_down = true;
       mongoc_cond_signal (&server_monitor->shared.cond);
@@ -783,43 +850,24 @@ mongoc_topology_background_monitor_shutdown (
    /* We can safely unlock the topology mutex now. Since the scanner state has transitioned to shutting down, no thread can modify server_monitors. */
    bson_mutex_unlock (&topology->mutex);
 
-   for (i = 0; i < background_monitor->server_monitors->items_len; i++) {
+   for (i = 0; i < topology->server_monitors->items_len; i++) {
       /* Wait for the thread to shutdown. */
-      server_monitor = mongoc_set_get_item (background_monitor->server_monitors, i);
+      server_monitor = mongoc_set_get_item (topology->server_monitors, i);
       MONGOC_DEBUG ("sm (%d) join start", server_monitor->server_id);
       bson_thread_join (server_monitor->thread);
       MONGOC_DEBUG ("sm (%d) join end", server_monitor->server_id);
       _server_monitor_destroy (server_monitor);
    }
 
-   mongoc_set_destroy (background_monitor->server_monitors);
+   mongoc_set_destroy (topology->server_monitors);
 
-   background_monitor->server_monitors = mongoc_set_new (1, NULL, NULL);
+   topology->server_monitors = mongoc_set_new (1, NULL, NULL);
 
    bson_mutex_lock (&topology->mutex);
-}
 
-mongoc_background_monitor_t *
-mongoc_topology_background_monitor_new (mongoc_topology_t *topology)
-{
-   mongoc_background_monitor_t *background_monitor;
+      topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;
+      bson_mutex_unlock (&topology->mutex);
 
-   background_monitor = bson_malloc0 (sizeof (mongoc_background_monitor_t));
-   background_monitor->topology = topology;
-   background_monitor->server_monitors = mongoc_set_new (1, NULL, NULL);
-   return background_monitor;
-}
-
-/* Called after shutdown. */
-void
-mongoc_topology_background_monitor_destroy (
-   mongoc_background_monitor_t *background_monitor)
-{
-   if (!background_monitor) {
-      return;
+      mongoc_cond_broadcast (&topology->cond_client);
    }
-   BSON_ASSERT (background_monitor->topology->scanner_state ==
-                MONGOC_TOPOLOGY_SCANNER_OFF);
-   mongoc_set_destroy (background_monitor->server_monitors);
-   bson_free (background_monitor);
 }
