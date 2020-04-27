@@ -30,7 +30,6 @@ _mongoc_topology_background_monitoring_start (mongoc_topology_t *topology);
 void
 _mongoc_topology_background_monitoring_reconcile (mongoc_topology_t *topology);
 
-/* Server selection or something else needs immediate scan. */
 void
 _mongoc_topology_background_monitoring_request_scan (mongoc_topology_t *topology);
 
