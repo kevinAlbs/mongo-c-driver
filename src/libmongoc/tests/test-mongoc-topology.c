@@ -16,6 +16,123 @@
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "topology-test"
 
+typedef struct {
+   int n_started;
+   int n_succeeded;
+   int n_failed;
+   int n_unknowns;
+   bson_mutex_t mutex;
+} checks_t;
+
+static void
+checks_init (checks_t *checks)
+{
+   memset (checks, 0, sizeof (*checks));
+   bson_mutex_init (&checks->mutex);
+}
+
+static void
+checks_cleanup (checks_t *checks)
+{
+   bson_mutex_destroy (&checks->mutex);
+}
+
+static bool
+checks_cmp (checks_t *checks, const char *metric, char cmp, int expected)
+{
+   int actual;
+
+   bson_mutex_lock (&checks->mutex);
+   if (0 == strcmp (metric, "n_started")) {
+      actual = checks->n_started;
+   } else if (0 == strcmp (metric, "n_succeeded")) {
+      actual = checks->n_succeeded;
+   } else if (0 == strcmp (metric, "n_failed")) {
+      actual = checks->n_failed;
+   } else if (0 == strcmp (metric, "n_unknowns")) {
+      actual = checks->n_unknowns;
+   } else {
+      test_error ("unknown metric: %s", metric);
+   }
+
+   bson_mutex_unlock (&checks->mutex);
+
+   if (cmp == '=') {
+      return expected == actual;
+   } else if (cmp == '>') {
+      return expected > actual;
+   } else if (cmp == '<') {
+      return expected < actual;
+   } else {
+      test_error ("unknown comparison: %c", cmp);
+   }
+   return false;
+}
+
+static void
+check_started (const mongoc_apm_server_heartbeat_started_t *event)
+{
+   checks_t *c;
+
+   c = (checks_t *) mongoc_apm_server_heartbeat_started_get_context (event);
+   bson_mutex_lock (&c->mutex);
+   c->n_started++;
+   bson_mutex_unlock (&c->mutex);
+}
+
+
+static void
+check_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
+{
+   checks_t *c;
+
+   c = (checks_t *) mongoc_apm_server_heartbeat_succeeded_get_context (event);
+   bson_mutex_lock (&c->mutex);
+   c->n_succeeded++;
+   bson_mutex_unlock (&c->mutex);
+}
+
+
+static void
+check_failed (const mongoc_apm_server_heartbeat_failed_t *event)
+{
+   checks_t *c;
+
+   c = (checks_t *) mongoc_apm_server_heartbeat_failed_get_context (event);
+   bson_mutex_lock (&c->mutex);
+   c->n_failed++;
+   bson_mutex_unlock (&c->mutex);
+}
+
+static void
+server_changed_callback (const mongoc_apm_server_changed_t *event)
+{
+   checks_t *c;
+   const mongoc_server_description_t *sd;
+
+   c = (checks_t *) mongoc_apm_server_changed_get_context (event);
+   bson_mutex_lock (&c->mutex);
+   sd = mongoc_apm_server_changed_get_new_description (event);
+   if (sd->type == MONGOC_SERVER_UNKNOWN) {
+      c->n_unknowns++;
+   }
+   bson_mutex_unlock (&c->mutex);
+}
+
+
+static mongoc_apm_callbacks_t *
+heartbeat_callbacks (void)
+{
+   mongoc_apm_callbacks_t *callbacks;
+
+   callbacks = mongoc_apm_callbacks_new ();
+   mongoc_apm_set_server_heartbeat_started_cb (callbacks, check_started);
+   mongoc_apm_set_server_heartbeat_succeeded_cb (callbacks, check_succeeded);
+   mongoc_apm_set_server_heartbeat_failed_cb (callbacks, check_failed);
+   mongoc_apm_set_server_changed_cb (callbacks, server_changed_callback);
+
+   return callbacks;
+}
 
 static void
 test_topology_client_creation (void)
@@ -350,16 +467,26 @@ _test_topology_invalidate_server (bool pooled)
    uint32_t fake_id = 42;
    uint32_t id;
    mongoc_server_stream_t *server_stream;
+   checks_t checks;
+   int server_count;
+   mongoc_apm_callbacks_t *callbacks;
 
+   checks_init (&checks);
    uri = test_framework_get_uri ();
    /* no auto heartbeat */
    mongoc_uri_set_option_as_int32 (uri, "heartbeatFrequencyMS", INT32_MAX);
-   mongoc_uri_set_option_as_int32 (uri, "connectTimeoutMS", 2000);
+   mongoc_uri_set_option_as_int32 (uri, "connectTimeoutMS", 3000);
+   server_count = test_framework_server_count ();
+   callbacks = heartbeat_callbacks ();
 
    if (pooled) {
       pool = mongoc_client_pool_new (uri);
+      mongoc_client_pool_set_apm_callbacks (pool, callbacks, &checks);
       test_framework_set_pool_ssl_opts (pool);
       client = mongoc_client_pool_pop (pool);
+
+      /* wait for all nodes to be scanned. */
+      WAIT_UNTIL (checks_cmp (&checks, "n_succeeded", '=', server_count));
 
       /* background scanner complains about failed connection */
       capture_logs (true);
@@ -406,6 +533,10 @@ _test_topology_invalidate_server (bool pooled)
       &client->cluster, fake_id, true, NULL, NULL, &error));
    bson_mutex_lock (&client->topology->mutex);
    sd = (mongoc_server_description_t *) mongoc_set_get (td->servers, fake_id);
+   /* A single threaded client, during reconnect, will scan ALL servers.
+    * When it receives a response from one of those nodes, showing that
+    * "fakeaddress" is not in the host list, it will remove the
+    * server description from the topology description. */
    if (!pooled && test_framework_is_replset ()) {
       BSON_ASSERT (!sd);
    } else {
@@ -430,6 +561,8 @@ _test_topology_invalidate_server (bool pooled)
    } else {
       mongoc_client_destroy (client);
    }
+   mongoc_apm_callbacks_destroy (callbacks);
+   checks_cleanup (&checks);
 }
 
 static void
@@ -1202,72 +1335,6 @@ test_add_and_scan_failure (void)
 }
 
 
-typedef struct {
-   int n_started;
-   int n_succeeded;
-   int n_failed;
-   int n_unknowns;
-} checks_t;
-
-
-static void
-check_started (const mongoc_apm_server_heartbeat_started_t *event)
-{
-   checks_t *c;
-   
-   c = (checks_t *) mongoc_apm_server_heartbeat_started_get_context (event);
-   c->n_started++;
-}
-
-
-static void
-check_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
-{
-   checks_t *c;
-   
-   c = (checks_t *) mongoc_apm_server_heartbeat_succeeded_get_context (event);
-   c->n_succeeded++;
-}
-
-
-static void
-check_failed (const mongoc_apm_server_heartbeat_failed_t *event)
-{
-   checks_t *c;
-
-   c = (checks_t *) mongoc_apm_server_heartbeat_failed_get_context (event);
-   c->n_failed++;
-}
-
-static void
-server_changed_callback (const mongoc_apm_server_changed_t *event)
-{
-   checks_t *c;
-   const mongoc_server_description_t *sd;
-
-   c = (checks_t *) mongoc_apm_server_changed_get_context (event);
-   sd = mongoc_apm_server_changed_get_new_description (event);
-   if (sd->type == MONGOC_SERVER_UNKNOWN) {
-      c->n_unknowns++;
-   }
-}
-
-
-static mongoc_apm_callbacks_t *
-heartbeat_callbacks (void)
-{
-   mongoc_apm_callbacks_t *callbacks;
-
-   callbacks = mongoc_apm_callbacks_new ();
-   mongoc_apm_set_server_heartbeat_started_cb (callbacks, check_started);
-   mongoc_apm_set_server_heartbeat_succeeded_cb (callbacks, check_succeeded);
-   mongoc_apm_set_server_heartbeat_failed_cb (callbacks, check_failed);
-   mongoc_apm_set_server_changed_cb (callbacks, server_changed_callback);
-
-   return callbacks;
-}
-
-
 static future_t *
 future_command (mongoc_client_t *client, bson_error_t *error)
 {
@@ -1307,7 +1374,7 @@ has_known_server (mongoc_client_t *client)
 static void
 _test_ismaster_retry_single (bool hangup, int n_failures)
 {
-   checks_t checks = {0};
+   checks_t checks;
    mongoc_apm_callbacks_t *callbacks;
    mock_server_t *server;
    mongoc_uri_t *uri;
@@ -1318,6 +1385,7 @@ _test_ismaster_retry_single (bool hangup, int n_failures)
    bson_error_t error;
    int64_t t;
 
+   checks_init (&checks);
    server = mock_server_new ();
    mock_server_run (server);
    uri = mongoc_uri_copy (mock_server_get_uri (server));
@@ -1388,6 +1456,7 @@ _test_ismaster_retry_single (bool hangup, int n_failures)
       BSON_ASSERT (has_known_server (client));
    }
 
+   checks_cleanup (&checks);
    mongoc_client_destroy (client);
    mongoc_uri_destroy (uri);
    mock_server_destroy (server);
@@ -1399,7 +1468,7 @@ _test_ismaster_retry_single (bool hangup, int n_failures)
 static void
 _test_ismaster_retry_pooled (bool hangup, int n_failures)
 {
-   checks_t checks = {0};
+   checks_t checks;
    mongoc_apm_callbacks_t *callbacks;
    mock_server_t *server;
    mongoc_uri_t *uri;
@@ -1412,6 +1481,7 @@ _test_ismaster_retry_pooled (bool hangup, int n_failures)
    int i;
    int64_t t;
 
+   checks_init (&checks);
    server = mock_server_new ();
    mock_server_run (server);
    uri = mongoc_uri_copy (mock_server_get_uri (server));
@@ -1459,13 +1529,13 @@ _test_ismaster_retry_pooled (bool hangup, int n_failures)
    /* retry immediately (for testing, "immediately" means less than 250ms */
    request = mock_server_receives_ismaster (server);
    ASSERT_CMPINT64 (bson_get_monotonic_time () - t, <, (int64_t) 250 * 1000);
+   /* Since connection was established successfully, the server description is not marked as Unknown until after a failed retry attempt. */
+   BSON_ASSERT (has_known_server (client));
    if (n_failures == 2) {
       if (hangup) {
          mock_server_hangs_up (request);
       }
-      // /* The server description should not transition to Unknown until after the
-      //  * retry has failed. */
-      // BSON_ASSERT (has_known_server (client));
+      WAIT_UNTIL (!has_known_server (client));
    } else {
       mock_server_replies_simple (request, ismaster);
       WAIT_UNTIL (has_known_server (client));
@@ -1473,10 +1543,11 @@ _test_ismaster_retry_pooled (bool hangup, int n_failures)
 
    request_destroy (request);
 
-   WAIT_UNTIL (checks.n_succeeded == 3 - n_failures);
-   WAIT_UNTIL (checks.n_failed == n_failures);
-   ASSERT_CMPINT (checks.n_started, ==, 3);
+   WAIT_UNTIL (checks_cmp (&checks, "n_succeeded", '=', 3 - n_failures));
+   WAIT_UNTIL (checks_cmp (&checks, "n_failed", '=', n_failures));
+   BSON_ASSERT (checks_cmp (&checks, "n_started", '=', 3));
 
+   checks_cleanup (&checks);
    mongoc_client_pool_push (pool, client);
    mongoc_client_pool_destroy (pool);
    mongoc_uri_destroy (uri);
@@ -1738,11 +1809,12 @@ _test_request_scan_on_error (bool pooled,
    const int64_t minHBMS = 10;
    int64_t ping_started_usec = 0;
    mongoc_apm_callbacks_t *callbacks;
-   checks_t ctx = {0};
+   checks_t checks;
    mongoc_server_description_t *sd;
    uint32_t primary_id;
    mongoc_read_prefs_t *read_prefs;
 
+   checks_init (&checks);
    read_prefs = mongoc_read_prefs_new (MONGOC_READ_PRIMARY_PREFERRED);
 
    primary = mock_server_new ();
@@ -1775,23 +1847,23 @@ _test_request_scan_on_error (bool pooled,
 
    callbacks = heartbeat_callbacks ();
    if (pooled) {
-      mongoc_client_pool_set_apm_callbacks (client_pool, callbacks, &ctx);
+      mongoc_client_pool_set_apm_callbacks (client_pool, callbacks, &checks);
    } else {
-      mongoc_client_set_apm_callbacks (client, callbacks, &ctx);
+      mongoc_client_set_apm_callbacks (client, callbacks, &checks);
    }
    mongoc_apm_callbacks_destroy (callbacks);
 
    if (pooled) {
       client = mongoc_client_pool_pop (client_pool);
       /* Scanning starts, wait for the initial scan. */
-      WAIT_UNTIL (ctx.n_succeeded == 2);
+      WAIT_UNTIL (checks_cmp (&checks, "n_succeeded", '=', 2));
    }
 
    sd = mongoc_client_select_server (client, true, NULL, &error);
    ASSERT_OR_PRINT (sd, error);
    primary_id = sd->id;
    mongoc_server_description_destroy (sd);
-   ASSERT_CMPINT (ctx.n_succeeded, ==, 2);
+   BSON_ASSERT (checks_cmp (&checks, "n_succeeded", '=', 2));
 
    mongoc_uri_destroy (uri);
    ping_started_usec = bson_get_monotonic_time ();
@@ -1814,7 +1886,7 @@ _test_request_scan_on_error (bool pooled,
 
    sd = mongoc_client_get_server_description (client, primary_id);
    if (should_mark_unknown) {
-      WAIT_UNTIL (ctx.n_unknowns == 1);
+      BSON_ASSERT (checks_cmp (&checks, "n_unknowns", '=', 1));
       /* background monitoring may have already overwritten the unknown server
        * description if the scan was requested. */
       if (pooled) {
@@ -1844,10 +1916,10 @@ _test_request_scan_on_error (bool pooled,
    if (pooled) {
       if (should_scan) {
          /* a scan is requested immediately. wait for the scan to finish. */
-         WAIT_UNTIL (ctx.n_started == 4);
+         WAIT_UNTIL (checks_cmp (&checks, "n_started", '=', 4));
       } else {
          _mongoc_usleep (minHBMS * 2);
-         ASSERT_CMPINT (ctx.n_started, ==, 2);
+         BSON_ASSERT (checks_cmp (&checks, "n_started", '=', 2));
       }
    } else {
       /* a single threaded client may mark the topology as stale. if a scan
@@ -1869,9 +1941,9 @@ _test_request_scan_on_error (bool pooled,
       future_destroy (future);
       bson_destroy (&reply);
       if (should_scan) {
-         ASSERT_CMPINT (ctx.n_started, ==, 4);
+         BSON_ASSERT (checks_cmp (&checks, "n_started", '=', 4));
       } else {
-         ASSERT_CMPINT (ctx.n_started, ==, 2);
+         BSON_ASSERT (checks_cmp (&checks, "n_started", '=', 2));
       }
    }
 
@@ -1881,6 +1953,7 @@ _test_request_scan_on_error (bool pooled,
    } else {
       mongoc_client_destroy (client);
    }
+   checks_cleanup (&checks);
    mock_server_destroy (primary);
    mock_server_destroy (secondary);
    mongoc_read_prefs_destroy (read_prefs);
@@ -2017,10 +2090,11 @@ test_slow_server_pooled (void)
    mongoc_uri_t *uri;
    mongoc_apm_callbacks_t *callbacks;
    request_t *request;
-   checks_t ctx = {0};
+   checks_t checks;
    bool ret;
    bson_error_t error;
 
+   checks_init (&checks);
    primary = mock_server_new ();
    secondary = mock_server_new ();
 
@@ -2052,7 +2126,7 @@ test_slow_server_pooled (void)
 
    pool = mongoc_client_pool_new (uri);
    callbacks = heartbeat_callbacks ();
-   mongoc_client_pool_set_apm_callbacks (pool, callbacks, &ctx);
+   mongoc_client_pool_set_apm_callbacks (pool, callbacks, &checks);
 
    /* Set a shorter heartbeat frequencies for faster responses. */
    _mongoc_client_pool_get_topology (pool)->description.heartbeat_msec = 10;
@@ -2061,7 +2135,7 @@ test_slow_server_pooled (void)
    client = mongoc_client_pool_pop (pool);
    /* As soon as a client is popped, background scanning starts.
     * Wait for two scans of the primary. */
-   WAIT_UNTIL (ctx.n_started >= 2);
+   WAIT_UNTIL (checks_cmp (&checks, "n_started", '>', 1));
 
    request = mock_server_receives_ismaster (secondary);
 
@@ -2093,6 +2167,7 @@ test_slow_server_pooled (void)
       client, "admin", tmp_bson ("{'ping': 1}"), prefs_secondary, NULL, &error);
    ASSERT_OR_PRINT (ret, error);
 
+   checks_cleanup (&checks);
    mongoc_read_prefs_destroy (prefs_secondary);
    mongoc_client_pool_push (pool, client);
    mongoc_apm_callbacks_destroy (callbacks);

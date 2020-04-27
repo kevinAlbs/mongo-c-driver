@@ -299,46 +299,56 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
    bson_error_t error = {0};
    int64_t rtt_us;
    int64_t start_us;
-   int attempts;
+   int attempt;
+   bool stream_established = false;
+   mongoc_topology_t *topology;
 
+   topology = server_monitor->topology;
    bson_init (&cmd);
    bson_init (&reply);
    rtt_us = 0;
-   for (attempts = 0; attempts < 2; attempts++) {
-      if (attempts == 1) {
+   attempt = 0;
+   while (true) {
+      /* If the first attempt to send an ismaster failed, see if we can attempt
+       * again.
+       * Server monitoring spec: Once the server is connected, the client MUST
+       * change its type to Unknown only after it has retried the server once.
+      */
+      if (attempt > 0) {
          mongoc_server_description_t *existing_sd;
-         bool should_retry;
+         bool should_retry = false;
 
-         /* "Once a server is connected, the client MUST change its type to
-          * Unknown only after it has retried the server once. (This rule
-          * applies to server checks during monitoring"
-          * If the existing server description is not Unknown, retry.
-          */
-         should_retry = false;
-
-         bson_mutex_lock (&server_monitor->topology->mutex);
-         if (server_monitor->topology->scanner_state !=
-             MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
-            existing_sd = mongoc_topology_description_server_by_id (
-               &server_monitor->topology->description,
-               server_monitor->server_id,
-               NULL);
-            if (existing_sd != NULL &&
-                existing_sd->type != MONGOC_SERVER_UNKNOWN) {
-               should_retry = true;
+         if (attempt > 1 || !stream_established) {
+            /* We've already retried, or we were not able to establish a
+             * connection at all. */
+            should_retry = false;
+         } else {
+            bson_mutex_lock (&topology->mutex);
+            /* If the server description is already Unknown, don't retry. */
+            if (topology->scanner_state !=
+                MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
+               existing_sd = mongoc_topology_description_server_by_id (
+                  &topology->description, server_monitor->server_id, NULL);
+               if (existing_sd != NULL &&
+                   existing_sd->type != MONGOC_SERVER_UNKNOWN) {
+                  should_retry = true;
+               }
             }
+
+            bson_mutex_unlock (&server_monitor->topology->mutex);
          }
-         /* If the server description is already Unknown, don't retry. */
-         bson_mutex_unlock (&server_monitor->topology->mutex);
 
          if (!should_retry) {
+            MONGOC_DEBUG ("cannot retry :(");
             /* error was previously set. */
             _server_monitor_update_topology_description (
                server_monitor, NULL, -1, &error);
             break;
          } else {
+            MONGOC_DEBUG ("going to retry");
          }
       }
+      attempt++;
 
       bson_reinit (&cmd);
       BCON_APPEND (&cmd, "isMaster", BCON_INT32 (1));
@@ -375,6 +385,10 @@ _server_monitor_regular_ismaster (mongoc_server_monitor_t *server_monitor)
          bson_copy_to (_mongoc_topology_get_ismaster (server_monitor->topology),
                        &cmd);
       }
+
+      /* A stream was already established, or we created one successfully. (This
+       * permits a retry). */
+      stream_established = true;
 
       /* Cluster time is updated on every reply. Don't wait for notifications,
        * just poll it. */
@@ -464,6 +478,9 @@ _server_monitor_run (void *server_monitor_void)
       sleep_duration = server_monitor->scan_due_ms - now_ms;
 
       if (sleep_duration > 0) {
+         MONGOC_DEBUG ("sm (%d) sleeping for %d",
+                       server_monitor->server_id,
+                       (int) sleep_duration);
          mongoc_cond_timedwait (&server_monitor->shared.cond,
                                 &server_monitor->shared.mutex,
                                 sleep_duration);
