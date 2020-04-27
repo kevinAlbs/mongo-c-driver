@@ -28,16 +28,13 @@ bool
 _mongoc_topology_background_monitor_start (mongoc_topology_t *topology);
 
 void
-mongoc_topology_background_monitor_reconcile (mongoc_topology_t *topology);
+_mongoc_topology_background_monitor_reconcile (mongoc_topology_t *topology);
 
 /* Server selection or something else needs immediate scan. */
 void
-mongoc_topology_background_monitor_request_scan (mongoc_topology_t *topology);
+_mongoc_topology_background_monitor_request_scan (mongoc_topology_t *topology);
 
 void
-mongoc_topology_background_monitor_collect_errors (mongoc_topology_t *topology, bson_error_t *error);
-
-void
-mongoc_topology_background_monitor_shutdown (mongoc_topology_t *topology);
+_mongoc_topology_background_monitor_shutdown (mongoc_topology_t *topology);
 
 #endif

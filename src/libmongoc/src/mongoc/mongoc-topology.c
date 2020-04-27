@@ -186,8 +186,8 @@ _mongoc_topology_scanner_cb (uint32_t id,
    }
 
    if (!topology->single_threaded) {
-      mongoc_topology_background_monitor_reconcile (
-         topology->background_monitor);
+      _mongoc_topology_background_monitor_reconcile (
+         topology);
    }
 
    bson_mutex_unlock (&topology->mutex);
@@ -468,7 +468,7 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
    bson_free (topology->mongocryptd_spawn_path);
 #endif
 
-   _mongoc_topology_background_thread_stop (topology);
+   _mongoc_topology_background_monitor_stop (topology);
    _mongoc_topology_description_monitor_closed (&topology->description);
 
    mongoc_uri_destroy (topology->uri);
@@ -963,7 +963,7 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
                                     (expire_at - loop_start) / 1000);
 
          // mongoc_topology_scanner_get_error (ts, &scanner_error);
-         mongoc_topology_background_monitor_collect_errors (
+         _mongoc_topology_background_monitor_collect_errors (
             topology, &scanner_error);
 
          bson_mutex_unlock (&topology->mutex);
@@ -1099,7 +1099,7 @@ _mongoc_topology_host_by_id (mongoc_topology_t *topology,
 void
 _mongoc_topology_request_scan (mongoc_topology_t *topology)
 {
-   mongoc_topology_background_monitor_request_scan (topology);
+   _mongoc_topology_background_monitor_request_scan (topology);
 }
 
 /*
@@ -1156,7 +1156,7 @@ _mongoc_topology_update_from_handshake (mongoc_topology_t *topology,
    /* if pooled, wake threads waiting in mongoc_topology_server_by_id */
    mongoc_cond_broadcast (&topology->cond_client);
    /* Update background monitoring. */
-   mongoc_topology_background_monitor_reconcile (topology);
+   _mongoc_topology_background_monitor_reconcile (topology);
    bson_mutex_unlock (&topology->mutex);
 
    return has_server;
@@ -1492,4 +1492,46 @@ _mongoc_topology_bypass_cooldown (mongoc_topology_t *topology)
 {
    BSON_ASSERT (topology->single_threaded);
    topology->scanner->bypass_cooldown = true;
+}
+
+/* Called from application threads
+ * Caller must hold topology lock.
+ * Locks topology description mutex to copy out server description errors.
+ * CLEANUP: this has nothing to do with background monitoring. Move to mongoc-topology.c.
+ * For single-threaded monitoring, the topology scanner may include errors for servers that were removed from the topology.
+ */
+static void
+_mongoc_topology_collect_errors (
+   mongoc_topology_t *topology, bson_error_t *error_out)
+{
+   mongoc_topology_description_t *topology_description;
+   mongoc_server_description_t *server_description;
+   bson_string_t *error_message;
+   int i;
+
+   topology_description = &topology->description;
+   memset (error_out, 0, sizeof (bson_error_t));
+   error_message = bson_string_new ("");
+
+   for (i = 0; i < topology_description->servers->items_len; i++) {
+      bson_error_t *error;
+
+      server_description = topology_description->servers->items[i].item;
+      error = &server_description->error;
+      if (error->code) {
+         if (error_message->len > 0) {
+            bson_string_append_c (error_message, ' ');
+         }
+         bson_string_append_printf (
+            error_message, "[%s]", server_description->error.message);
+         /* The last error's code and domain wins. */
+         error_out->code = error->code;
+         error_out->domain = error->domain;
+      }
+   }
+
+   bson_strncpy ((char *) &error_out->message,
+                 error_message->str,
+                 sizeof (error_out->message));
+   bson_string_free (error_message, true);
 }
