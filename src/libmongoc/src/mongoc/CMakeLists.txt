@@ -171,7 +171,7 @@ set (src_libmongoc_src_mongoc_DIST_cs
    mongoc-array.c
    mongoc-async.c
    mongoc-async-cmd.c
-   mongoc-topology-background-monitor.c
+   mongoc-topology-background-monitoring.c
    mongoc-buffer.c
    mongoc-bulk-operation.c
    mongoc-change-stream.c
