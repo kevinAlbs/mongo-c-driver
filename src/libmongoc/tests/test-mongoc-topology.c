@@ -2256,6 +2256,6 @@ test_topology_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite,
                                 "/Topology/last_server_removed_warning",
                                 test_last_server_removed_warning);
-   // TestSuite_AddMockServerTest (
-   //    suite, "/Topology/slow_server/pooled", test_slow_server_pooled);
+   TestSuite_AddMockServerTest (
+      suite, "/Topology/slow_server/pooled", test_slow_server_pooled);
 }
