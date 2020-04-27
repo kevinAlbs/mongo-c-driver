@@ -17,24 +17,24 @@
 
 #include "mongoc-prelude.h"
 
-#ifndef MONGOC_TOPOLOGY_BACKGROUND_MONITOR_PRIVATE_H
-#define MONGOC_TOPOLOGY_BACKGROUND_MONITOR_PRIVATE_H
+#ifndef MONGOC_TOPOLOGY_BACKGROUND_MONITORING_PRIVATE_H
+#define MONGOC_TOPOLOGY_BACKGROUND_MONITORING_PRIVATE_H
 
-#include <mongoc/mongoc.h>
+/* Methods of mongoc_topology_t for managing background monitoring. */
 
-/* Functions related to background monitoring. */
-
-bool
-_mongoc_topology_background_monitor_start (mongoc_topology_t *topology);
+typedef struct _mongoc_topology_t mongoc_topology_t;
 
 void
-_mongoc_topology_background_monitor_reconcile (mongoc_topology_t *topology);
+_mongoc_topology_background_monitoring_start (mongoc_topology_t *topology);
+
+void
+_mongoc_topology_background_monitoring_reconcile (mongoc_topology_t *topology);
 
 /* Server selection or something else needs immediate scan. */
 void
-_mongoc_topology_background_monitor_request_scan (mongoc_topology_t *topology);
+_mongoc_topology_background_monitoring_request_scan (mongoc_topology_t *topology);
 
 void
-_mongoc_topology_background_monitor_shutdown (mongoc_topology_t *topology);
+_mongoc_topology_background_monitoring_stop (mongoc_topology_t *topology);
 
-#endif
+#endif /* MONGOC_TOPOLOGY_BACKGROUND_MONITORING_PRIVATE_H */

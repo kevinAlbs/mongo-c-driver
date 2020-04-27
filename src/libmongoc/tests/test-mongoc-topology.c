@@ -4,7 +4,7 @@
 
 #include "mongoc/mongoc-client-private.h"
 #include "mongoc/mongoc-util-private.h"
-#include "mongoc/mongoc-topology-background-monitor-private.h"
+#include "mongoc/mongoc-topology-background-monitoring-private.h"
 #include "TestSuite.h"
 
 #include "test-libmongoc.h"
@@ -100,25 +100,35 @@ test_topology_thread_start_stop (void)
    topology = _mongoc_client_pool_get_topology (pool);
 
    /* Test starting up the scanner */
-   ASSERT (_mongoc_topology_background_monitor_start (topology));
+   bson_mutex_lock (&topology->mutex);
+   _mongoc_topology_background_monitoring_start (topology);
+   bson_mutex_unlock (&topology->mutex);
    assert_topology_state (topology, MONGOC_TOPOLOGY_SCANNER_BG_RUNNING);
 
    /* Test that starting the topology while it is already
       running is ok to do. */
-   ASSERT (_mongoc_topology_background_monitor_start (topology));
+   bson_mutex_lock (&topology->mutex);
+   _mongoc_topology_background_monitoring_start (topology);
+   bson_mutex_unlock (&topology->mutex);
    assert_topology_state (topology, MONGOC_TOPOLOGY_SCANNER_BG_RUNNING);
 
    /* Test that we can stop the topology */
-   _mongoc_topology_background_monitor_stop (topology);
+   bson_mutex_lock (&topology->mutex);
+   _mongoc_topology_background_monitoring_stop (topology);
+   bson_mutex_unlock (&topology->mutex);
    assert_topology_state (topology, MONGOC_TOPOLOGY_SCANNER_OFF);
 
    /* Test that stopping the topology when it is already
       stopped is ok to do. */
-   _mongoc_topology_background_monitor_stop (topology);
+   bson_mutex_lock (&topology->mutex);
+   _mongoc_topology_background_monitoring_stop (topology);
+   bson_mutex_unlock (&topology->mutex);
    assert_topology_state (topology, MONGOC_TOPOLOGY_SCANNER_OFF);
 
    /* Test that we can start the topology again after stopping it */
-   ASSERT (_mongoc_topology_background_monitor_start (topology));
+   bson_mutex_lock (&topology->mutex);
+   _mongoc_topology_background_monitoring_start (topology);
+   bson_mutex_unlock (&topology->mutex);
    assert_topology_state (topology, MONGOC_TOPOLOGY_SCANNER_BG_RUNNING);
 
    mongoc_client_pool_destroy (pool);

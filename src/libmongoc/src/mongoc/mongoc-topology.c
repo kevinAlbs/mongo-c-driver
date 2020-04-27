@@ -29,9 +29,13 @@
 #include "mongoc-uri-private.h"
 #include "mongoc-util-private.h"
 #include "mongoc-trace-private.h"
-#include "mongoc-topology-background-monitor-private.h"
+#include "mongoc-topology-background-monitoring-private.h"
 
 #include "utlist.h"
+
+static void
+_topology_collect_errors (
+   mongoc_topology_t *topology, bson_error_t *error_out);
 
 static bool
 _mongoc_topology_reconcile_add_nodes (mongoc_server_description_t *sd,
@@ -186,7 +190,7 @@ _mongoc_topology_scanner_cb (uint32_t id,
    }
 
    if (!topology->single_threaded) {
-      _mongoc_topology_background_monitor_reconcile (
+      _mongoc_topology_background_monitoring_reconcile (
          topology);
    }
 
@@ -468,17 +472,19 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
    bson_free (topology->mongocryptd_spawn_path);
 #endif
 
-   _mongoc_topology_background_monitor_stop (topology);
+   if (!topology->single_threaded) {
+      bson_mutex_lock (&topology->mutex);
+      _mongoc_topology_background_monitoring_stop (topology);
+      bson_mutex_unlock (&topology->mutex);
+      BSON_ASSERT (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_OFF);
+      mongoc_set_destroy (topology->server_monitors);
+      bson_mutex_destroy (&topology->apm_mutex);
+   }
    _mongoc_topology_description_monitor_closed (&topology->description);
 
    mongoc_uri_destroy (topology->uri);
    mongoc_topology_description_destroy (&topology->description);
    mongoc_topology_scanner_destroy (topology->scanner);
-   if (!topology->single_threaded) {
-      BSON_ASSERT (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_OFF);
-      mongoc_set_destroy (topology->server_monitors);
-      bson_mutex_destroy (&topology->apm_mutex);
-   }
 
    /* If we are single-threaded, the client will try to call
       _mongoc_topology_end_sessions_cmd when it dies. This removes
@@ -962,9 +968,7 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
                                     &topology->mutex,
                                     (expire_at - loop_start) / 1000);
 
-         // mongoc_topology_scanner_get_error (ts, &scanner_error);
-         _mongoc_topology_background_monitor_collect_errors (
-            topology, &scanner_error);
+         _topology_collect_errors (topology, &scanner_error);
 
          bson_mutex_unlock (&topology->mutex);
 
@@ -1099,7 +1103,7 @@ _mongoc_topology_host_by_id (mongoc_topology_t *topology,
 void
 _mongoc_topology_request_scan (mongoc_topology_t *topology)
 {
-   _mongoc_topology_background_monitor_request_scan (topology);
+   _mongoc_topology_background_monitoring_request_scan (topology);
 }
 
 /*
@@ -1156,7 +1160,7 @@ _mongoc_topology_update_from_handshake (mongoc_topology_t *topology,
    /* if pooled, wake threads waiting in mongoc_topology_server_by_id */
    mongoc_cond_broadcast (&topology->cond_client);
    /* Update background monitoring. */
-   _mongoc_topology_background_monitor_reconcile (topology);
+   _mongoc_topology_background_monitoring_reconcile (topology);
    bson_mutex_unlock (&topology->mutex);
 
    return has_server;
@@ -1501,7 +1505,7 @@ _mongoc_topology_bypass_cooldown (mongoc_topology_t *topology)
  * For single-threaded monitoring, the topology scanner may include errors for servers that were removed from the topology.
  */
 static void
-_mongoc_topology_collect_errors (
+_topology_collect_errors (
    mongoc_topology_t *topology, bson_error_t *error_out)
 {
    mongoc_topology_description_t *topology_description;
