@@ -797,8 +797,7 @@ test_handshake_platform_config ()
 }
 
 /* Called by a single thread in test_mongoc_handshake_race_condition */
-static void *
-handshake_append_worker (void *data)
+static BSON_THREAD_FUN (handshake_append_worker, data)
 {
    const char *driver_name = "php driver";
    const char *driver_version = "version abc";

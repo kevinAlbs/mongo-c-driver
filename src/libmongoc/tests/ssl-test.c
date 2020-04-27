@@ -30,8 +30,7 @@
  *    7. echoes it back to the client
  *    8. shuts down
  */
-static void *
-ssl_test_server (void *ptr)
+static BSON_THREAD_FUN (ssl_test_server, ptr)
 {
    ssl_test_data_t *data = (ssl_test_data_t *) ptr;
 
@@ -165,8 +164,7 @@ ssl_test_server (void *ptr)
  *    7. confirms that its the same as what was written
  *    8. shuts down
  */
-static void *
-ssl_test_client (void *ptr)
+static BSON_THREAD_FUN (ssl_test_client, ptr)
 {
    ssl_test_data_t *data = (ssl_test_data_t *) ptr;
    mongoc_stream_t *sock_stream;

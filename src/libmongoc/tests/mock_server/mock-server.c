@@ -1541,8 +1541,7 @@ typedef struct worker_closure_t {
 } worker_closure_t;
 
 
-static void *
-main_thread (void *data)
+static BSON_THREAD_FUN (main_thread, data)
 {
    mock_server_t *server = (mock_server_t *) data;
    mongoc_socket_t *client_sock;
@@ -1642,8 +1641,7 @@ _reply_destroy (reply_t *reply)
 }
 
 
-static void *
-worker_thread (void *data)
+static BSON_THREAD_FUN (worker_thread, data)
 {
    worker_closure_t *closure = (worker_closure_t *) data;
    mock_server_t *server = closure->server;

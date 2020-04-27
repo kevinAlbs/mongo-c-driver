@@ -26,8 +26,8 @@
 #include "future-functions.h"
 
 
-static void *
-background_mongoc_async_run (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_async_run, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -42,8 +42,8 @@ background_mongoc_async_run (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_bulk_operation_execute (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_bulk_operation_execute, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -63,8 +63,8 @@ background_mongoc_bulk_operation_execute (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_database_read_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_database_read_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -87,8 +87,8 @@ background_mongoc_database_read_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_database_read_write_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_database_read_write_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -111,8 +111,8 @@ background_mongoc_database_read_write_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_database_write_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_database_write_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -134,8 +134,8 @@ background_mongoc_database_write_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_command_simple (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_command_simple, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -158,8 +158,8 @@ background_mongoc_client_command_simple (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -183,8 +183,8 @@ background_mongoc_client_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_read_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_read_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -208,8 +208,8 @@ background_mongoc_client_read_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_write_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_write_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -232,8 +232,8 @@ background_mongoc_client_write_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_read_write_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_read_write_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -257,8 +257,8 @@ background_mongoc_client_read_write_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_kill_cursor (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_kill_cursor, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -274,8 +274,8 @@ background_mongoc_client_kill_cursor (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_watch (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_watch, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -295,8 +295,8 @@ background_mongoc_client_watch (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_aggregate (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_aggregate, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -318,8 +318,8 @@ background_mongoc_collection_aggregate (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_count (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_count, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -343,8 +343,8 @@ background_mongoc_collection_count (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_count_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_count_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -369,8 +369,8 @@ background_mongoc_collection_count_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_create_index_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_create_index_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -393,8 +393,8 @@ background_mongoc_collection_create_index_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_drop_index_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_drop_index_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -415,8 +415,8 @@ background_mongoc_collection_drop_index_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_drop_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_drop_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -436,8 +436,8 @@ background_mongoc_collection_drop_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_find_and_modify_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_find_and_modify_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -459,8 +459,8 @@ background_mongoc_collection_find_and_modify_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_find_and_modify (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_find_and_modify, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -487,8 +487,8 @@ background_mongoc_collection_find_and_modify (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_find_indexes_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_find_indexes_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -507,8 +507,8 @@ background_mongoc_collection_find_indexes_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_stats (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_stats, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -529,8 +529,8 @@ background_mongoc_collection_stats (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_insert_many (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_insert_many, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -553,8 +553,8 @@ background_mongoc_collection_insert_many (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_insert_one (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_insert_one, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -576,8 +576,8 @@ background_mongoc_collection_insert_one (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_read_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_read_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -600,8 +600,8 @@ background_mongoc_collection_read_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_read_write_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_read_write_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -624,8 +624,8 @@ background_mongoc_collection_read_write_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_write_command_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_write_command_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -647,8 +647,8 @@ background_mongoc_collection_write_command_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_insert_bulk (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_insert_bulk, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -671,8 +671,8 @@ background_mongoc_collection_insert_bulk (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_cluster_run_command_parts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_cluster_run_command_parts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -694,8 +694,8 @@ background_mongoc_cluster_run_command_parts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_cursor_destroy (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_cursor_destroy, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -710,8 +710,8 @@ background_mongoc_cursor_destroy (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_cursor_next (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_cursor_next, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -730,8 +730,8 @@ background_mongoc_cursor_next (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_get_database_names_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_get_database_names_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -751,8 +751,8 @@ background_mongoc_client_get_database_names_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_select_server (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_select_server, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -773,8 +773,8 @@ background_mongoc_client_select_server (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_destroy (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_destroy, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -789,8 +789,8 @@ background_mongoc_client_destroy (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_pool_destroy (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_pool_destroy, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -805,8 +805,8 @@ background_mongoc_client_pool_destroy (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_database_command_simple (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_database_command_simple, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -828,8 +828,8 @@ background_mongoc_database_command_simple (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_database_drop_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_database_drop_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -849,8 +849,8 @@ background_mongoc_database_drop_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_database_get_collection_names_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_database_get_collection_names_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -870,8 +870,8 @@ background_mongoc_database_get_collection_names_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_database_watch (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_database_watch, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -891,8 +891,8 @@ background_mongoc_database_watch (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_gridfs_file_readv (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_gridfs_file_readv, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -914,8 +914,8 @@ background_mongoc_gridfs_file_readv (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_gridfs_find_one (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_gridfs_find_one, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -935,8 +935,8 @@ background_mongoc_gridfs_find_one (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_gridfs_file_remove (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_gridfs_file_remove, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -955,8 +955,8 @@ background_mongoc_gridfs_file_remove (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_gridfs_file_seek (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_gridfs_file_seek, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -976,8 +976,8 @@ background_mongoc_gridfs_file_seek (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_gridfs_file_writev (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_gridfs_file_writev, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -998,8 +998,8 @@ background_mongoc_gridfs_file_writev (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_gridfs_find_one_with_opts (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_gridfs_find_one_with_opts, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1020,8 +1020,8 @@ background_mongoc_gridfs_find_one_with_opts (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_topology_select (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_topology_select, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1042,8 +1042,8 @@ background_mongoc_topology_select (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_client_get_gridfs (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_client_get_gridfs, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1064,8 +1064,8 @@ background_mongoc_client_get_gridfs (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_watch (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_watch, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1085,8 +1085,8 @@ background_mongoc_collection_watch (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_change_stream_next (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_change_stream_next, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1105,8 +1105,8 @@ background_mongoc_change_stream_next (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_change_stream_destroy (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_change_stream_destroy, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1121,8 +1121,8 @@ background_mongoc_change_stream_destroy (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_delete_one (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_delete_one, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1144,8 +1144,8 @@ background_mongoc_collection_delete_one (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_delete_many (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_delete_many, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1167,8 +1167,8 @@ background_mongoc_collection_delete_many (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_remove (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_remove, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1190,8 +1190,8 @@ background_mongoc_collection_remove (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_update_one (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_update_one, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1214,8 +1214,8 @@ background_mongoc_collection_update_one (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_update_many (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_update_many, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1238,8 +1238,8 @@ background_mongoc_collection_update_many (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_replace_one (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_replace_one, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1262,8 +1262,8 @@ background_mongoc_collection_replace_one (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_count_documents (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_count_documents, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;
@@ -1286,8 +1286,8 @@ background_mongoc_collection_count_documents (void *data)
    return NULL;
 }
 
-static void *
-background_mongoc_collection_estimated_document_count (void *data)
+static
+BSON_THREAD_FUN (background_mongoc_collection_estimated_document_count, data)
 {
    future_t *future = (future_t *) data;
    future_value_t return_value;

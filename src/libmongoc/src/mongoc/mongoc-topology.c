@@ -341,9 +341,10 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
     *     - otherwise, if the seed list has a single host, initialize to SINGLE
     *   - everything else gets initialized to UNKNOWN
     */
-   has_directconnection = mongoc_uri_has_option (
-      uri, MONGOC_URI_DIRECTCONNECTION);
-   directconnection = has_directconnection &&
+   has_directconnection =
+      mongoc_uri_has_option (uri, MONGOC_URI_DIRECTCONNECTION);
+   directconnection =
+      has_directconnection &&
       mongoc_uri_get_option_as_bool (uri, MONGOC_URI_DIRECTCONNECTION, false);
    hl = mongoc_uri_get_hosts (topology->uri);
    if (service && !has_directconnection) {
@@ -1245,8 +1246,7 @@ _mongoc_topology_get_type (mongoc_topology_t *topology)
  *
  *--------------------------------------------------------------------------
  */
-static
-BSON_THREAD_FUN (_mongoc_topology_run_background, data)
+static BSON_THREAD_FUN (_mongoc_topology_run_background, data)
 {
    mongoc_topology_t *topology;
    int64_t now;
@@ -1374,10 +1374,8 @@ _mongoc_topology_start_background_scanner (mongoc_topology_t *topology)
    _mongoc_handshake_freeze ();
    _mongoc_topology_description_monitor_opening (&topology->description);
 
-   MONGOC_DEBUG ("start thread - start");
    r = bson_thread_create (
       &topology->thread, _mongoc_topology_run_background, topology);
-   MONGOC_DEBUG ("start thread - end");
 
    if (r != 0) {
       MONGOC_ERROR ("could not start topology scanner thread: %s",
@@ -1432,9 +1430,7 @@ _mongoc_topology_background_thread_stop (mongoc_topology_t *topology)
    if (join_thread) {
       /* if we're joining the thread, wait for it to come back and broadcast
        * all listeners */
-      MONGOC_DEBUG ("join start");
       bson_thread_join (topology->thread);
-      MONGOC_DEBUG ("join end");
 
       bson_mutex_lock (&topology->mutex);
       topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;

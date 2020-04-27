@@ -56,8 +56,7 @@ static const char *gTestOidsFail[] = {"                        ",
                                       "00187263123ghh21382812a8",
                                       NULL};
 
-static void *
-oid_worker (void *data)
+BSON_THREAD_FUN (oid_worker, data)
 {
    bson_context_t *context = data;
    bson_oid_t oid;

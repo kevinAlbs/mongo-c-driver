@@ -27,8 +27,7 @@
  *    5. reads a byte
  *    7. hangs up
  */
-static void *
-ssl_error_server (void *ptr)
+static BSON_THREAD_FUN (ssl_error_server, ptr)
 {
    ssl_test_data_t *data = (ssl_test_data_t *) ptr;
 
@@ -119,8 +118,7 @@ ssl_error_server (void *ptr)
  *    5. confirms that the server hangs up promptly
  *    6. shuts down
  */
-static void *
-ssl_hangup_client (void *ptr)
+static BSON_THREAD_FUN (ssl_hangup_client, ptr)
 {
    ssl_test_data_t *data = (ssl_test_data_t *) ptr;
    mongoc_stream_t *sock_stream;
@@ -236,8 +234,7 @@ test_mongoc_tls_hangup (void)
  *    5. confirms that it times out
  *    6. shuts down
  */
-static void *
-handshake_stall_client (void *ptr)
+static BSON_THREAD_FUN (handshake_stall_client, ptr)
 {
    ssl_test_data_t *data = (ssl_test_data_t *) ptr;
    char *uri_str;

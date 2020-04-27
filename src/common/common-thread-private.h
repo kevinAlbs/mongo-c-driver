@@ -42,7 +42,10 @@ BSON_BEGIN_DECLS
 #define bson_thread_create(_t, _f, _d) pthread_create ((_t), NULL, (_f), (_d))
 #define bson_thread_join(_n) pthread_join ((_n), NULL)
 #define bson_thread_t pthread_t
-#define BSON_THREAD_FUN(_function_name, _arg_name) void * _function_name (void * _arg_name)
+#define BSON_THREAD_FUN(_function_name, _arg_name) \
+   void *_function_name (void *_arg_name)
+#define BSON_THREAD_FUN_TYPE(_function_name, _arg_name) \
+   void *(*_function_name) (void *_arg_name)
 #else
 #define BSON_ONCE_FUN(n) \
    BOOL CALLBACK n (PINIT_ONCE _ignored_a, PVOID _ignored_b, PVOID *_ignored_c)
@@ -55,10 +58,19 @@ BSON_BEGIN_DECLS
 #define bson_mutex_unlock LeaveCriticalSection
 #define bson_once(o, c) InitOnceExecuteOnce (o, c, NULL, NULL)
 #define bson_once_t INIT_ONCE
-#define bson_thread_create(_thread_handle, _function, _arg) (!(*(_thread_handle) = (HANDLE)_beginthreadex (NULL, 0, (_function), (_arg), 0, NULL)))
-#define bson_thread_join(_n) do { WaitForSingleObject ((_n), INFINITE); CloseHandle ((_n)); } while (0)
+#define bson_thread_create(_thread_handle, _function, _arg) \
+   (!(*(_thread_handle) =                                   \
+         (HANDLE) _beginthreadex (NULL, 0, (_function), (_arg), 0, NULL)))
+#define bson_thread_join(_n)                \
+   do {                                     \
+      WaitForSingleObject ((_n), INFINITE); \
+      CloseHandle ((_n));                   \
+   } while (0)
 #define bson_thread_t HANDLE
-#define BSON_THREAD_FUN(_function_name, _arg_name) unsigned __stdcall _function_name(void * _arg_name)
+#define BSON_THREAD_FUN(_function_name, _arg_name) \
+   unsigned __stdcall _function_name (void *_arg_name)
+#define BSON_THREAD_FUN_TYPE(_function_name, _arg_name) \
+   unsigned __stdcall (*_function_name) (void *_arg_name)
 #endif
 
 BSON_END_DECLS

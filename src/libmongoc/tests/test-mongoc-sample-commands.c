@@ -2480,8 +2480,8 @@ typedef struct {
 } change_stream_ctx_t;
 
 
-static void *
-insert_docs (void *p)
+static 
+BSON_THREAD_FUN (insert_docs, p)
 {
    change_stream_ctx_t *ctx = (change_stream_ctx_t *) p;
    bson_t doc = BSON_INITIALIZER;

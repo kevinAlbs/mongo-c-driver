@@ -533,7 +533,7 @@ test_datakey_and_double_encryption_creating_and_using (
     * exactly match the value of encrypted. */
    BSON_ASSERT (encrypted_via_altname.value_type == BSON_TYPE_BINARY);
    BSON_ASSERT (encrypted_via_altname.value.v_binary.subtype ==
-                   BSON_SUBTYPE_ENCRYPTED);
+                BSON_SUBTYPE_ENCRYPTED);
    BSON_ASSERT (encrypted_via_altname.value.v_binary.data_len ==
                 encrypted.value.v_binary.data_len);
    BSON_ASSERT (0 == memcmp (encrypted_via_altname.value.v_binary.data,
@@ -1636,8 +1636,7 @@ test_invalid_single_and_pool_mismatches (void *unused)
    mongoc_auto_encryption_opts_destroy (opts);
 }
 
-static void *
-_worker_thread (void *client_ptr)
+static BSON_THREAD_FUN (_worker_thread, client_ptr)
 {
    mongoc_client_t *client_encrypted;
    mongoc_collection_t *coll;

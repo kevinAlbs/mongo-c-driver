@@ -177,8 +177,7 @@ socket_test_client (void *data_)
 }
 
 
-static void *
-sendv_test_server (void *data_)
+static BSON_THREAD_FUN (sendv_test_server, data_)
 {
    socket_test_data_t *data = (socket_test_data_t *) data_;
    struct sockaddr_in server_addr = {0};
@@ -268,8 +267,7 @@ sendv_test_server (void *data_)
 }
 
 
-static void *
-sendv_test_client (void *data_)
+static BSON_THREAD_FUN (sendv_test_client, data_)
 {
    socket_test_data_t *data = (socket_test_data_t *) data_;
    mongoc_socket_t *conn_sock;

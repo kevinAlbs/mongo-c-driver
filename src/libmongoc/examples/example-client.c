@@ -25,7 +25,7 @@ main (int argc, char *argv[])
       client = mongoc_client_pool_pop (pool);
 
       iterations++;
-      
+
       mongoc_client_pool_push (pool, client);
       mongoc_client_pool_destroy (pool);
       MONGOC_DEBUG ("Iteration end");

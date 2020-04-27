@@ -54,8 +54,7 @@ struct closure_t {
 };
 
 
-static void *
-gssapi_kerberos_worker (void *data)
+static BSON_THREAD_FUN (gssapi_kerberos_worker, data)
 {
    struct closure_t *closure = (struct closure_t *) data;
    mongoc_client_pool_t *pool = closure->pool;
