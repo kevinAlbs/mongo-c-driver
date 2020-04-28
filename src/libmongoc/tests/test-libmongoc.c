@@ -2381,7 +2381,7 @@ test_framework_skip_if_time_sensitive (void)
 
 static char MONGOC_TEST_UNIQUE[32];
 
-#ifdef _WIN32
+#ifdef _MSC_VER
 LONG windows_exception_handler (EXCEPTION_POINTERS *pExceptionInfo) {
     HANDLE process = GetCurrentProcess();
 
@@ -2465,7 +2465,7 @@ main (int argc, char *argv[])
    TestSuite suite;
    int ret;
 
-#ifdef _WIN32
+#ifdef _MSC_VER
    SetUnhandledExceptionFilter (windows_exception_handler);
 #endif
    mongoc_init ();

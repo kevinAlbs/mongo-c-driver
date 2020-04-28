@@ -1814,6 +1814,11 @@ _test_request_scan_on_error (bool pooled,
    uint32_t primary_id;
    mongoc_read_prefs_t *read_prefs;
 
+   MONGOC_DEBUG ("pooled? %d", (int)pooled);
+   MONGOC_DEBUG ("err_response %s", err_response);
+   MONGOC_DEBUG ("should_scan %d, should_mark_unknown: %d", (int)should_scan, (int)should_mark_unknown);
+   MONGOC_DEBUG ("server_error %s", server_err);
+
    checks_init (&checks);
    read_prefs = mongoc_read_prefs_new (MONGOC_READ_PRIMARY_PREFERRED);
 
