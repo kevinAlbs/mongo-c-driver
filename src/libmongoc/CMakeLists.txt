@@ -788,6 +788,8 @@ function (mongoc_add_test test use_shared)
       if (NOT MSVC)
          # We've tests that test our deprecated api. MSVC 2013 will complain about invalid flag
          set_source_files_properties (${ARGN} PROPERTIES COMPILE_FLAGS -Wno-deprecated-declarations)
+      else ()
+         target_link_libraries (${test} DbgHelp.dll)
       endif ()
       target_include_directories (${test} PRIVATE ${PROJECT_SOURCE_DIR}/tests)
       target_compile_definitions (${test} PUBLIC "MONGOC_COMPILATION" PUBLIC "BSON_COMPILATION")
