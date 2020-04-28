@@ -1965,7 +1965,7 @@ _test_request_scan_on_error (bool pooled,
 }
 
 static void
-test_last_server_removed_warning ()
+test_last_server_removed_warning (void)
 {
    mock_server_t *server;
    mongoc_client_t *client;

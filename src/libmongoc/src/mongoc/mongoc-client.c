@@ -614,10 +614,12 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
    hints.ai_flags = 0;
    hints.ai_protocol = 0;
 
+   MONGOC_DEBUG ("getaddrinfo for %s", host->host);
    s = getaddrinfo (host->host, portstr, &hints, &result);
 
    if (s != 0) {
       mongoc_counter_dns_failure_inc ();
+      MONGOC_DEBUG ("Failed to resolve %s", host->host);
       bson_set_error (error,
                       MONGOC_ERROR_STREAM,
                       MONGOC_ERROR_STREAM_NAME_RESOLUTION,

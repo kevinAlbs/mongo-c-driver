@@ -128,8 +128,8 @@ export MONGOC_TEST_SKIP_LIVE=on
 export MONGOC_TEST_SKIP_SLOW=on
 
 # We are done here if we don't want to run the tests.
-# if [ "$SKIP_MOCK_TESTS" = "ON" ]; then
+if [ "$SKIP_MOCK_TESTS" = "ON" ]; then
    exit 0
-# fi
+fi
 
 "$TEST_PATH" --no-fork -d -F test-results.json
