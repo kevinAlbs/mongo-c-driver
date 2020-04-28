@@ -227,7 +227,7 @@ _mongoc_client_push_server_session (mongoc_client_t *client,
 void
 _mongoc_client_end_sessions (mongoc_client_t *client);
 
-mongoc_stream_t *
+BSON_EXPORT (mongoc_stream_t *)
 mongoc_client_connect_tcp (int32_t connecttimeoutms,
                            const mongoc_host_list_t *host,
                            bson_error_t *error);

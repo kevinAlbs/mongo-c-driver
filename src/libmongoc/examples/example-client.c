@@ -2,37 +2,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
+#define MONGOC_INSIDE
+#include <mongoc/mongoc-client-private.h>
+#include <mongoc/mongoc-host-list-private.h>
 
 int
 main (int argc, char *argv[])
 {
-   mongoc_client_pool_t *pool;
-   mongoc_client_t *client;
-   mongoc_uri_t *uri;
-   int64_t iterations;
-   bson_t ping;
-   bson_t reply;
+   mongoc_host_list_t host_list;
+   mongoc_stream_t *stream;
    bson_error_t error;
 
    mongoc_init ();
 
-   uri = mongoc_uri_new ("mongodb://localhost:27017");
-
-   iterations = 0;
-   while (true) {
-      MONGOC_DEBUG ("Iteration %d start", iterations);
-      pool = mongoc_client_pool_new (uri);
-      client = mongoc_client_pool_pop (pool);
-
-      iterations++;
-      
-      mongoc_client_pool_push (pool, client);
-      mongoc_client_pool_destroy (pool);
-      MONGOC_DEBUG ("Iteration end");
+   if (!_mongoc_host_list_from_string_with_err (&host_list, argv[1], &error)) {
+      MONGOC_ERROR ("error = %s", error.message);
+      return EXIT_FAILURE;
    }
 
-   mongoc_uri_destroy (uri);
-   mongoc_client_destroy (client);
+
+   MONGOC_DEBUG ("connection start");
+   stream = mongoc_client_connect_tcp (5000, &host_list, &error);
+   MONGOC_DEBUG ("connection end");
+
+   if (!stream) {
+      MONGOC_DEBUG ("failed");
+   } else {
+      MONGOC_DEBUG ("succeeded");
+   }
+   mongoc_stream_destroy (stream);
    mongoc_cleanup ();
 
    return EXIT_SUCCESS;

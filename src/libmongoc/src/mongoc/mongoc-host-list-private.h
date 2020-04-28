@@ -42,7 +42,7 @@ bool
 _mongoc_host_list_from_string (mongoc_host_list_t *host_list,
                                const char *host_and_port);
 
-bool
+BSON_EXPORT (bool)
 _mongoc_host_list_from_string_with_err (mongoc_host_list_t *host_list,
                                         const char *host_and_port,
                                         bson_error_t *error);
