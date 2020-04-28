@@ -1456,12 +1456,12 @@ _test_ismaster_retry_single (bool hangup, int n_failures)
       BSON_ASSERT (has_known_server (client));
    }
 
-   checks_cleanup (&checks);
    mongoc_client_destroy (client);
    mongoc_uri_destroy (uri);
    mock_server_destroy (server);
    bson_free (ismaster);
    mongoc_apm_callbacks_destroy (callbacks);
+   checks_cleanup (&checks);
 }
 
 
@@ -1547,13 +1547,13 @@ _test_ismaster_retry_pooled (bool hangup, int n_failures)
    WAIT_UNTIL (checks_cmp (&checks, "n_failed", '=', n_failures));
    BSON_ASSERT (checks_cmp (&checks, "n_started", '=', 3));
 
-   checks_cleanup (&checks);
    mongoc_client_pool_push (pool, client);
    mongoc_client_pool_destroy (pool);
    mongoc_uri_destroy (uri);
    mock_server_destroy (server);
    bson_free (ismaster);
    mongoc_apm_callbacks_destroy (callbacks);
+   checks_cleanup (&checks);
 }
 
 
@@ -1958,10 +1958,10 @@ _test_request_scan_on_error (bool pooled,
    } else {
       mongoc_client_destroy (client);
    }
-   checks_cleanup (&checks);
    mock_server_destroy (primary);
    mock_server_destroy (secondary);
    mongoc_read_prefs_destroy (read_prefs);
+   checks_cleanup (&checks);
 }
 
 static void
@@ -2172,7 +2172,6 @@ test_slow_server_pooled (void)
       client, "admin", tmp_bson ("{'ping': 1}"), prefs_secondary, NULL, &error);
    ASSERT_OR_PRINT (ret, error);
 
-   checks_cleanup (&checks);
    mongoc_read_prefs_destroy (prefs_secondary);
    mongoc_client_pool_push (pool, client);
    mongoc_apm_callbacks_destroy (callbacks);
@@ -2183,6 +2182,7 @@ test_slow_server_pooled (void)
    bson_free (ismaster_common);
    mock_server_destroy (secondary);
    mock_server_destroy (primary);
+   checks_cleanup (&checks);
 }
 void
 test_topology_install (TestSuite *suite)
