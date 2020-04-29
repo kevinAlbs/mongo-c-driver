@@ -41,9 +41,10 @@ BSON_BEGIN_DECLS
 #define bson_once_t pthread_once_t
 #define bson_thread_t pthread_t
 #define BSON_THREAD_FUN(_function_name, _arg_name) \
-   void *_function_name (void *_arg_name)
-#define BSON_THREAD_FUN_TYPE(_function_name) void *(*_function_name) (void *)
+   void *(_function_name) (void *(_arg_name))
+#define BSON_THREAD_FUN_TYPE(_function_name) void *(*(_function_name)) (void *)
 #else
+#include <process.h>
 #define BSON_ONCE_FUN(n) \
    BOOL CALLBACK n (PINIT_ONCE _ignored_a, PVOID _ignored_b, PVOID *_ignored_c)
 #define BSON_ONCE_INIT INIT_ONCE_STATIC_INIT
@@ -57,9 +58,9 @@ BSON_BEGIN_DECLS
 #define bson_once_t INIT_ONCE
 #define bson_thread_t HANDLE
 #define BSON_THREAD_FUN(_function_name, _arg_name) \
-   unsigned __stdcall _function_name (void *_arg_name)
+   unsigned (__stdcall _function_name) (void *(_arg_name))
 #define BSON_THREAD_FUN_TYPE(_function_name) \
-   unsigned __stdcall (*_function_name) (void *)
+   unsigned (__stdcall *_function_name) (void *)
 #endif
 
 /* Functions that require definitions get the common prefix (_mongoc for
