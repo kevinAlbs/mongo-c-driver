@@ -1727,14 +1727,14 @@ _test_multi_threaded (bool external_key_vault)
    client1 = mongoc_client_pool_pop (pool);
    client2 = mongoc_client_pool_pop (pool);
 
-   r = bson_thread_create (threads, _worker_thread, client1);
+   r = COMMON_PREFIX (thread_create) (threads, _worker_thread, client1);
    BSON_ASSERT (r == 0);
 
-   r = bson_thread_create (threads + 1, _worker_thread, client2);
+   r = COMMON_PREFIX (thread_create) (threads + 1, _worker_thread, client2);
    BSON_ASSERT (r == 0);
 
    for (i = 0; i < 2; i++) {
-      r = bson_thread_join (threads[i]);
+      r = COMMON_PREFIX (thread_join) (threads[i]);
       BSON_ASSERT (r == 0);
    }
 

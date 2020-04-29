@@ -1374,7 +1374,7 @@ _mongoc_topology_start_background_scanner (mongoc_topology_t *topology)
    _mongoc_handshake_freeze ();
    _mongoc_topology_description_monitor_opening (&topology->description);
 
-   r = bson_thread_create (
+   r = COMMON_PREFIX (thread_create) (
       &topology->thread, _mongoc_topology_run_background, topology);
 
    if (r != 0) {
@@ -1430,7 +1430,7 @@ _mongoc_topology_background_thread_stop (mongoc_topology_t *topology)
    if (join_thread) {
       /* if we're joining the thread, wait for it to come back and broadcast
        * all listeners */
-      bson_thread_join (topology->thread);
+      COMMON_PREFIX (thread_join) (topology->thread);
 
       bson_mutex_lock (&topology->mutex);
       topology->scanner_state = MONGOC_TOPOLOGY_SCANNER_OFF;

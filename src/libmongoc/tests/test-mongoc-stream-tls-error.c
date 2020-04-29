@@ -204,14 +204,14 @@ test_mongoc_tls_hangup (void)
    bson_mutex_init (&data.cond_mutex);
    mongoc_cond_init (&data.cond);
 
-   r = bson_thread_create (threads, &ssl_error_server, &data);
+   r = COMMON_PREFIX (thread_create) (threads, &ssl_error_server, &data);
    BSON_ASSERT (r == 0);
 
-   r = bson_thread_create (threads + 1, &ssl_hangup_client, &data);
+   r = COMMON_PREFIX (thread_create) (threads + 1, &ssl_hangup_client, &data);
    BSON_ASSERT (r == 0);
 
    for (i = 0; i < 2; i++) {
-      r = bson_thread_join (threads[i]);
+      r = COMMON_PREFIX (thread_join) (threads[i]);
       BSON_ASSERT (r == 0);
    }
 
@@ -327,14 +327,15 @@ test_mongoc_tls_handshake_stall (void)
    bson_mutex_init (&data.cond_mutex);
    mongoc_cond_init (&data.cond);
 
-   r = bson_thread_create (threads, &ssl_error_server, &data);
+   r = COMMON_PREFIX (thread_create) (threads, &ssl_error_server, &data);
    BSON_ASSERT (r == 0);
 
-   r = bson_thread_create (threads + 1, &handshake_stall_client, &data);
+   r = COMMON_PREFIX (thread_create) (
+      threads + 1, &handshake_stall_client, &data);
    BSON_ASSERT (r == 0);
 
    for (i = 0; i < 2; i++) {
-      r = bson_thread_join (threads[i]);
+      r = COMMON_PREFIX (thread_join) (threads[i]);
       BSON_ASSERT (r == 0);
    }
 

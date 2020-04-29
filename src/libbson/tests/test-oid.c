@@ -342,12 +342,13 @@ test_bson_oid_init_with_threads (void)
 
       for (i = 0; i < N_THREADS; i++) {
          contexts[i] = bson_context_new (flags);
-         r = bson_thread_create (&threads[i], oid_worker, contexts[i]);
+         r = COMMON_PREFIX (thread_create) (
+            &threads[i], oid_worker, contexts[i]);
          BSON_ASSERT (r == 0);
       }
 
       for (i = 0; i < N_THREADS; i++) {
-         bson_thread_join (threads[i]);
+         COMMON_PREFIX (thread_join) (threads[i]);
       }
 
       for (i = 0; i < N_THREADS; i++) {
@@ -364,12 +365,12 @@ test_bson_oid_init_with_threads (void)
       context = bson_context_new (BSON_CONTEXT_THREAD_SAFE);
 
       for (i = 0; i < N_THREADS; i++) {
-         r = bson_thread_create (&threads[i], oid_worker, context);
+         r = COMMON_PREFIX (thread_create) (&threads[i], oid_worker, context);
          BSON_ASSERT (r == 0);
       }
 
       for (i = 0; i < N_THREADS; i++) {
-         r = bson_thread_join (threads[i]);
+         r = COMMON_PREFIX (thread_join) (threads[i]);
          BSON_ASSERT (r == 0);
       }
 
