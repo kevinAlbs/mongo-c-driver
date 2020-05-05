@@ -85,11 +85,9 @@ typedef struct {
 } reply_t;
 
 
-static void *
-main_thread (void *data);
+static BSON_THREAD_FUN (main_thread, data);
 
-static void *
-worker_thread (void *data);
+static BSON_THREAD_FUN (worker_thread, data);
 
 static void
 _mock_server_reply_with_stream (mock_server_t *server,

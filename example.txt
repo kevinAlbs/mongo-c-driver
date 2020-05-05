@@ -1,0 +1,31 @@
+entering windows exception handler
+exception '(access violation)' at '0x00007FF836A72BE7', terminating
+begin stack trace
+strnicoll_l
+strnicoll_l
+strnicoll_l
+strnlen
+_p__commode
+_p__commode
+_p__commode
+_p__commode
+_p__commode
+_p__commode
+_p__commode
+_p__commode
+_stdio_common_vfprintf
+test-libmongoc : _vfprintf_l C:\Program Files (x86)\Windows Kits\10\Include\10.0.18362.0\ucrt\stdio.h:644
+test-libmongoc : printf C:\Program Files (x86)\Windows Kits\10\Include\10.0.18362.0\ucrt\stdio.h:958
+test-libmongoc : test_version_cmp C:\code\mongo-c-driver\src\libmongoc\tests\test-libmongoc.c:2102
+test-libmongoc : TestSuite_AddHelper C:\code\mongo-c-driver\src\libmongoc\tests\TestSuite.c:254
+test-libmongoc : TestSuite_RunTest C:\code\mongo-c-driver\src\libmongoc\tests\TestSuite.c:598
+test-libmongoc : TestSuite_RunNamed C:\code\mongo-c-driver\src\libmongoc\tests\TestSuite.c:924
+test-libmongoc : TestSuite_Run C:\code\mongo-c-driver\src\libmongoc\tests\TestSuite.c:968
+test-libmongoc : main C:\code\mongo-c-driver\src\libmongoc\tests\test-libmongoc.c:2621
+test-libmongoc : invoke_main d:\agent\_work\3\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:79
+test-libmongoc : __scrt_common_main_seh d:\agent\_work\3\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:288
+test-libmongoc : __scrt_common_main d:\agent\_work\3\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:331
+test-libmongoc : mainCRTStartup d:\agent\_work\3\s\src\vctools\crt\vcstartup\src\startup\exe_main.cpp:17
+BaseThreadInitThunk
+RtlUserThreadStart
+end stack trace

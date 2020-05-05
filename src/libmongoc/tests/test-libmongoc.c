@@ -2394,7 +2394,26 @@ windows_exception_handler (EXCEPTION_POINTERS *pExceptionInfo)
     use a copy.
     */
    CONTEXT context_record = *pExceptionInfo->ContextRecord;
+   DWORD exception_code = pExceptionInfo->ExceptionRecord->ExceptionCode;
    /* Initialize stack walking. */
+   char exception_string[128];
+   bson_snprintf (exception_string,
+                  sizeof(exception_string),
+                  (exception_code == EXCEPTION_ACCESS_VIOLATION)
+                  ? "(access violation)"
+                  : "0x%08X", exception_code);
+
+   char address_string[32];
+   bson_snprintf(address_string,
+                 sizeof(address_string),
+                 "0x%p",
+                 pExceptionInfo->ExceptionRecord->ExceptionAddress);
+
+   fprintf (stderr,
+            "exception '%s' at '%s', terminating\n",
+            exception_string,
+            address_string);
+
    STACKFRAME64 stack_frame;
    memset (&stack_frame, 0, sizeof (stack_frame));
 #if defined(_WIN64)
