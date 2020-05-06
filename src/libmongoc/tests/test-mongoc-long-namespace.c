@@ -24,18 +24,6 @@
 #include "test-conveniences.h"
 #include "test-libmongoc.h"
 
-/*
- * Prevent failing on pedantic GCC/clang warning: "ISO C forbids conversion of
- * function pointer to object pointer type."
- */
-#ifdef __clang__
-#pragma clang diagnostic warning "-Wpedantic"
-#elif __GNUC__ > 6
-#pragma GCC diagnostic warning "-Wpedantic"
-#elif __GNUC__ <= 6
-#pragma GCC diagnostic warning "-pedantic"
-#endif
-
 typedef struct {
    char *ns;
    char *ns_coll;
@@ -497,30 +485,32 @@ collection_rename (test_fixture_t *test_fixture)
    bson_free (new_ns);
 }
 
-typedef void (*test_fn) (test_fixture_t *fixture);
+typedef struct {
+   void (*fn) (test_fixture_t *fixture);
+} test_functor_t;
 
 static void
 run_test (void *ctx)
 {
-   test_fn one_test;
+   test_functor_t* one_test;
    test_fixture_t test_fixture;
 
-   one_test = (test_fn) ctx;
+   one_test = (test_functor_t*) ctx;
    /* Small names. */
    test_fixture_init (&test_fixture, 32, 32);
-   one_test (&test_fixture);
+   one_test->fn (&test_fixture);
    test_fixture_cleanup (&test_fixture);
    /* Large collection name. */
    test_fixture_init (&test_fixture, 32, 100);
-   one_test (&test_fixture);
+   one_test->fn (&test_fixture);
    test_fixture_cleanup (&test_fixture);
    /* Maximum valid database name is still 64 characters. */
    test_fixture_init (&test_fixture, 63, 32);
-   one_test (&test_fixture);
+   one_test->fn (&test_fixture);
    test_fixture_cleanup (&test_fixture);
    /* Large for both names. */
    test_fixture_init (&test_fixture, 63, 100);
-   one_test (&test_fixture);
+   one_test->fn (&test_fixture);
    test_fixture_cleanup (&test_fixture);
 }
 
@@ -586,48 +576,56 @@ unsupported_long_db (void)
 void
 test_long_namespace_install (TestSuite *suite)
 {
+   test_functor_t client_command_fn = { client_command };
+   test_functor_t database_command_fn = { database_command };
+   test_functor_t collection_command_fn = { collection_command };
+   test_functor_t crud_fn = { crud };
+   test_functor_t getmore_fn = { getmore };
+   test_functor_t change_stream_fn = { change_stream };
+   test_functor_t collection_rename_fn = { collection_rename };
+
    /* MongoDB 4.4 (wire version 9) introduced support for long namespaces in
     * SERVER-32959 */
    TestSuite_AddFull (suite,
                       "/long_namespace/client_command",
                       run_test,
                       NULL /* dtor */,
-                      client_command,
+                      &client_command_fn,
                       test_framework_skip_if_max_wire_version_less_than_9);
 
    TestSuite_AddFull (suite,
                       "/long_namespace/database_command",
                       run_test,
                       NULL /* dtor */,
-                      database_command,
+                      &database_command_fn,
                       test_framework_skip_if_max_wire_version_less_than_9);
 
    TestSuite_AddFull (suite,
                       "/long_namespace/collection_command",
                       run_test,
                       NULL /* dtor */,
-                      collection_command,
+                      &collection_command_fn,
                       test_framework_skip_if_max_wire_version_less_than_9);
 
    TestSuite_AddFull (suite,
                       "/long_namespace/crud",
                       run_test,
                       NULL /* dtor */,
-                      crud,
+                      &crud_fn,
                       test_framework_skip_if_max_wire_version_less_than_9);
 
    TestSuite_AddFull (suite,
                       "/long_namespace/getmore",
                       run_test,
                       NULL /* dtor */,
-                      getmore,
+                      &getmore_fn,
                       test_framework_skip_if_max_wire_version_less_than_9);
 
    TestSuite_AddFull (suite,
                       "/long_namespace/change_stream",
                       run_test,
                       NULL /* dtor */,
-                      change_stream,
+                      &change_stream_fn,
                       test_framework_skip_if_not_rs_version_9,
                       test_framework_skip_if_no_sessions);
 
@@ -635,7 +633,7 @@ test_long_namespace_install (TestSuite *suite)
                       "/long_namespace/collection_rename",
                       run_test,
                       NULL /* dtor */,
-                      collection_rename,
+                      &collection_rename_fn,
                       test_framework_skip_if_max_wire_version_less_than_9,
                       test_framework_skip_if_mongos);
 
