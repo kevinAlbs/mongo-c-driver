@@ -123,7 +123,7 @@ When ``tlsCAFile`` is set, the driver will only allow server certificates issued
 
 When ``crl_file`` is set with :symbol:`mongoc_ssl_opt_t`, the driver will import the revocation list to the ``System Local Machine Root`` certificate store.
 
-Setting ``tlsDisableOCSPEndpointCheck`` has no effect.
+Setting ``tlsDisableOCSPEndpointCheck`` and ``tlsDisableCertificateRevocationCheck`` has no effect.
 
 Setting ``tlsAllowInvalidHostnames`` additionally consider certificates with no revocation mechanisms specified (CRL / OCSP) a non-error.
 
