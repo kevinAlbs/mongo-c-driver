@@ -208,7 +208,7 @@ if [ "$COMPILE_LIBMONGOCRYPT" = "ON" ]; then
    git clone https://github.com/mongodb/libmongocrypt
    mkdir libmongocrypt/cmake-build
    cd libmongocrypt/cmake-build
-   $CMAKE -DENABLE_SHARED_BSON=ON -DCMAKE_BUILD_TYPE="Debug" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR" ../
+   "$CMAKE" -DENABLE_SHARED_BSON=ON -DCMAKE_BUILD_TYPE="Debug" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR" ../
    make install
    cd ../../
    else
@@ -225,7 +225,7 @@ if [ "$ANALYZE" = "ON" ]; then
    # Put clang static analyzer results in scan/ and fail build if warnings found.
    SCAN_BUILD="scan-build -o scan --status-bugs"
 else
-   $CMAKE $CONFIGURE_FLAGS .
+   "$CMAKE" $CONFIGURE_FLAGS .
 fi
 
 $SCAN_BUILD make -j8 all

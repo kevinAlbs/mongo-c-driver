@@ -20,10 +20,14 @@ CONFIGURE_FLAGS="\
    -DENABLE_MAINTAINER_FLAGS=ON \
    -DENABLE_BSON=ON"
 BUILD_FLAGS="/m"  # Number of concurrent processes. No value=# of cpus
-CMAKE="/cygdrive/c/cmake/bin/cmake"
+. .evergreen/find-cmake.sh
 CC=${CC:-"Visual Studio 15 2017 Win64"}
 SSL=${SSL:-WINDOWS}
 SASL=${SASL:-SSPI}
+
+if [ -n "$CMAKE_ARCHITECTURE" ]; then
+   CMAKE_ARCHITECTURE_FLAG="-A$CMAKE_ARCHITECTURE"
+fi
 
 echo "CC: $CC"
 echo "RELEASE: $RELEASE"
@@ -114,12 +118,12 @@ if [ "$COMPILE_LIBMONGOCRYPT" = "ON" ]; then
    git clone https://github.com/mongodb/libmongocrypt
    mkdir libmongocrypt/cmake-build
    cd libmongocrypt/cmake-build
-   "$CMAKE" -G "$CC" "-DCMAKE_PREFIX_PATH=${INSTALL_DIR}/lib/cmake" -DENABLE_SHARED_BSON=ON -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" ../
+   "$CMAKE" -G "$CC" "$CMAKE_ARCHITECTURE_FLAG" "-DCMAKE_PREFIX_PATH=${INSTALL_DIR}/lib/cmake" -DENABLE_SHARED_BSON=ON -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" ../
    "$CMAKE" --build . --target INSTALL --config $BUILD_CONFIG -- $BUILD_FLAGS
    cd ../../
 fi
 
-"$CMAKE" -G "$CC" "-DCMAKE_PREFIX_PATH=${INSTALL_DIR}/lib/cmake" $CONFIGURE_FLAGS
+"$CMAKE" -G "$CC" "$CMAKE_ARCHITECTURE_FLAG" "-DCMAKE_PREFIX_PATH=${INSTALL_DIR}/lib/cmake" $CONFIGURE_FLAGS
 "$CMAKE" --build . --target ALL_BUILD --config $BUILD_CONFIG -- $BUILD_FLAGS
 "$CMAKE" --build . --target INSTALL --config $BUILD_CONFIG -- $BUILD_FLAGS
 

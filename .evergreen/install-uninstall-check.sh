@@ -47,12 +47,12 @@ else
 fi
 
 
-$CMAKE -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX -DCMAKE_PREFIX_PATH=$INSTALL_DIR/lib/cmake $BSON_ONLY_OPTION .
-$CMAKE --build .
+"$CMAKE" -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX -DCMAKE_PREFIX_PATH=$INSTALL_DIR/lib/cmake $BSON_ONLY_OPTION .
+"$CMAKE" --build .
 if [ "$DESTDIR" ]; then
-   DESTDIR=$DESTDIR $CMAKE --build . --target install
+   DESTDIR=$DESTDIR "$CMAKE" --build . --target install
 else
-   $CMAKE --build . --target install
+   "$CMAKE" --build . --target install
 fi
 touch $INSTALL_DIR/lib/canary.txt
 
@@ -78,7 +78,7 @@ fi
 
 ls -l $INSTALL_DIR/share/mongo-c-driver
 
-$CMAKE --build . --target uninstall
+"$CMAKE" --build . --target uninstall
 
 set +o xtrace
 

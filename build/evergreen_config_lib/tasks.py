@@ -73,8 +73,7 @@ class CompileTask(NamedTask):
         for opt, value in sorted(self.compile_sh_opt.items()):
             script += 'export %s="%s"\n' % (opt, value)
 
-        script += "CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh" + \
-                  self.extra_script
+        script += "CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh" + self.extra_script
         task['commands'].append(shell_mongoc(script))
         task['commands'].append(func('upload build'))
         task['commands'].extend(self.suffix_commands)
@@ -899,8 +898,8 @@ aws_compile_task = NamedTask('debug-compile-aws', commands=[shell_mongoc('''
         # Compile mongoc-ping. Disable unnecessary dependencies since mongoc-ping is copied to a remote Ubuntu 18.04 ECS cluster for testing, which may not have all dependent libraries.
         . .evergreen/find-cmake.sh
         export CC='${CC}'
-        $CMAKE -DENABLE_SASL=OFF -DENABLE_SNAPPY=OFF -DENABLE_ZSTD=OFF -DENABLE_CLIENT_SIDE_ENCRYPTION=OFF .
-        $CMAKE --build . --target mongoc-ping
+        "$CMAKE" -DENABLE_SASL=OFF -DENABLE_SNAPPY=OFF -DENABLE_ZSTD=OFF -DENABLE_CLIENT_SIDE_ENCRYPTION=OFF .
+        "$CMAKE" --build . --target mongoc-ping
 '''), func('upload build')])
 
 all_tasks = chain(all_tasks, [aws_compile_task])

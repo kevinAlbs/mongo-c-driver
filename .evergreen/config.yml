@@ -772,7 +772,7 @@ tasks:
         export SNAPPY="OFF"
         export ZLIB="OFF"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: abi-compliance-check
   commands:
@@ -794,7 +794,7 @@ tasks:
         export SNAPPY="OFF"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-compression-snappy
   tags:
@@ -813,7 +813,7 @@ tasks:
         export SNAPPY="ON"
         export ZLIB="OFF"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-compression-zstd
   tags:
@@ -832,7 +832,7 @@ tasks:
         export SNAPPY="OFF"
         export ZLIB="OFF"
         export ZSTD="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-compression
   tags:
@@ -853,7 +853,7 @@ tasks:
         export SNAPPY="ON"
         export ZLIB="BUNDLED"
         export ZSTD="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-no-align
   tags:
@@ -872,7 +872,7 @@ tasks:
         export SNAPPY="OFF"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-nosasl-nossl
   tags:
@@ -890,7 +890,7 @@ tasks:
         set -o xtrace
         export DEBUG="ON"
         export SSL="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-lto
   commands:
@@ -904,7 +904,7 @@ tasks:
         set -o xtrace
         export CFLAGS="-flto"
         export DEBUG="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-lto-thin
   commands:
@@ -918,7 +918,7 @@ tasks:
         set -o xtrace
         export CFLAGS="-flto=thin"
         export DEBUG="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-c11
   tags:
@@ -937,7 +937,7 @@ tasks:
         set -o xtrace
         export CFLAGS="-std=c11 -D_XOPEN_SOURCE=600"
         export DEBUG="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-c99
   tags:
@@ -956,7 +956,7 @@ tasks:
         set -o xtrace
         export CFLAGS="-std=c99 -D_XOPEN_SOURCE=600"
         export DEBUG="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-c89
   tags:
@@ -975,7 +975,7 @@ tasks:
         set -o xtrace
         export CFLAGS="-std=c89 -D_POSIX_C_SOURCE=200112L -pedantic"
         export DEBUG="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-valgrind
   tags:
@@ -996,7 +996,7 @@ tasks:
         export SASL="OFF"
         export SSL="OPENSSL"
         export VALGRIND="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-coverage
   tags:
@@ -1014,7 +1014,7 @@ tasks:
         set -o xtrace
         export COVERAGE="ON"
         export DEBUG="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
   - func: upload coverage
 - name: debug-compile-no-counters
@@ -1032,7 +1032,7 @@ tasks:
         set -o xtrace
         export DEBUG="ON"
         export ENABLE_SHM_COUNTERS="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-asan-clang
   tags:
@@ -1057,7 +1057,7 @@ tasks:
         export SNAPPY="OFF"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-asan-gcc
   tags:
@@ -1078,7 +1078,7 @@ tasks:
         export SNAPPY="OFF"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-asan-clang-openssl
   tags:
@@ -1104,7 +1104,7 @@ tasks:
         export SSL="OPENSSL"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-ubsan
   tags:
@@ -1127,7 +1127,7 @@ tasks:
         export SNAPPY="OFF"
         export ZLIB="BUNDLED"
         export ZSTD="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-scan-build
   tags:
@@ -1147,7 +1147,7 @@ tasks:
         export ANALYZE="ON"
         export CC="clang"
         export DEBUG="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
   - func: upload scan artifacts
   - command: shell.exec
@@ -1174,7 +1174,7 @@ tasks:
         export CFLAGS="-Werror -Wno-cast-align"
         export DEBUG="ON"
         export TRACING="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: release-compile
   depends_on:
@@ -1190,7 +1190,7 @@ tasks:
         set -o errexit
         set -o xtrace
         export RELEASE="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-nosasl-openssl
   tags:
@@ -1208,7 +1208,7 @@ tasks:
         set -o xtrace
         export DEBUG="ON"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-nosasl-darwinssl
   tags:
@@ -1226,7 +1226,7 @@ tasks:
         set -o xtrace
         export DEBUG="ON"
         export SSL="DARWIN"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-nosasl-winssl
   tags:
@@ -1244,7 +1244,7 @@ tasks:
         set -o xtrace
         export DEBUG="ON"
         export SSL="WINDOWS"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-nossl
   tags:
@@ -1263,7 +1263,7 @@ tasks:
         export DEBUG="ON"
         export SASL="AUTO"
         export SSL="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-openssl
   tags:
@@ -1282,7 +1282,7 @@ tasks:
         export DEBUG="ON"
         export SASL="AUTO"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-darwinssl
   tags:
@@ -1301,7 +1301,7 @@ tasks:
         export DEBUG="ON"
         export SASL="AUTO"
         export SSL="DARWIN"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-winssl
   tags:
@@ -1320,7 +1320,7 @@ tasks:
         export DEBUG="ON"
         export SASL="CYRUS"
         export SSL="WINDOWS"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sspi-nossl
   tags:
@@ -1339,7 +1339,7 @@ tasks:
         export DEBUG="ON"
         export SASL="SSPI"
         export SSL="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sspi-openssl
   tags:
@@ -1358,7 +1358,7 @@ tasks:
         export DEBUG="ON"
         export SASL="SSPI"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-rdtscp
   commands:
@@ -1372,7 +1372,7 @@ tasks:
         set -o xtrace
         export DEBUG="ON"
         export ENABLE_RDTSCP="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sspi-winssl
   tags:
@@ -1391,7 +1391,7 @@ tasks:
         export DEBUG="ON"
         export SASL="SSPI"
         export SSL="WINDOWS"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-nosrv
   tags:
@@ -1407,7 +1407,7 @@ tasks:
         set -o xtrace
         export DEBUG="ON"
         export SRV="OFF"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: link-with-cmake
   depends_on:
@@ -1700,7 +1700,7 @@ tasks:
         set -o xtrace
         export CFLAGS="-Werror -Wno-cast-align"
         export DEBUG="ON"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-openssl-cse
   tags:
@@ -1724,7 +1724,7 @@ tasks:
         export SASL="AUTO"
         export SKIP_MOCK_TESTS="ON"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
         rm CMakeCache.txt
         set -o errexit
         set -o xtrace
@@ -1734,7 +1734,7 @@ tasks:
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_CLIENT_SIDE_ENCRYPTION=ON"
         export SASL="AUTO"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-darwinssl-cse
   tags:
@@ -1758,7 +1758,7 @@ tasks:
         export SASL="AUTO"
         export SKIP_MOCK_TESTS="ON"
         export SSL="DARWIN"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
         rm CMakeCache.txt
         set -o errexit
         set -o xtrace
@@ -1768,7 +1768,7 @@ tasks:
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_CLIENT_SIDE_ENCRYPTION=ON"
         export SASL="AUTO"
         export SSL="DARWIN"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-sasl-winssl-cse
   tags:
@@ -1792,7 +1792,7 @@ tasks:
         export SASL="AUTO"
         export SKIP_MOCK_TESTS="ON"
         export SSL="WINDOWS"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
         rm CMakeCache.txt
         set -o errexit
         set -o xtrace
@@ -1802,7 +1802,7 @@ tasks:
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_CLIENT_SIDE_ENCRYPTION=ON"
         export SASL="AUTO"
         export SSL="WINDOWS"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-asan-openssl-cse
   tags:
@@ -1825,7 +1825,7 @@ tasks:
         export PATH="/usr/lib/llvm-3.8/bin:$PATH"
         export SKIP_MOCK_TESTS="ON"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
         rm CMakeCache.txt
         set -o errexit
         set -o xtrace
@@ -1836,7 +1836,7 @@ tasks:
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_CLIENT_SIDE_ENCRYPTION=ON -DENABLE_EXTRA_ALIGNMENT=OFF"
         export PATH="/usr/lib/llvm-3.8/bin:$PATH"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-nosasl-openssl-1.0.1
   commands:
@@ -1855,7 +1855,7 @@ tasks:
         export DEBUG="ON"
         export SASL="OFF"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: debug-compile-tsan-openssl
   tags:
@@ -1875,7 +1875,7 @@ tasks:
         export DEBUG="ON"
         export EXTRA_CONFIGURE_FLAGS="-DENABLE_EXTRA_ALIGNMENT=OFF -DENABLE_SHM_COUNTERS=OFF"
         export SSL="OPENSSL"
-        CC='${CC}' MARCH='${MARCH}' sh .evergreen/compile.sh
+        CC='${CC}' MARCH='${MARCH}' CMAKE_ARCHITECTURE='${CMAKE_ARCHITECTURE}' sh .evergreen/compile.sh
   - func: upload build
 - name: test-valgrind-latest-server-auth-nosasl-openssl
   tags:
@@ -14969,8 +14969,8 @@ tasks:
         # Compile mongoc-ping. Disable unnecessary dependencies since mongoc-ping is copied to a remote Ubuntu 18.04 ECS cluster for testing, which may not have all dependent libraries.
         . .evergreen/find-cmake.sh
         export CC='${CC}'
-        $CMAKE -DENABLE_SASL=OFF -DENABLE_SNAPPY=OFF -DENABLE_ZSTD=OFF -DENABLE_CLIENT_SIDE_ENCRYPTION=OFF .
-        $CMAKE --build . --target mongoc-ping
+        "$CMAKE" -DENABLE_SASL=OFF -DENABLE_SNAPPY=OFF -DENABLE_ZSTD=OFF -DENABLE_CLIENT_SIDE_ENCRYPTION=OFF .
+        "$CMAKE" --build . --target mongoc-ping
   - func: upload build
 - name: test-aws-openssl-regular-latest
   depends_on:
@@ -20041,6 +20041,44 @@ buildvariants:
   - debug-compile-aws
   - test-aws-openssl-regular-4.4
   - test-aws-openssl-regular-latest
+- name: windows-2019
+  display_name: Windows (VS 2019)
+  expansions:
+    CC: Visual Studio 16 2019
+    CMAKE_ARCHITECTURE: x64
+  run_on: windows-64-vs2019-small
+  tasks:
+  - .debug-compile .winssl
+  - .debug-compile !.sspi .openssl
+  - .debug-compile !.sspi .nossl
+  - .debug-compile .sspi
+  - debug-compile-sasl-winssl
+  - .server .winssl .latest
+  - .server .openssl .latest !.nosasl
+  - .latest .nossl
+  - .nosasl .latest .nossl
+  - .sspi .latest
+  - test-dns-winssl
+  - test-dns-auth-winssl
+  - .4.4 .winssl !.nosasl .server
+  - debug-compile-aws
+  - test-aws-openssl-regular-4.4
+  - test-aws-openssl-regular-latest
+- name: windows-2019-32
+  display_name: Windows (i386) (VS 2019)
+  expansions:
+    CC: Visual Studio 16 2019
+    CMAKE_ARCHITECTURE: Win32
+  run_on: windows-64-vs2019-small
+  tasks:
+  - .debug-compile .winssl .nosasl
+  - .debug-compile !.sspi .nossl .nosasl
+  - .debug-compile .sspi !.openssl
+  - debug-compile-sasl-winssl
+  - .server .winssl .latest .nosasl
+  - .latest .nossl .nosasl
+  - .nosasl .latest .nossl
+  - .sspi .latest
 - name: windows-2017-32
   display_name: Windows (i386) (VS 2017)
   expansions:

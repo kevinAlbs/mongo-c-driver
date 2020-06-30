@@ -23,6 +23,8 @@ find_cmake ()
      mkdir cmake-3.11.0
      tar xzf cmake.tar.gz -C cmake-3.11.0 --strip-components=1
      CMAKE=$(pwd)/cmake-3.11.0/bin/cmake
+  elif [ -f "/cygdrive/c/Program Files/CMake/bin/cmake.exe" ]; then
+     CMAKE="/cygdrive/c/Program Files/CMake/bin/cmake.exe"
   elif [ -f "/cygdrive/c/cmake/bin/cmake" ]; then
      CMAKE="/cygdrive/c/cmake/bin/cmake"
   fi
