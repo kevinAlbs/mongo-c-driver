@@ -28,6 +28,30 @@
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "CYRUS-SASL"
 
+static void
+_log_data (const char *ctx, const uint8_t *data, uint32_t data_len)
+{
+   bson_string_t *str;
+   int i;
+   MONGOC_DEBUG ("[%s] raw data payload: (%d)", ctx, data_len);
+
+   str = bson_string_new ("");
+   for (i = 0; i < data_len; i++) {
+      bson_string_append_printf (str, "%02x", data[i]);
+   }
+   MONGOC_DEBUG ("%s", str->str);
+   bson_string_free (str, true);
+}
+
+static void
+_log_base64 (const char *ctx,
+             const uint8_t *base64_encoded,
+             uint32_t base64_encoded_len)
+{
+   MONGOC_DEBUG ("[%s] base64 payload: (%d)", ctx, base64_encoded_len);
+   MONGOC_DEBUG ("%.*s", base64_encoded_len, base64_encoded);
+}
+
 bool
 _mongoc_cyrus_set_mechanism (mongoc_cyrus_t *sasl,
                              const char *mechanism,
@@ -103,7 +127,7 @@ _mongoc_cyrus_canon_user (sasl_conn_t *conn,
                           unsigned out_max,
                           unsigned *out_len)
 {
-   TRACE ("Canonicalizing %s (%" PRIu32 ")\n", in, inlen);
+   MONGOC_DEBUG ("Canonicalizing %s (%" PRIu32 ")\n", in, inlen);
    strcpy (out, in);
    *out_len = inlen;
    return SASL_OK;
@@ -227,15 +251,12 @@ _mongoc_cyrus_destroy (mongoc_cyrus_t *sasl)
 
 
 static bool
-_mongoc_cyrus_is_failure (int status, bson_error_t *error)
+_mongoc_cyrus_is_failure (mongoc_cyrus_t *sasl, int status, bson_error_t *error)
 {
    bool ret = (status < 0);
 
-   TRACE ("Got status: %d ok is %d, continue=%d interact=%d\n",
-          status,
-          SASL_OK,
-          SASL_CONTINUE,
-          SASL_INTERACT);
+   MONGOC_DEBUG (
+      "Got status: %d (%s)\n", status, sasl_errstring (status, NULL, NULL));
    if (ret) {
       switch (status) {
       case SASL_NOMEM:
@@ -273,9 +294,10 @@ _mongoc_cyrus_is_failure (int status, bson_error_t *error)
          bson_set_error (error,
                          MONGOC_ERROR_SASL,
                          status,
-                         "SASL Failure: (%d): %s",
+                         "SASL Failure: (%d): %s. Detail: %s",
                          status,
-                         sasl_errstring (status, NULL, NULL));
+                         sasl_errstring (status, NULL, NULL),
+                         sasl_errdetail (sasl->conn));
          break;
       }
    }
@@ -313,9 +335,10 @@ _mongoc_cyrus_start (mongoc_cyrus_t *sasl,
 
    status = sasl_client_new (
       service_name, service_host, NULL, NULL, sasl->callbacks, 0, &sasl->conn);
-   TRACE ("Created new sasl client %s",
-          status == SASL_OK ? "successfully" : "UNSUCCESSFULLY");
-   if (_mongoc_cyrus_is_failure (status, error)) {
+   MONGOC_DEBUG ("Created new sasl client. Status: (%d): %s",
+                 status,
+                 sasl_errstring (status, NULL, NULL));
+   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
       return false;
    }
 
@@ -325,9 +348,10 @@ _mongoc_cyrus_start (mongoc_cyrus_t *sasl,
                                &raw,
                                &raw_len,
                                &mechanism);
-   TRACE ("Started the sasl client %s",
-          status == SASL_CONTINUE ? "successfully" : "UNSUCCESSFULLY");
-   if (_mongoc_cyrus_is_failure (status, error)) {
+   MONGOC_DEBUG ("Started the sasl client. Status: (%d): %s",
+                 status,
+                 sasl_errstring (status, NULL, NULL));
+   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
       return false;
    }
 
@@ -342,10 +366,15 @@ _mongoc_cyrus_start (mongoc_cyrus_t *sasl,
    }
 
 
+   _log_data ("sasl -> driver", (const uint8_t *) raw, raw_len);
    status = sasl_encode64 (raw, raw_len, (char *) outbuf, outbufmax, outbuflen);
-   if (_mongoc_cyrus_is_failure (status, error)) {
+   MONGOC_DEBUG ("base64 encoded sasl start");
+   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
       return false;
    }
+   _log_base64 ("driver -> mongodb",
+                (const uint8_t *) (const uint8_t *) outbuf,
+                *outbuflen);
 
    return true;
 }
@@ -369,7 +398,7 @@ _mongoc_cyrus_step (mongoc_cyrus_t *sasl,
    BSON_ASSERT (outbuf);
    BSON_ASSERT (outbuflen);
 
-   TRACE ("Running %d, inbuflen: %" PRIu32, sasl->step, inbuflen);
+   MONGOC_DEBUG ("Running %d, inbuflen: %" PRIu32, sasl->step, inbuflen);
    sasl->step++;
 
    if (sasl->step == 1) {
@@ -382,7 +411,7 @@ _mongoc_cyrus_step (mongoc_cyrus_t *sasl,
       return false;
    }
 
-   TRACE ("Running %d, inbuflen: %" PRIu32, sasl->step, inbuflen);
+   MONGOC_DEBUG ("Running %d, inbuflen: %" PRIu32, sasl->step, inbuflen);
    if (!inbuflen) {
       bson_set_error (error,
                       MONGOC_ERROR_SASL,
@@ -392,25 +421,36 @@ _mongoc_cyrus_step (mongoc_cyrus_t *sasl,
       return false;
    }
 
+   _log_data ("mongodb -> driver", (const uint8_t *) inbuf, inbuflen);
    status = sasl_decode64 (
       (char *) inbuf, inbuflen, (char *) outbuf, outbufmax, outbuflen);
-   if (_mongoc_cyrus_is_failure (status, error)) {
+   MONGOC_DEBUG ("base64 decoded MongoDB response. Status: (%d) %s.",
+                 status,
+                 sasl_errstring (status, NULL, NULL));
+   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
       return false;
    }
+   _log_data ("driver -> sasl", (const uint8_t *) outbuf, *outbuflen);
 
-   TRACE ("%s", "Running client_step");
+   MONGOC_DEBUG ("Running client_step");
    status = sasl_client_step (
       sasl->conn, (char *) outbuf, *outbuflen, &sasl->interact, &raw, &rawlen);
-   TRACE ("%s sent a client step",
-          status == SASL_OK ? "Successfully" : "UNSUCCESSFULLY");
-   if (_mongoc_cyrus_is_failure (status, error)) {
+   MONGOC_DEBUG ("Sent a client step. Status: (%d) %s.",
+                 status,
+                 sasl_errstring (status, NULL, NULL));
+   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
       return false;
    }
 
    status = sasl_encode64 (raw, rawlen, (char *) outbuf, outbufmax, outbuflen);
-   if (_mongoc_cyrus_is_failure (status, error)) {
+   MONGOC_DEBUG ("base64 encoded Cyrus response. Status: (%d) %s.",
+                 status,
+                 sasl_errstring (status, NULL, NULL));
+   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
       return false;
    }
+   _log_data ("sasl -> driver", (const uint8_t *) raw, rawlen);
+   _log_base64 ("driver -> mongodb", (const uint8_t *) outbuf, *outbuflen);
 
    return true;
 }

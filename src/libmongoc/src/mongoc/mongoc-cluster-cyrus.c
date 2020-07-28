@@ -68,7 +68,7 @@ _mongoc_cluster_auth_node_cyrus (mongoc_cluster_t *cluster,
             &cmd, conv_id, (const char *) buf, buflen);
       }
 
-      TRACE ("SASL: authenticating (step %d)", sasl.step);
+      MONGOC_DEBUG ("SASL: authenticating (step %d)", sasl.step);
 
       server_stream = _mongoc_cluster_create_server_stream (
          cluster->client->topology, sd->id, stream, error);
@@ -127,7 +127,7 @@ _mongoc_cluster_auth_node_cyrus (mongoc_cluster_t *cluster,
       mongoc_cmd_parts_cleanup (&parts);
    }
 
-   TRACE ("%s", "SASL: authenticated");
+   MONGOC_DEBUG ("%s", "SASL: authenticated");
 
    ret = true;
 
