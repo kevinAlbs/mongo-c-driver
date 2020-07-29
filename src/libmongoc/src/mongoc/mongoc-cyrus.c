@@ -228,7 +228,7 @@ _mongoc_cyrus_destroy (mongoc_cyrus_t *sasl)
 
 
 static bool
-_mongoc_cyrus_is_failure (int status, bson_error_t *error)
+_mongoc_cyrus_is_failure (mongoc_cyrus_t *sasl, int status, bson_error_t *error)
 {
    bool ret = (status < 0);
 
@@ -274,9 +274,10 @@ _mongoc_cyrus_is_failure (int status, bson_error_t *error)
          bson_set_error (error,
                          MONGOC_ERROR_SASL,
                          status,
-                         "SASL Failure: (%d): %s",
+                         "SASL Failure: (%d): %s. Detail: %s",
                          status,
-                         sasl_errstring (status, NULL, NULL));
+                         sasl_errstring (status, NULL, NULL),
+                         sasl_errdetail (sasl->conn));
          break;
       }
    }
@@ -316,7 +317,7 @@ _mongoc_cyrus_start (mongoc_cyrus_t *sasl,
       service_name, service_host, NULL, NULL, sasl->callbacks, 0, &sasl->conn);
    TRACE ("Created new sasl client %s",
           status == SASL_OK ? "successfully" : "UNSUCCESSFULLY");
-   if (_mongoc_cyrus_is_failure (status, error)) {
+   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
       return false;
    }
 
@@ -328,7 +329,7 @@ _mongoc_cyrus_start (mongoc_cyrus_t *sasl,
                                &mechanism);
    TRACE ("Started the sasl client %s",
           status == SASL_CONTINUE ? "successfully" : "UNSUCCESSFULLY");
-   if (_mongoc_cyrus_is_failure (status, error)) {
+   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
       return false;
    }
 
@@ -436,13 +437,14 @@ _mongoc_cyrus_step (mongoc_cyrus_t *sasl,
       sasl->conn, decoded, decoded_len, &sasl->interact, &raw, &rawlen);
    TRACE ("%s sent a client step",
           status == SASL_OK ? "Successfully" : "UNSUCCESSFULLY");
-   if (_mongoc_cyrus_is_failure (status, error)) {
+   if (_mongoc_cyrus_is_failure (sasl, status, error)) {
       bson_free (decoded);
       return false;
    }
 
    *outbuflen = 0;
-   outbuf_capacity = COMMON_PREFIX (bson_b64_ntop_calculate_target_size (rawlen));
+   outbuf_capacity =
+      COMMON_PREFIX (bson_b64_ntop_calculate_target_size (rawlen));
    *outbuf = bson_malloc0 (outbuf_capacity);
    b64_ret = COMMON_PREFIX (bson_b64_ntop) (
       (const uint8_t *) raw, rawlen, (char *) *outbuf, outbuf_capacity);
