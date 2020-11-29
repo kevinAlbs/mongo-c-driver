@@ -39,6 +39,8 @@
 static bool gConveniencesInitialized = false;
 static mongoc_array_t gTmpBsonArray;
 static mongoc_array_t gTmpStringArray;
+static mongoc_array_t gTestExitFunctionArray;
+static mongoc_array_t gTestExitFunctionArgArray;
 
 static char *gHugeString;
 static size_t gHugeStringLength;
@@ -51,6 +53,8 @@ test_conveniences_init ()
    if (!gConveniencesInitialized) {
       _mongoc_array_init (&gTmpBsonArray, sizeof (bson_t *));
       _mongoc_array_init (&gTmpStringArray, sizeof (char *));
+      _mongoc_array_init (&gTestExitFunctionArray, sizeof (test_atexit_fn));
+      _mongoc_array_init (&gTestExitFunctionArgArray, sizeof (void*));
       atexit (test_conveniences_cleanup);
       gConveniencesInitialized = true;
       gHugeString = NULL;
@@ -78,8 +82,20 @@ test_conveniences_cleanup ()
          bson_free (str);
       }
 
+      /* Call atexit functions in reverse order. */
+      for (i = gTestExitFunctionArray.len - 1; i >= 0; i--) {
+         test_atexit_fn fn;
+         void* arg;
+
+         fn = _mongoc_array_index (&gTestExitFunctionArray, test_atexit_fn, i);
+         arg = _mongoc_array_index (&gTestExitFunctionArgArray, void*, i);
+         fn (arg);
+      }
+
       _mongoc_array_destroy (&gTmpBsonArray);
       _mongoc_array_destroy (&gTmpStringArray);
+      _mongoc_array_destroy (&gTestExitFunctionArray);
+      _mongoc_array_destroy (&gTestExitFunctionArgArray);
 
       bson_free (gHugeString);
       bson_free (gFourMBString);

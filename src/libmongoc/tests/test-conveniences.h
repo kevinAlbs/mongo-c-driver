@@ -53,6 +53,24 @@ tmp_str (const char *fmt, ...);
 const char *
 tmp_json (const bson_t *bson);
 
+typedef void (*test_atexit_fn) (void* arg);
+
+/* Register a function to be called at the end of a test.
+ * Functions are called in the reverse order they are set.
+ * This is useful to "defer" clean up functions.
+ * 
+ * db = mongoc_client_get_database (client, "db");
+ * test_atexit (mongoc_database_destroy, db);
+ * 
+ * coll = mongoc_database_get_collection (db, "coll");
+ * test_atexit (mongoc_collection_destroy, coll);
+ * 
+ * bson = fn_returning_bson ();
+ * test_atexit (bson_destroy, some_bson);
+ */
+void
+test_atexit (test_atexit_fn fn, void* arg);
+
 void
 bson_iter_bson (const bson_iter_t *iter, bson_t *bson);
 
