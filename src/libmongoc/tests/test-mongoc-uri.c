@@ -255,6 +255,25 @@ test_mongoc_uri_new (void)
    ASSERT (!mongoc_uri_new (
       "mongodb://localhost/?" MONGOC_URI_HEARTBEATFREQUENCYMS "=499"));
 
+   /* timeoutMS */
+   uri = mongoc_uri_new ("mongodb://localhost/?" MONGOC_URI_TIMEOUTMS "=3000");
+   ASSERT (uri);
+   ASSERT_CMPINT64 (3000, ==, mongoc_uri_get_option_as_int64 (uri, MONGOC_URI_TIMEOUTMS, 0));
+   mongoc_uri_destroy (uri);
+
+   /* wrong type for timeoutMS */
+   ASSERT (!mongoc_uri_new ("mongodb://localhost/?" MONGOC_URI_TIMEOUTMS "=hello"));
+   ASSERT (!mongoc_uri_new ("mongodb://localhost/?" MONGOC_URI_TIMEOUTMS "=true"));
+
+   /* negative timeoutMS */
+   ASSERT (!mongoc_uri_new ("mongodb://localhost/?" MONGOC_URI_TIMEOUTMS "=-1000"));
+
+   uri = mongoc_uri_new ("mongodb://localhost/");
+   ASSERT (!mongoc_uri_set_option_as_int64 (uri, MONGOC_URI_TIMEOUTMS, -100));
+   ASSERT (mongoc_uri_set_option_as_int64 (uri, MONGOC_URI_TIMEOUTMS, 100));
+   ASSERT_CMPINT64 (100, ==, mongoc_uri_get_option_as_int64 (uri, MONGOC_URI_TIMEOUTMS, 0));
+   mongoc_uri_destroy (uri);
+
    /* should use the " MONGOC_URI_AUTHSOURCE " over db when both are specified
     */
    uri = mongoc_uri_new (
@@ -593,6 +612,10 @@ test_mongoc_uri_functions (void)
 
    ASSERT_CMPINT32 (i, ==, 500);
 
+   ASSERT (mongoc_uri_set_option_as_int64 (uri, MONGOC_URI_TIMEOUTMS, 20));
+   ASSERT_CMPINT (
+      mongoc_uri_get_option_as_int64 (uri, MONGOC_URI_TIMEOUTMS, 19), ==, 20);
+
    capture_logs (true);
 
    /* Server Discovery and Monitoring Spec: "the driver MUST NOT permit users to
@@ -604,6 +627,15 @@ test_mongoc_uri_functions (void)
       "mongoc_uri_set_option_as_int32",
       MONGOC_LOG_LEVEL_WARNING,
       "Invalid \"heartbeatfrequencyms\" of 499: must be at least 500");
+
+   /* timeoutMS must be non-negative */
+   ASSERT (!mongoc_uri_set_option_as_int64 (
+      uri, MONGOC_URI_TIMEOUTMS, -10));
+
+   ASSERT_CAPTURED_LOG (
+      "mongoc_uri_set_option_as_int64",
+      MONGOC_LOG_LEVEL_WARNING,
+      "Invalid \"timeoutms\" of -10: must be a non-negative integer");
 
    /* socketcheckintervalms isn't set, return our fallback */
    ASSERT_CMPINT (mongoc_uri_get_option_as_int32 (
@@ -821,6 +853,15 @@ test_mongoc_uri_new_with_error (void)
       MONGOC_ERROR_COMMAND,
       MONGOC_ERROR_COMMAND_INVALID_ARG,
       "Invalid \"heartbeatfrequencyms\" of 10: must be at least 500");
+
+   memset (&error, 0, sizeof (bson_error_t));
+   ASSERT (!mongoc_uri_new_with_error (
+      "mongodb://localhost/db?timeoutms=-10", &error));
+   ASSERT_ERROR_CONTAINS (
+      error,
+      MONGOC_ERROR_COMMAND,
+      MONGOC_ERROR_COMMAND_INVALID_ARG,
+      "Invalid \"timeoutms\" of -10: must be a non-negative integer");
 
    memset (&error, 0, sizeof (bson_error_t));
    ASSERT (!mongoc_uri_new_with_error (
@@ -2493,6 +2534,11 @@ test_mongoc_uri_duplicates (void)
    ASSERT_LOG_DUPE (MONGOC_URI_SOCKETTIMEOUTMS);
    BSON_ASSERT (
       mongoc_uri_get_option_as_int32 (uri, MONGOC_URI_SOCKETTIMEOUTMS, 0) == 2);
+
+   RECREATE_URI (MONGOC_URI_TIMEOUTMS "=100&" MONGOC_URI_TIMEOUTMS "=200");
+   ASSERT_LOG_DUPE (MONGOC_URI_TIMEOUTMS);
+   BSON_ASSERT (
+      mongoc_uri_get_option_as_int64 (uri, MONGOC_URI_TIMEOUTMS, 0) == 200);
 
    RECREATE_URI (MONGOC_URI_TLS "=false&" MONGOC_URI_TLS "=true");
    ASSERT_LOG_DUPE (MONGOC_URI_TLS);
