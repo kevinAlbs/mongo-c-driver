@@ -2784,7 +2784,6 @@ mongoc_uri_set_option_as_int64 (mongoc_uri_t *uri,
 
    r = _mongoc_uri_set_option_as_int64_with_error (uri, option, value, &error);
    if (!r) {
-      printf ("got a warning for int64\n");
       MONGOC_WARNING ("%s", error.message);
    }
 
@@ -2821,7 +2820,7 @@ _mongoc_uri_set_option_as_int64_with_error (mongoc_uri_t *uri,
    option = mongoc_uri_canonicalize_option (option_orig);
 
    /* timeoutMS may not be a negative number. */
-   if (!bson_strcasecmp (option, MONGOC_URI_TIMEOUTMS) && value < 0) {
+   if (!bson_strcasecmp (option, MONGOC_URI_TIMEOUTMS) && value < 0 && value != -1) {
       printf("checking value for timeoutMS in set_int64\n");
       MONGOC_URI_ERROR (error,
 			"Invalid \"%s\" of %lld: must be a non-negative integer",
