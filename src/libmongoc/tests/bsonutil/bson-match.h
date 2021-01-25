@@ -26,21 +26,14 @@ typedef struct _bson_matcher_t bson_matcher_t;
 
 bson_matcher_t bson_matcher_new (bson_val_t *expected, bson_val_t *actual, char* path);
 
-bson_val_t* bson_matcher_get_actual (bson_matcher_t* matcher);
-
-bson_val_t* bson_matcher_get_expected (bson_matcher_t* matcher);
-
-char* bson_matcher_get_path (bson_matcher_t* matcher);
-
 /* Add a hook function for matching a special $$ operator */
-void bson_matcher_add_special_match (bson_matcher_t* matcher, char* keyword, special_fn special);
+void bson_matcher_add_special_match (bson_matcher_t* matcher, char* keyword, special_fn special, void* ctx);
 
 bool bson_matcher_match (bson_matcher_t* matcher, bson_error_t *error);
 
 void bson_matcher_destroy (bson_matcher_t *matcher);
 
-typedef bool (*special_fn) (bson_matcher_t *matcher,
-                            bson_error_t *error);
+typedef bool (*special_fn) (void* ctx, bson_val_t *expected, bson_val_t *actual, char* path, bson_error_t *error);
 
 bool
 bson_match_with_path (bson_val_t *expected,
