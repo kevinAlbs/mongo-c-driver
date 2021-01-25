@@ -144,3 +144,22 @@ bson_type_to_string (bson_type_t btype)
    test_error ("unrecognized type: %d\n", (int) btype);
    return "invalid";
 }
+
+static void
+test_copy_and_sort (void)
+{
+   bson_t *in = tmp_bson ("{'b': 1, 'a': 1, 'd': 1, 'c': 1}");
+   bson_t *expect = tmp_bson ("{'a': 1, 'b': 1, 'c': 1, 'd': 1}");
+   bson_t *out = bson_copy_and_sort (in);
+   if (!bson_equal (expect, out)) {
+      test_error ("expected: %s, got: %s", tmp_json (expect), tmp_json (out));
+   }
+   bson_destroy (out);
+}
+
+void
+test_bson_util_install (TestSuite *suite)
+{
+   TestSuite_Add (
+      suite, "/unified/selftest/util/copy_and_sort", test_copy_and_sort);
+}

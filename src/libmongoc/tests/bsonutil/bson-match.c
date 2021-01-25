@@ -147,8 +147,8 @@ evaluate_special_match (const bson_t *assertion,
       }
 
       assertion_val = bson_val_from_iter (&iter);
-      ret =
-         bson_match_with_path (assertion_val, actual, hook, hook_ctx, path, error);
+      ret = bson_match_with_path (
+         assertion_val, actual, hook, hook_ctx, path, error);
       bson_val_destroy (assertion_val);
       goto done;
    }
@@ -386,6 +386,17 @@ bson_match_with_path (bson_val_t *expected,
 
    ret = true;
 done:
+   if (!ret && is_root) {
+      /* Append the error with more info at the root. */
+      bson_error_t tmp_error;
+
+      memcpy (&tmp_error, error, sizeof (bson_error_t));
+      test_set_error (error,
+                      "BSON match failed: %s\nExpected: %s\nActual: %s",
+                      tmp_error.message,
+                      bson_val_to_json (expected),
+                      bson_val_to_json (actual));
+   }
    return ret;
 }
 
@@ -402,17 +413,7 @@ bson_match_with_hook (bson_val_t *expected,
                       void *hook_ctx,
                       bson_error_t *error)
 {
-   bool ret = bson_match_with_path (expected, actual, hook, hook_ctx, "", error);
-
-   /*
-   if (!ret) {
-      bson_error_append (te,
-                         "BSON pattern match failed.\nExpected: %s\nActual: %s",
-                         bson_val_to_json (expected),
-                         bson_val_to_json (actual));
-   }
-   */
-   return ret;
+   return bson_match_with_path (expected, actual, hook, hook_ctx, "", error);
 }
 
 typedef struct {
@@ -456,21 +457,8 @@ test_match (void)
    }
 }
 
-static void
-test_copy_and_sort (void)
-{
-   bson_t *in = tmp_bson ("{'b': 1, 'a': 1, 'd': 1, 'c': 1}");
-   bson_t *expect = tmp_bson ("{'a': 1, 'b': 1, 'c': 1, 'd': 1}");
-   bson_t *out = bson_copy_and_sort (in);
-   if (!bson_equal (expect, out)) {
-      test_error ("expected: %s, got: %s", tmp_json (expect), tmp_json (out));
-   }
-   bson_destroy (out);
-}
-
 void
-test_bson_helpers_install (TestSuite *suite)
+test_bson_match_install (TestSuite *suite)
 {
    TestSuite_Add (suite, "/unified/selftest/bson/match", test_match);
-   TestSuite_Add (suite, "/unified/selftest/bson/copy_and_sort", test_copy_and_sort);
 }
