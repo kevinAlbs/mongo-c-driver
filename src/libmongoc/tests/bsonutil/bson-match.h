@@ -22,10 +22,24 @@
 bool
 bson_match (bson_val_t *expected, bson_val_t *actual, bson_error_t *error);
 
-typedef bool (*special_fn) (const bson_t *assertion,
-                            bson_val_t *actual,
-                            void *hook_ctx,
-                            const char *path,
+typedef struct _bson_matcher_t bson_matcher_t;
+
+bson_matcher_t bson_matcher_new (bson_val_t *expected, bson_val_t *actual, char* path);
+
+bson_val_t* bson_matcher_get_actual (bson_matcher_t* matcher);
+
+bson_val_t* bson_matcher_get_expected (bson_matcher_t* matcher);
+
+char* bson_matcher_get_path (bson_matcher_t* matcher);
+
+/* Add a hook function for matching a special $$ operator */
+void bson_matcher_add_special_match (bson_matcher_t* matcher, char* keyword, special_fn special);
+
+bool bson_matcher_match (bson_matcher_t* matcher, bson_error_t *error);
+
+void bson_matcher_destroy (bson_matcher_t *matcher);
+
+typedef bool (*special_fn) (bson_matcher_t *matcher,
                             bson_error_t *error);
 
 bool

@@ -50,16 +50,16 @@ is_special_match (const bson_t *bson)
 
 /* actual may be NULL */
 static bool
-evaluate_special_match (const bson_t *assertion,
+evaluate_special_match (bson_matcher_t *matcher, const bson_t *assertion,
                         bson_val_t *actual,
-                        special_fn hook,
-                        void *hook_ctx,
-                        const char *path,
                         bson_error_t *error)
 {
    bson_iter_t iter;
    const char *assertion_key;
    bool ret = false;
+   bson_t *assertion = bson_val_as_bson (matcher->expected);
+   bson_val_t *actual = matcher->actual;
+   special_functor_t *special_iter;
 
    bson_iter_init (&iter, assertion);
    BSON_ASSERT (bson_iter_next (&iter));
@@ -212,6 +212,11 @@ evaluate_special_match (const bson_t *assertion,
       goto done;
    }
 
+   LL_FOREACH (matcher->specials, special_iter) {
+      if (0 == strcmp (special_iter->keyword, assertion_key)) {
+
+      }
+   }
    if (hook) {
       ret = hook (assertion, actual, hook_ctx, path, error);
       goto done;
@@ -226,15 +231,12 @@ done:
 }
 
 bool
-bson_match_with_path (bson_val_t *expected,
-                      bson_val_t *actual,
-                      special_fn hook,
-                      void *hook_ctx,
-                      const char *path,
-                      bson_error_t *error)
+bson_matcher_match (bson_matcher_t *matcher, bson_error_t *error)
 {
    bool ret = false;
-   bool is_root = (0 == strcmp (path, ""));
+   bool is_root = (0 == strcmp (matcher->path, ""));
+   bson_val_t *expected = matcher->expected;
+   bson_val_t *actual = matcher->actual;
 
    if (bson_val_type (expected) == BSON_TYPE_DOCUMENT) {
       bson_iter_t expected_iter;
@@ -243,8 +245,7 @@ bson_match_with_path (bson_val_t *expected,
 
       /* handle special operators (e.g. $$type) */
       if (is_special_match (expected_bson)) {
-         ret = evaluate_special_match (
-            expected_bson, actual, hook, hook_ctx, path, error);
+         ret = evaluate_special_match (matcher, error);
          goto done;
       }
 
@@ -259,6 +260,7 @@ bson_match_with_path (bson_val_t *expected,
       BSON_FOREACH (expected_bson, expected_iter)
       {
          const char *key;
+         bson_matcher_t *matcher_child = NULL;
          bson_val_t *expected_val = NULL;
          bson_val_t *actual_val = NULL;
          bson_iter_t actual_iter;
@@ -271,20 +273,18 @@ bson_match_with_path (bson_val_t *expected,
             actual_val = bson_val_from_iter (&actual_iter);
          }
 
+         matcher_child = bson_matcher_new (expected_val, actual_val);
+
          if (bson_val_type (expected_val) == BSON_TYPE_DOCUMENT &&
              is_special_match (bson_val_to_document (expected_val))) {
             bool special_ret;
             path_child = bson_strdup_printf ("%s.%s", path, key);
-            special_ret =
-               evaluate_special_match (bson_val_to_document (expected_val),
-                                       actual_val,
-                                       hook,
-                                       hook_ctx,
-                                       path,
-                                       error);
+            bson_matcher_set_path (matcher_child, sub_path);
+            special_ret = evaluate_special_match (matcher_child, error);
             bson_free (path_child);
             bson_val_destroy (expected_val);
             bson_val_destroy (actual_val);
+            bson_matcher_destroy (matcher_child);
             if (!special_ret) {
                goto done;
             }
@@ -295,6 +295,7 @@ bson_match_with_path (bson_val_t *expected,
             MATCH_ERR ("key %s is not present", key);
             bson_val_destroy (expected_val);
             bson_val_destroy (actual_val);
+            bson_matcher_destroy (matcher_child);
             goto done;
          }
 
@@ -304,11 +305,13 @@ bson_match_with_path (bson_val_t *expected,
             bson_val_destroy (expected_val);
             bson_val_destroy (actual_val);
             bson_free (path_child);
+            bson_matcher_destroy (matcher_child);
             goto done;
          }
          bson_val_destroy (expected_val);
          bson_val_destroy (actual_val);
          bson_free (path_child);
+         bson_matcher_destroy (matcher_child);
       }
 
       if (!is_root) {
@@ -328,6 +331,7 @@ bson_match_with_path (bson_val_t *expected,
       bson_t *expected_bson = bson_val_to_array (expected);
       bson_t *actual_bson = NULL;
       char *path_child = NULL;
+      bson_matcher_t *matcher_child = NULL;
 
       if (bson_val_type (actual) != BSON_TYPE_ARRAY) {
          MATCH_ERR ("expected array, but got: %s",
@@ -362,16 +366,19 @@ bson_match_with_path (bson_val_t *expected,
          actual_val = bson_val_from_iter (&actual_iter);
 
          path_child = bson_strdup_printf ("%s.%s", path, key);
-         if (!bson_match_with_path (
-                expected_val, actual_val, hook, hook_ctx, path_child, error)) {
+         matcher_child = bson_matcher_new (expected_val, actual_val);
+         bson_matcher_set_path (matcher_child, path_child);
+         if (!bson_matcher_match (matcher_child, error)) {
             bson_val_destroy (expected_val);
             bson_val_destroy (actual_val);
             bson_free (path_child);
+            bson_matcher_destroy (matcher_child);
             goto done;
          }
          bson_val_destroy (expected_val);
          bson_val_destroy (actual_val);
          bson_free (path_child);
+         bson_matcher_destroy (matcher_child);
       }
       ret = true;
       goto done;
@@ -414,6 +421,52 @@ bson_match_with_hook (bson_val_t *expected,
                       bson_error_t *error)
 {
    return bson_match_with_path (expected, actual, hook, hook_ctx, "", error);
+}
+
+typedef struct _special_functor_t {
+   special_fn fn;
+   struct _special_functor_t *next;
+} special_functor_t;
+
+struct _bson_matcher_t {
+   special_functor_t *specials;
+   char* path;
+   bson_val_t *expected;
+   bson_val_t *actual;
+   char *path;
+}
+
+bson_matcher_t bson_matcher_new (bson_val_t *expected, bson_val_t *actual, char* path) {
+   bson_matcher_t *matcher;
+
+   matcher = bson_malloc0 (sizeof(bson_matcher_t));
+   matcher->path = bson_strdup (path);
+   matcher->expected = bson_val_copy(expected);
+   matcher->actual = bson_val_copy(actual);
+}
+
+/* Add a hook function for matching a special $$ operator */
+void bson_matcher_add_special_match (bson_matcher_t* matcher, char* keyword, special_fn hook) {
+   special_functor_t functor = bson_malloc0 (sizeof (special_functor_t));
+   functor->keyword = bson_strdup (keyword);
+   if (strstr (keyword, "$$") != keyword) {
+      test_error ("invalid matcher configuration, special %s must begin with '$$'", keyword);
+   }
+
+   LL_PREPEND (matcher->specials, functor);
+}
+
+void bson_matcher_set_path (bson_matcher_t* matcher, char* path) {
+   bson_free (matcher->root_path);
+   matcher->root_path = bson_strdup (path);
+}
+
+bool bson_matcher_match (bson_matcher_t* matcher, bson_val_t *expected, bson_val_t *actual, bson_error_t *error) {
+
+}
+
+void bson_matcher_destroy (bson_matcher_t *matcher) {
+
 }
 
 typedef struct {
