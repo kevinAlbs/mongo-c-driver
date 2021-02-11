@@ -718,6 +718,7 @@ _contact_ocsp_responder (OCSP_CERTID *id,
       http_req.port = (int) bson_ascii_strtoll (port, NULL, 10);
       http_req.body = (const char *) request_der;
       http_req.body_len = request_der_len;
+      MONGOC_DEBUG ("contacting: %s/%s", host, path);
       if (!_mongoc_http_send (&http_req,
                               MONGOC_OCSP_REQUEST_TIMEOUT_MS,
                               ssl != 0,
@@ -813,6 +814,7 @@ _mongoc_ocsp_tlsext_status (SSL *ssl, mongoc_openssl_ocsp_opt_t *opts)
 
    if (_mongoc_ocsp_cache_get_status (
           id, &cert_status, &reason, &this_update, &next_update)) {
+      MONGOC_DEBUG ("Obtained cached OCSP response");
       GOTO (validate);
    }
 
@@ -827,7 +829,7 @@ _mongoc_ocsp_tlsext_status (SSL *ssl, mongoc_openssl_ocsp_opt_t *opts)
          GOTO (done);
       }
    } else {
-      TRACE ("%s", "Server does not contain a stapled response");
+      MONGOC_DEBUG ("%s", "Server does not contain a stapled response");
       must_staple = _get_must_staple (peer);
       if (must_staple) {
          MONGOC_ERROR ("Server must contain a stapled response");
