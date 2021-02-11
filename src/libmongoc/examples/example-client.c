@@ -20,6 +20,7 @@ main (int argc, char *argv[])
    char *str;
    const char *uri_string = "mongodb://127.0.0.1/?appname=client-example";
    mongoc_uri_t *uri;
+   bson_t reply;
 
    mongoc_init ();
    if (argc > 1) {
@@ -46,6 +47,9 @@ main (int argc, char *argv[])
    }
 
    mongoc_client_set_error_api (client, 2);
+
+   mongoc_client_command_simple(client, "admin", BCON_NEW("whatsmyuri", BCON_INT32(1)), NULL, &reply, &error);
+   MONGOC_DEBUG ("reply=%s\n", bson_as_canonical_extended_json (&reply, NULL));
 
    bson_init (&query);
    collection = mongoc_client_get_collection (client, "test", collection_name);

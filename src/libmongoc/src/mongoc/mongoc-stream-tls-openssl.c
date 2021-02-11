@@ -568,6 +568,7 @@ _mongoc_stream_tls_openssl_handshake (mongoc_stream_t *stream,
 
 #ifdef MONGOC_ENABLE_OCSP_OPENSSL
       /* Validate OCSP */
+      MONGOC_DEBUG ("checking OCSP");
       if (openssl->ocsp_opts &&
           1 != _mongoc_ocsp_tlsext_status (ssl, openssl->ocsp_opts)) {
          bson_set_error (error,
