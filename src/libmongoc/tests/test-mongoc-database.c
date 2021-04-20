@@ -1154,9 +1154,9 @@ test_get_collection_names_error (void)
    capture_logs (true);
 
    server = mock_server_new ();
-   mock_server_auto_ismaster (server,
-                              "{'ismaster': true,"
-                              " 'maxWireVersion': 3}");
+   mock_server_auto_hello (server,
+                           "{'ismaster': true,"
+                           " 'maxWireVersion': 3}");
    mock_server_run (server);
    client = mongoc_client_new_from_uri (mock_server_get_uri (server));
 
@@ -1206,14 +1206,16 @@ test_get_default_database (void)
 static void
 test_timeout_ms (void)
 {
-   mongoc_client_t *client = mongoc_client_new ("mongodb://localhost/?timeoutms=100");
+   mongoc_client_t *client =
+      mongoc_client_new ("mongodb://localhost/?timeoutms=100");
    mongoc_database_t *db = mongoc_client_get_database (client, "test");
    bool res;
    bson_error_t error;
 
    /* no timeoutMS returns client's timeoutMS */
-   ASSERT_CMPINT (mongoc_database_get_timeout_ms (db), ==,
-		  mongoc_client_get_timeout_ms (client));
+   ASSERT_CMPINT (mongoc_database_get_timeout_ms (db),
+                  ==,
+                  mongoc_client_get_timeout_ms (client));
 
    /* negative timeouts are invalid */
    res = mongoc_database_set_timeout_ms (db, -1, &error);

@@ -877,7 +877,7 @@ auto_ismaster (mock_server_t *server,
                                         max_batch_size);
 
    BSON_ASSERT (max_wire_version > 0);
-   mock_server_auto_ismaster (server, response);
+   mock_server_auto_hello (server, response);
 
    bson_free (response);
 }
@@ -6407,7 +6407,8 @@ test_fam_no_error_on_retry (void *unused)
 static void
 test_timeout_ms (void)
 {
-   mongoc_client_t *client = mongoc_client_new ("mongodb://localhost/?timeoutms=100");
+   mongoc_client_t *client =
+      mongoc_client_new ("mongodb://localhost/?timeoutms=100");
    mongoc_database_t *db = NULL;
    mongoc_collection_t *coll =
       mongoc_client_get_collection (client, "db", "test");
@@ -6416,8 +6417,9 @@ test_timeout_ms (void)
    bson_error_t error;
 
    /* no timeoutMS returns client's timeoutMS */
-   ASSERT_CMPINT (mongoc_collection_get_timeout_ms (coll), ==,
-		  mongoc_client_get_timeout_ms (client));
+   ASSERT_CMPINT (mongoc_collection_get_timeout_ms (coll),
+                  ==,
+                  mongoc_client_get_timeout_ms (client));
 
    /* negative timeouts are invalid */
    res = mongoc_collection_set_timeout_ms (coll, -1, &error);
