@@ -2207,7 +2207,7 @@ _test_ismaster_versioned_api (bool pooled)
    mongoc_uri_t *uri;
    mongoc_client_pool_t *pool;
    mongoc_client_t *client;
-   char *ismaster;
+   char *hello;
    future_t *future;
    request_t *request;
    bson_error_t error;
@@ -2233,13 +2233,13 @@ _test_ismaster_versioned_api (bool pooled)
                        error);
    }
 
-   ismaster = bson_strdup_printf ("{'ok': 1,"
-                                  " 'ismaster': true,"
-                                  " 'setName': 'rs',"
-                                  " 'minWireVersion': 2,"
-                                  " 'maxWireVersion': 5,"
-                                  " 'hosts': ['%s']}",
-                                  mock_server_get_host_and_port (server));
+   hello = bson_strdup_printf ("{'ok': 1,"
+                               " 'isWritablePrimary': true,"
+                               " 'setName': 'rs',"
+                               " 'minWireVersion': 2,"
+                               " 'maxWireVersion': 5,"
+                               " 'hosts': ['%s']}",
+                               mock_server_get_host_and_port (server));
 
    /* For client pools, the first handshake happens when the client is popped.
     * For non-pooled clients, send a ping command to trigger a handshake. */
@@ -2248,10 +2248,10 @@ _test_ismaster_versioned_api (bool pooled)
          client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
    }
 
-   request = mock_server_receives_ismaster (server);
+   request = mock_server_receives_hello (server);
    BSON_ASSERT (request);
    BSON_ASSERT (bson_has_field (request_get_doc (request, 0), "apiVersion"));
-   mock_server_replies_simple (request, ismaster);
+   mock_server_replies_simple (request, hello);
    request_destroy (request);
 
    if (!pooled) {
@@ -2272,7 +2272,7 @@ _test_ismaster_versioned_api (bool pooled)
    mongoc_server_api_destroy (api);
    mongoc_uri_destroy (uri);
    mock_server_destroy (server);
-   bson_free (ismaster);
+   bson_free (hello);
 }
 
 static void
