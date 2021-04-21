@@ -486,9 +486,10 @@ test_datakey_and_double_encryption_creating_and_using (
                    "'keyName': 'key-name-csfle'}"));
    } else if (0 == strcmp (kms_provider, "gcp")) {
       mongoc_client_encryption_datakey_opts_set_masterkey (
-         opts, tmp_bson ("{'projectId': 'devprod-drivers','location': "
-                         "'global','keyRing': 'key-ring-csfle','keyName': "
-                         "'key-name-csfle'}"));
+         opts,
+         tmp_bson ("{'projectId': 'devprod-drivers','location': "
+                   "'global','keyRing': 'key-ring-csfle','keyName': "
+                   "'key-name-csfle'}"));
    }
 
    altname = bson_strdup_printf ("%s_altname", kms_provider);
@@ -2085,7 +2086,7 @@ _check_mongocryptd_not_spawned (void)
 
    client = mongoc_client_new (
       "mongodb://localhost:27021/db?serverSelectionTimeoutMS=1000");
-   cmd = BCON_NEW ("ismaster", BCON_INT32 (1));
+   cmd = BCON_NEW ("hello", BCON_INT32 (1));
    ret = mongoc_client_command_simple (
       client, "keyvault", cmd, NULL /* read prefs */, NULL /* reply */, &error);
    BSON_ASSERT (!ret);
