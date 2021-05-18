@@ -1,0 +1,15 @@
+SchemaVersion: 2018-07-01
+
+Actors:
+- Name: foo
+  Type: CrudActor
+  Threads: 100
+  Database: test
+  Phases:
+  - Name: foo
+    Duration: 2 minutes
+    Collection: c
+    Operations:
+    - OperationName: find
+      OperationCommand:
+        Filter: {_id: 0}
