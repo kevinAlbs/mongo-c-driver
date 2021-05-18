@@ -30,3 +30,5 @@ VERSION_RELEASED
 Debug
 install_manifest.txt
 x64
+
+.DS_STORE
