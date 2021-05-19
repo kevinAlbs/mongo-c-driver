@@ -12,6 +12,7 @@
 #define DB "test"
 #define COLL "coll"
 #define ENV_FLAG_EXPLICIT_SESSION "FLAG_EXPLICIT_SESSION"
+#define ENV_FLAG_SINGLE_THREADED "FLAG_SINGLE_THREADED"
 typedef struct {
    int tid;
    mongoc_client_pool_t *pool;
@@ -44,7 +45,16 @@ void *thread_find (void *arg) {
    start_time = bson_get_monotonic_time();
 
    mongoc_client_t* client;
-   client = mongoc_client_pool_pop (pool);
+
+   if (flag_isset (ENV_FLAG_SINGLE_THREADED)) {
+      client = mongoc_client_new (URI);
+      if (!client) {
+         MONGOC_ERROR ("[tid=%d] error creating client", args->tid);
+         return NULL;
+      }
+   } else {
+      client = mongoc_client_pool_pop (pool);
+   }
 
    if (flag_isset (ENV_FLAG_EXPLICIT_SESSION)) {
       session = mongoc_client_start_session (client, NULL /* opts */, &error);
@@ -85,7 +95,12 @@ void *thread_find (void *arg) {
    bson_destroy (&filter);
    bson_destroy (&opts);
    mongoc_client_session_destroy (session);
-   mongoc_client_pool_push (pool, client);
+
+   if (flag_isset(ENV_FLAG_SINGLE_THREADED)) {
+      mongoc_client_destroy (client);
+   } else {
+      mongoc_client_pool_push (pool, client);
+   }
    return NULL;
 }
 
@@ -127,6 +142,7 @@ main (int argc, char *argv[])
 
    MONGOC_INFO ("running with %d threads", n);
    MONGOC_INFO ("testing with explicit session? %d", (int) flag_isset(ENV_FLAG_EXPLICIT_SESSION));
+   MONGOC_INFO ("testing with single threaded? %d", (int) flag_isset(ENV_FLAG_SINGLE_THREADED));
 
    for (i = 0; i < n; i++) {
       pthread_join (threads[i], NULL);
