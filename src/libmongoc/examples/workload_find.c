@@ -11,12 +11,19 @@
 #define URI "mongodb://localhost:27017"
 #define DB "test"
 #define COLL "coll"
-
+#define ENV_FLAG_EXPLICIT_SESSION "FLAG_EXPLICIT_SESSION"
 typedef struct {
    int tid;
    mongoc_client_pool_t *pool;
 } thread_args_t;
 
+bool flag_isset (char* name) {
+   char* flag = getenv(name);
+   if (flag && 0 == strcmp(flag, "ON")) {
+      return true;
+   }
+   return false;
+}
 /* thread_find repeatedly runs find with a filter {_id: 0} */
 void *thread_find (void *arg) {
    mongoc_client_pool_t *pool;
@@ -26,21 +33,36 @@ void *thread_find (void *arg) {
    bson_error_t error;
    thread_args_t *args = (thread_args_t*) arg;
    int64_t start_time;
+   mongoc_client_session_t *session = NULL;
+   bson_t opts;
 
    pool = args->pool;
 
+   bson_init (&opts);
    bson_init (&filter);
    BSON_APPEND_INT32 (&filter, "_id", 0);
    start_time = bson_get_monotonic_time();
+
+   mongoc_client_t* client;
+   client = mongoc_client_pool_pop (pool);
+
+   if (flag_isset (ENV_FLAG_EXPLICIT_SESSION)) {
+      session = mongoc_client_start_session (client, NULL /* opts */, &error);
+      if (!session) {
+         MONGOC_ERROR ("[tid=%d] error starting session: %s", args->tid, error.message);
+         return NULL;
+      }
+      if (!mongoc_client_session_append (session, &opts, &error)) {
+         MONGOC_ERROR ("[tid=%d] error appending session to opts: %s", args->tid, error.message);
+         return NULL;
+      }
+   }
    
    while (true) {
-      mongoc_client_t* client;
       mongoc_collection_t *coll;
       mongoc_cursor_t *cursor;
-
-      client = mongoc_client_pool_pop (pool);
       coll = mongoc_client_get_collection (client, DB, COLL);
-      cursor = mongoc_collection_find_with_opts (coll, &filter, NULL /* opts */, NULL /* read_prefs */);
+      cursor = mongoc_collection_find_with_opts (coll, &filter, &opts, NULL /* read_prefs */);
       if (mongoc_cursor_error (cursor, &error)) {
          MONGOC_ERROR ("[tid=%d] find returned error: %s", args->tid, error.message);
          return NULL;
@@ -58,8 +80,12 @@ void *thread_find (void *arg) {
       }
 
       mongoc_collection_destroy (coll);
-      mongoc_client_pool_push (pool, client);
    }
+
+   bson_destroy (&filter);
+   bson_destroy (&opts);
+   mongoc_client_session_destroy (session);
+   mongoc_client_pool_push (pool, client);
    return NULL;
 }
 
@@ -100,6 +126,7 @@ main (int argc, char *argv[])
    }
 
    MONGOC_INFO ("running with %d threads", n);
+   MONGOC_INFO ("testing with explicit session? %d", (int) flag_isset(ENV_FLAG_EXPLICIT_SESSION));
 
    for (i = 0; i < n; i++) {
       pthread_join (threads[i], NULL);
