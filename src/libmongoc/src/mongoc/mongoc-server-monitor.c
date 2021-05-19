@@ -219,12 +219,12 @@ _server_monitor_append_cluster_time (mongoc_server_monitor_t *server_monitor,
 
    topology = server_monitor->topology;
    /* Cluster time is updated on every reply. */
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->cluster_time_mutex);
    if (!bson_empty (&topology->description.cluster_time)) {
       bson_append_document (
          cmd, "$clusterTime", 12, &topology->description.cluster_time);
    }
-   bson_mutex_unlock (&topology->mutex);
+   bson_mutex_unlock (&topology->cluster_time_mutex);
 }
 
 static bool

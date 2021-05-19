@@ -312,6 +312,8 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
    bson_mutex_init (&topology->mutex);
    mongoc_cond_init (&topology->cond_client);
 
+   bson_mutex_init (&topology->cluster_time_mutex);
+
    if (single_threaded) {
       /* single threaded drivers attempt speculative authentication during a
        * topology scan */
@@ -540,6 +542,7 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
 
    mongoc_cond_destroy (&topology->cond_client);
    bson_mutex_destroy (&topology->mutex);
+   bson_mutex_destroy (&topology->cluster_time_mutex);
 
    bson_free (topology);
 }
@@ -1389,11 +1392,11 @@ _mongoc_topology_update_cluster_time (mongoc_topology_t *topology,
    
    mongoc_topology_description_update_cluster_time (&topology->description,
                                                     reply,
-                                                    &topology->mutex);
-   bson_mutex_lock (&topology->mutex);
+                                                    &topology->cluster_time_mutex);
+   bson_mutex_lock (&topology->cluster_time_mutex);
    _mongoc_topology_scanner_set_cluster_time (
       topology->scanner, &topology->description.cluster_time);
-   bson_mutex_unlock (&topology->mutex);
+   bson_mutex_unlock (&topology->cluster_time_mutex);
 }
 
 

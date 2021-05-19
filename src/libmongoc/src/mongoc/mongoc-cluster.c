@@ -2520,8 +2520,10 @@ _mongoc_cluster_create_server_stream (mongoc_topology_t *topology,
          &topology->description, server_id, error));
 
    if (sd) {
+      bson_mutex_lock (&topology->cluster_time_mutex);
       server_stream =
          mongoc_server_stream_new (&topology->description, sd, stream);
+      bson_mutex_unlock (&topology->cluster_time_mutex);
    }
 
    bson_mutex_unlock (&topology->mutex);
