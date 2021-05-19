@@ -1225,7 +1225,7 @@ mongoc_topology_description_add_server (mongoc_topology_description_t *topology,
 
 void
 mongoc_topology_description_update_cluster_time (
-   mongoc_topology_description_t *td, const bson_t *reply)
+   mongoc_topology_description_t *td, const bson_t *reply, bson_mutex_t *mutex)
 {
    bson_iter_t iter;
    bson_iter_t child;
@@ -1246,10 +1246,17 @@ mongoc_topology_description_update_cluster_time (
    bson_iter_document (&iter, &size, &data);
    BSON_ASSERT (bson_init_static (&cluster_time, data, (size_t) size));
 
+   if (mutex) {
+      bson_mutex_lock (mutex);
+   }
    if (bson_empty (&td->cluster_time) ||
        _mongoc_cluster_time_greater (&cluster_time, &td->cluster_time)) {
       bson_destroy (&td->cluster_time);
       bson_copy_to (&cluster_time, &td->cluster_time);
+   }
+
+   if (mutex) {
+      bson_mutex_unlock (mutex);
    }
 }
 
@@ -2010,7 +2017,7 @@ mongoc_topology_description_handle_ismaster (
    }
 
    mongoc_topology_description_update_cluster_time (topology,
-                                                    ismaster_response);
+                                                    ismaster_response, NULL);
 
    if (prev_sd) {
       sd_changed = !_mongoc_server_description_equal (prev_sd, sd);

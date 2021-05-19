@@ -24,6 +24,7 @@
 #include "mongoc-array-private.h"
 #include "mongoc-topology-description.h"
 #include "mongoc-apm-private.h"
+#include "common-thread-private.h"
 
 
 typedef enum {
@@ -133,7 +134,7 @@ mongoc_topology_description_add_server (mongoc_topology_description_t *topology,
 
 void
 mongoc_topology_description_update_cluster_time (
-   mongoc_topology_description_t *td, const bson_t *reply);
+   mongoc_topology_description_t *td, const bson_t *reply, bson_mutex_t *mutex);
 
 void
 mongoc_topology_description_reconcile (mongoc_topology_description_t *td,

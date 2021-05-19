@@ -1386,9 +1386,11 @@ void
 _mongoc_topology_update_cluster_time (mongoc_topology_t *topology,
                                       const bson_t *reply)
 {
-   bson_mutex_lock (&topology->mutex);
+   
    mongoc_topology_description_update_cluster_time (&topology->description,
-                                                    reply);
+                                                    reply,
+                                                    &topology->mutex);
+   bson_mutex_lock (&topology->mutex);
    _mongoc_topology_scanner_set_cluster_time (
       topology->scanner, &topology->description.cluster_time);
    bson_mutex_unlock (&topology->mutex);
