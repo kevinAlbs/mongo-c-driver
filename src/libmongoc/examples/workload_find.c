@@ -1,6 +1,8 @@
-/* Conversation in:
- * Compile with:
- * clang -o long_runner long_runner.c $(pkg-config --cflags --libs libmongoc-1.0) -pthread
+/* Run as follows:
+ * workload_find <thread count (max 100)>
+ * Use environment variables to test flags:
+ * FLAG_EXPLICIT_SESSION=ON tests passing a single explicit session to each thread.
+ * FLAG_SINGLE_THREADED=ON tests using a separate single-threaded mongoc_client_t per thread.
  */
 
 #include <mongoc/mongoc.h>
@@ -89,6 +91,7 @@ void *thread_find (void *arg) {
          MONGOC_INFO ("[tid=%d] ran %" PRId64 " ops, ops/s=%f", args->tid, running_ops, ops_s);
       }
 
+      mongoc_cursor_destroy (cursor);
       mongoc_collection_destroy (coll);
    }
 
