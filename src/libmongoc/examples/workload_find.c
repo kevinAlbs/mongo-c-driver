@@ -25,11 +25,13 @@ void *thread_find (void *arg) {
    int64_t running_ops = 0;
    bson_error_t error;
    thread_args_t *args = (thread_args_t*) arg;
+   int64_t start_time;
 
    pool = args->pool;
 
    bson_init (&filter);
    BSON_APPEND_INT32 (&filter, "_id", 0);
+   start_time = bson_get_monotonic_time();
    
    while (true) {
       mongoc_client_t* client;
@@ -44,10 +46,15 @@ void *thread_find (void *arg) {
          return NULL;
       }
       ops += 1;
-      if (ops >= 1000000) {
+      if (ops >= 100000) {
+         double ops_s;
+         int64_t current_time;
+
          running_ops += ops;
+         current_time = bson_get_monotonic_time ();
+         ops_s = (double) running_ops / (((double)(current_time - start_time)) / (1000 * 1000));
          ops = 0;
-         MONGOC_INFO ("[tid=%d] ran %" PRId64 " ops", args->tid, running_ops);
+         MONGOC_INFO ("[tid=%d] ran %" PRId64 " ops, ops/s=%f", args->tid, running_ops, ops_s);
       }
 
       mongoc_collection_destroy (coll);
