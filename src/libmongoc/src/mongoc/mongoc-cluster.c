@@ -600,7 +600,10 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster,
       mongoc_apm_command_failed_cleanup (&failed_event);
    }
 
-   _handle_not_master_error (cluster, server_stream, reply);
+   /* _handle_not_master_error locks. Only enter if there was an error indicated in the reply. */
+   if (!_mongoc_cmd_check_ok_no_wce (reply, MONGOC_ERROR_API_VERSION_2, error)) {
+      _handle_not_master_error (cluster, server_stream, reply);
+   }
 
    _handle_txn_error_labels (retval, error, cmd, reply);
 
