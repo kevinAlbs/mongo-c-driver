@@ -73,10 +73,18 @@ void *thread_find (void *arg) {
    while (true) {
       mongoc_collection_t *coll;
       mongoc_cursor_t *cursor;
+      const bson_t *doc;
+
       coll = mongoc_client_get_collection (client, DB, COLL);
       cursor = mongoc_collection_find_with_opts (coll, &filter, &opts, NULL /* read_prefs */);
       if (mongoc_cursor_error (cursor, &error)) {
          MONGOC_ERROR ("[tid=%d] find returned error: %s", args->tid, error.message);
+         return NULL;
+      }
+      /* iterate once */
+      mongoc_cursor_next(cursor, &doc);
+      if (mongoc_cursor_error (cursor, &error)) {
+         MONGOC_ERROR ("[tid=%d] next returned error: %s", args->tid, error.message);
          return NULL;
       }
       ops += 1;
