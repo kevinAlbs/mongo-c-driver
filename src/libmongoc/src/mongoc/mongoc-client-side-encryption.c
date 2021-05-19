@@ -1661,9 +1661,9 @@ _mongoc_cse_is_enabled (mongoc_client_t *client)
 {
    bool ret = false;
 
-   bson_mutex_lock (&client->topology->mutex);
+   /* bson_mutex_lock (&client->topology->mutex); */
    ret = client->topology->cse_enabled;
-   bson_mutex_unlock (&client->topology->mutex);
+   /* bson_mutex_unlock (&client->topology->mutex); */
    return ret;
 }
 
