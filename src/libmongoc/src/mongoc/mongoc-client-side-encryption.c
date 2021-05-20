@@ -1325,6 +1325,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
 
    BSON_ASSERT (topology);
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
    if (!opts) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
@@ -1411,6 +1412,7 @@ _mongoc_cse_client_pool_enable_auto_encryption (
    ret = true;
 fail:
    mongoc_uri_destroy (mongocryptd_uri);
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&topology->mutex);
    RETURN (ret);
 }

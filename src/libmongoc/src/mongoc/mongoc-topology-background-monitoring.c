@@ -37,12 +37,14 @@ static BSON_THREAD_FUN (srv_polling_run, topology_void)
 
    topology = topology_void;
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
    while (true) {
       int64_t now_ms;
       int64_t scan_due_ms;
       int64_t sleep_duration_ms;
 
       if (topology->scanner_state != MONGOC_TOPOLOGY_SCANNER_BG_RUNNING) {
+         bson_rwlock_unlock (&topology->rwlock);
          bson_mutex_unlock (&topology->mutex);
          break;
       }
@@ -50,6 +52,7 @@ static BSON_THREAD_FUN (srv_polling_run, topology_void)
       /* This will check if a scan is due. */
       if (!mongoc_topology_should_rescan_srv (topology)) {
          TRACE ("%s\n", "topology ineligible for SRV polling, stopping");
+         bson_rwlock_unlock (&topology->rwlock);
          bson_mutex_unlock (&topology->mutex);
          break;
       }
@@ -72,13 +75,16 @@ static BSON_THREAD_FUN (srv_polling_run, topology_void)
        * topology mutex for the scan. The topology may have shut down in that
        * time. */
       if (topology->scanner_state != MONGOC_TOPOLOGY_SCANNER_BG_RUNNING) {
+         bson_rwlock_unlock (&topology->rwlock);
          bson_mutex_unlock (&topology->mutex);
          break;
       }
 
       /* If shutting down, stop. */
+      bson_rwlock_unlock (&topology->rwlock);
       mongoc_cond_timedwait (
          &topology->srv_polling_cond, &topology->mutex, sleep_duration_ms);
+      bson_rwlock_wrlock (&topology->rwlock);
    }
    BSON_THREAD_RETURN;
 }
@@ -313,6 +319,7 @@ _mongoc_topology_background_monitoring_stop (mongoc_topology_t *topology)
     * they can proceed to terminate. It is safe to unlock topology mutex. Since
     * scanner_state has transitioned to shutting down, no thread can modify
     * server_monitors. */
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&topology->mutex);
 
    for (i = 0; i < topology->server_monitors->items_len; i++) {
@@ -335,6 +342,7 @@ _mongoc_topology_background_monitoring_stop (mongoc_topology_t *topology)
    }
 
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
    mongoc_set_destroy (topology->server_monitors);
    mongoc_set_destroy (topology->rtt_monitors);
    topology->server_monitors = mongoc_set_new (1, NULL, NULL);

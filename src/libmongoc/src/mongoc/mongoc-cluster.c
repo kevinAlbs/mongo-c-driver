@@ -95,6 +95,7 @@ _handle_not_master_error (mongoc_cluster_t *cluster,
 
    server_id = server_stream->sd->id;
    bson_mutex_lock (&cluster->client->topology->mutex);
+   bson_rwlock_wrlock (&cluster->client->topology->rwlock);
    if (_mongoc_topology_handle_app_error (cluster->client->topology,
                                           server_id,
                                           true /* handshake complete */,
@@ -105,6 +106,7 @@ _handle_not_master_error (mongoc_cluster_t *cluster,
                                           server_stream->sd->generation)) {
       mongoc_cluster_disconnect_node (cluster, server_id);
    }
+   bson_rwlock_unlock (&cluster->client->topology->rwlock);
    bson_mutex_unlock (&cluster->client->topology->mutex);
 }
 
@@ -131,6 +133,7 @@ _handle_network_error (mongoc_cluster_t *cluster,
    }
 
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
    _mongoc_topology_handle_app_error (topology,
                                       server_id,
                                       handshake_complete,
@@ -139,6 +142,7 @@ _handle_network_error (mongoc_cluster_t *cluster,
                                       why,
                                       server_stream->sd->max_wire_version,
                                       server_stream->sd->generation);
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&topology->mutex);
    /* Always disconnect the current connection on network error. */
    mongoc_cluster_disconnect_node (cluster, server_id);
@@ -2255,11 +2259,13 @@ _mongoc_cluster_stream_for_server (mongoc_cluster_t *cluster,
       mongoc_topology_invalidate_server (topology, server_id, err_ptr);
       mongoc_cluster_disconnect_node (cluster, server_id);
       bson_mutex_lock (&topology->mutex);
+      bson_rwlock_wrlock (&topology->rwlock);
       _mongoc_topology_clear_connection_pool (topology, server_id);
       if (!topology->single_threaded) {
          _mongoc_topology_background_monitoring_cancel_check (topology,
                                                               server_id);
       }
+      bson_rwlock_unlock (&topology->rwlock);
       bson_mutex_unlock (&topology->mutex);
       _mongoc_bson_init_with_transient_txn_error (cs, reply);
    }
@@ -2487,13 +2493,16 @@ mongoc_cluster_stream_valid (mongoc_cluster_t *cluster,
 
    topology = cluster->client->topology;
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
    sd = mongoc_topology_description_server_by_id (
       &topology->description, server_stream->sd->id, &error);
    if (!sd || server_stream->sd->generation < sd->generation) {
       /* No server description, or the pool has been cleared. */
+      bson_rwlock_unlock (&topology->rwlock);
       bson_mutex_unlock (&topology->mutex);
       goto done;
    }
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&topology->mutex);
 
    ret = true;
@@ -2514,6 +2523,7 @@ _mongoc_cluster_create_server_stream (mongoc_topology_t *topology,
    /* can't just use mongoc_topology_server_by_id(), since we must hold the
     * lock while copying topology->description.logical_time below */
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
 
    sd = mongoc_server_description_new_copy (
       mongoc_topology_description_server_by_id (
@@ -2521,11 +2531,13 @@ _mongoc_cluster_create_server_stream (mongoc_topology_t *topology,
 
    if (sd) {
       bson_mutex_lock (&topology->cluster_time_mutex);
+      bson_rwlock_wrlock (&topology->rwlock);
       server_stream =
          mongoc_server_stream_new (&topology->description, sd, stream);
+      bson_rwlock_unlock (&topology->rwlock);
       bson_mutex_unlock (&topology->cluster_time_mutex);
    }
-
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&topology->mutex);
 
    return server_stream;
@@ -2550,12 +2562,14 @@ mongoc_cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
 
    topology = cluster->client->topology;
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
    sd = mongoc_topology_description_server_by_id (
       &topology->description, server_id, error);
    if (sd) {
       has_server_description = true;
       generation = sd->generation;
    }
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&topology->mutex);
 
    if (cluster_node) {

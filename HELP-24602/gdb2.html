@@ -1,0 +1,139 @@
+<html><head><meta charset="utf-8"><script>
+    function _hide(ctl, e) {
+        if (ctl!='none') {
+            e.style.display = 'none'
+            document.getElementById('t'+e.id).innerHTML = '▷ '
+        } else {
+            e.style.display = 'block'
+            document.getElementById('t'+e.id).innerHTML = '▽ '
+        }
+    }
+    function hide(id) {
+        var e = document.getElementById(id)
+        _hide(e.style.display, e)
+    }
+    function _hide_all(ctl, e) {
+        _hide(ctl, e)
+        for (var i in e.childNodes) {
+            var c = e.childNodes[i]
+            if (c.tagName=='DIV')
+                _hide_all(ctl, c)
+        }
+    }
+    function hide_all(id) {
+        var e = document.getElementById(id)
+        _hide_all(e.style.display, e)
+    }
+</script><style>
+    pre, .fixed {
+      font-family: menlo, "lucida console", courier, fixed;
+      font-size: 8pt;
+    }
+    body {
+      font-family: sans-serif;
+      font-size: 9pt
+    }
+</style></head><body>
+    Click on <span class='fixed'>▽ </span> or <span class='fixed'>▷ </span>
+    to hide or show direct children of item.<br/>
+    Click on a function name to hide or show all descendents of item.
+<pre>threads  call tree
+ 39.000  <span id="t0" onClick="hide(0)">▽ </span><span onClick="hide_all(0)">clone:95</span>
+<div id="0"> 39.000   <span id="t1" onClick="hide(1)">▽ </span><span onClick="hide_all(1)">start_thread:463</span>
+<div id="1"> 33.000   ├<span id="t2" onClick="hide(2)">▽ </span><span onClick="hide_all(2)">execute_native_thread_routine:80</span>
+<div id="2"> 33.000   │ <span id="t3" onClick="hide(3)">▽ </span><span onClick="hide_all(3)">std::thread::_State_impl&lt;...&gt;</span>
+<div id="3"> 33.000   │  <span id="t4" onClick="hide(4)">▽ </span><span onClick="hide_all(4)">std::thread::_Invoker&lt;...&gt;</span>
+<div id="4"> 33.000   │   <span id="t5" onClick="hide(5)">▽ </span><span onClick="hide_all(5)">decltype</span>
+<div id="5"> 33.000   │    <span id="t6" onClick="hide(6)">▽ </span><span onClick="hide_all(6)">std::__invoke_result&lt;...&gt;</span>
+<div id="6"> 33.000   │     <span id="t7" onClick="hide(7)">▽ </span><span onClick="hide_all(7)">void std::__invoke_impl&lt;...&gt;</span>
+<div id="7"> 23.000   │     ├<span id="t8" onClick="hide(8)">▽ </span><span onClick="hide_all(8)">genny::metrics::internals::v2::GrpcThread&lt;...&gt;::run</span>
+<div id="8"> 23.000   │     │ <span id="t9" onClick="hide(9)">▽ </span><span onClick="hide_all(9)">std::cv_status std::condition_variable::wait_for&lt;...&gt;</span>
+<div id="9"> 23.000   │     │  <span id="t10" onClick="hide(10)">▽ </span><span onClick="hide_all(10)">std::cv_status std::condition_variable::wait_until&lt;...&gt;</span>
+<div id="10"> 23.000   │     │   <span id="t11" onClick="hide(11)">▽ </span><span onClick="hide_all(11)">std::cv_status std::condition_variable::__wait_until_impl&lt;...&gt;</span>
+<div id="11"> 23.000   │     │    <span id="t12" onClick="hide(12)">▽ </span><span onClick="hide_all(12)">__gthread_cond_timedwait</span>
+<div id="12"> 23.000   │     │     <span id="t13" onClick="hide(13)">▽ </span><span onClick="hide_all(13)">__pthread_cond_timedwait:667</span>
+<div id="13"> 23.000   │     │      <span id="t14" onClick="hide(14)">▽ </span><span onClick="hide_all(14)">__pthread_cond_wait_common:539</span>
+<div id="14"> 23.000   │     │       <span id="t15" onClick="hide(15)">▽ </span><span onClick="hide_all(15)">futex_abstimed_wait_cancelable:205</span>
+<div id="15"></div></div></div></div></div></div></div></div> 10.000   │     └<span id="t16" onClick="hide(16)">▽ </span><span onClick="hide_all(16)">genny::driver::(anonymous namespace)::doRunLogic</span>
+<div id="16"> 10.000   │       <span id="t17" onClick="hide(17)">▽ </span><span onClick="hide_all(17)">void genny::driver::(anonymous namespace)::runActor&lt;...&gt;</span>
+<div id="17"> 10.000   │        <span id="t18" onClick="hide(18)">▽ </span><span onClick="hide_all(18)">genny::actor::CrudActor::run</span>
+<div id="18"> 10.000   │         <span id="t19" onClick="hide(19)">▽ </span><span onClick="hide_all(19)">(anonymous namespace)::FindOperation::run</span>
+<div id="19"> 10.000   │          <span id="t20" onClick="hide(20)">▽ </span><span onClick="hide_all(20)">void (anonymous namespace)::BaseOperation::doBlock&lt;...&gt;</span>
+<div id="20"> 10.000   │           <span id="t21" onClick="hide(21)">▽ </span><span onClick="hide_all(21)">(anonymous namespace)::FindOperation::run</span>
+<div id="21"> 10.000   │            <span id="t22" onClick="hide(22)">▽ </span><span onClick="hide_all(22)">mongocxx::v_noabi::cursor::begin</span>
+<div id="22"> 10.000   │             <span id="t23" onClick="hide(23)">▽ </span><span onClick="hide_all(23)">mongocxx::v_noabi::cursor::iterator::operator++</span>
+<div id="23"> 10.000   │              <span id="t24" onClick="hide(24)">▽ </span><span onClick="hide_all(24)">mongoc_cursor_next</span>
+<div id="24"> 10.000   │               <span id="t25" onClick="hide(25)">▽ </span><span onClick="hide_all(25)">_prime</span>
+<div id="25"> 10.000   │                <span id="t26" onClick="hide(26)">▽ </span><span onClick="hide_all(26)">_mongoc_cursor_response_refresh</span>
+<div id="26">  8.000   │                ├<span id="t27" onClick="hide(27)">▽ </span><span onClick="hide_all(27)">_mongoc_cursor_run_command</span>
+<div id="27">  4.000   │                │├<span id="t28" onClick="hide(28)">▽ </span><span onClick="hide_all(28)">mongoc_cluster_run_command_monitored</span>
+<div id="28">  4.000   │                ││ <span id="t29" onClick="hide(29)">▽ </span><span onClick="hide_all(29)">mongoc_cluster_run_opmsg</span>
+<div id="29">  3.000   │                ││ ├<span id="t30" onClick="hide(30)">▽ </span><span onClick="hide_all(30)">_mongoc_buffer_append_from_stream</span>
+<div id="30">  3.000   │                ││ │ <span id="t31" onClick="hide(31)">▽ </span><span onClick="hide_all(31)">mongoc_stream_read</span>
+<div id="31">  3.000   │                ││ │  <span id="t32" onClick="hide(32)">▽ </span><span onClick="hide_all(32)">mongoc_stream_buffered_readv</span>
+<div id="32">  3.000   │                ││ │   <span id="t33" onClick="hide(33)">▽ </span><span onClick="hide_all(33)">_mongoc_buffer_fill</span>
+<div id="33">  3.000   │                ││ │    <span id="t34" onClick="hide(34)">▽ </span><span onClick="hide_all(34)">mongoc_stream_read</span>
+<div id="34">  3.000   │                ││ │     <span id="t35" onClick="hide(35)">▽ </span><span onClick="hide_all(35)">_mongoc_stream_socket_readv</span>
+<div id="35">  3.000   │                ││ │      <span id="t36" onClick="hide(36)">▽ </span><span onClick="hide_all(36)">mongoc_socket_recv</span>
+<div id="36">  3.000   │                ││ │       <span id="t37" onClick="hide(37)">▽ </span><span onClick="hide_all(37)">__GI___poll:29</span>
+<div id="37"></div></div></div></div></div></div></div></div>  1.000   │                ││ └<span id="t38" onClick="hide(38)">▽ </span><span onClick="hide_all(38)">_mongoc_topology_update_cluster_time</span>
+<div id="38">  1.000   │                ││   <span id="t39" onClick="hide(39)">▽ </span><span onClick="hide_all(39)">__GI___pthread_mutex_lock:80</span>
+<div id="39">  1.000   │                ││    <span id="t40" onClick="hide(40)">▽ </span><span onClick="hide_all(40)">__lll_lock_wait:135</span>
+<div id="40"></div></div></div></div></div>  2.000   │                │├<span id="t41" onClick="hide(41)">▽ </span><span onClick="hide_all(41)">mongoc_client_start_session</span>
+<div id="41">  2.000   │                ││ <span id="t42" onClick="hide(42)">▽ </span><span onClick="hide_all(42)">_mongoc_topology_pop_server_session</span>
+<div id="42">  1.000   │                ││ ├<span id="t43" onClick="hide(43)">▽ </span><span onClick="hide_all(43)">__GI___pthread_mutex_lock:80</span>
+<div id="43">  1.000   │                ││ │ <span id="t44" onClick="hide(44)">▽ </span><span onClick="hide_all(44)">__lll_lock_wait:135</span>
+<div id="44"></div></div>  1.000   │                ││ └<span id="t45" onClick="hide(45)">▽ </span><span onClick="hide_all(45)">_mongoc_server_session_timed_out</span>
+<div id="45">  1.000   │                ││   <span id="t46" onClick="hide(46)">▽ </span><span onClick="hide_all(46)">bson_get_monotonic_time</span>
+<div id="46">  1.000   │                ││    <span id="t47" onClick="hide(47)">▽ </span><span onClick="hide_all(47)">__GI___clock_gettime:115</span>
+<div id="47">  1.000   │                ││     <span id="t48" onClick="hide(48)">▽ </span><span onClick="hide_all(48)">clock_gettime</span>
+<div id="48"></div></div></div></div></div></div>  2.000   │                │└<span id="t49" onClick="hide(49)">▽ </span><span onClick="hide_all(49)">_mongoc_cursor_fetch_stream</span>
+<div id="49">  2.000   │                │  <span id="t50" onClick="hide(50)">▽ </span><span onClick="hide_all(50)">mongoc_cluster_stream_for_server</span>
+<div id="50">  2.000   │                │   <span id="t51" onClick="hide(51)">▽ </span><span onClick="hide_all(51)">_mongoc_cluster_stream_for_server</span>
+<div id="51">  1.000   │                │   ├<span id="t52" onClick="hide(52)">▽ </span><span onClick="hide_all(52)">__GI___pthread_mutex_lock:80</span>
+<div id="52">  1.000   │                │   │ <span id="t53" onClick="hide(53)">▽ </span><span onClick="hide_all(53)">__lll_lock_wait:135</span>
+<div id="53"></div></div>  1.000   │                │   └<span id="t54" onClick="hide(54)">▽ </span><span onClick="hide_all(54)">_mongoc_cluster_create_server_stream</span>
+<div id="54">  1.000   │                │     <span id="t55" onClick="hide(55)">▽ </span><span onClick="hide_all(55)">__GI___pthread_mutex_lock:80</span>
+<div id="55">  1.000   │                │      <span id="t56" onClick="hide(56)">▽ </span><span onClick="hide_all(56)">__lll_lock_wait:135</span>
+<div id="56"></div></div></div></div></div></div></div>  2.000   │                └<span id="t57" onClick="hide(57)">▽ </span><span onClick="hide_all(57)">_mongoc_cursor_start_reading_response</span>
+<div id="57">  2.000   │                  <span id="t58" onClick="hide(58)">▽ </span><span onClick="hide_all(58)">mongoc_client_session_destroy</span>
+<div id="58">  2.000   │                   <span id="t59" onClick="hide(59)">▽ </span><span onClick="hide_all(59)">_mongoc_topology_push_server_session</span>
+<div id="59">  2.000   │                    <span id="t60" onClick="hide(60)">▽ </span><span onClick="hide_all(60)">__GI___pthread_mutex_lock:80</span>
+<div id="60">  2.000   │                     <span id="t61" onClick="hide(61)">▽ </span><span onClick="hide_all(61)">__lll_lock_wait:135</span>
+<div id="61"></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>  4.000   ├<span id="t62" onClick="hide(62)">▽ </span><span onClick="hide_all(62)">grpc_core::(anonymous namespace)::ThreadInternalsPosix::&lt;...&gt;:144</span>
+<div id="62">  4.000   │ <span id="t63" onClick="hide(63)">▽ </span><span onClick="hide_all(63)">grpc_core::(anonymous namespace)::ThreadInternalsPosix::&lt;...&gt;:139</span>
+<div id="63">  2.000   │ ├<span id="t64" onClick="hide(64)">▽ </span><span onClick="hide_all(64)">grpc_core::Executor::ThreadMain:248</span>
+<div id="64">  2.000   │ │ <span id="t65" onClick="hide(65)">▽ </span><span onClick="hide_all(65)">gpr_cv_wait:128</span>
+<div id="65">  2.000   │ │  <span id="t66" onClick="hide(66)">▽ </span><span onClick="hide_all(66)">__pthread_cond_wait:655</span>
+<div id="66">  2.000   │ │   <span id="t67" onClick="hide(67)">▽ </span><span onClick="hide_all(67)">__pthread_cond_wait_common:502</span>
+<div id="67">  2.000   │ │    <span id="t68" onClick="hide(68)">▽ </span><span onClick="hide_all(68)">futex_wait_cancelable:88</span>
+<div id="68"></div></div></div></div></div>  2.000   │ └<span id="t69" onClick="hide(69)">▽ </span><span onClick="hide_all(69)">timer_thread:280</span>
+<div id="69">  2.000   │   <span id="t70" onClick="hide(70)">▽ </span><span onClick="hide_all(70)">timer_main_loop:251</span>
+<div id="70">  2.000   │    <span id="t71" onClick="hide(71)">▽ </span><span onClick="hide_all(71)">wait_until:197</span>
+<div id="71">  1.000   │    ├<span id="t72" onClick="hide(72)">▽ </span><span onClick="hide_all(72)">gpr_cv_wait:128</span>
+<div id="72">  1.000   │    │ <span id="t73" onClick="hide(73)">▽ </span><span onClick="hide_all(73)">__pthread_cond_wait:655</span>
+<div id="73">  1.000   │    │  <span id="t74" onClick="hide(74)">▽ </span><span onClick="hide_all(74)">__pthread_cond_wait_common:502</span>
+<div id="74">  1.000   │    │   <span id="t75" onClick="hide(75)">▽ </span><span onClick="hide_all(75)">futex_wait_cancelable:88</span>
+<div id="75"></div></div></div></div>  1.000   │    └<span id="t76" onClick="hide(76)">▽ </span><span onClick="hide_all(76)">gpr_cv_wait:144</span>
+<div id="76">  1.000   │      <span id="t77" onClick="hide(77)">▽ </span><span onClick="hide_all(77)">__pthread_cond_timedwait:667</span>
+<div id="77">  1.000   │       <span id="t78" onClick="hide(78)">▽ </span><span onClick="hide_all(78)">__pthread_cond_wait_common:533</span>
+<div id="78">  1.000   │        <span id="t79" onClick="hide(79)">▽ </span><span onClick="hide_all(79)">futex_reltimed_wait_cancelable:142</span>
+<div id="79"></div></div></div></div></div></div></div></div></div>  1.000   ├<span id="t80" onClick="hide(80)">▽ </span><span onClick="hide_all(80)">_server_monitor_rtt_thread</span>
+<div id="80">  1.000   │ <span id="t81" onClick="hide(81)">▽ </span><span onClick="hide_all(81)">mongoc_server_monitor_wait</span>
+<div id="81">  1.000   │  <span id="t82" onClick="hide(82)">▽ </span><span onClick="hide_all(82)">__pthread_cond_timedwait:667</span>
+<div id="82">  1.000   │   <span id="t83" onClick="hide(83)">▽ </span><span onClick="hide_all(83)">__pthread_cond_wait_common:539</span>
+<div id="83">  1.000   │    <span id="t84" onClick="hide(84)">▽ </span><span onClick="hide_all(84)">futex_abstimed_wait_cancelable:205</span>
+<div id="84"></div></div></div></div></div>  1.000   └<span id="t85" onClick="hide(85)">▽ </span><span onClick="hide_all(85)">_server_monitor_thread</span>
+<div id="85">  1.000     <span id="t86" onClick="hide(86)">▽ </span><span onClick="hide_all(86)">mongoc_server_monitor_check_server</span>
+<div id="86">  1.000      <span id="t87" onClick="hide(87)">▽ </span><span onClick="hide_all(87)">_server_monitor_awaitable_ismaster_recv</span>
+<div id="87">  1.000       <span id="t88" onClick="hide(88)">▽ </span><span onClick="hide_all(88)">mongoc_stream_poll</span>
+<div id="88">  1.000        <span id="t89" onClick="hide(89)">▽ </span><span onClick="hide_all(89)">_mongoc_stream_socket_poll</span>
+<div id="89">  1.000         <span id="t90" onClick="hide(90)">▽ </span><span onClick="hide_all(90)">mongoc_socket_poll</span>
+<div id="90">  1.000          <span id="t91" onClick="hide(91)">▽ </span><span onClick="hide_all(91)">__GI___poll:29</span>
+<div id="91"></div></div></div></div></div></div></div></div></div>  1.000  <span id="t92" onClick="hide(92)">▽ </span><span onClick="hide_all(92)">main</span>
+<div id="92">  1.000   <span id="t93" onClick="hide(93)">▽ </span><span onClick="hide_all(93)">genny::driver::DefaultDriver::run</span>
+<div id="93">  1.000    <span id="t94" onClick="hide(94)">▽ </span><span onClick="hide_all(94)">genny::driver::(anonymous namespace)::doRunLogic</span>
+<div id="94">  1.000     <span id="t95" onClick="hide(95)">▽ </span><span onClick="hide_all(95)">std::thread::join:110</span>
+<div id="95">  1.000      <span id="t96" onClick="hide(96)">▽ </span><span onClick="hide_all(96)">__gthread_join:668</span>
+<div id="96">  1.000       <span id="t97" onClick="hide(97)">▽ </span><span onClick="hide_all(97)">__GI___pthread_timedjoin_ex:89</span>
+<div id="97"></div></div></div></div></div></div></pre></body></html>

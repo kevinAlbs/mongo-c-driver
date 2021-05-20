@@ -1,0 +1,209 @@
+<html><head><meta charset="utf-8"><script>
+    function _hide(ctl, e) {
+        if (ctl!='none') {
+            e.style.display = 'none'
+            document.getElementById('t'+e.id).innerHTML = '▷ '
+        } else {
+            e.style.display = 'block'
+            document.getElementById('t'+e.id).innerHTML = '▽ '
+        }
+    }
+    function hide(id) {
+        var e = document.getElementById(id)
+        _hide(e.style.display, e)
+    }
+    function _hide_all(ctl, e) {
+        _hide(ctl, e)
+        for (var i in e.childNodes) {
+            var c = e.childNodes[i]
+            if (c.tagName=='DIV')
+                _hide_all(ctl, c)
+        }
+    }
+    function hide_all(id) {
+        var e = document.getElementById(id)
+        _hide_all(e.style.display, e)
+    }
+</script><style>
+    pre, .fixed {
+      font-family: menlo, "lucida console", courier, fixed;
+      font-size: 8pt;
+    }
+    body {
+      font-family: sans-serif;
+      font-size: 9pt
+    }
+</style></head><body>
+    Click on <span class='fixed'>▽ </span> or <span class='fixed'>▷ </span>
+    to hide or show direct children of item.<br/>
+    Click on a function name to hide or show all descendents of item.
+<pre>threads  reverse call tree
+ 65.000  <span id="t0" onClick="hide(0)">▽ </span><span onClick="hide_all(0)">LEAF</span>
+<div id="0"> 26.000  ├<span id="t1" onClick="hide(1)">▽ </span><span onClick="hide_all(1)">__lll_lock_wait:135</span>
+<div id="1"> 26.000  │ <span id="t2" onClick="hide(2)">▽ </span><span onClick="hide_all(2)">__GI___pthread_mutex_lock:80</span>
+<div id="2">  9.000  │ ├<span id="t3" onClick="hide(3)">▽ </span><span onClick="hide_all(3)">mongoc_topology_select_server_id</span>
+<div id="3">  9.000  │ │ <span id="t4" onClick="hide(4)">▽ </span><span onClick="hide_all(4)">mongoc_cluster_stream_for_reads</span>
+<div id="4">  9.000  │ │  <span id="t5" onClick="hide(5)">▽ </span><span onClick="hide_all(5)">_mongoc_cursor_fetch_stream</span>
+<div id="5">  9.000  │ │   <span id="t6" onClick="hide(6)">▽ </span><span onClick="hide_all(6)">_prime</span>
+<div id="6">  9.000  │ │    <span id="t7" onClick="hide(7)">▽ </span><span onClick="hide_all(7)">mongoc_cursor_next</span>
+<div id="7">  9.000  │ │     <span id="t8" onClick="hide(8)">▽ </span><span onClick="hide_all(8)">thread_find</span>
+<div id="8">  9.000  │ │      <span id="t9" onClick="hide(9)">▽ </span><span onClick="hide_all(9)">start_thread:463</span>
+<div id="9">  9.000  │ │       <span id="t10" onClick="hide(10)">▽ </span><span onClick="hide_all(10)">clone:95</span>
+<div id="10"></div></div></div></div></div></div></div></div>  7.000  │ ├<span id="t11" onClick="hide(11)">▽ </span><span onClick="hide_all(11)">_mongoc_cluster_stream_for_server</span>
+<div id="11">  4.000  │ │├<span id="t12" onClick="hide(12)">▽ </span><span onClick="hide_all(12)">_mongoc_cursor_fetch_stream</span>
+<div id="12">  4.000  │ ││ <span id="t13" onClick="hide(13)">▽ </span><span onClick="hide_all(13)">_prime</span>
+<div id="13">  4.000  │ ││  <span id="t14" onClick="hide(14)">▽ </span><span onClick="hide_all(14)">mongoc_cursor_next</span>
+<div id="14">  4.000  │ ││   <span id="t15" onClick="hide(15)">▽ </span><span onClick="hide_all(15)">thread_find</span>
+<div id="15">  4.000  │ ││    <span id="t16" onClick="hide(16)">▽ </span><span onClick="hide_all(16)">start_thread:463</span>
+<div id="16">  4.000  │ ││     <span id="t17" onClick="hide(17)">▽ </span><span onClick="hide_all(17)">clone:95</span>
+<div id="17"></div></div></div></div></div></div>  3.000  │ │└<span id="t18" onClick="hide(18)">▽ </span><span onClick="hide_all(18)">mongoc_cluster_stream_for_server</span>
+<div id="18">  3.000  │ │  <span id="t19" onClick="hide(19)">▽ </span><span onClick="hide_all(19)">_mongoc_cursor_fetch_stream</span>
+<div id="19">  3.000  │ │   <span id="t20" onClick="hide(20)">▽ </span><span onClick="hide_all(20)">_mongoc_cursor_run_command</span>
+<div id="20">  3.000  │ │    <span id="t21" onClick="hide(21)">▽ </span><span onClick="hide_all(21)">_mongoc_cursor_response_refresh</span>
+<div id="21">  3.000  │ │     <span id="t22" onClick="hide(22)">▽ </span><span onClick="hide_all(22)">_prime</span>
+<div id="22">  3.000  │ │      <span id="t23" onClick="hide(23)">▽ </span><span onClick="hide_all(23)">mongoc_cursor_next</span>
+<div id="23">  3.000  │ │       <span id="t24" onClick="hide(24)">▽ </span><span onClick="hide_all(24)">thread_find</span>
+<div id="24">  3.000  │ │        <span id="t25" onClick="hide(25)">▽ </span><span onClick="hide_all(25)">start_thread:463</span>
+<div id="25">  3.000  │ │         <span id="t26" onClick="hide(26)">▽ </span><span onClick="hide_all(26)">clone:95</span>
+<div id="26"></div></div></div></div></div></div></div></div></div></div>  4.000  │ ├<span id="t27" onClick="hide(27)">▽ </span><span onClick="hide_all(27)">mongoc_cluster_run_command_monitored</span>
+<div id="27">  4.000  │ │ <span id="t28" onClick="hide(28)">▽ </span><span onClick="hide_all(28)">_mongoc_cursor_run_command</span>
+<div id="28">  4.000  │ │  <span id="t29" onClick="hide(29)">▽ </span><span onClick="hide_all(29)">_mongoc_cursor_response_refresh</span>
+<div id="29">  4.000  │ │   <span id="t30" onClick="hide(30)">▽ </span><span onClick="hide_all(30)">_prime</span>
+<div id="30">  4.000  │ │    <span id="t31" onClick="hide(31)">▽ </span><span onClick="hide_all(31)">mongoc_cursor_next</span>
+<div id="31">  4.000  │ │     <span id="t32" onClick="hide(32)">▽ </span><span onClick="hide_all(32)">thread_find</span>
+<div id="32">  4.000  │ │      <span id="t33" onClick="hide(33)">▽ </span><span onClick="hide_all(33)">start_thread:463</span>
+<div id="33">  4.000  │ │       <span id="t34" onClick="hide(34)">▽ </span><span onClick="hide_all(34)">clone:95</span>
+<div id="34"></div></div></div></div></div></div></div></div>  4.000  │ ├<span id="t35" onClick="hide(35)">▽ </span><span onClick="hide_all(35)">_mongoc_topology_update_cluster_time</span>
+<div id="35">  4.000  │ │ <span id="t36" onClick="hide(36)">▽ </span><span onClick="hide_all(36)">mongoc_cluster_run_opmsg</span>
+<div id="36">  4.000  │ │  <span id="t37" onClick="hide(37)">▽ </span><span onClick="hide_all(37)">mongoc_cluster_run_command_monitored</span>
+<div id="37">  4.000  │ │   <span id="t38" onClick="hide(38)">▽ </span><span onClick="hide_all(38)">_mongoc_cursor_run_command</span>
+<div id="38">  4.000  │ │    <span id="t39" onClick="hide(39)">▽ </span><span onClick="hide_all(39)">_mongoc_cursor_response_refresh</span>
+<div id="39">  4.000  │ │     <span id="t40" onClick="hide(40)">▽ </span><span onClick="hide_all(40)">_prime</span>
+<div id="40">  4.000  │ │      <span id="t41" onClick="hide(41)">▽ </span><span onClick="hide_all(41)">mongoc_cursor_next</span>
+<div id="41">  4.000  │ │       <span id="t42" onClick="hide(42)">▽ </span><span onClick="hide_all(42)">thread_find</span>
+<div id="42">  4.000  │ │        <span id="t43" onClick="hide(43)">▽ </span><span onClick="hide_all(43)">start_thread:463</span>
+<div id="43">  4.000  │ │         <span id="t44" onClick="hide(44)">▽ </span><span onClick="hide_all(44)">clone:95</span>
+<div id="44"></div></div></div></div></div></div></div></div></div></div>  2.000  │ └<span id="t45" onClick="hide(45)">▽ </span><span onClick="hide_all(45)">_mongoc_cluster_create_server_stream</span>
+<div id="45">  2.000  │   <span id="t46" onClick="hide(46)">▽ </span><span onClick="hide_all(46)">_mongoc_cluster_stream_for_server</span>
+<div id="46">  2.000  │    <span id="t47" onClick="hide(47)">▽ </span><span onClick="hide_all(47)">mongoc_cluster_stream_for_server</span>
+<div id="47">  2.000  │     <span id="t48" onClick="hide(48)">▽ </span><span onClick="hide_all(48)">_mongoc_cursor_fetch_stream</span>
+<div id="48">  2.000  │      <span id="t49" onClick="hide(49)">▽ </span><span onClick="hide_all(49)">_mongoc_cursor_run_command</span>
+<div id="49">  2.000  │       <span id="t50" onClick="hide(50)">▽ </span><span onClick="hide_all(50)">_mongoc_cursor_response_refresh</span>
+<div id="50">  2.000  │        <span id="t51" onClick="hide(51)">▽ </span><span onClick="hide_all(51)">_prime</span>
+<div id="51">  2.000  │         <span id="t52" onClick="hide(52)">▽ </span><span onClick="hide_all(52)">mongoc_cursor_next</span>
+<div id="52">  2.000  │          <span id="t53" onClick="hide(53)">▽ </span><span onClick="hide_all(53)">thread_find</span>
+<div id="53">  2.000  │           <span id="t54" onClick="hide(54)">▽ </span><span onClick="hide_all(54)">start_thread:463</span>
+<div id="54">  2.000  │            <span id="t55" onClick="hide(55)">▽ </span><span onClick="hide_all(55)">clone:95</span>
+<div id="55"></div></div></div></div></div></div></div></div></div></div></div></div></div> 20.000  ├<span id="t56" onClick="hide(56)">▽ </span><span onClick="hide_all(56)">__GI___poll:29</span>
+<div id="56"> 15.000  │├<span id="t57" onClick="hide(57)">▽ </span><span onClick="hide_all(57)">mongoc_socket_recv</span>
+<div id="57"> 15.000  ││ <span id="t58" onClick="hide(58)">▽ </span><span onClick="hide_all(58)">_mongoc_stream_socket_readv</span>
+<div id="58"> 15.000  ││  <span id="t59" onClick="hide(59)">▽ </span><span onClick="hide_all(59)">mongoc_stream_read</span>
+<div id="59"> 15.000  ││   <span id="t60" onClick="hide(60)">▽ </span><span onClick="hide_all(60)">_mongoc_buffer_fill</span>
+<div id="60"> 15.000  ││    <span id="t61" onClick="hide(61)">▽ </span><span onClick="hide_all(61)">mongoc_stream_buffered_readv</span>
+<div id="61"> 15.000  ││     <span id="t62" onClick="hide(62)">▽ </span><span onClick="hide_all(62)">mongoc_stream_read</span>
+<div id="62"> 15.000  ││      <span id="t63" onClick="hide(63)">▽ </span><span onClick="hide_all(63)">_mongoc_buffer_append_from_stream</span>
+<div id="63"> 15.000  ││       <span id="t64" onClick="hide(64)">▽ </span><span onClick="hide_all(64)">mongoc_cluster_run_opmsg</span>
+<div id="64"> 15.000  ││        <span id="t65" onClick="hide(65)">▽ </span><span onClick="hide_all(65)">mongoc_cluster_run_command_monitored</span>
+<div id="65"> 15.000  ││         <span id="t66" onClick="hide(66)">▽ </span><span onClick="hide_all(66)">_mongoc_cursor_run_command</span>
+<div id="66"> 15.000  ││          <span id="t67" onClick="hide(67)">▽ </span><span onClick="hide_all(67)">_mongoc_cursor_response_refresh</span>
+<div id="67"> 15.000  ││           <span id="t68" onClick="hide(68)">▽ </span><span onClick="hide_all(68)">_prime</span>
+<div id="68"> 15.000  ││            <span id="t69" onClick="hide(69)">▽ </span><span onClick="hide_all(69)">mongoc_cursor_next</span>
+<div id="69"> 15.000  ││             <span id="t70" onClick="hide(70)">▽ </span><span onClick="hide_all(70)">thread_find</span>
+<div id="70"> 15.000  ││              <span id="t71" onClick="hide(71)">▽ </span><span onClick="hide_all(71)">start_thread:463</span>
+<div id="71"> 15.000  ││               <span id="t72" onClick="hide(72)">▽ </span><span onClick="hide_all(72)">clone:95</span>
+<div id="72"></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div>  5.000  │└<span id="t73" onClick="hide(73)">▽ </span><span onClick="hide_all(73)">mongoc_socket_poll</span>
+<div id="73">  5.000  │  <span id="t74" onClick="hide(74)">▽ </span><span onClick="hide_all(74)">_mongoc_stream_socket_poll</span>
+<div id="74">  5.000  │   <span id="t75" onClick="hide(75)">▽ </span><span onClick="hide_all(75)">mongoc_stream_poll</span>
+<div id="75">  5.000  │    <span id="t76" onClick="hide(76)">▽ </span><span onClick="hide_all(76)">_server_monitor_awaitable_ismaster_recv</span>
+<div id="76">  5.000  │     <span id="t77" onClick="hide(77)">▽ </span><span onClick="hide_all(77)">mongoc_server_monitor_check_server</span>
+<div id="77">  5.000  │      <span id="t78" onClick="hide(78)">▽ </span><span onClick="hide_all(78)">_server_monitor_thread</span>
+<div id="78">  5.000  │       <span id="t79" onClick="hide(79)">▽ </span><span onClick="hide_all(79)">start_thread:463</span>
+<div id="79">  5.000  │        <span id="t80" onClick="hide(80)">▽ </span><span onClick="hide_all(80)">clone:95</span>
+<div id="80"></div></div></div></div></div></div></div></div></div>  5.000  ├<span id="t81" onClick="hide(81)">▽ </span><span onClick="hide_all(81)">__GI___pthread_timedjoin_ex:89</span>
+<div id="81">  5.000  │ <span id="t82" onClick="hide(82)">▽ </span><span onClick="hide_all(82)">main</span>
+<div id="82"></div></div>  5.000  ├<span id="t83" onClick="hide(83)">▽ </span><span onClick="hide_all(83)">futex_abstimed_wait_cancelable:205</span>
+<div id="83">  5.000  │ <span id="t84" onClick="hide(84)">▽ </span><span onClick="hide_all(84)">__pthread_cond_wait_common:539</span>
+<div id="84">  5.000  │  <span id="t85" onClick="hide(85)">▽ </span><span onClick="hide_all(85)">__pthread_cond_timedwait:667</span>
+<div id="85">  5.000  │   <span id="t86" onClick="hide(86)">▽ </span><span onClick="hide_all(86)">mongoc_server_monitor_wait</span>
+<div id="86">  5.000  │    <span id="t87" onClick="hide(87)">▽ </span><span onClick="hide_all(87)">_server_monitor_rtt_thread</span>
+<div id="87">  5.000  │     <span id="t88" onClick="hide(88)">▽ </span><span onClick="hide_all(88)">start_thread:463</span>
+<div id="88">  5.000  │      <span id="t89" onClick="hide(89)">▽ </span><span onClick="hide_all(89)">clone:95</span>
+<div id="89"></div></div></div></div></div></div></div>  4.000  ├<span id="t90" onClick="hide(90)">▽ </span><span onClick="hide_all(90)">__libc_sendmsg:28</span>
+<div id="90">  4.000  │ <span id="t91" onClick="hide(91)">▽ </span><span onClick="hide_all(91)">mongoc_socket_sendv</span>
+<div id="91">  4.000  │  <span id="t92" onClick="hide(92)">▽ </span><span onClick="hide_all(92)">_mongoc_stream_socket_writev</span>
+<div id="92">  4.000  │   <span id="t93" onClick="hide(93)">▽ </span><span onClick="hide_all(93)">_mongoc_stream_writev_full</span>
+<div id="93">  4.000  │    <span id="t94" onClick="hide(94)">▽ </span><span onClick="hide_all(94)">mongoc_cluster_run_opmsg</span>
+<div id="94">  4.000  │     <span id="t95" onClick="hide(95)">▽ </span><span onClick="hide_all(95)">mongoc_cluster_run_command_monitored</span>
+<div id="95">  4.000  │      <span id="t96" onClick="hide(96)">▽ </span><span onClick="hide_all(96)">_mongoc_cursor_run_command</span>
+<div id="96">  4.000  │       <span id="t97" onClick="hide(97)">▽ </span><span onClick="hide_all(97)">_mongoc_cursor_response_refresh</span>
+<div id="97">  4.000  │        <span id="t98" onClick="hide(98)">▽ </span><span onClick="hide_all(98)">_prime</span>
+<div id="98">  4.000  │         <span id="t99" onClick="hide(99)">▽ </span><span onClick="hide_all(99)">mongoc_cursor_next</span>
+<div id="99">  4.000  │          <span id="t100" onClick="hide(100)">▽ </span><span onClick="hide_all(100)">thread_find</span>
+<div id="100">  4.000  │           <span id="t101" onClick="hide(101)">▽ </span><span onClick="hide_all(101)">start_thread:463</span>
+<div id="101">  4.000  │            <span id="t102" onClick="hide(102)">▽ </span><span onClick="hide_all(102)">clone:95</span>
+<div id="102"></div></div></div></div></div></div></div></div></div></div></div></div></div>  1.000  ├<span id="t103" onClick="hide(103)">▽ </span><span onClick="hide_all(103)">clock_gettime</span>
+<div id="103">  1.000  │ <span id="t104" onClick="hide(104)">▽ </span><span onClick="hide_all(104)">__GI___clock_gettime:115</span>
+<div id="104">  1.000  │  <span id="t105" onClick="hide(105)">▽ </span><span onClick="hide_all(105)">bson_get_monotonic_time:126</span>
+<div id="105">  1.000  │   <span id="t106" onClick="hide(106)">▽ </span><span onClick="hide_all(106)">mongoc_cmd_parts_assemble</span>
+<div id="106">  1.000  │    <span id="t107" onClick="hide(107)">▽ </span><span onClick="hide_all(107)">_mongoc_cursor_run_command</span>
+<div id="107">  1.000  │     <span id="t108" onClick="hide(108)">▽ </span><span onClick="hide_all(108)">_mongoc_cursor_response_refresh</span>
+<div id="108">  1.000  │      <span id="t109" onClick="hide(109)">▽ </span><span onClick="hide_all(109)">_prime</span>
+<div id="109">  1.000  │       <span id="t110" onClick="hide(110)">▽ </span><span onClick="hide_all(110)">mongoc_cursor_next</span>
+<div id="110">  1.000  │        <span id="t111" onClick="hide(111)">▽ </span><span onClick="hide_all(111)">thread_find</span>
+<div id="111">  1.000  │         <span id="t112" onClick="hide(112)">▽ </span><span onClick="hide_all(112)">start_thread:463</span>
+<div id="112">  1.000  │          <span id="t113" onClick="hide(113)">▽ </span><span onClick="hide_all(113)">clone:95</span>
+<div id="113"></div></div></div></div></div></div></div></div></div></div></div>  1.000  ├<span id="t114" onClick="hide(114)">▽ </span><span onClick="hide_all(114)">memcpy:34</span>
+<div id="114">  1.000  │ <span id="t115" onClick="hide(115)">▽ </span><span onClick="hide_all(115)">bson_copy_to:2205</span>
+<div id="115">  1.000  │  <span id="t116" onClick="hide(116)">▽ </span><span onClick="hide_all(116)">mongoc_server_stream_new</span>
+<div id="116">  1.000  │   <span id="t117" onClick="hide(117)">▽ </span><span onClick="hide_all(117)">_mongoc_cluster_create_server_stream</span>
+<div id="117">  1.000  │    <span id="t118" onClick="hide(118)">▽ </span><span onClick="hide_all(118)">_mongoc_cluster_stream_for_server</span>
+<div id="118">  1.000  │     <span id="t119" onClick="hide(119)">▽ </span><span onClick="hide_all(119)">mongoc_cluster_stream_for_server</span>
+<div id="119">  1.000  │      <span id="t120" onClick="hide(120)">▽ </span><span onClick="hide_all(120)">_mongoc_cursor_fetch_stream</span>
+<div id="120">  1.000  │       <span id="t121" onClick="hide(121)">▽ </span><span onClick="hide_all(121)">_mongoc_cursor_run_command</span>
+<div id="121">  1.000  │        <span id="t122" onClick="hide(122)">▽ </span><span onClick="hide_all(122)">_mongoc_cursor_response_refresh</span>
+<div id="122">  1.000  │         <span id="t123" onClick="hide(123)">▽ </span><span onClick="hide_all(123)">_prime</span>
+<div id="123">  1.000  │          <span id="t124" onClick="hide(124)">▽ </span><span onClick="hide_all(124)">mongoc_cursor_next</span>
+<div id="124">  1.000  │           <span id="t125" onClick="hide(125)">▽ </span><span onClick="hide_all(125)">thread_find</span>
+<div id="125">  1.000  │            <span id="t126" onClick="hide(126)">▽ </span><span onClick="hide_all(126)">start_thread:463</span>
+<div id="126">  1.000  │             <span id="t127" onClick="hide(127)">▽ </span><span onClick="hide_all(127)">clone:95</span>
+<div id="127"></div></div></div></div></div></div></div></div></div></div></div></div></div></div>  1.000  ├<span id="t128" onClick="hide(128)">▽ </span><span onClick="hide_all(128)">mongoc_server_description_new_copy</span>
+<div id="128">  1.000  │ <span id="t129" onClick="hide(129)">▽ </span><span onClick="hide_all(129)">_mongoc_cluster_create_server_stream</span>
+<div id="129">  1.000  │  <span id="t130" onClick="hide(130)">▽ </span><span onClick="hide_all(130)">_mongoc_cluster_stream_for_server</span>
+<div id="130">  1.000  │   <span id="t131" onClick="hide(131)">▽ </span><span onClick="hide_all(131)">_mongoc_cursor_fetch_stream</span>
+<div id="131">  1.000  │    <span id="t132" onClick="hide(132)">▽ </span><span onClick="hide_all(132)">_prime</span>
+<div id="132">  1.000  │     <span id="t133" onClick="hide(133)">▽ </span><span onClick="hide_all(133)">mongoc_cursor_next</span>
+<div id="133">  1.000  │      <span id="t134" onClick="hide(134)">▽ </span><span onClick="hide_all(134)">thread_find</span>
+<div id="134">  1.000  │       <span id="t135" onClick="hide(135)">▽ </span><span onClick="hide_all(135)">start_thread:463</span>
+<div id="135">  1.000  │        <span id="t136" onClick="hide(136)">▽ </span><span onClick="hide_all(136)">clone:95</span>
+<div id="136"></div></div></div></div></div></div></div></div></div>  1.000  ├<span id="t137" onClick="hide(137)">▽ </span><span onClick="hide_all(137)">__strcmp_sse2_unaligned:34</span>
+<div id="137">  1.000  │ <span id="t138" onClick="hide(138)">▽ </span><span onClick="hide_all(138)">mongoc_server_description_handle_ismaster.part</span>
+<div id="138">  1.000  │  <span id="t139" onClick="hide(139)">▽ </span><span onClick="hide_all(139)">mongoc_server_description_new_copy</span>
+<div id="139">  1.000  │   <span id="t140" onClick="hide(140)">▽ </span><span onClick="hide_all(140)">_mongoc_cluster_create_server_stream</span>
+<div id="140">  1.000  │    <span id="t141" onClick="hide(141)">▽ </span><span onClick="hide_all(141)">_mongoc_cluster_stream_for_server</span>
+<div id="141">  1.000  │     <span id="t142" onClick="hide(142)">▽ </span><span onClick="hide_all(142)">mongoc_cluster_stream_for_server</span>
+<div id="142">  1.000  │      <span id="t143" onClick="hide(143)">▽ </span><span onClick="hide_all(143)">_mongoc_cursor_fetch_stream</span>
+<div id="143">  1.000  │       <span id="t144" onClick="hide(144)">▽ </span><span onClick="hide_all(144)">_mongoc_cursor_run_command</span>
+<div id="144">  1.000  │        <span id="t145" onClick="hide(145)">▽ </span><span onClick="hide_all(145)">_mongoc_cursor_response_refresh</span>
+<div id="145">  1.000  │         <span id="t146" onClick="hide(146)">▽ </span><span onClick="hide_all(146)">_prime</span>
+<div id="146">  1.000  │          <span id="t147" onClick="hide(147)">▽ </span><span onClick="hide_all(147)">mongoc_cursor_next</span>
+<div id="147">  1.000  │           <span id="t148" onClick="hide(148)">▽ </span><span onClick="hide_all(148)">thread_find</span>
+<div id="148">  1.000  │            <span id="t149" onClick="hide(149)">▽ </span><span onClick="hide_all(149)">start_thread:463</span>
+<div id="149">  1.000  │             <span id="t150" onClick="hide(150)">▽ </span><span onClick="hide_all(150)">clone:95</span>
+<div id="150"></div></div></div></div></div></div></div></div></div></div></div></div></div></div>  1.000  └<span id="t151" onClick="hide(151)">▽ </span><span onClick="hide_all(151)">__libc_recv:28</span>
+<div id="151">  1.000    <span id="t152" onClick="hide(152)">▽ </span><span onClick="hide_all(152)">mongoc_socket_recv</span>
+<div id="152">  1.000     <span id="t153" onClick="hide(153)">▽ </span><span onClick="hide_all(153)">_mongoc_stream_socket_readv</span>
+<div id="153">  1.000      <span id="t154" onClick="hide(154)">▽ </span><span onClick="hide_all(154)">mongoc_stream_read</span>
+<div id="154">  1.000       <span id="t155" onClick="hide(155)">▽ </span><span onClick="hide_all(155)">_mongoc_buffer_fill</span>
+<div id="155">  1.000        <span id="t156" onClick="hide(156)">▽ </span><span onClick="hide_all(156)">mongoc_stream_buffered_readv</span>
+<div id="156">  1.000         <span id="t157" onClick="hide(157)">▽ </span><span onClick="hide_all(157)">mongoc_stream_read</span>
+<div id="157">  1.000          <span id="t158" onClick="hide(158)">▽ </span><span onClick="hide_all(158)">_mongoc_buffer_append_from_stream</span>
+<div id="158">  1.000           <span id="t159" onClick="hide(159)">▽ </span><span onClick="hide_all(159)">mongoc_cluster_run_opmsg</span>
+<div id="159">  1.000            <span id="t160" onClick="hide(160)">▽ </span><span onClick="hide_all(160)">mongoc_cluster_run_command_monitored</span>
+<div id="160">  1.000             <span id="t161" onClick="hide(161)">▽ </span><span onClick="hide_all(161)">_mongoc_cursor_run_command</span>
+<div id="161">  1.000              <span id="t162" onClick="hide(162)">▽ </span><span onClick="hide_all(162)">_mongoc_cursor_response_refresh</span>
+<div id="162">  1.000               <span id="t163" onClick="hide(163)">▽ </span><span onClick="hide_all(163)">_prime</span>
+<div id="163">  1.000                <span id="t164" onClick="hide(164)">▽ </span><span onClick="hide_all(164)">mongoc_cursor_next</span>
+<div id="164">  1.000                 <span id="t165" onClick="hide(165)">▽ </span><span onClick="hide_all(165)">thread_find</span>
+<div id="165">  1.000                  <span id="t166" onClick="hide(166)">▽ </span><span onClick="hide_all(166)">start_thread:463</span>
+<div id="166">  1.000                   <span id="t167" onClick="hide(167)">▽ </span><span onClick="hide_all(167)">clone:95</span>
+<div id="167"></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></div></pre></body></html>

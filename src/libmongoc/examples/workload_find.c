@@ -88,7 +88,7 @@ void *thread_find (void *arg) {
          return NULL;
       }
       ops += 1;
-      if (ops >= 100000) {
+      if (ops >= 10000) {
          double ops_s;
          int64_t current_time;
 

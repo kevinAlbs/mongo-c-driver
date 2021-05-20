@@ -57,6 +57,14 @@ BSON_BEGIN_DECLS
 #define bson_mutex_t pthread_mutex_t
 #define bson_mutex_unlock pthread_mutex_unlock
 
+#define bson_rwlock_destroy pthread_rwlock_destroy
+#define bson_rwlock_init(_n) pthread_rwlock_init ((_n), NULL)
+#define bson_rwlock_wrlock pthread_rwlock_wrlock
+#define bson_rwlock_rdlock pthread_rwlock_rdlock
+#define bson_rwlock_t pthread_rwlock_t
+#define bson_rwlock_unlock pthread_rwlock_unlock
+/* welcome our newest friend: */
+
 #else
 typedef struct {
    pthread_t lock_owner;

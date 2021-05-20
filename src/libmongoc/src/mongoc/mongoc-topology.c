@@ -164,7 +164,7 @@ _mongoc_topology_scanner_cb (uint32_t id,
 
    topology = (mongoc_topology_t *) data;
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
    sd = mongoc_topology_description_server_by_id (
       &topology->description, id, NULL);
 
@@ -198,7 +198,7 @@ _mongoc_topology_scanner_cb (uint32_t id,
       mongoc_cond_broadcast (&topology->cond_client);
    }
 
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
 }
 
 /*
@@ -310,6 +310,7 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
                                    topology->connect_timeout_msec);
 
    bson_mutex_init (&topology->mutex);
+   bson_rwlock_init (&topology->rwlock);
    mongoc_cond_init (&topology->cond_client);
 
    bson_mutex_init (&topology->cluster_time_mutex);
@@ -519,9 +520,9 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
 #endif
 
    if (!topology->single_threaded) {
-      bson_mutex_lock (&topology->mutex);
+      bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
       _mongoc_topology_background_monitoring_stop (topology);
-      bson_mutex_unlock (&topology->mutex);
+      bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
       BSON_ASSERT (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_OFF);
       mongoc_set_destroy (topology->server_monitors);
       mongoc_set_destroy (topology->rtt_monitors);
@@ -542,6 +543,7 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
 
    mongoc_cond_destroy (&topology->cond_client);
    bson_mutex_destroy (&topology->mutex);
+   bson_rwlock_destroy (&topology->rwlock);
    bson_mutex_destroy (&topology->cluster_time_mutex);
 
    bson_free (topology);
@@ -694,13 +696,13 @@ mongoc_topology_rescan_srv (mongoc_topology_t *topology)
 
    /* Unlock topology mutex during scan so it does not hold up other operations.
     */
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
    ret = _mongoc_client_get_rr (prefixed_service,
                                 MONGOC_RR_SRV,
                                 &rr_data,
                                 MONGOC_RR_DEFAULT_BUFFER_SIZE,
                                 &topology->scanner->error);
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
 
    topology->srv_polling_last_scan_ms = bson_get_monotonic_time () / 1000;
    if (!ret) {
@@ -773,10 +775,10 @@ mongoc_topology_scan_once (mongoc_topology_t *topology, bool obey_cooldown)
    mongoc_topology_scanner_start (topology->scanner, obey_cooldown);
 
    /* scanning locks and unlocks the mutex itself until the scan is done */
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
    mongoc_topology_scanner_work (topology->scanner);
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
 
    _mongoc_topology_scanner_finish (topology->scanner);
 
@@ -801,9 +803,9 @@ _mongoc_topology_do_blocking_scan (mongoc_topology_t *topology,
 {
    _mongoc_handshake_freeze ();
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
    mongoc_topology_scan_once (topology, true /* obey cooldown */);
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
    mongoc_topology_scanner_get_error (topology->scanner, error);
 }
 
@@ -970,7 +972,7 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
    BSON_ASSERT (topology);
    ts = topology->scanner;
 
-   bson_mutex_lock (&topology->mutex);
+   bson_rwlock_rdlock (&topology->rwlock);
    /* It isn't strictly necessary to lock here, because if the topology
     * is invalid, it will never become valid. Lock anyway for consistency. */
    if (!mongoc_topology_scanner_valid (ts)) {
@@ -979,10 +981,10 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
          error->domain = MONGOC_ERROR_SERVER_SELECTION;
          error->code = MONGOC_ERROR_SERVER_SELECTION_FAILURE;
       }
-      bson_mutex_unlock (&topology->mutex);
+      bson_rwlock_unlock (&topology->rwlock);
       return 0;
    }
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock);
 
    heartbeat_msec = topology->description.heartbeat_msec;
    local_threshold_ms = topology->local_threshold_msec;
@@ -1080,11 +1082,11 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
    /* With background thread */
    /* we break out when we've found a server or timed out */
    for (;;) {
-      bson_mutex_lock (&topology->mutex);
+      bson_rwlock_rdlock (&topology->rwlock);
 
       if (!mongoc_topology_compatible (
              &topology->description, read_prefs, error)) {
-         bson_mutex_unlock (&topology->mutex);
+         bson_rwlock_unlock (&topology->rwlock);
          return 0;
       }
 
@@ -1099,13 +1101,18 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
 
          TRACE ("server selection about to wait for %" PRId64 "ms",
                 (expire_at - loop_start) / 1000);
+         bson_rwlock_unlock (&topology->rwlock);
+
+         bson_mutex_lock (&topology->mutex);
          r = mongoc_cond_timedwait (&topology->cond_client,
                                     &topology->mutex,
                                     (expire_at - loop_start) / 1000);
+         bson_rwlock_wrlock (&topology->rwlock);
          TRACE ("%s", "server selection awake");
          _topology_collect_errors (topology, &scanner_error);
-
          bson_mutex_unlock (&topology->mutex);
+
+         bson_rwlock_unlock (&topology->rwlock); 
 
 #ifdef _WIN32
          if (r == WSAETIMEDOUT) {
@@ -1135,7 +1142,7 @@ mongoc_topology_select_server_id (mongoc_topology_t *topology,
          }
       } else {
          server_id = selected_server->id;
-         bson_mutex_unlock (&topology->mutex);
+         bson_rwlock_unlock (&topology->rwlock);
          return server_id;
       }
    }
@@ -1171,13 +1178,13 @@ mongoc_topology_server_by_id (mongoc_topology_t *topology,
 {
    mongoc_server_description_t *sd;
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
 
    sd = mongoc_server_description_new_copy (
       mongoc_topology_description_server_by_id (
          &topology->description, id, error));
 
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
 
    return sd;
 }
@@ -1213,7 +1220,7 @@ _mongoc_topology_host_by_id (mongoc_topology_t *topology,
    mongoc_server_description_t *sd;
    mongoc_host_list_t *host = NULL;
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
 
    /* not a copy - direct pointer into topology description data */
    sd = mongoc_topology_description_server_by_id (
@@ -1224,7 +1231,7 @@ _mongoc_topology_host_by_id (mongoc_topology_t *topology,
       memcpy (host, &sd->host, sizeof (mongoc_host_list_t));
    }
 
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
 
    return host;
 }
@@ -1260,10 +1267,10 @@ mongoc_topology_invalidate_server (mongoc_topology_t *topology,
 {
    BSON_ASSERT (error);
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
    mongoc_topology_description_invalidate_server (
       &topology->description, id, error);
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
 }
 
 /*
@@ -1286,7 +1293,7 @@ _mongoc_topology_update_from_handshake (mongoc_topology_t *topology,
    BSON_ASSERT (sd);
    BSON_ASSERT (!topology->single_threaded);
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
 
    /* return false if server was removed from topology */
    has_server = _mongoc_topology_update_no_lock (
@@ -1296,7 +1303,7 @@ _mongoc_topology_update_from_handshake (mongoc_topology_t *topology,
    mongoc_cond_broadcast (&topology->cond_client);
    /* Update background monitoring. */
    _mongoc_topology_background_monitoring_reconcile (topology);
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
 
    return has_server;
 }
@@ -1349,11 +1356,11 @@ _mongoc_topology_get_type (mongoc_topology_t *topology)
 {
    mongoc_topology_description_type_t td_type;
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
 
    td_type = topology->description.type;
 
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
 
    return td_type;
 }
@@ -1362,14 +1369,14 @@ bool
 _mongoc_topology_set_appname (mongoc_topology_t *topology, const char *appname)
 {
    bool ret = false;
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
 
    if (topology->scanner_state == MONGOC_TOPOLOGY_SCANNER_OFF) {
       ret = _mongoc_topology_scanner_set_appname (topology->scanner, appname);
    } else {
       MONGOC_ERROR ("Cannot set appname after handshake initiated");
    }
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
    return ret;
 }
 
@@ -1421,7 +1428,7 @@ _mongoc_topology_pop_server_session (mongoc_topology_t *topology,
 
    ENTRY;
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
 
    td = &topology->description;
    timeout = td->session_timeout_minutes;
@@ -1429,18 +1436,18 @@ _mongoc_topology_pop_server_session (mongoc_topology_t *topology,
    if (timeout == MONGOC_NO_SESSIONS) {
       /* if needed, connect and check for session timeout again */
       if (!mongoc_topology_description_has_data_node (td)) {
-         bson_mutex_unlock (&topology->mutex);
+         bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
          if (!mongoc_topology_select_server_id (
                 topology, MONGOC_SS_READ, NULL, error)) {
             RETURN (NULL);
          }
 
-         bson_mutex_lock (&topology->mutex);
+         bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
          timeout = td->session_timeout_minutes;
       }
 
       if (timeout == MONGOC_NO_SESSIONS) {
-         bson_mutex_unlock (&topology->mutex);
+         bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
          bson_set_error (error,
                          MONGOC_ERROR_CLIENT,
                          MONGOC_ERROR_CLIENT_SESSION_FAILURE,
@@ -1460,7 +1467,7 @@ _mongoc_topology_pop_server_session (mongoc_topology_t *topology,
       }
    }
 
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
 
    if (!ss) {
       ss = _mongoc_server_session_new (error);
@@ -1488,7 +1495,7 @@ _mongoc_topology_push_server_session (mongoc_topology_t *topology,
 
    ENTRY;
 
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
 
    timeout = topology->description.session_timeout_minutes;
 
@@ -1524,7 +1531,7 @@ _mongoc_topology_push_server_session (mongoc_topology_t *topology,
       }
    }
 
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
 
    EXIT;
 }
@@ -1597,9 +1604,9 @@ const bson_t *
 _mongoc_topology_get_handshake_cmd (mongoc_topology_t *topology)
 {
    const bson_t *cmd;
-   bson_mutex_lock (&topology->mutex);
+   bson_mutex_lock (&topology->mutex); bson_rwlock_wrlock (&topology->rwlock);
    cmd = _mongoc_topology_scanner_get_handshake_cmd (topology->scanner);
-   bson_mutex_unlock (&topology->mutex);
+   bson_rwlock_unlock (&topology->rwlock); bson_mutex_unlock (&topology->mutex);
    return cmd;
 }
 

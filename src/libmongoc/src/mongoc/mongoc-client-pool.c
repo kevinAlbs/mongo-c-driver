@@ -456,6 +456,7 @@ mongoc_client_pool_set_apm_callbacks (mongoc_client_pool_t *pool,
    }
 
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
 
    if (callbacks) {
       memcpy (&topology->description.apm_callbacks,
@@ -469,6 +470,7 @@ mongoc_client_pool_set_apm_callbacks (mongoc_client_pool_t *pool,
    pool->apm_context = context;
    pool->apm_callbacks_set = true;
 
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&topology->mutex);
 
    return true;
@@ -541,7 +543,9 @@ mongoc_client_pool_set_server_api (mongoc_client_pool_t *pool,
 
    pool->api = mongoc_server_api_copy (api);
    bson_mutex_lock (&pool->topology->mutex);
+   bson_rwlock_wrlock (&pool->topology->rwlock);
    _mongoc_topology_scanner_set_server_api (pool->topology->scanner, api);
+   bson_rwlock_unlock (&pool->topology->rwlock);
    bson_mutex_unlock (&pool->topology->mutex);
    return true;
 }

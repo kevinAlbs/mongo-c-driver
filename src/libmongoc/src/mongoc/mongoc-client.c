@@ -2566,8 +2566,10 @@ mongoc_client_kill_cursor (mongoc_client_t *client, int64_t cursor_id)
    read_prefs = mongoc_read_prefs_new (MONGOC_READ_PRIMARY);
 
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
    if (!mongoc_topology_compatible (&topology->description, NULL, &error)) {
       MONGOC_ERROR ("Could not kill cursor: %s", error.message);
+      bson_rwlock_unlock (&topology->rwlock);
       bson_mutex_unlock (&topology->mutex);
       mongoc_read_prefs_destroy (read_prefs);
       return;
@@ -2584,6 +2586,7 @@ mongoc_client_kill_cursor (mongoc_client_t *client, int64_t cursor_id)
       server_id = selected_server->id;
    }
 
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&topology->mutex);
 
    if (server_id) {
@@ -2796,9 +2799,11 @@ mongoc_client_get_server_descriptions (const mongoc_client_t *client,
 
    /* in case the client is pooled */
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
 
    sds = mongoc_topology_description_get_servers (&topology->description, n);
 
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&topology->mutex);
 
    return sds;
@@ -3122,7 +3127,9 @@ mongoc_client_set_server_api (mongoc_client_t *client,
 
    client->api = mongoc_server_api_copy (api);
    bson_mutex_lock (&client->topology->mutex);
+   bson_rwlock_rdlock (&client->topology->rwlock);
    _mongoc_topology_scanner_set_server_api (client->topology->scanner, api);
+   bson_rwlock_unlock (&client->topology->rwlock);
    bson_mutex_unlock (&client->topology->mutex);
    return true;
 }

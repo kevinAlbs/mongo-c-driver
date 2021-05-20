@@ -75,6 +75,7 @@ typedef struct _mongoc_topology_t {
 
    bson_mutex_t cluster_time_mutex;
    bson_mutex_t mutex;
+   bson_rwlock_t rwlock;
    mongoc_cond_t cond_client;
    mongoc_topology_scanner_state_t scanner_state;
 

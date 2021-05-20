@@ -661,6 +661,7 @@ _server_monitor_update_topology_description (
    }
 
    bson_mutex_lock (&topology->mutex);
+   bson_rwlock_wrlock (&topology->rwlock);
    if (topology->scanner_state != MONGOC_TOPOLOGY_SCANNER_SHUTTING_DOWN) {
       /* This is the another case of holding both locks. topology->mutex is
        * always locked first, then server monitor mutex after. */
@@ -679,6 +680,7 @@ _server_monitor_update_topology_description (
    }
    /* Wake threads performing server selection. */
    mongoc_cond_broadcast (&server_monitor->topology->cond_client);
+   bson_rwlock_unlock (&topology->rwlock);
    bson_mutex_unlock (&server_monitor->topology->mutex);
 }
 
@@ -931,8 +933,10 @@ exit:
       server_monitor->stream = NULL;
       server_monitor->more_to_come = false;
       bson_mutex_lock (&server_monitor->topology->mutex);
+      bson_rwlock_wrlock (&server_monitor->topology->rwlock);
       _mongoc_topology_clear_connection_pool (server_monitor->topology,
                                               server_monitor->description->id);
+      bson_rwlock_unlock (&server_monitor->topology->rwlock);
       bson_mutex_unlock (&server_monitor->topology->mutex);
    }
 
@@ -1145,6 +1149,7 @@ static BSON_THREAD_FUN (_server_monitor_rtt_thread, server_monitor_void)
          mongoc_server_description_t *sd;
 
          bson_mutex_lock (&server_monitor->topology->mutex);
+         bson_rwlock_wrlock (&server_monitor->topology->rwlock);
          sd = mongoc_topology_description_server_by_id (
             &server_monitor->topology->description,
             server_monitor->description->id,
@@ -1154,6 +1159,7 @@ static BSON_THREAD_FUN (_server_monitor_rtt_thread, server_monitor_void)
              * be terminated by background monitoring soon. */
             mongoc_server_description_update_rtt (sd, rtt_ms);
          }
+         bson_rwlock_unlock (&server_monitor->topology->rwlock);
          bson_mutex_unlock (&server_monitor->topology->mutex);
       }
       mongoc_server_monitor_wait (server_monitor);
