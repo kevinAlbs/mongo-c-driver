@@ -1851,7 +1851,8 @@ mongoc_client_pool_t *
 test_framework_new_default_client_pool ()
 {
    mongoc_uri_t *test_uri = test_framework_get_uri ();
-   mongoc_client_pool_t *pool = test_framework_client_pool_new_from_uri (test_uri, NULL);
+   mongoc_client_pool_t *pool =
+      test_framework_client_pool_new_from_uri (test_uri, NULL);
 
    BSON_ASSERT (pool);
    test_framework_set_pool_ssl_opts (pool);
@@ -2622,6 +2623,12 @@ test_framework_resolve_path (const char *path, char *resolved)
       MONGOC_ERROR ("Run test-libmongoc in repository root directory.\n");
       ASSERT (false);
    }
+}
+
+bool
+test_framework_is_serverless (void)
+{
+   return test_framework_getenv_bool ("MONGOC_TEST_IS_SERVERLESS");
 }
 
 int
