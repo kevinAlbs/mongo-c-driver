@@ -1,0 +1,6 @@
+{
+   "uri": "mongodb://localhost:8000/?loadBalanced=true",
+   "apm": "on",
+   "apm_show_succeeded": "off",
+   "scenario": "interrupted_find"
+}
