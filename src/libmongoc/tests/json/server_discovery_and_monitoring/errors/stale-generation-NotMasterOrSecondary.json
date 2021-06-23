@@ -1,5 +1,5 @@
 {
-  "description": "Stale generation NotPrimaryOrSecondary error",
+  "description": "Stale generation NotMasterOrSecondary error",
   "uri": "mongodb://a/?replicaSet=rs",
   "phases": [
     {
@@ -124,7 +124,7 @@
       }
     },
     {
-      "description": "Ignore stale NotPrimaryOrSecondary error (stale generation)",
+      "description": "Ignore stale NotMasterOrSecondary error (stale generation)",
       "applicationErrors": [
         {
           "address": "a:27017",
@@ -134,7 +134,7 @@
           "type": "command",
           "response": {
             "ok": 0,
-            "errmsg": "NotPrimaryOrSecondary",
+            "errmsg": "NotMasterOrSecondary",
             "code": 13436,
             "topologyVersion": {
               "processId": {

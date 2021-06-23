@@ -54,7 +54,6 @@ typedef struct mongoc_topology_scanner_node {
    int64_t last_used;
    int64_t last_failed;
    bool has_auth;
-   bool hello_ok;
    mongoc_host_list_t host;
    struct mongoc_topology_scanner *ts;
 
@@ -85,8 +84,7 @@ typedef struct mongoc_topology_scanner {
    int64_t connect_timeout_msec;
    mongoc_topology_scanner_node_t *nodes;
    bson_t hello_cmd;
-   bson_t legacy_hello_cmd;
-   bson_t handshake_cmd;
+   bson_t hello_cmd_with_handshake;
    bson_t cluster_time;
    bool handshake_ok_to_send;
    const char *appname;
@@ -132,8 +130,7 @@ mongoc_topology_scanner_valid (mongoc_topology_scanner_t *ts);
 void
 mongoc_topology_scanner_add (mongoc_topology_scanner_t *ts,
                              const mongoc_host_list_t *host,
-                             uint32_t id,
-                             bool hello_ok);
+                             uint32_t id);
 
 void
 mongoc_topology_scanner_scan (mongoc_topology_scanner_t *ts, uint32_t id);
@@ -197,8 +194,7 @@ _mongoc_topology_scanner_get_speculative_auth_mechanism (
    const mongoc_uri_t *uri);
 
 const bson_t *
-_mongoc_topology_scanner_get_monitoring_cmd (mongoc_topology_scanner_t *ts,
-                                             bool hello_ok);
+_mongoc_topology_scanner_get_hello_cmd (mongoc_topology_scanner_t *ts);
 
 const bson_t *
 _mongoc_topology_scanner_get_handshake_cmd (mongoc_topology_scanner_t *ts);

@@ -464,10 +464,6 @@ test_all_spec_tests (TestSuite *suite)
    ASSERT (
       realpath (JSON_DIR "/server_discovery_and_monitoring/errors", resolved));
    install_json_test_suite (suite, resolved, &test_sdam_cb);
-   ASSERT (realpath (JSON_DIR
-                     "/server_discovery_and_monitoring/legacy-hello/errors",
-                     resolved));
-   install_json_test_suite (suite, resolved, &test_sdam_cb);
 
    /* Tests not in official Server Discovery And Monitoring Spec */
    ASSERT (realpath (JSON_DIR "/server_discovery_and_monitoring/supplemental",
@@ -600,8 +596,7 @@ test_direct_connection (void *ctx)
    BSON_APPEND_UTF8 (&doc, "hello", "world");
    r = mongoc_collection_insert_one (collection, &doc, NULL, &reply, &error);
    ASSERT_OR_PRINT (!r, error);
-   ASSERT (strstr (error.message, "not master") ||
-           strstr (error.message, "not primary"));
+   ASSERT (strstr (error.message, "not master"));
 
    bson_destroy (&reply);
    bson_destroy (&doc);
@@ -665,8 +660,7 @@ test_existing_behavior (void *ctx)
    BSON_APPEND_UTF8 (&doc, "hello", "world");
    r = mongoc_collection_insert_one (collection, &doc, NULL, &reply, &error);
    ASSERT_OR_PRINT (!r, error);
-   ASSERT (strstr (error.message, "not master") ||
-           strstr (error.message, "not primary"));
+   ASSERT (strstr (error.message, "not master"));
 
    bson_destroy (&reply);
    bson_destroy (&doc);

@@ -1,5 +1,5 @@
 {
-  "description": "Non-stale topologyVersion missing NotWritablePrimary error",
+  "description": "Non-stale topologyVersion missing NotMaster error",
   "uri": "mongodb://a/?replicaSet=rs",
   "phases": [
     {
@@ -51,7 +51,7 @@
       }
     },
     {
-      "description": "Non-stale topologyVersion missing NotWritablePrimary error marks server Unknown",
+      "description": "Non-stale topologyVersion missing NotMaster error marks server Unknown",
       "applicationErrors": [
         {
           "address": "a:27017",
@@ -60,7 +60,7 @@
           "type": "command",
           "response": {
             "ok": 0,
-            "errmsg": "NotWritablePrimary",
+            "errmsg": "NotMaster",
             "code": 10107
           }
         }

@@ -1,5 +1,5 @@
 {
-  "description": "Stale generation NotWritablePrimary error afterHandshakeCompletes",
+  "description": "Stale generation NotMaster error afterHandshakeCompletes",
   "uri": "mongodb://a/?replicaSet=rs",
   "phases": [
     {
@@ -124,7 +124,7 @@
       }
     },
     {
-      "description": "Ignore stale NotWritablePrimary error (stale generation)",
+      "description": "Ignore stale NotMaster error (stale generation)",
       "applicationErrors": [
         {
           "address": "a:27017",
@@ -134,7 +134,7 @@
           "type": "command",
           "response": {
             "ok": 0,
-            "errmsg": "NotWritablePrimary",
+            "errmsg": "NotMaster",
             "code": 10107,
             "topologyVersion": {
               "processId": {

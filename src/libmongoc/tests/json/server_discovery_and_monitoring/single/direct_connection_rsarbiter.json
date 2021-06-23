@@ -8,7 +8,7 @@
           "a:27017",
           {
             "ok": 1,
-            "isWritablePrimary": false,
+            "ismaster": false,
             "arbiterOnly": true,
             "hosts": [
               "a:27017",

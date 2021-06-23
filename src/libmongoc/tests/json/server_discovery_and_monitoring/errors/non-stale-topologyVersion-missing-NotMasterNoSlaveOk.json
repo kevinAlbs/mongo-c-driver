@@ -1,5 +1,5 @@
 {
-  "description": "Non-stale topologyVersion missing NotPrimaryNoSecondaryOk error",
+  "description": "Non-stale topologyVersion missing NotMasterNoSlaveOk error",
   "uri": "mongodb://a/?replicaSet=rs",
   "phases": [
     {
@@ -51,7 +51,7 @@
       }
     },
     {
-      "description": "Non-stale topologyVersion missing NotPrimaryNoSecondaryOk error marks server Unknown",
+      "description": "Non-stale topologyVersion missing NotMasterNoSlaveOk error marks server Unknown",
       "applicationErrors": [
         {
           "address": "a:27017",
@@ -60,7 +60,7 @@
           "type": "command",
           "response": {
             "ok": 0,
-            "errmsg": "NotPrimaryNoSecondaryOk",
+            "errmsg": "NotMasterNoSlaveOk",
             "code": 13435
           }
         }

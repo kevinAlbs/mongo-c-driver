@@ -12,7 +12,7 @@
               "localhost:27017",
               "localhost:27018"
             ],
-            "isWritablePrimary": true,
+            "ismaster": true,
             "setName": "rs",
             "primary": "localhost:27017",
             "me": "a:27017",
@@ -47,7 +47,7 @@
               "localhost:27017",
               "localhost:27018"
             ],
-            "isWritablePrimary": false,
+            "ismaster": false,
             "secondary": true,
             "setName": "rs",
             "primary": "localhost:27017",
