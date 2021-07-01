@@ -54,6 +54,7 @@ typedef enum {
    MONGOC_SERVER_RS_ARBITER,
    MONGOC_SERVER_RS_OTHER,
    MONGOC_SERVER_RS_GHOST,
+   MONGOC_SERVER_LOADBALANCER,
    MONGOC_SERVER_DESCRIPTION_TYPES,
 } mongoc_server_description_type_t;
 
@@ -107,7 +108,8 @@ struct _mongoc_server_description_t {
    1. a monitor receives a network error
    2. an app thread receives any network error before completing a handshake
    3. an app thread receives a non-timeout network error after the handshake
-   4. an app thread receives a "not primary" or "node is recovering" error from a
+   4. an app thread receives a "not primary" or "node is recovering" error from
+   a
    pre-4.2 server.
    */
    uint32_t generation;

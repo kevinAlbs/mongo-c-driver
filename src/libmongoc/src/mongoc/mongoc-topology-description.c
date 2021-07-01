@@ -2139,6 +2139,8 @@ mongoc_topology_description_type (const mongoc_topology_description_t *td)
       return "ReplicaSetWithPrimary";
    case MONGOC_TOPOLOGY_SINGLE:
       return "Single";
+   case MONGOC_TOPOLOGY_LOADBALANCED:
+      return "LoadBalanced";
    case MONGOC_TOPOLOGY_DESCRIPTION_TYPES:
    default:
       fprintf (stderr, "ERROR: Unknown topology type %d\n", td->type);

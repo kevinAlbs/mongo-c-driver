@@ -413,7 +413,10 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
       has_directconnection &&
       mongoc_uri_get_option_as_bool (uri, MONGOC_URI_DIRECTCONNECTION, false);
    hl = mongoc_uri_get_hosts (topology->uri);
-   if (service && !has_directconnection) {
+   if (mongoc_uri_get_option_as_bool (
+          topology->uri, MONGOC_URI_LOADBALANCED, false)) {
+      init_type = MONGOC_TOPOLOGY_LOADBALANCED;
+   } else if (service && !has_directconnection) {
       init_type = MONGOC_TOPOLOGY_UNKNOWN;
    } else if (has_directconnection) {
       if (directconnection) {
@@ -653,11 +656,6 @@ mongoc_topology_should_rescan_srv (mongoc_topology_t *topology)
       return false;
    }
 
-   /* TODO: rely on topology->description.type instead of URI option. */
-   if (mongoc_uri_get_option_as_bool (
-          topology->uri, MONGOC_URI_LOADBALANCED, false)) {
-      return false;
-   }
 
    if ((topology->description.type != MONGOC_TOPOLOGY_SHARDED) &&
        (topology->description.type != MONGOC_TOPOLOGY_UNKNOWN)) {
@@ -818,6 +816,10 @@ _mongoc_topology_do_blocking_scan (mongoc_topology_t *topology,
 {
    _mongoc_handshake_freeze ();
 
+   if (topology->description.type == MONGOC_TOPOLOGY_LOADBALANCED) {
+      MONGOC_DEBUG ("bypassing server selection logic for single threaded");
+      return;
+   }
    bson_mutex_lock (&topology->mutex);
    mongoc_topology_scan_once (topology, true /* obey cooldown */);
    bson_mutex_unlock (&topology->mutex);
