@@ -1438,6 +1438,7 @@ _mongoc_topology_pop_server_session (mongoc_topology_t *topology,
    int64_t timeout;
    mongoc_server_session_t *ss = NULL;
    mongoc_topology_description_t *td;
+   bool loadbalanced;
 
    ENTRY;
 
@@ -1445,38 +1446,45 @@ _mongoc_topology_pop_server_session (mongoc_topology_t *topology,
 
    td = &topology->description;
    timeout = td->session_timeout_minutes;
+   loadbalanced = td->type == MONGOC_TOPOLOGY_LOADBALANCED;
 
-   if (timeout == MONGOC_NO_SESSIONS) {
-      /* if needed, connect and check for session timeout again */
-      if (!mongoc_topology_description_has_data_node (td)) {
-         bson_mutex_unlock (&topology->mutex);
-         if (!mongoc_topology_select_server_id (
-                topology, MONGOC_SS_READ, NULL, error)) {
-            RETURN (NULL);
+   /* When the topology type is LoadBalanced, sessions are always supported. */
+   if (!loadbalanced) {
+      if (timeout == MONGOC_NO_SESSIONS) {
+         /* if needed, connect and check for session timeout again */
+         if (!mongoc_topology_description_has_data_node (td)) {
+            bson_mutex_unlock (&topology->mutex);
+            if (!mongoc_topology_select_server_id (
+                   topology, MONGOC_SS_READ, NULL, error)) {
+               RETURN (NULL);
+            }
+
+            bson_mutex_lock (&topology->mutex);
+            timeout = td->session_timeout_minutes;
          }
 
-         bson_mutex_lock (&topology->mutex);
-         timeout = td->session_timeout_minutes;
-      }
-
-      if (timeout == MONGOC_NO_SESSIONS) {
-         bson_mutex_unlock (&topology->mutex);
-         bson_set_error (error,
-                         MONGOC_ERROR_CLIENT,
-                         MONGOC_ERROR_CLIENT_SESSION_FAILURE,
-                         "Server does not support sessions");
-         RETURN (NULL);
+         if (timeout == MONGOC_NO_SESSIONS) {
+            bson_mutex_unlock (&topology->mutex);
+            bson_set_error (error,
+                            MONGOC_ERROR_CLIENT,
+                            MONGOC_ERROR_CLIENT_SESSION_FAILURE,
+                            "Server does not support sessions");
+            RETURN (NULL);
+         }
       }
    }
 
    while (topology->session_pool) {
       ss = topology->session_pool;
       CDL_DELETE (topology->session_pool, ss);
-      if (_mongoc_server_session_timed_out (ss, timeout)) {
-         _mongoc_server_session_destroy (ss);
-         ss = NULL;
-      } else {
-         break;
+      /* Sessions do not expire when the topology type is load balanced. */
+      if (!loadbalanced) {
+         if (_mongoc_server_session_timed_out (ss, timeout)) {
+            _mongoc_server_session_destroy (ss);
+            ss = NULL;
+         } else {
+            break;
+         }
       }
    }
 
@@ -1505,17 +1513,20 @@ _mongoc_topology_push_server_session (mongoc_topology_t *topology,
 {
    int64_t timeout;
    mongoc_server_session_t *ss;
+   bool loadbalanced;
 
    ENTRY;
 
    bson_mutex_lock (&topology->mutex);
 
    timeout = topology->description.session_timeout_minutes;
+   loadbalanced = topology->description.type == MONGOC_TOPOLOGY_LOADBALANCED;
 
    /* start at back of queue and reap timed-out sessions */
    while (topology->session_pool && topology->session_pool->prev) {
       ss = topology->session_pool->prev;
-      if (_mongoc_server_session_timed_out (ss, timeout)) {
+      /* Sessions do not expire when the topology type is load balanced. */
+      if (!loadbalanced && _mongoc_server_session_timed_out (ss, timeout)) {
          BSON_ASSERT (ss->next); /* silences clang scan-build */
          CDL_DELETE (topology->session_pool, ss);
          _mongoc_server_session_destroy (ss);
@@ -1526,8 +1537,10 @@ _mongoc_topology_push_server_session (mongoc_topology_t *topology,
    }
 
    /* If session is expiring or "dirty" (a network error occurred on it), do not
-    * return it to the pool. */
-   if (_mongoc_server_session_timed_out (server_session, timeout) ||
+    * return it to the pool. Sessions do not expire when the topology type is
+    * load balanced. */
+   if ((!loadbalanced &&
+        _mongoc_server_session_timed_out (server_session, timeout)) ||
        server_session->dirty) {
       _mongoc_server_session_destroy (server_session);
    } else {
