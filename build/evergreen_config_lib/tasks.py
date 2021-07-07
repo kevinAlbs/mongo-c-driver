@@ -1074,4 +1074,44 @@ class OCSPTask(MatrixTask):
 
 all_tasks = chain(all_tasks, OCSPTask.matrix())
 
+class LoadBalancedTaskAsan (MatrixTask):
+    axes = OD([('auth', [True, False]),
+               ('server_ssl', [True, False]),
+               ('version', ['latest', '5.0'])])
+
+    name_prefix = 'test-loadbalanced-asan-openssl'
+
+    def __init__(self, *args, **kwargs):
+        super(LoadBalancedTaskAsan, self).__init__(*args, **kwargs)
+        self.add_dependency('debug-compile-asan-clang-openssl')
+        self.add_tags('test-asan')
+
+    @property
+    def name(self):
+        return self.name_prefix + '-' + self.display('auth') + '-' + self.display('version')
+
+    def to_dict(self):
+        task = super(MatrixTask, self).to_dict()
+        commands = task['commands']
+        commands.append(
+            func('fetch build', BUILD_NAME=self.depends_on['name']))
+        orchestration = bootstrap(TOPOLOGY='sharded_cluster',
+                                  AUTH='auth' if self.auth else 'noauth',
+                                  SSL='ssl' if self.server_ssl else 'nossl',
+                                  VERSION=self.version)
+        commands.append (orchestration)
+        commands.append (func("clone drivers-evergreen-tools"))
+        commands.append (func("start load balancer", MONGODB_URI="mongodb://localhost:27017,localhost:27018"))
+        commands.append(run_tests(ASAN='on',
+            AUTH='auth' if self.auth else 'noauth',
+            SSL='ssl' if self.server_ssl else 'nossl',
+            LOADBALANCED='on'))
+        return task
+
+    def _check_allowed(self):
+        # Test with server ssl and auth, or no server ssl and no auth, but not a mix.
+        prohibit (self.server_ssl != self.auth)
+
+all_tasks = chain (all_tasks, LoadBalancedTaskAsan.matrix())
+
 all_tasks = list(all_tasks)

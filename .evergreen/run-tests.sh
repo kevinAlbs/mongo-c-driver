@@ -59,6 +59,12 @@ if [ "$DNS" != "nodns" ]; then
    fi
 fi
 
+# If testing against a load balanced cluster, then only run loadbalanced tests.
+if [ "$LOADBALANCED" = "on" ]; then
+   export MONGOC_TEST_LOADBALANCED=on
+   TEST_ARGS="$TEST_ARGS -l /loadbalanced/*"
+fi
+
 if [ "$CC" = "mingw" ]; then
    if [ "$DNS" != "nodns" ]; then
       echo "ERROR - DNS tests not implemented for MinGW yet"
