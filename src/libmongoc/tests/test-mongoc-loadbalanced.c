@@ -20,7 +20,9 @@
 #include "test-libmongoc.h"
 #include "TestSuite.h"
 
-static char *loadbalanced_uri (void) {
+static char *
+loadbalanced_uri (void)
+{
    return test_framework_getenv ("SINGLE_MONGOS_LB_URI");
 }
 
@@ -65,7 +67,8 @@ test_loadbalanced_sessions_do_not_expire (void *unused)
    mongoc_client_session_destroy (session);
 
    if (!bson_equal (lsid1, lsid2)) {
-      test_error ("Session not reused: %s != %s", tmp_json (lsid1), tmp_json (lsid2));
+      test_error (
+         "Session not reused: %s != %s", tmp_json (lsid1), tmp_json (lsid2));
    }
 
    bson_destroy (lsid1);
@@ -77,23 +80,24 @@ test_loadbalanced_sessions_do_not_expire (void *unused)
 static int
 skip_if_not_loadbalanced (void)
 {
-   char *val = loadbalanced_uri ();
-   if (!val) {
+   if (test_framework_getenv_bool ("MONGOC_TEST_LOADBALANCED")) {
+      return 1;
+   } else {
       return 0;
    }
-   bson_free (val);
-   return 1;
 }
 
 void
 test_loadbalanced_install (TestSuite *suite)
 {
-   TestSuite_AddFull (suite, "/loadbalanced/sessions/supported",
+   TestSuite_AddFull (suite,
+                      "/loadbalanced/sessions/supported",
                       test_loadbalanced_sessions_supported,
                       NULL /* ctx */,
                       NULL /* dtor */,
                       skip_if_not_loadbalanced);
-   TestSuite_AddFull (suite, "/loadbalanced/sessions/do_not_expire",
+   TestSuite_AddFull (suite,
+                      "/loadbalanced/sessions/do_not_expire",
                       test_loadbalanced_sessions_do_not_expire,
                       NULL /* ctx */,
                       NULL /* dtor */,
