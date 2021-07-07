@@ -23,6 +23,8 @@
 static char *
 loadbalanced_uri (void)
 {
+   /* TODO (CDRIVER-4062): This will need to add TLS and auth to the URI when
+    * run in evergreen. */
    return test_framework_getenv ("SINGLE_MONGOS_LB_URI");
 }
 
