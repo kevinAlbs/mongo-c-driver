@@ -111,6 +111,10 @@ _add_hello (mongoc_topology_scanner_t *ts)
    BSON_APPEND_INT32 (&ts->hello_cmd, "hello", 1);
    BSON_APPEND_BOOL (&ts->hello_cmd, "helloOk", true);
 
+   // LBTODO: if load balancer is set, add loadBalanced: true
+   // because hello_cmd and legacy_hello_cmd are used as backups for the handshake
+   // if constructing the handshake is too large.
+
    BSON_APPEND_INT32 (&ts->legacy_hello_cmd, HANDSHAKE_CMD_LEGACY_HELLO, 1);
    BSON_APPEND_BOOL (&ts->legacy_hello_cmd, "helloOk", true);
 
@@ -277,6 +281,8 @@ _build_handshake_cmd (mongoc_topology_scanner_t *ts)
       }
    }
    bson_append_array_end (doc, &subdoc);
+
+   // LBTODO: if the topology scanner has loadbalanced set, add loadBalanced: true
 
    /* Return whether the handshake doc fit the size limit */
    return res;

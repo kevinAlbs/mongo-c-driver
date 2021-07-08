@@ -236,6 +236,8 @@ void
 _mongoc_topology_scanner_set_server_api (mongoc_topology_scanner_t *ts,
                                          const mongoc_server_api_t *api);
 
+// LBTODO add void _mongoc_topology_scanner_set_loadbalanced (mongoc_topology_scanner_t *ts, bool val);
+
 /* for testing. */
 mongoc_stream_t *
 _mongoc_topology_scanner_tcp_initiate (mongoc_async_cmd_t *acmd);
