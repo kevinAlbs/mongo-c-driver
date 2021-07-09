@@ -242,6 +242,7 @@ _make_cursor (mongoc_change_stream_t *stream)
    BSON_ASSERT (!stream->cursor);
    bson_init (&command);
    bson_copy_to (&(stream->opts.extra), &command_opts);
+   // LBTODO: use the server stream's server description
    sd = mongoc_client_select_server (
       stream->client, false /* for_writes */, stream->read_prefs, &stream->err);
    if (!sd) {

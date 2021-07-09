@@ -1940,6 +1940,8 @@ _mongoc_cluster_node_destroy (mongoc_cluster_node_t *node)
    mongoc_stream_failed (node->stream);
    bson_free (node->connection_address);
 
+   // LBTODO: destroy this cluster node
+
    bson_free (node);
 }
 
@@ -2131,6 +2133,8 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
          GOTO (error);
       }
    }
+
+   // LBTODO: copy this server description to the cluster node.
    mongoc_server_description_destroy (sd);
 
    bson_destroy (&speculative_auth_response);
@@ -2867,6 +2871,7 @@ _mongoc_cluster_min_of_max_obj_size_nodes (void *item, void *ctx)
    mongoc_cluster_node_t *node = (mongoc_cluster_node_t *) item;
    int32_t *current_min = (int32_t *) ctx;
 
+   // LBTODO: use the server description attached to the cluster node
    if (node->max_bson_obj_size < *current_min) {
       *current_min = node->max_bson_obj_size;
    }
@@ -2879,6 +2884,7 @@ _mongoc_cluster_min_of_max_msg_size_sds (void *item, void *ctx)
    mongoc_server_description_t *sd = (mongoc_server_description_t *) item;
    int32_t *current_min = (int32_t *) ctx;
 
+   // LBTODO: use the server description attached to the cluster node
    if (sd->max_msg_size < *current_min) {
       *current_min = sd->max_msg_size;
    }
