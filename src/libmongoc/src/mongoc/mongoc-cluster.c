@@ -2384,11 +2384,7 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
    }
 
    if (scanner_node->stream) {
-      sd = mongoc_topology_server_by_id (topology, server_id, error);
-
-      if (!sd) {
-         return NULL;
-      }
+      sd = mongoc_server_description_new_copy (scanner_node->sd);
    } else {
       if (!reconnect_ok) {
          stream_not_found (
@@ -2414,10 +2410,7 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
       }
       bson_free (address);
 
-      sd = mongoc_topology_server_by_id (topology, server_id, error);
-      if (!sd) {
-         return NULL;
-      }
+      sd = mongoc_server_description_new_copy (scanner_node->sd);
    }
 
    if (sd->type == MONGOC_SERVER_UNKNOWN) {
@@ -2461,9 +2454,7 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
       scanner_node->has_auth = true;
    }
 
-   // LBTODO: swap the following:
-   // return mongoc_server_stream_new (
-   //    &topology->description, mongoc_server_description_new_copy (scanner_node->sd), scanner_node->stream);
+   // LBTODO-DONE: swap the following:
    return mongoc_server_stream_new (
       &topology->description, sd, scanner_node->stream);
 }
@@ -3588,28 +3579,22 @@ mongoc_cluster_server_description_for_server (mongoc_cluster_t *cluster,
                                               bson_error_t *error)
 {
    // LBTODO: fetch a stream (allow reconnecting). */
-   if (cluster->client->topology->single_threaded) {
-      /* TODO: this is still wrong. */
-      return mongoc_topology_server_by_id (
-         cluster->client->topology, server_id, error);
-   } else {
-      mongoc_server_stream_t *stream;
-      mongoc_server_description_t *sd;
+   mongoc_server_stream_t *stream;
+   mongoc_server_description_t *sd;
+      
+   stream = mongoc_cluster_stream_for_server (cluster, server_id, true /* reconnect ok */, NULL /* client session */, NULL /* reply */, error);
 
-      stream = mongoc_cluster_fetch_stream_pooled (
-         cluster, server_id, true /* reconnect OK */, error);
-      if (!stream) {
-         bson_set_error (error,
-                         MONGOC_ERROR_STREAM,
-                         MONGOC_ERROR_STREAM_NOT_ESTABLISHED,
-                         "server for id %" PRIu32
-                         " does not have an established connection",
-                         server_id);
-         return NULL;
-      }
-
-      sd = mongoc_server_description_new_copy (stream->sd);
-      mongoc_server_stream_cleanup (stream);
-      return sd;
+   if (!stream) {
+      bson_set_error (error,
+                        MONGOC_ERROR_STREAM,
+                        MONGOC_ERROR_STREAM_NOT_ESTABLISHED,
+                        "server for id %" PRIu32
+                        " does not have an established connection",
+                        server_id);
+      return NULL;
    }
+
+   sd = mongoc_server_description_new_copy (stream->sd);
+   mongoc_server_stream_cleanup (stream);
+   return sd;
 }

@@ -143,74 +143,74 @@ test_server_stream_ties_server_description_pooled (void *unused)
    mongoc_client_pool_destroy (pool);
 }
 
-// /* Test that a connection uses the server description from the handshake when
-//  * checking wire version (instead of the server description from the topology
-//  * description). */
-// static void
-// test_server_stream_ties_server_description_single (void *unused)
-// {
-//    mongoc_client_t *client;
-//    mongoc_uri_t *uri;
-//    mock_server_t *server;
-//    request_t *request;
-//    future_t *future;
-//    bson_error_t error;
-//    mongoc_server_description_t *sd;
+/* Test that a connection uses the server description from the handshake when
+ * checking wire version (instead of the server description from the topology
+ * description). */
+static void
+test_server_stream_ties_server_description_single (void *unused)
+{
+   mongoc_client_t *client;
+   mongoc_uri_t *uri;
+   mock_server_t *server;
+   request_t *request;
+   future_t *future;
+   bson_error_t error;
+   mongoc_server_description_t *sd;
 
-//    server = mock_server_new ();
-//    mock_server_run (server);
-//    uri = mongoc_uri_copy (mock_server_get_uri (server));
-//    client = mongoc_client_new_from_uri (uri);
+   server = mock_server_new ();
+   mock_server_run (server);
+   uri = mongoc_uri_copy (mock_server_get_uri (server));
+   client = mongoc_client_new_from_uri (uri);
 
-//    /* Create a connection on client. */
-//    MONGOC_DEBUG ("Create a connection on client.");
-//    future = future_client_command_simple (client,
-//                                           "admin",
-//                                           tmp_bson ("{'ping': 1}"),
-//                                           NULL /* read prefs */,
-//                                           NULL /* reply */,
-//                                           &error);
-//    /* The first command on a client creates a new connection. */
-//    request = mock_server_receives_legacy_hello (server, NULL);
-//    mock_server_replies_simple (request, HELLO_POST_OPMSG);
-//    request_destroy (request);
-//    MONGOC_DEBUG ("Receiving ping");
-//    /* Check that the mock server receives an OP_MSG. */
-//    request = mock_server_receives_msg (server, 0, tmp_bson ("{'ping': 1}"));
-//    ASSERT_CMPINT ((int) request->opcode, ==, (int) MONGOC_OPCODE_MSG);
-//    mock_server_replies_ok_and_destroys (request);
-//    ASSERT_OR_PRINT (future_get_bool (future), error);
-//    future_destroy (future);
+   /* Create a connection on client. */
+   MONGOC_DEBUG ("Create a connection on client.");
+   future = future_client_command_simple (client,
+                                          "admin",
+                                          tmp_bson ("{'ping': 1}"),
+                                          NULL /* read prefs */,
+                                          NULL /* reply */,
+                                          &error);
+   /* The first command on a client creates a new connection. */
+   request = mock_server_receives_legacy_hello (server, NULL);
+   mock_server_replies_simple (request, HELLO_POST_OPMSG);
+   request_destroy (request);
+   MONGOC_DEBUG ("Receiving ping");
+   /* Check that the mock server receives an OP_MSG. */
+   request = mock_server_receives_msg (server, 0, tmp_bson ("{'ping': 1}"));
+   ASSERT_CMPINT ((int) request->opcode, ==, (int) MONGOC_OPCODE_MSG);
+   mock_server_replies_ok_and_destroys (request);
+   ASSERT_OR_PRINT (future_get_bool (future), error);
+   future_destroy (future);
 
-//    /* Muck with the topology description. */
-//    mongoc_topology_description_handle_hello (
-//       &client->topology->description, 1, tmp_bson (HELLO_PRE_OPMSG), 0, &error);
+   /* Muck with the topology description. */
+   mongoc_topology_description_handle_hello (
+      &client->topology->description, 1, tmp_bson (HELLO_PRE_OPMSG), 0, &error);
 
-//    /* Send another command, it should still use OP_MSG. */
-//    future = future_client_command_simple (client,
-//                                           "admin",
-//                                           tmp_bson ("{'ping': 1}"),
-//                                           NULL /* read prefs */,
-//                                           NULL /* reply */,
-//                                           &error);
-//    request = mock_server_receives_msg (server, 0, tmp_bson ("{'ping': 1}"));
-//    ASSERT_CMPINT ((int) request->opcode, ==, (int) MONGOC_OPCODE_MSG);
-//    mock_server_replies_ok_and_destroys (request);
-//    ASSERT_OR_PRINT (future_get_bool (future), error);
-//    future_destroy (future);
+   /* Send another command, it should still use OP_MSG. */
+   future = future_client_command_simple (client,
+                                          "admin",
+                                          tmp_bson ("{'ping': 1}"),
+                                          NULL /* read prefs */,
+                                          NULL /* reply */,
+                                          &error);
+   request = mock_server_receives_msg (server, 0, tmp_bson ("{'ping': 1}"));
+   ASSERT_CMPINT ((int) request->opcode, ==, (int) MONGOC_OPCODE_MSG);
+   mock_server_replies_ok_and_destroys (request);
+   ASSERT_OR_PRINT (future_get_bool (future), error);
+   future_destroy (future);
 
-//    /* Check that selecting the server returns the OP_QUERY server */
-//    sd = mongoc_client_select_server (
-//       client, true /* for writes */, NULL /* read prefs */, &error);
-//    ASSERT_OR_PRINT (sd, error);
-//    ASSERT_MATCH (mongoc_server_description_hello_response (sd),
-//                  "{'maxWireVersion': 5}");
-//    mongoc_server_description_destroy (sd);
+   /* Check that selecting the server returns the OP_QUERY server */
+   sd = mongoc_client_select_server (
+      client, true /* for writes */, NULL /* read prefs */, &error);
+   ASSERT_OR_PRINT (sd, error);
+   ASSERT_MATCH (mongoc_server_description_hello_response (sd),
+                 "{'maxWireVersion': 5}");
+   mongoc_server_description_destroy (sd);
 
-//    mock_server_destroy (server);
-//    mongoc_uri_destroy (uri);
-//    mongoc_client_destroy (client);
-// }
+   mock_server_destroy (server);
+   mongoc_uri_destroy (uri);
+   mongoc_client_destroy (client);
+}
 
 void
 test_server_stream_install (TestSuite *suite)
@@ -221,10 +221,10 @@ test_server_stream_install (TestSuite *suite)
                       NULL /* dtor */,
                       NULL /* ctx */,
                       NULL);
-   // TestSuite_AddFull (suite,
-   //                    "/server_stream/ties_server_description/single",
-   //                    test_server_stream_ties_server_description_single,
-   //                    NULL /* dtor */,
-   //                    NULL /* ctx */,
-   //                    NULL);
+   TestSuite_AddFull (suite,
+                      "/server_stream/ties_server_description/single",
+                      test_server_stream_ties_server_description_single,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      NULL);
 }
