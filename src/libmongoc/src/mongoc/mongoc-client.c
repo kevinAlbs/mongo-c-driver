@@ -3150,10 +3150,8 @@ mongoc_client_set_server_api (mongoc_client_t *client,
    return true;
 }
 
-mongoc_server_description_t *
-mongoc_client_get_stream_metadata (mongoc_client_t *client,
-                                   uint32_t server_id,
-                                   bson_error_t *error)
+bson_t *
+mongoc_client_get_handshake_hello_response (mongoc_client_t *client, uint32_t server_id, bson_error_t *error)
 {
    /* TODO */
    return NULL;

@@ -526,7 +526,8 @@ mongoc_topology_scanner_node_disconnect (mongoc_topology_scanner_node_t *node,
       }
 
       node->stream = NULL;
-      // LBTODO: destroy the scanner node's server description.
+      // LBTODO-DONE: destroy the scanner node's server description.
+      mongoc_server_description_destroy (node->sd);
       memset (
          &node->sasl_supported_mechs, 0, sizeof (node->sasl_supported_mechs));
       node->negotiated_sasl_supported_mechs = false;
@@ -645,6 +646,14 @@ _async_success (mongoc_async_cmd_t *acmd,
    node->stream = stream;
 
    /* LBTODO: construct and store a server description. */
+   if (!node->sd) {
+      mongoc_server_description_t sd;
+
+      /* Store a server description associated with the handshake. */
+      mongoc_server_description_init (&sd, node->host.host_and_port, node->id);
+      mongoc_server_description_handle_hello (&sd, hello_response, duration_usec / 1000, &acmd->error);
+      node->sd = mongoc_server_description_new_copy (&sd);
+   }
 
    if (ts->negotiate_sasl_supported_mechs &&
        !node->negotiated_sasl_supported_mechs) {
@@ -721,6 +730,8 @@ _async_error_or_timeout (mongoc_async_cmd_t *acmd,
       ts->cb (node->id, NULL, duration_usec / 1000, ts->cb_data, error);
 
       /* LBTODO: clear a server description, if one exists. */
+      mongoc_server_description_destroy (node->sd);
+      node->sd = NULL;
    } else {
       /* there are still more commands left for this node or it succeeded
        * with another stream. skip the topology scanner callback. */

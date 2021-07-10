@@ -282,8 +282,8 @@ mongoc_client_set_server_api (mongoc_client_t *client,
  * This is distinct from the server description of the server itself.
  * This should be preferred.
  */
-MONGOC_EXPORT (mongoc_server_description_t *)
-mongoc_client_get_stream_metadata (mongoc_client_t *client,
+MONGOC_EXPORT (bson_t *)
+mongoc_client_get_handshake_hello_response (mongoc_client_t *client,
                                    uint32_t server_id,
                                    bson_error_t *error);
 

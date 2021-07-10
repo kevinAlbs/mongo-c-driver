@@ -30,6 +30,7 @@
 #include "mongoc-scram-private.h"
 #include "mongoc-ssl.h"
 #include "mongoc-crypto-private.h"
+#include "mongoc-server-description-private.h"
 
 BSON_BEGIN_DECLS
 
@@ -81,6 +82,7 @@ typedef struct mongoc_topology_scanner_node {
 
    // LBTODO: this should also have a server description that is tied to the lifetime of stream.
    // This is only updated after the initial handshake.
+   mongoc_server_description_t *sd;
 } mongoc_topology_scanner_node_t;
 
 typedef struct mongoc_topology_scanner {
