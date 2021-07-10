@@ -192,6 +192,11 @@ TestSuite_Init (TestSuite *suite, const char *name, int argc, char **argv)
          }
          val = bson_strdup (argv[++i]);
          _mongoc_array_append_val (&suite->skip_patterns, val);
+      } else if (0 == strcmp ("--after", argv[i])) {
+         if (argc - 1 == i) {
+            test_error ("--after requires an argument.");
+         }
+         suite->after = bson_strdup (argv[++i]);
       } else {
          test_error ("Unknown option: %s\n"
                      "Try using the --help option.",
@@ -673,22 +678,24 @@ done:
 static void
 TestSuite_PrintHelp (TestSuite *suite) /* IN */
 {
-   printf ("usage: %s [OPTIONS]\n"
-           "\n"
-           "Options:\n"
-           "    -h, --help    Show this help menu.\n"
-           "    --list-tests  Print list of available tests.\n"
-           "    -f, --no-fork Do not spawn a process per test (abort on first "
-           "error).\n"
-           "    -l NAME       Run test by name, e.g. \"/Client/command\" or "
-           "\"/Client/*\". May be repeated.\n"
-           "    -s, --silent  Suppress all output.\n"
-           "    -F FILENAME   Write test results (JSON) to FILENAME.\n"
-           "    -d            Print debug output (useful if a test hangs).\n"
-           "    -t, --trace   Enable mongoc tracing (useful to debug tests).\n"
-           "    --skip NAME   Skip test by name or pattern. May be repeated.\n"
-           "\n",
-           suite->prgname);
+   printf (
+      "usage: %s [OPTIONS]\n"
+      "\n"
+      "Options:\n"
+      "    -h, --help       Show this help menu.\n"
+      "    --list-tests     Print list of available tests.\n"
+      "    -f, --no-fork    Do not spawn a process per test (abort on first "
+      "error).\n"
+      "    -l PATTERN       Run test by name, e.g. \"/Client/command\" or "
+      "\"/Client/*\". May be repeated.\n"
+      "    -s, --silent     Suppress all output.\n"
+      "    -F FILENAME      Write test results (JSON) to FILENAME.\n"
+      "    -d               Print debug output (useful if a test hangs).\n"
+      "    -t, --trace      Enable mongoc tracing (useful to debug tests).\n"
+      "    --skip PATTERN   Skip test by name or pattern. May be repeated.\n"
+      "    --after NAME     Start running tests after this test name.\n"
+      "\n",
+      suite->prgname);
 }
 
 
@@ -927,6 +934,7 @@ TestSuite_RunAll (TestSuite *suite /* IN */)
    Test *test;
    int count = 0;
    int status = 0;
+   int num_to_skip = 0;
 
    ASSERT (suite);
 
@@ -934,11 +942,22 @@ TestSuite_RunAll (TestSuite *suite /* IN */)
    for (test = suite->tests; test; test = test->next) {
       if (test_matches (suite, test)) {
          count++;
-      } else {
+      }
+      if (suite->after && 0 == strcmp (test->name, suite->after)) {
+         num_to_skip = count - 1;
       }
    }
 
+   if (suite->after && num_to_skip == 0) {
+      test_error ("Error: specified --after \"%s\", but no tests matched", suite->after);
+   }
+
    for (test = suite->tests; test; test = test->next) {
+      if (num_to_skip > 0) {
+         num_to_skip--;
+         count--;
+         continue;
+      }
       if (test_matches (suite, test)) {
          status += TestSuite_RunTest (suite, test, &count);
          count--;
@@ -1040,6 +1059,7 @@ TestSuite_Destroy (TestSuite *suite)
       bson_free (val);
    }
    _mongoc_array_destroy (&suite->match_patterns);
+   free (suite->after);
 }
 
 

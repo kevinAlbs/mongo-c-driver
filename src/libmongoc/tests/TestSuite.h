@@ -669,6 +669,7 @@ struct _TestSuite {
    int silent;
    bson_string_t *mock_server_log_buf;
    FILE *mock_server_log;
+   char *after;
 };
 
 
