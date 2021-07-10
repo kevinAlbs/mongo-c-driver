@@ -2461,6 +2461,9 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
       scanner_node->has_auth = true;
    }
 
+   // LBTODO: swap the following:
+   // return mongoc_server_stream_new (
+   //    &topology->description, mongoc_server_description_new_copy (scanner_node->sd), scanner_node->stream);
    return mongoc_server_stream_new (
       &topology->description, sd, scanner_node->stream);
 }

@@ -528,6 +528,7 @@ mongoc_topology_scanner_node_disconnect (mongoc_topology_scanner_node_t *node,
       node->stream = NULL;
       // LBTODO-DONE: destroy the scanner node's server description.
       mongoc_server_description_destroy (node->sd);
+      node->sd = NULL;
       memset (
          &node->sasl_supported_mechs, 0, sizeof (node->sasl_supported_mechs));
       node->negotiated_sasl_supported_mechs = false;
