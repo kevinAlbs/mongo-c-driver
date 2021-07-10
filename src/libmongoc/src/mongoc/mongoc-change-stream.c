@@ -250,7 +250,6 @@ _make_cursor (mongoc_change_stream_t *stream)
    if (0 == server_id) {
       goto cleanup;
    }
-   server_id = mongoc_server_description_id (sd);
    bson_append_int32 (&command_opts, "serverId", 8, server_id);
    bson_append_int32 (&getmore_opts, "serverId", 8, server_id);
    sd = mongoc_cluster_server_description_for_server (

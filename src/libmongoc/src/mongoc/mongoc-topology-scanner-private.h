@@ -78,6 +78,9 @@ typedef struct mongoc_topology_scanner_node {
    bool negotiated_sasl_supported_mechs;
    bson_t speculative_auth_response;
    mongoc_scram_t scram;
+
+   // LBTODO: this should also have a server description that is tied to the lifetime of stream.
+   // This is only updated after the initial handshake.
 } mongoc_topology_scanner_node_t;
 
 typedef struct mongoc_topology_scanner {

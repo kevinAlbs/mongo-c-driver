@@ -3579,10 +3579,12 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
 }
 
 mongoc_server_description_t *
+// LBTODO: rename this to mongoc_cluster_get_handshake_description.
 mongoc_cluster_server_description_for_server (mongoc_cluster_t *cluster,
                                               uint32_t server_id,
                                               bson_error_t *error)
 {
+   // LBTODO: fetch a stream (allow reconnecting). */
    if (cluster->client->topology->single_threaded) {
       /* TODO: this is still wrong. */
       return mongoc_topology_server_by_id (
