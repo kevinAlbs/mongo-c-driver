@@ -2493,6 +2493,12 @@ prose_test_17 (void)
    request = mock_server_receives_msg (
       server,
       MONGOC_QUERY_NONE,
+      tmp_bson ("{ 'killCursors': 'coll', 'cursors': [{ '$numberLong': '123'}]}"));
+   mock_server_replies_ok_and_destroys (request);
+
+   request = mock_server_receives_msg (
+      server,
+      MONGOC_QUERY_NONE,
       tmp_bson ("{ 'aggregate': 'coll', 'pipeline': [ { "
                 "'$changeStream': { 'startAfter': {'x': 1}, 'resumeAfter': { "
                 "'$exists': false }, 'startAtOperationTime': { '$exists': "
@@ -2569,6 +2575,12 @@ prose_test_18 (void)
       "['ResumableChangeStreamError'], 'ok': 0 }");
 
    request_destroy (request);
+
+   request = mock_server_receives_msg (
+      server,
+      MONGOC_QUERY_NONE,
+      tmp_bson ("{ 'killCursors': 'coll', 'cursors': [{ '$numberLong': '123'}]}"));
+   mock_server_replies_ok_and_destroys (request);
 
    request = mock_server_receives_msg (
       server,

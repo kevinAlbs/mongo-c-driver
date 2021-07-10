@@ -2141,6 +2141,9 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
 
    /* Transfer ownership of the server description into the cluster node. */
    cluster_node->sd = sd;
+   cluster_node->sd->generation = generation;
+   // LBTODO: the generation also tracks the lifetime of the connection.
+   // Right now it is duplicated on the server description and the cluster node.
 
    bson_destroy (&speculative_auth_response);
    mongoc_set_add (cluster->nodes, server_id, cluster_node);
@@ -2355,6 +2358,7 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
                                     bson_error_t *error /* OUT */)
 {
    mongoc_topology_t *topology;
+   mongoc_server_description_t *monitor_sd;
    mongoc_server_description_t *sd;
    mongoc_topology_scanner_node_t *scanner_node;
    char *address;
@@ -2453,6 +2457,15 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
 
       scanner_node->has_auth = true;
    }
+
+   /* Always copy the latest generation from the shared server description. */
+   monitor_sd = mongoc_topology_server_by_id (topology, server_id, error);
+   if (!monitor_sd) {
+      mongoc_server_description_destroy (sd);
+      return NULL;
+   }
+   sd->generation = monitor_sd->generation;
+   mongoc_server_description_destroy (monitor_sd);
 
    // LBTODO-DONE: swap the following:
    return mongoc_server_stream_new (
