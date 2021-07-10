@@ -88,8 +88,8 @@ _bson_error_message_printf (bson_error_t *error, const char *format, ...)
 
 static void
 _handle_not_primary_error (mongoc_cluster_t *cluster,
-                          const mongoc_server_stream_t *server_stream,
-                          const bson_t *reply)
+                           const mongoc_server_stream_t *server_stream,
+                           const bson_t *reply)
 {
    uint32_t server_id;
 
@@ -1064,8 +1064,11 @@ _mongoc_cluster_auth_node_cr (mongoc_cluster_t *cluster,
     */
    bson_init (&command);
    bson_append_int32 (&command, "getnonce", 8, 1);
-   mongoc_cmd_parts_init (
-      &parts, cluster->client, auth_source, MONGOC_QUERY_SECONDARY_OK, &command);
+   mongoc_cmd_parts_init (&parts,
+                          cluster->client,
+                          auth_source,
+                          MONGOC_QUERY_SECONDARY_OK,
+                          &command);
    parts.prohibit_lsid = true;
    server_stream = _mongoc_cluster_create_server_stream (
       cluster->client->topology, sd->id, stream, error);
@@ -1111,8 +1114,11 @@ _mongoc_cluster_auth_node_cr (mongoc_cluster_t *cluster,
     * Execute the authenticate command. mongoc_cluster_run_command_private
     * checks for {ok: 1} in the response.
     */
-   mongoc_cmd_parts_init (
-      &parts, cluster->client, auth_source, MONGOC_QUERY_SECONDARY_OK, &command);
+   mongoc_cmd_parts_init (&parts,
+                          cluster->client,
+                          auth_source,
+                          MONGOC_QUERY_SECONDARY_OK,
+                          &command);
    parts.prohibit_lsid = true;
    ret = mongoc_cluster_run_command_parts (
       cluster, server_stream, &parts, &reply, error);
@@ -1939,8 +1945,7 @@ _mongoc_cluster_node_destroy (mongoc_cluster_node_t *node)
    /* Failure, or Replica Set reconfigure without this node */
    mongoc_stream_failed (node->stream);
    bson_free (node->connection_address);
-
-   // LBTODO: destroy this cluster node
+   mongoc_server_description_destroy (node->sd);
 
    bson_free (node);
 }
@@ -2061,7 +2066,7 @@ _mongoc_cluster_finish_speculative_auth (mongoc_cluster_t *cluster,
  *
  *--------------------------------------------------------------------------
  */
-static mongoc_stream_t *
+static mongoc_cluster_node_t *
 _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
                           uint32_t generation,
                           uint32_t server_id,
@@ -2134,8 +2139,8 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
       }
    }
 
-   // LBTODO: copy this server description to the cluster node.
-   mongoc_server_description_destroy (sd);
+   /* Transfer ownership of the server description into the cluster node. */
+   cluster_node->sd = sd;
 
    bson_destroy (&speculative_auth_response);
    mongoc_set_add (cluster->nodes, server_id, cluster_node);
@@ -2145,7 +2150,7 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
    _mongoc_scram_destroy (&scram);
 #endif
 
-   RETURN (stream);
+   RETURN (cluster_node);
 
 error:
    bson_destroy (&speculative_auth_response);
@@ -2551,7 +2556,6 @@ mongoc_cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
                                     bson_error_t *error /* OUT */)
 {
    mongoc_topology_t *topology;
-   mongoc_stream_t *stream;
    mongoc_cluster_node_t *cluster_node;
    mongoc_server_description_t *sd;
    bool has_server_description = false;
@@ -2584,8 +2588,16 @@ mongoc_cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
           */
          mongoc_cluster_disconnect_node (cluster, server_id);
       } else {
-         return _mongoc_cluster_create_server_stream (
-            topology, server_id, cluster_node->stream, error);
+         mongoc_server_stream_t *stream;
+         // LBTODO-DONE: return a new server stream from the server description
+         // on the cluster node.
+         bson_mutex_lock (&topology->mutex);
+         stream = mongoc_server_stream_new (
+            &topology->description,
+            mongoc_server_description_new_copy (cluster_node->sd),
+            cluster_node->stream);
+         bson_mutex_unlock (&topology->mutex);
+         return stream;
       }
    }
 
@@ -2595,10 +2607,19 @@ mongoc_cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
       return NULL;
    }
 
-   stream = _mongoc_cluster_add_node (cluster, generation, server_id, error);
-   if (stream) {
-      return _mongoc_cluster_create_server_stream (
-         topology, server_id, stream, error);
+   cluster_node =
+      _mongoc_cluster_add_node (cluster, generation, server_id, error);
+   if (cluster_node) {
+      mongoc_server_stream_t *stream;
+      // LBTODO-DONE: return a new server stream from the server description on
+      // the cluster node.
+      bson_mutex_lock (&topology->mutex);
+      stream = mongoc_server_stream_new (
+         &topology->description,
+         mongoc_server_description_new_copy (cluster_node->sd),
+         cluster_node->stream);
+      bson_mutex_unlock (&topology->mutex);
+      return stream;
    } else {
       return NULL;
    }
@@ -3555,4 +3576,35 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
    bson_free (output);
 
    return ok;
+}
+
+mongoc_server_description_t *
+mongoc_cluster_server_description_for_server (mongoc_cluster_t *cluster,
+                                              uint32_t server_id,
+                                              bson_error_t *error)
+{
+   if (cluster->client->topology->single_threaded) {
+      /* TODO: this is still wrong. */
+      return mongoc_topology_server_by_id (
+         cluster->client->topology, server_id, error);
+   } else {
+      mongoc_server_stream_t *stream;
+      mongoc_server_description_t *sd;
+
+      stream = mongoc_cluster_fetch_stream_pooled (
+         cluster, server_id, true /* reconnect OK */, error);
+      if (!stream) {
+         bson_set_error (error,
+                         MONGOC_ERROR_STREAM,
+                         MONGOC_ERROR_STREAM_NOT_ESTABLISHED,
+                         "server for id %" PRIu32
+                         " does not have an established connection",
+                         server_id);
+         return NULL;
+      }
+
+      sd = mongoc_server_description_new_copy (stream->sd);
+      mongoc_server_stream_cleanup (stream);
+      return sd;
+   }
 }

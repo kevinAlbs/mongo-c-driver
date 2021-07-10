@@ -1041,22 +1041,30 @@ mongoc_client_session_start_transaction (mongoc_client_session_t *session,
                                          const mongoc_transaction_opt_t *opts,
                                          bson_error_t *error)
 {
-   mongoc_server_description_t *sd;
+   uint32_t server_id;
+   mongoc_server_description_t *sd = NULL;
    bool ret;
 
    ENTRY;
    BSON_ASSERT (session);
 
    ret = true;
-   // LBTODO: this has the same problem.
+   // LBTODO-DONE: this has the same problem.
    // At the very least, this can check out a connection, and check it back in.
    // There is only one connection to the server so that is OK.
-   sd = mongoc_client_select_server (
-      session->client, true /* primary */, NULL, error);
+   server_id = mongoc_topology_select_server_id (
+      session->client->topology, MONGOC_SS_WRITE, NULL, error);
+   if (0 == server_id) {
+      ret = false;
+      GOTO (done);
+   }
+   sd = mongoc_cluster_server_description_for_server (
+      &session->client->cluster, server_id, error);
    if (!sd) {
       ret = false;
       GOTO (done);
    }
+
 
    if (sd->max_wire_version < 7 ||
        (sd->max_wire_version < 8 && sd->type == MONGOC_SERVER_MONGOS)) {

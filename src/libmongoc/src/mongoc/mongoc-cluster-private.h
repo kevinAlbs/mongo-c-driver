@@ -45,7 +45,8 @@ typedef struct _mongoc_cluster_node_t {
    mongoc_stream_t *stream;
    char *connection_address;
    uint32_t generation;
-
+   /* sd is a server description created from the handshake on the stream. */
+   mongoc_server_description_t *sd;
    /* TODO CDRIVER-3653, these fields are unused. */
    int32_t max_wire_version;
    int32_t min_wire_version;
@@ -193,6 +194,20 @@ _mongoc_cluster_get_auth_cmd_scram (mongoc_crypto_hash_algorithm_t algo,
                                     mongoc_scram_t *scram,
                                     bson_t *cmd /* OUT */,
                                     bson_error_t *error /* OUT */);
+
+/* The returned server description is only guaranteed to be valid up to the
+first network operation using this cluster to this server. A network operation,
+e.g. calling mongoc_cluster_run_command_monitored, can invalidate the server
+description on disconnect.
+
+Successful post-conditions:
+- A connection is established to the server identified by server_id.
+*/
+mongoc_server_description_t *
+mongoc_cluster_server_description_for_server (mongoc_cluster_t *cluster,
+                                              uint32_t server_id,
+                                              bson_error_t *error);
+
 #endif /* MONGOC_ENABLE_CRYPTO */
 
 BSON_END_DECLS

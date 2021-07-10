@@ -1174,7 +1174,8 @@ _mongoc_client_new_from_uri (mongoc_topology_t *topology)
       BSON_ASSERT (mongoc_client_set_appname (client, appname));
    }
 
-   client->timeout_ms = mongoc_uri_get_option_as_int64 (client->uri, MONGOC_URI_TIMEOUTMS, MONGOC_TIMEOUTMS_UNSET);
+   client->timeout_ms = mongoc_uri_get_option_as_int64 (
+      client->uri, MONGOC_URI_TIMEOUTMS, MONGOC_TIMEOUTMS_UNSET);
 
    mongoc_cluster_init (&client->cluster, client->uri, client);
 
@@ -3126,10 +3127,11 @@ mongoc_client_set_server_api (mongoc_client_t *client,
    BSON_ASSERT_PARAM (api);
 
    if (client->is_pooled) {
-      bson_set_error (error,
-                      MONGOC_ERROR_CLIENT,
-                      MONGOC_ERROR_CLIENT_API_FROM_POOL,
-                      "Cannot set server api on a client checked out from a pool");
+      bson_set_error (
+         error,
+         MONGOC_ERROR_CLIENT,
+         MONGOC_ERROR_CLIENT_API_FROM_POOL,
+         "Cannot set server api on a client checked out from a pool");
       return false;
    }
 
@@ -3146,4 +3148,13 @@ mongoc_client_set_server_api (mongoc_client_t *client,
    _mongoc_topology_scanner_set_server_api (client->topology->scanner, api);
    bson_mutex_unlock (&client->topology->mutex);
    return true;
+}
+
+mongoc_server_description_t *
+mongoc_client_get_stream_metadata (mongoc_client_t *client,
+                                   uint32_t server_id,
+                                   bson_error_t *error)
+{
+   /* TODO */
+   return NULL;
 }

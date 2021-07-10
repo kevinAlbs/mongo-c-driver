@@ -137,8 +137,8 @@ TestSuite_Init (TestSuite *suite, const char *name, int argc, char **argv)
    suite->flags = 0;
    suite->prgname = bson_strdup (argv[0]);
    suite->silent = false;
-   _mongoc_array_init (&suite->match_patterns, sizeof (char*));
-   _mongoc_array_init (&suite->skip_patterns, sizeof (char*));
+   _mongoc_array_init (&suite->match_patterns, sizeof (char *));
+   _mongoc_array_init (&suite->skip_patterns, sizeof (char *));
 
    for (i = 1; i < argc; i++) {
       if (0 == strcmp ("-d", argv[i])) {
@@ -186,7 +186,7 @@ TestSuite_Init (TestSuite *suite, const char *name, int argc, char **argv)
          val = bson_strdup (argv[++i]);
          _mongoc_array_append_val (&suite->match_patterns, val);
       } else if (0 == strcmp ("--skip", argv[i])) {
-         char* val;
+         char *val;
          if (argc - 1 == i) {
             test_error ("--skip requires an argument.");
          }
@@ -888,17 +888,21 @@ TestSuite_TestMatchesName (const TestSuite *suite,
 }
 
 
-bool test_matches (TestSuite *suite, Test *test) {
+bool
+test_matches (TestSuite *suite, Test *test)
+{
    int i;
    bool matches;
 
-   /* If no match patterns were provided, then assume all match unless they are skipped. */
+   /* If no match patterns were provided, then assume all match unless they are
+    * skipped. */
    if (suite->match_patterns.len == 0) {
       matches = true;
    } else {
       matches = false;
       for (i = 0; i < suite->match_patterns.len; i++) {
-         char *pattern = _mongoc_array_index (&suite->match_patterns, char *, i);
+         char *pattern =
+            _mongoc_array_index (&suite->match_patterns, char *, i);
          if (TestSuite_TestMatchesName (suite, test, pattern)) {
             matches = true;
             break;
@@ -1027,13 +1031,15 @@ TestSuite_Destroy (TestSuite *suite)
    free (suite->name);
    free (suite->prgname);
    for (i = 0; i < suite->skip_patterns.len; i++) {
-      char* val = _mongoc_array_index (&suite->skip_patterns, char *, i);
+      char *val = _mongoc_array_index (&suite->skip_patterns, char *, i);
       bson_free (val);
    }
+   _mongoc_array_destroy (&suite->skip_patterns);
    for (i = 0; i < suite->match_patterns.len; i++) {
-      char* val = _mongoc_array_index (&suite->match_patterns, char *, i);
+      char *val = _mongoc_array_index (&suite->match_patterns, char *, i);
       bson_free (val);
    }
+   _mongoc_array_destroy (&suite->match_patterns);
 }
 
 

@@ -235,24 +235,31 @@ _make_cursor (mongoc_change_stream_t *stream)
    bson_t reply;
    bson_t getmore_opts = BSON_INITIALIZER;
    bson_iter_t iter;
-   mongoc_server_description_t *sd;
+   mongoc_server_description_t *sd = NULL;
    uint32_t server_id;
 
    BSON_ASSERT (stream);
    BSON_ASSERT (!stream->cursor);
    bson_init (&command);
    bson_copy_to (&(stream->opts.extra), &command_opts);
-   // LBTODO: use the server stream's server description
-   sd = mongoc_client_select_server (
-      stream->client, false /* for_writes */, stream->read_prefs, &stream->err);
-   if (!sd) {
+   // LBTODO-DONE: use the server stream's server description
+   server_id = mongoc_topology_select_server_id (stream->client->topology,
+                                                 MONGOC_SS_READ,
+                                                 stream->read_prefs,
+                                                 &stream->err);
+   if (0 == server_id) {
       goto cleanup;
    }
    server_id = mongoc_server_description_id (sd);
    bson_append_int32 (&command_opts, "serverId", 8, server_id);
    bson_append_int32 (&getmore_opts, "serverId", 8, server_id);
+   sd = mongoc_cluster_server_description_for_server (
+      &stream->client->cluster, server_id, &stream->err);
+   if (!sd) {
+      goto cleanup;
+   }
    stream->max_wire_version = sd->max_wire_version;
-   mongoc_server_description_destroy (sd);
+
 
    if (bson_iter_init_find (&iter, &command_opts, "sessionId")) {
       if (!_mongoc_client_session_from_iter (
@@ -370,6 +377,7 @@ cleanup:
    bson_destroy (&command);
    bson_destroy (&command_opts);
    bson_destroy (&getmore_opts);
+   mongoc_server_description_destroy (sd);
    return stream->err.code == 0;
 }
 
