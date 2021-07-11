@@ -110,7 +110,7 @@ case "$OS" in
          . $DIR/valgrind.sh
          run_valgrind ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS -d
       else
-         ./src/libmongoc/test-libmongoc --no-fork -l "/change_stream/pipeline" -d
+         ./src/libmongoc/test-libmongoc --no-fork $TEST_ARGS -d
       fi
 
       ;;

@@ -195,6 +195,8 @@ _mongoc_cluster_get_auth_cmd_scram (mongoc_crypto_hash_algorithm_t algo,
                                     bson_t *cmd /* OUT */,
                                     bson_error_t *error /* OUT */);
 
+#endif /* MONGOC_ENABLE_CRYPTO */
+
 /* The returned server description is only guaranteed to be valid up to the
 first network operation using this cluster to this server. A network operation,
 e.g. calling mongoc_cluster_run_command_monitored, can invalidate the server
@@ -207,8 +209,6 @@ mongoc_server_description_t *
 mongoc_cluster_server_description_for_server (mongoc_cluster_t *cluster,
                                               uint32_t server_id,
                                               bson_error_t *error);
-
-#endif /* MONGOC_ENABLE_CRYPTO */
 
 BSON_END_DECLS
 

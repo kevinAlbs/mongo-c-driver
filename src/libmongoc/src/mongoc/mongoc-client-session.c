@@ -16,6 +16,7 @@
 
 
 #include "mongoc-client-session-private.h"
+#include "mongoc-cluster-private.h"
 #include "mongoc-trace-private.h"
 #include "mongoc-client-private.h"
 #include "mongoc-rand-private.h"
