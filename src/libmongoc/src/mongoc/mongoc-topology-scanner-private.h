@@ -78,6 +78,9 @@ typedef struct mongoc_topology_scanner_node {
    bool negotiated_sasl_supported_mechs;
    bson_t speculative_auth_response;
    mongoc_scram_t scram;
+
+   // LBTODO: store the hello response from the handshake.
+   bson_t *handshake_hello_response;
 } mongoc_topology_scanner_node_t;
 
 typedef struct mongoc_topology_scanner {

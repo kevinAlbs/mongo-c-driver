@@ -45,7 +45,8 @@ typedef struct _mongoc_cluster_node_t {
    mongoc_stream_t *stream;
    char *connection_address;
    uint32_t generation;
-
+   /* LBTODO: store a hello_response from the handshake. */
+   bson_t *handshake_hello_response;
    /* TODO CDRIVER-3653, these fields are unused. */
    int32_t max_wire_version;
    int32_t min_wire_version;

@@ -531,6 +531,9 @@ mongoc_topology_scanner_node_disconnect (mongoc_topology_scanner_node_t *node,
       node->negotiated_sasl_supported_mechs = false;
       bson_reinit (&node->speculative_auth_response);
    }
+   bson_destroy (node->handshake_hello_response);
+   node->handshake_hello_response = NULL;
+   MONGOC_DEBUG ("destroying handshake_hello_response");
 }
 
 void
@@ -643,6 +646,12 @@ _async_success (mongoc_async_cmd_t *acmd,
    BSON_ASSERT (!node->stream);
    node->stream = stream;
 
+   /* LBTODO-DONE: construct and store a server description. */
+   if (NULL == node->handshake_hello_response) {
+      MONGOC_DEBUG ("storing handshake_hello_response");
+      node->handshake_hello_response = bson_copy (hello_response);
+   }
+
    if (ts->negotiate_sasl_supported_mechs &&
        !node->negotiated_sasl_supported_mechs) {
       _mongoc_handshake_parse_sasl_supported_mechs (
@@ -716,6 +725,11 @@ _async_error_or_timeout (mongoc_async_cmd_t *acmd,
       /* call the topology scanner callback. cannot connect to this node.
        * callback takes rtt_msec, not usec. */
       ts->cb (node->id, NULL, duration_usec / 1000, ts->cb_data, error);
+
+      /* LBTODO: clear a server description, if one exists. */
+      MONGOC_DEBUG ("destroying handshake_hello_response since no streams succeeded to connect");
+      bson_destroy (node->handshake_hello_response);
+      node->handshake_hello_response = NULL;
    } else {
       /* there are still more commands left for this node or it succeeded
        * with another stream. skip the topology scanner callback. */

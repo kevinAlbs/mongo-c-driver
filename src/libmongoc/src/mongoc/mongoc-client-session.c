@@ -1048,7 +1048,7 @@ mongoc_client_session_start_transaction (mongoc_client_session_t *session,
    BSON_ASSERT (session);
 
    ret = true;
-   // LBTODO: this has the same problem.
+   // LBTODO: check out a stream instead.
    // At the very least, this can check out a connection, and check it back in.
    // There is only one connection to the server so that is OK.
    sd = mongoc_client_select_server (
