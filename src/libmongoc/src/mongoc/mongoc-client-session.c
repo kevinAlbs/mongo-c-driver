@@ -1043,32 +1043,22 @@ mongoc_client_session_start_transaction (mongoc_client_session_t *session,
                                          bson_error_t *error)
 {
    uint32_t server_id;
-   mongoc_server_description_t *sd = NULL;
+   mongoc_server_stream_t *server_stream = NULL;
    bool ret;
 
    ENTRY;
    BSON_ASSERT (session);
 
    ret = true;
-   // LBTODO-DONE: this has the same problem.
-   // At the very least, this can check out a connection, and check it back in.
-   // There is only one connection to the server so that is OK.
-   server_id = mongoc_topology_select_server_id (
-      session->client->topology, MONGOC_SS_WRITE, NULL, error);
-   if (0 == server_id) {
-      ret = false;
-      GOTO (done);
-   }
-   sd = mongoc_cluster_server_description_for_server (
-      &session->client->cluster, server_id, error);
-   if (!sd) {
+   server_stream = mongoc_cluster_stream_for_writes (&session->client->cluster, session, NULL /* reply */, &error);
+   if (!server_stream) {
       ret = false;
       GOTO (done);
    }
 
 
-   if (sd->max_wire_version < 7 ||
-       (sd->max_wire_version < 8 && sd->type == MONGOC_SERVER_MONGOS)) {
+   if (server_stream->sd->max_wire_version < 7 ||
+       (server_stream->sd->max_wire_version < 8 && server_stream->sd->type == MONGOC_SERVER_MONGOS)) {
       bson_set_error (error,
                       MONGOC_ERROR_TRANSACTION,
                       MONGOC_ERROR_TRANSACTION_INVALID_STATE,
@@ -1138,7 +1128,7 @@ mongoc_client_session_start_transaction (mongoc_client_session_t *session,
    session->recovery_token = NULL;
 
 done:
-   mongoc_server_description_destroy (sd);
+   mongoc_server_stream_cleanup (server_stream);
    return ret;
 }
 

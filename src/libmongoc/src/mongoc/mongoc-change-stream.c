@@ -236,29 +236,12 @@ _make_cursor (mongoc_change_stream_t *stream)
    bson_t reply;
    bson_t getmore_opts = BSON_INITIALIZER;
    bson_iter_t iter;
-   mongoc_server_description_t *sd = NULL;
-   uint32_t server_id;
+   mongoc_server_stream_t *server_stream;
 
    BSON_ASSERT (stream);
    BSON_ASSERT (!stream->cursor);
    bson_init (&command);
    bson_copy_to (&(stream->opts.extra), &command_opts);
-   // LBTODO-DONE: use the server stream's server description
-   server_id = mongoc_topology_select_server_id (stream->client->topology,
-                                                 MONGOC_SS_READ,
-                                                 stream->read_prefs,
-                                                 &stream->err);
-   if (0 == server_id) {
-      goto cleanup;
-   }
-   bson_append_int32 (&command_opts, "serverId", 8, server_id);
-   bson_append_int32 (&getmore_opts, "serverId", 8, server_id);
-   sd = mongoc_cluster_server_description_for_server (
-      &stream->client->cluster, server_id, &stream->err);
-   if (!sd) {
-      goto cleanup;
-   }
-   stream->max_wire_version = sd->max_wire_version;
 
 
    if (bson_iter_init_find (&iter, &command_opts, "sessionId")) {
@@ -296,6 +279,18 @@ _make_cursor (mongoc_change_stream_t *stream)
    if (cs && !mongoc_client_session_append (cs, &getmore_opts, &stream->err)) {
       goto cleanup;
    }
+
+   server_stream = mongoc_cluster_stream_for_reads (&stream->client->cluster, NULL, cs, &reply, &stream->err);
+   if (!server_stream) {
+      bson_destroy (&stream->err_doc);
+      bson_copy_to (&reply, &stream->err_doc);
+      bson_destroy (&reply);
+      goto cleanup;
+   }
+   bson_append_int32 (&command_opts, "serverId", 8, server_stream->sd->id);
+   bson_append_int32 (&getmore_opts, "serverId", 8, server_stream->sd->id);
+   stream->max_wire_version = server_stream->sd->max_wire_version;
+   mongoc_server_stream_cleanup (server_stream);
 
    if (stream->read_concern && !bson_has_field (&command_opts, "readConcern")) {
       mongoc_read_concern_append (stream->read_concern, &command_opts);
@@ -377,7 +372,6 @@ cleanup:
    bson_destroy (&command);
    bson_destroy (&command_opts);
    bson_destroy (&getmore_opts);
-   mongoc_server_description_destroy (sd);
    return stream->err.code == 0;
 }
 

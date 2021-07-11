@@ -2312,8 +2312,7 @@ _mongoc_client_kill_cursor (mongoc_client_t *client,
       return;
    }
 
-   // LBTODO: as a consequence of these changes, we will send kill cursors on an open cursor if the server is marked Unknown.
-   // This actually seems like the preferred behavior.
+   // LBTODO: as a consequence of these changes, we will send kill cursors on an open cursor if the server is later marked Unknown. This actually seems like the preferred behavior.
    if (db && collection &&
        server_stream->sd->max_wire_version >= WIRE_VERSION_KILLCURSORS_CMD) {
       _mongoc_client_killcursors_command (

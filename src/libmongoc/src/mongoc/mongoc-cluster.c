@@ -2141,9 +2141,10 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
 
    /* Transfer ownership of the server description into the cluster node. */
    cluster_node->sd = sd;
+   /* Copy the generation from the cluster node.
+    * TODO (CDRIVER-????) do not store the generation counter on the server description.
+    */
    cluster_node->sd->generation = generation;
-   // LBTODO: the generation also tracks the lifetime of the connection.
-   // Right now it is duplicated on the server description and the cluster node.
 
    bson_destroy (&speculative_auth_response);
    mongoc_set_add (cluster->nodes, server_id, cluster_node);
@@ -3583,28 +3584,4 @@ mongoc_cluster_run_opmsg (mongoc_cluster_t *cluster,
    bson_free (output);
 
    return ok;
-}
-
-// LBTODO: rename this to mongoc_cluster_get_handshake_description.
-mongoc_server_description_t *
-mongoc_cluster_server_description_for_server (mongoc_cluster_t *cluster,
-                                              uint32_t server_id,
-                                              bson_error_t *error)
-{
-   // LBTODO: fetch a stream (allow reconnecting). */
-   mongoc_server_stream_t *stream;
-   mongoc_server_description_t *sd;
-      
-   stream = mongoc_cluster_stream_for_server (cluster, server_id, true /* reconnect ok */, NULL /* client session */, NULL /* reply */, error);
-
-   if (!stream) {
-      return NULL;
-   }
-
-   MONGOC_DEBUG ("fetched a server stream");
-   MONGOC_DEBUG ("server stream details: minWireVersion=%d, maxWireVersion=%d", stream->sd->min_wire_version, stream->sd->max_wire_version);
-
-   sd = mongoc_server_description_new_copy (stream->sd);
-   mongoc_server_stream_cleanup (stream);
-   return sd;
 }
