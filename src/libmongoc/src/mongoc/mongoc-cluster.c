@@ -3598,14 +3598,11 @@ mongoc_cluster_server_description_for_server (mongoc_cluster_t *cluster,
    stream = mongoc_cluster_stream_for_server (cluster, server_id, true /* reconnect ok */, NULL /* client session */, NULL /* reply */, error);
 
    if (!stream) {
-      bson_set_error (error,
-                        MONGOC_ERROR_STREAM,
-                        MONGOC_ERROR_STREAM_NOT_ESTABLISHED,
-                        "server for id %" PRIu32
-                        " does not have an established connection",
-                        server_id);
       return NULL;
    }
+
+   MONGOC_DEBUG ("fetched a server stream");
+   MONGOC_DEBUG ("server stream details: minWireVersion=%d, maxWireVersion=%d", stream->sd->min_wire_version, stream->sd->max_wire_version);
 
    sd = mongoc_server_description_new_copy (stream->sd);
    mongoc_server_stream_cleanup (stream);

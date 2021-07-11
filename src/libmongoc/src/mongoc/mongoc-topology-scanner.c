@@ -655,6 +655,7 @@ _async_success (mongoc_async_cmd_t *acmd,
       mongoc_server_description_handle_hello (&sd, hello_response, duration_usec / 1000, &acmd->error);
       node->sd = mongoc_server_description_new_copy (&sd);
       node->sd->generation = 0;
+      mongoc_server_description_cleanup (&sd);
    }
 
    if (ts->negotiate_sasl_supported_mechs &&
