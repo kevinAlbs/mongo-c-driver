@@ -526,14 +526,15 @@ mongoc_topology_scanner_node_disconnect (mongoc_topology_scanner_node_t *node,
       }
 
       node->stream = NULL;
-      // LBTODO-DONE: destroy the scanner node's server description.
-      mongoc_server_description_destroy (node->sd);
-      node->sd = NULL;
       memset (
          &node->sasl_supported_mechs, 0, sizeof (node->sasl_supported_mechs));
       node->negotiated_sasl_supported_mechs = false;
       bson_reinit (&node->speculative_auth_response);
    }
+   MONGOC_DEBUG ("topology scanner is destroying and NULL-ing server description");
+   // LBTODO-DONE: destroy the scanner node's server description.
+   mongoc_server_description_destroy (node->sd);
+   node->sd = NULL;
 }
 
 void
@@ -653,6 +654,7 @@ _async_success (mongoc_async_cmd_t *acmd,
       /* Store a server description associated with the handshake. */
       mongoc_server_description_init (&sd, node->host.host_and_port, node->id);
       mongoc_server_description_handle_hello (&sd, hello_response, duration_usec / 1000, &acmd->error);
+      MONGOC_DEBUG ("topology scanner is copying a new server description");
       node->sd = mongoc_server_description_new_copy (&sd);
       node->sd->generation = 0;
       mongoc_server_description_cleanup (&sd);
@@ -733,6 +735,7 @@ _async_error_or_timeout (mongoc_async_cmd_t *acmd,
       ts->cb (node->id, NULL, duration_usec / 1000, ts->cb_data, error);
 
       /* LBTODO: clear a server description, if one exists. */
+      MONGOC_DEBUG ("topology scanner errored, and is destroying and NULL-ing server description");
       mongoc_server_description_destroy (node->sd);
       node->sd = NULL;
    } else {
