@@ -2520,6 +2520,7 @@ mongoc_server_stream_t *
 _mongoc_cluster_create_server_stream (mongoc_topology_t *topology,
                                       uint32_t server_id,
                                       mongoc_stream_t *stream,
+                                      const bson_t *handshake_hello_response,
                                       bson_error_t *error /* OUT */)
 {
    mongoc_server_description_t *sd;
@@ -2535,7 +2536,7 @@ _mongoc_cluster_create_server_stream (mongoc_topology_t *topology,
 
    if (sd) {
       server_stream =
-         mongoc_server_stream_new (&topology->description, sd, stream);
+         mongoc_server_stream_new (&topology->description, sd, handshake_hello_response, stream);
    }
 
    bson_mutex_unlock (&topology->mutex);
@@ -2585,7 +2586,7 @@ mongoc_cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
          mongoc_cluster_disconnect_node (cluster, server_id);
       } else {
          return _mongoc_cluster_create_server_stream (
-            topology, server_id, cluster_node->stream, error);
+            topology, server_id, cluster_node->stream, cluster_node->handshake_hello_response, error);
       }
    }
 
@@ -2598,7 +2599,7 @@ mongoc_cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
    stream = _mongoc_cluster_add_node (cluster, generation, server_id, error);
    if (stream) {
       return _mongoc_cluster_create_server_stream (
-         topology, server_id, stream, error);
+         topology, server_id, stream, cluster_node->handshake_hello_response, error);
    } else {
       return NULL;
    }

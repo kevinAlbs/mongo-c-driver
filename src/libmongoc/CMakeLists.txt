@@ -517,6 +517,7 @@ set (SOURCES ${SOURCES}
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-gridfs-file-page.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-gridfs-file-list.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-handshake.c
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-handshake-metadata.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-host-list.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-http.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-index.c
