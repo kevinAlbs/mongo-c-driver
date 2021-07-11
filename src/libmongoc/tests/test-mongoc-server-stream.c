@@ -214,55 +214,87 @@ test_server_stream_ties_server_description_single (void *unused)
    mongoc_client_destroy (client);
 }
 
-/* Test that a server stream is considered valid after reconnecting due to a pool clear. */
+/* Test that server streams are invalidated as expected. */
 static void
-test_server_stream_valid_after_reconnect_single (void *unused)
+test_cluster_stream_invalidation_single (void)
 {
    mongoc_client_t *client;
-   mongoc_uri_t *uri;
-   mock_server_t *server;
-   request_t *request;
-   future_t *future;
-   bson_error_t error;
    mongoc_server_description_t *sd;
+   bson_error_t error;
    mongoc_server_stream_t *stream;
+   
+   client = test_framework_new_default_client ();
+   /* Select a server to start monitoring. */
+   sd = mongoc_client_select_server (client, true /* for writes */, NULL /* read prefs */, &error);
+   ASSERT_OR_PRINT (sd, error);
 
-   server = mock_server_with_auto_hello (WIRE_VERSION_OP_MSG);
-   mock_server_run (server);
-   uri = mongoc_uri_copy (mock_server_get_uri (server));
-   client = mongoc_client_new_from_uri (uri);
+   /* Test "clearing the pool". This should invalidate existing server streams. */
+   stream = mongoc_cluster_stream_for_writes (&client->cluster, NULL /* session */, NULL /* reply */, &error);
+   ASSERT_OR_PRINT (stream, error);
+   BSON_ASSERT (mongoc_cluster_stream_valid (&client->cluster, stream));
+   _mongoc_topology_clear_connection_pool (client->topology, mongoc_server_description_id (sd));
+   BSON_ASSERT (!mongoc_cluster_stream_valid (&client->cluster, stream));
+   mongoc_server_stream_cleanup (stream);
 
-   /* Create a connection on client. */
-   future = future_client_command_simple (client,
-                                          "admin",
-                                          tmp_bson ("{'ping': 1}"),
-                                          NULL /* read prefs */,
-                                          NULL /* reply */,
-                                          &error);
-   /* Check that the mock server receives an OP_MSG. */
-   request = mock_server_receives_msg (server, 0, tmp_bson ("{'ping': 1}"));
-   ASSERT_CMPINT ((int) request->opcode, ==, (int) MONGOC_OPCODE_MSG);
-   mock_server_hangs_up (request);
-   request_destroy (request);
-   BSON_ASSERT (!future_get_bool (future));
-   future_destroy (future);
+   /* Test closing the connection. This should invalidate existing server streams. */
+   stream = mongoc_cluster_stream_for_writes (&client->cluster, NULL /* session */, NULL /* reply */, &error);
+   ASSERT_OR_PRINT (stream, error);
+   BSON_ASSERT (mongoc_cluster_stream_valid (&client->cluster, stream));
+   mongoc_cluster_disconnect_node (&client->cluster, sd->id);
+   BSON_ASSERT (!mongoc_cluster_stream_valid (&client->cluster, stream));
+   mongoc_server_stream_cleanup (stream);
 
-   /* Reconnect. */
-   sd =
-      mongoc_client_select_server (client, true, NULL /* read prefs */, &error);
-   ASSERT_CMPINT (sd->generation, ==, 1);
-   mongoc_server_description_destroy (sd);
-
-   /* Now, ensure that a server stream is still valid. */
-   stream = mongoc_cluster_stream_for_writes (
-      &client->cluster, NULL /* session */, NULL /* reply */, &error);
-   MONGOC_DEBUG ("streams generation is %d", stream->sd->generation);
+   /* Test that a new stream is considered valid. */
+   stream = mongoc_cluster_stream_for_writes (&client->cluster, NULL /* session */, NULL /* reply */, &error);
+   ASSERT_OR_PRINT (stream, error);
    BSON_ASSERT (mongoc_cluster_stream_valid (&client->cluster, stream));
    mongoc_server_stream_cleanup (stream);
 
-   mock_server_destroy (server);
-   mongoc_uri_destroy (uri);
+   mongoc_server_description_destroy (sd);
    mongoc_client_destroy (client);
+}
+
+/* Test that server streams are invalidated as expected. */
+static void
+test_cluster_stream_invalidation_pooled (void)
+{
+   mongoc_client_pool_t *pool;
+   mongoc_client_t *client;
+   mongoc_server_description_t *sd;
+   bson_error_t error;
+   mongoc_server_stream_t *stream;
+   
+   pool = test_framework_new_default_client_pool ();
+   client = mongoc_client_pool_pop (pool);
+   /* Select a server. */
+   sd = mongoc_client_select_server (client, true /* for writes */, NULL /* read prefs */, &error);
+   ASSERT_OR_PRINT (sd, error);
+
+   /* Test "clearing the pool". This should invalidate existing server streams. */
+   stream = mongoc_cluster_stream_for_writes (&client->cluster, NULL /* session */, NULL /* reply */, &error);
+   ASSERT_OR_PRINT (stream, error);
+   BSON_ASSERT (mongoc_cluster_stream_valid (&client->cluster, stream));
+   _mongoc_topology_clear_connection_pool (client->topology, mongoc_server_description_id (sd));
+   BSON_ASSERT (!mongoc_cluster_stream_valid (&client->cluster, stream));
+   mongoc_server_stream_cleanup (stream);
+
+   /* Test closing the connection. This should invalidate existing server streams. */
+   stream = mongoc_cluster_stream_for_writes (&client->cluster, NULL /* session */, NULL /* reply */, &error);
+   ASSERT_OR_PRINT (stream, error);
+   BSON_ASSERT (mongoc_cluster_stream_valid (&client->cluster, stream));
+   mongoc_cluster_disconnect_node (&client->cluster, sd->id);
+   BSON_ASSERT (!mongoc_cluster_stream_valid (&client->cluster, stream));
+   mongoc_server_stream_cleanup (stream);
+
+   /* Test that a new stream is considered valid. */
+   stream = mongoc_cluster_stream_for_writes (&client->cluster, NULL /* session */, NULL /* reply */, &error);
+   ASSERT_OR_PRINT (stream, error);
+   BSON_ASSERT (mongoc_cluster_stream_valid (&client->cluster, stream));
+   mongoc_server_stream_cleanup (stream);
+
+   mongoc_server_description_destroy (sd);
+   mongoc_client_pool_push (pool, client);
+   mongoc_client_pool_destroy (pool);
 }
 
 void
@@ -280,10 +312,11 @@ test_server_stream_install (TestSuite *suite)
                       NULL /* dtor */,
                       NULL /* ctx */,
                       NULL);
-   TestSuite_AddFull (suite,
-                      "/server_stream/valid_after_reconnect/single",
-                      test_server_stream_valid_after_reconnect_single,
-                      NULL /* dtor */,
-                      NULL /* ctx */,
-                      NULL);
+   /* TODO: move these tests. */
+   TestSuite_AddLive (suite,
+                      "/Cluster/stream_invalidation/single",
+                      test_cluster_stream_invalidation_single);
+   TestSuite_AddLive (suite,
+                      "/Cluster/stream_invalidation/pooled",
+                      test_cluster_stream_invalidation_pooled);
 }
