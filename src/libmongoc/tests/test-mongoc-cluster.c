@@ -1783,7 +1783,6 @@ _test_cmd_on_unknown_serverid (bool pooled)
                                                       &error);
    ASSERT_OR_PRINT (ret, error);
 
-   MONGOC_DEBUG ("invalidating server");
    /* Invalidate the server, giving it the server type MONGOC_SERVER_UNKNOWN */
    bson_set_error (
       &error, MONGOC_ERROR_STREAM, MONGOC_ERROR_STREAM_CONNECT, "invalidated");
@@ -1792,8 +1791,6 @@ _test_cmd_on_unknown_serverid (bool pooled)
 
    /* The next command is attempted directly on the unknown server and should
     * result in an error. */
-   /* Note - checking for a data bearing node for session support does server selection. */
-   MONGOC_DEBUG ("sending command");
    ret = mongoc_client_command_simple_with_server_id (client,
                                                       "admin",
                                                       tmp_bson ("{'ping': 1}"),
@@ -1801,7 +1798,6 @@ _test_cmd_on_unknown_serverid (bool pooled)
                                                       1,
                                                       NULL /* reply */,
                                                       &error);
-   MONGOC_DEBUG ("command sent");
    ASSERT_OR_PRINT (ret, error);
 
    if (pooled) {
@@ -1822,7 +1818,7 @@ test_cmd_on_unknown_serverid_pooled (void)
 void
 test_cmd_on_unknown_serverid_single (void)
 {
-   // LBTODO: _test_cmd_on_unknown_serverid (false /* pooled */);
+   _test_cmd_on_unknown_serverid (false /* pooled */);
 }
 
 

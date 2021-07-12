@@ -836,16 +836,6 @@ cmd_failed_cb (const mongoc_apm_command_failed_t *event)
    cmd_test_t *test;
    int64_t duration;
 
-   if (!strcmp (mongoc_apm_command_failed_get_command_name (event),
-                "endSessions")) {
-      bson_error_t error;
-
-      MONGOC_DEBUG ("Why is this now failing with endSessions?");
-      mongoc_apm_command_failed_get_error(event, &error);
-      MONGOC_DEBUG ("error: %s, %d", error.message, (int)error.code);
-      return;
-   }
-
    test = (cmd_test_t *) mongoc_apm_command_failed_get_context (event);
    test->failed_calls++;
    ASSERT_CMPSTR (test->cmd_name,

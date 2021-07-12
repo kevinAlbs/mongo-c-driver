@@ -1945,7 +1945,7 @@ _mongoc_cluster_node_destroy (mongoc_cluster_node_t *node)
    /* Failure, or Replica Set reconfigure without this node */
    mongoc_stream_failed (node->stream);
    bson_free (node->connection_address);
-   mongoc_server_description_destroy (node->sd);
+   mongoc_server_description_destroy (node->handshake_sd);
 
    bson_free (node);
 }
@@ -2140,11 +2140,10 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
    }
 
    /* Transfer ownership of the server description into the cluster node. */
-   cluster_node->sd = sd;
+   cluster_node->handshake_sd = sd;
    /* Copy the generation from the cluster node.
-    * TODO (CDRIVER-????) do not store the generation counter on the server description.
-    */
-   cluster_node->sd->generation = generation;
+    * TODO (CDRIVER-????) do not store the generation counter on the server description */
+   cluster_node->handshake_sd->generation = generation;
 
    bson_destroy (&speculative_auth_response);
    mongoc_set_add (cluster->nodes, server_id, cluster_node);
@@ -2360,7 +2359,7 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
 {
    mongoc_topology_t *topology;
    mongoc_server_description_t *monitor_sd;
-   mongoc_server_description_t *sd;
+   mongoc_server_description_t *handshake_sd;
    mongoc_topology_scanner_node_t *scanner_node;
    char *address;
 
@@ -2389,7 +2388,7 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
    }
 
    if (scanner_node->stream) {
-      sd = mongoc_server_description_new_copy (scanner_node->sd);
+      handshake_sd = mongoc_server_description_new_copy (scanner_node->handshake_sd);
    } else {
       if (!reconnect_ok) {
          stream_not_found (
@@ -2415,12 +2414,12 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
       }
       bson_free (address);
 
-      sd = mongoc_server_description_new_copy (scanner_node->sd);
+      handshake_sd = mongoc_server_description_new_copy (scanner_node->handshake_sd);
    }
 
-   if (sd->type == MONGOC_SERVER_UNKNOWN) {
-      memcpy (error, &sd->error, sizeof *error);
-      mongoc_server_description_destroy (sd);
+   if (handshake_sd->type == MONGOC_SERVER_UNKNOWN) {
+      memcpy (error, &handshake_sd->error, sizeof *error);
+      mongoc_server_description_destroy (handshake_sd);
       return NULL;
    }
 
@@ -2430,29 +2429,29 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
       bool has_speculative_auth = _mongoc_cluster_finish_speculative_auth (
          cluster,
          scanner_node->stream,
-         sd,
+         handshake_sd,
          &scanner_node->speculative_auth_response,
          &scanner_node->scram,
-         &sd->error);
+         &handshake_sd->error);
 
 #ifdef MONGOC_ENABLE_CRYPTO
       _mongoc_scram_destroy (&scanner_node->scram);
 #endif
 
       if (!scanner_node->stream) {
-         memcpy (error, &sd->error, sizeof *error);
-         mongoc_server_description_destroy (sd);
+         memcpy (error, &handshake_sd->error, sizeof *error);
+         mongoc_server_description_destroy (handshake_sd);
          return NULL;
       }
 
       if (!has_speculative_auth &&
           !_mongoc_cluster_auth_node (cluster,
                                       scanner_node->stream,
-                                      sd,
+                                      handshake_sd,
                                       &scanner_node->sasl_supported_mechs,
-                                      &sd->error)) {
-         memcpy (error, &sd->error, sizeof *error);
-         mongoc_server_description_destroy (sd);
+                                      &handshake_sd->error)) {
+         memcpy (error, &handshake_sd->error, sizeof *error);
+         mongoc_server_description_destroy (handshake_sd);
          return NULL;
       }
 
@@ -2462,15 +2461,15 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
    /* Always copy the latest generation from the shared server description. */
    monitor_sd = mongoc_topology_server_by_id (topology, server_id, error);
    if (!monitor_sd) {
-      mongoc_server_description_destroy (sd);
+      mongoc_server_description_destroy (handshake_sd);
       return NULL;
    }
-   sd->generation = monitor_sd->generation;
+   /* TODO: (CDRIVER-????) do not store the generation counter as part of the server description. */
+   handshake_sd->generation = monitor_sd->generation;
    mongoc_server_description_destroy (monitor_sd);
 
-   // LBTODO-DONE: swap the following:
    return mongoc_server_stream_new (
-      &topology->description, sd, scanner_node->stream);
+      &topology->description, handshake_sd, scanner_node->stream);
 }
 
 
@@ -2597,12 +2596,11 @@ mongoc_cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
          mongoc_cluster_disconnect_node (cluster, server_id);
       } else {
          mongoc_server_stream_t *stream;
-         // LBTODO-DONE: return a new server stream from the server description
-         // on the cluster node.
+
          bson_mutex_lock (&topology->mutex);
          stream = mongoc_server_stream_new (
             &topology->description,
-            mongoc_server_description_new_copy (cluster_node->sd),
+            mongoc_server_description_new_copy (cluster_node->handshake_sd),
             cluster_node->stream);
          bson_mutex_unlock (&topology->mutex);
          return stream;
@@ -2619,12 +2617,11 @@ mongoc_cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
       _mongoc_cluster_add_node (cluster, generation, server_id, error);
    if (cluster_node) {
       mongoc_server_stream_t *stream;
-      // LBTODO-DONE: return a new server stream from the server description on
-      // the cluster node.
+
       bson_mutex_lock (&topology->mutex);
       stream = mongoc_server_stream_new (
          &topology->description,
-         mongoc_server_description_new_copy (cluster_node->sd),
+         mongoc_server_description_new_copy (cluster_node->handshake_sd),
          cluster_node->stream);
       bson_mutex_unlock (&topology->mutex);
       return stream;
@@ -2900,7 +2897,6 @@ _mongoc_cluster_min_of_max_obj_size_nodes (void *item, void *ctx)
    mongoc_cluster_node_t *node = (mongoc_cluster_node_t *) item;
    int32_t *current_min = (int32_t *) ctx;
 
-   // LBTODO: use the server description attached to the cluster node
    if (node->max_bson_obj_size < *current_min) {
       *current_min = node->max_bson_obj_size;
    }
@@ -2913,7 +2909,6 @@ _mongoc_cluster_min_of_max_msg_size_sds (void *item, void *ctx)
    mongoc_server_description_t *sd = (mongoc_server_description_t *) item;
    int32_t *current_min = (int32_t *) ctx;
 
-   // LBTODO: use the server description attached to the cluster node
    if (sd->max_msg_size < *current_min) {
       *current_min = sd->max_msg_size;
    }

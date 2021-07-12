@@ -80,10 +80,8 @@ typedef struct mongoc_topology_scanner_node {
    bson_t speculative_auth_response;
    mongoc_scram_t scram;
 
-   // LBTODO: rename this.
-   // this should also have a server description that is tied to the lifetime of stream.
-   // This is only updated after the initial handshake.
-   mongoc_server_description_t *sd;
+   /* handshake_sd is a server description constructed from the response of the initial handshake. It is bound to the lifetime of stream. */
+   mongoc_server_description_t *handshake_sd;
 } mongoc_topology_scanner_node_t;
 
 typedef struct mongoc_topology_scanner {

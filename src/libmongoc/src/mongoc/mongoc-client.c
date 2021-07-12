@@ -2312,7 +2312,6 @@ _mongoc_client_kill_cursor (mongoc_client_t *client,
       return;
    }
 
-   // LBTODO: as a consequence of these changes, we will send kill cursors on an open cursor if the server is later marked Unknown. This actually seems like the preferred behavior.
    if (db && collection &&
        server_stream->sd->max_wire_version >= WIRE_VERSION_KILLCURSORS_CMD) {
       _mongoc_client_killcursors_command (
@@ -3152,8 +3151,30 @@ mongoc_client_set_server_api (mongoc_client_t *client,
 }
 
 bson_t *
-mongoc_client_get_handshake_hello_response (mongoc_client_t *client, uint32_t server_id, bson_error_t *error)
+mongoc_client_get_handshake_hello_response (mongoc_client_t *client,
+                                            uint32_t server_id,
+                                            bson_t *opts,
+                                            bson_error_t *error)
 {
-   /* TODO */
-   return NULL;
+   mongoc_server_stream_t *server_stream;
+   bson_t *hello_response;
+
+   server_stream = mongoc_cluster_stream_for_server (&client->cluster,
+                                                     server_id,
+                                                     true,
+                                                     NULL /* client session */,
+                                                     NULL /* reply */,
+                                                     error);
+   if (!server_stream) {
+      return NULL;
+   }
+
+   if (!server_stream->sd->has_hello_response) {
+      mongoc_server_stream_cleanup (server_stream);
+      return NULL;
+   }
+      
+   hello_response = bson_copy (&server_stream->sd->last_hello_response);
+   mongoc_server_stream_cleanup (server_stream);
+   return hello_response;
 }

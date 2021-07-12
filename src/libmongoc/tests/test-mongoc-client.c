@@ -817,17 +817,19 @@ test_mongoc_client_authenticate_timeout (void *context)
 }
 
 
+/* Update: this test was changed after CDRIVER-3653 was fixed.
+ * Originally, the test used cursor operations, assuming changes in the min/maxWireVersion from the mock server would be re-evaluated on each cursor operation.
+ * After CDRIVER-3653 was fixed, this is no longer true. The cursor will examine the server description associated with the connection handshake. If the connection has not been closed, changes from monitoring will not affect the connection's server description.
+ * This test now uses mongoc_client_select_server to validate wire version checks. */
 static void
 test_wire_version (void)
 {
    mongoc_uri_t *uri;
-   mongoc_collection_t *collection;
-   mongoc_cursor_t *cursor;
    mongoc_client_t *client;
    mock_server_t *server;
-   const bson_t *doc;
    bson_error_t error;
    bson_t q = BSON_INITIALIZER;
+   mongoc_server_description_t *sd;
 
    if (!test_framework_skip_if_slow ()) {
       bson_destroy (&q);
@@ -847,17 +849,11 @@ test_wire_version (void)
    uri = mongoc_uri_copy (mock_server_get_uri (server));
    mongoc_uri_set_option_as_int32 (uri, "heartbeatFrequencyMS", 500);
    client = test_framework_client_new_from_uri (uri, NULL);
-   collection = mongoc_client_get_collection (client, "test", "test");
-
-   cursor = mongoc_collection_find_with_opts (collection, &q, NULL, NULL);
-   BSON_ASSERT (!mongoc_cursor_next (cursor, &doc));
-   BSON_ASSERT (mongoc_cursor_error (cursor, &error));
+   sd = mongoc_client_select_server (client, true, NULL, &error);
+   BSON_ASSERT (!sd);
    BSON_ASSERT (error.domain == MONGOC_ERROR_PROTOCOL);
    BSON_ASSERT (error.code == MONGOC_ERROR_PROTOCOL_BAD_WIRE_VERSION);
-   mongoc_cursor_destroy (cursor);
 
-   // LBTODO: this tests an impossible scenario.
-   // A server cannot change wire version without restarting. 
    /* too old */
    mock_server_auto_hello (server,
                            "{'ok': 1.0,"
@@ -867,13 +863,10 @@ test_wire_version (void)
 
    /* wait until it's time for next heartbeat */
    _mongoc_usleep (600 * 1000);
-   mongoc_client_select_server (client, true, NULL, &error);
-   // cursor = mongoc_collection_find_with_opts (collection, &q, NULL, NULL);
-   // BSON_ASSERT (!mongoc_cursor_next (cursor, &doc));
-   // BSON_ASSERT (mongoc_cursor_error (cursor, &error));
+   sd = mongoc_client_select_server (client, true, NULL, &error);
+   BSON_ASSERT (!sd);
    BSON_ASSERT (error.domain == MONGOC_ERROR_PROTOCOL);
    BSON_ASSERT (error.code == MONGOC_ERROR_PROTOCOL_BAD_WIRE_VERSION);
-   // mongoc_cursor_destroy (cursor);
 
    /* compatible again */
    mock_server_auto_hello (server,
@@ -884,22 +877,11 @@ test_wire_version (void)
 
    /* wait until it's time for next heartbeat */
    _mongoc_usleep (600 * 1000);
-   mongoc_client_select_server (client, true, NULL, &error);
-   // cursor = mongoc_collection_find_with_opts (collection, &q, NULL, NULL);
-   // future = future_cursor_next (cursor, &doc);
-   // request = mock_server_receives_request (server);
-   // mock_server_replies_to_find (
-   //    request, MONGOC_QUERY_SECONDARY_OK, 0, 0, "test.test", "{}", true);
-
-   /* no error */
-   // BSON_ASSERT (future_get_bool (future));
-   // BSON_ASSERT (!mongoc_cursor_error (cursor, &error));
+   sd = mongoc_client_select_server (client, true, NULL, &error);
+   ASSERT_OR_PRINT (sd, error);
+   mongoc_server_description_destroy (sd);
 
    bson_destroy (&q);
-   // request_destroy (request);
-   // future_destroy (future);
-   // mongoc_cursor_destroy (cursor);
-   mongoc_collection_destroy (collection);
    mongoc_client_destroy (client);
    mongoc_uri_destroy (uri);
    mock_server_destroy (server);
@@ -4016,6 +3998,47 @@ test_mongoc_client_timeout_ms (void)
    mongoc_client_destroy (client);
 }
 
+void test_mongoc_client_get_handshake_hello_response_single (void) {
+   mongoc_client_t *client;
+   mongoc_server_description_t *sd;
+   bson_t *hello_response;
+   bson_error_t error = {0};
+
+   client = test_framework_new_default_client ();
+   sd = mongoc_client_select_server (client, false /* for writes */, NULL /* read prefs */, &error);
+   /* Invalidate the server in the shared topology. */
+   mongoc_topology_invalidate_server (client->topology, sd->id, &error);
+   hello_response = mongoc_client_get_handshake_hello_response (client, sd->id, NULL /* opts */, &error);
+   BSON_ASSERT (hello_response);
+   ASSERT_MATCH (hello_response, "{'ok': 1}");
+
+   bson_destroy (hello_response);
+   mongoc_server_description_destroy (sd);
+   mongoc_client_destroy (client);
+}
+
+void test_mongoc_client_get_handshake_hello_response_pooled (void) {
+   mongoc_client_pool_t *pool;
+   mongoc_client_t *client;
+   mongoc_server_description_t *sd;
+   bson_t *hello_response;
+   bson_error_t error = {0};
+
+   pool = test_framework_new_default_client_pool ();
+   client = mongoc_client_pool_pop (pool);
+   sd = mongoc_client_select_server (client, false /* for writes */, NULL /* read prefs */, &error);
+   /* Invalidate the server in the shared topology. */
+   mongoc_topology_invalidate_server (client->topology, sd->id, &error);
+   hello_response = mongoc_client_get_handshake_hello_response (client, sd->id, NULL /* opts */, &error);
+   BSON_ASSERT (hello_response);
+   ASSERT_MATCH (hello_response, "{'ok': 1}");
+
+   bson_destroy (hello_response);
+   mongoc_server_description_destroy (sd);
+   mongoc_client_pool_push (pool, client);
+   mongoc_client_pool_destroy (pool);
+}
+
 void
 test_client_install (TestSuite *suite)
 {
@@ -4310,4 +4333,6 @@ test_client_install (TestSuite *suite)
                                 "/Client/recv_network_error",
                                 test_mongoc_client_recv_network_error);
    TestSuite_Add (suite, "/Client/timeout_ms", test_mongoc_client_timeout_ms);
+   TestSuite_AddLive (suite, "/Client/get_handshake_hello_response/single", test_mongoc_client_get_handshake_hello_response_single);
+   TestSuite_AddLive (suite, "/Client/get_handshake_hello_response/pooled", test_mongoc_client_get_handshake_hello_response_pooled);
 }

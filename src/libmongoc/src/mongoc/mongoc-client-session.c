@@ -1042,7 +1042,6 @@ mongoc_client_session_start_transaction (mongoc_client_session_t *session,
                                          const mongoc_transaction_opt_t *opts,
                                          bson_error_t *error)
 {
-   uint32_t server_id;
    mongoc_server_stream_t *server_stream = NULL;
    bool ret;
 

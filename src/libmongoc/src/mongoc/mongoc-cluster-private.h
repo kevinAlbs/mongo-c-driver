@@ -46,7 +46,7 @@ typedef struct _mongoc_cluster_node_t {
    char *connection_address;
    uint32_t generation;
    /* sd is a server description created from the handshake on the stream. */
-   mongoc_server_description_t *sd;
+   mongoc_server_description_t *handshake_sd;
    /* TODO CDRIVER-3653, these fields are unused. */
    int32_t max_wire_version;
    int32_t min_wire_version;

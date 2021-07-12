@@ -277,15 +277,14 @@ mongoc_client_set_server_api (mongoc_client_t *client,
                               const mongoc_server_api_t *api,
                               bson_error_t *error);
 
-/* Gets the server description associated with the connection to the server
- * identified by server_id.
- * This is distinct from the server description of the server itself.
- * This should be preferred.
+/* Returns the connection's initial handshake response to a server.
+ * This will attempt to establish a connection to the server if one does not exist.
  */
 MONGOC_EXPORT (bson_t *)
 mongoc_client_get_handshake_hello_response (mongoc_client_t *client,
-                                   uint32_t server_id,
-                                   bson_error_t *error);
+                                             uint32_t server_id,
+                                             bson_t *opts,
+                                             bson_error_t *error);
 
 BSON_END_DECLS
 
