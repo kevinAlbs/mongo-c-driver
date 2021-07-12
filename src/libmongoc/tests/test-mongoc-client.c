@@ -4020,7 +4020,7 @@ test_mongoc_client_get_handshake_hello_response_single (void)
    mongoc_topology_invalidate_server (client->topology, sd->id, &error);
    hello_response = mongoc_client_get_handshake_hello_response (
       client, sd->id, NULL /* opts */, &error);
-   BSON_ASSERT (hello_response);
+   ASSERT_OR_PRINT (NULL != hello_response, error);
    ASSERT_MATCH (hello_response, "{'ok': 1}");
 
    bson_destroy (hello_response);
@@ -4045,7 +4045,7 @@ test_mongoc_client_get_handshake_hello_response_pooled (void)
    mongoc_topology_invalidate_server (client->topology, sd->id, &error);
    hello_response = mongoc_client_get_handshake_hello_response (
       client, sd->id, NULL /* opts */, &error);
-   BSON_ASSERT (hello_response);
+   ASSERT_OR_PRINT (NULL != hello_response, error);
    ASSERT_MATCH (hello_response, "{'ok': 1}");
 
    bson_destroy (hello_response);
