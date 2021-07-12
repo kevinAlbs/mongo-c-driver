@@ -325,8 +325,9 @@ _begin_hello_cmd (mongoc_topology_scanner_node_t *node,
 
    if (node->last_used != -1 && node->last_failed == -1) {
       /* The node's been used before and not failed recently */
-      bson_copy_to (_mongoc_topology_scanner_get_monitoring_cmd (ts, node->hello_ok),
-                    &cmd);
+      bson_copy_to (
+         _mongoc_topology_scanner_get_monitoring_cmd (ts, node->hello_ok),
+         &cmd);
    } else {
       bson_copy_to (_mongoc_topology_scanner_get_handshake_cmd (ts), &cmd);
    }
@@ -650,7 +651,8 @@ _async_success (mongoc_async_cmd_t *acmd,
 
       /* Store a server description associated with the handshake. */
       mongoc_server_description_init (&sd, node->host.host_and_port, node->id);
-      mongoc_server_description_handle_hello (&sd, hello_response, duration_usec / 1000, &acmd->error);
+      mongoc_server_description_handle_hello (
+         &sd, hello_response, duration_usec / 1000, &acmd->error);
       node->handshake_sd = mongoc_server_description_new_copy (&sd);
       mongoc_server_description_cleanup (&sd);
    }

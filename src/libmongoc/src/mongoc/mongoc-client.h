@@ -278,13 +278,14 @@ mongoc_client_set_server_api (mongoc_client_t *client,
                               bson_error_t *error);
 
 /* Returns the connection's initial handshake response to a server.
- * This will attempt to establish a connection to the server if one does not exist.
+ * This will attempt to establish a connection to the server if one does not
+ * exist.
  */
 MONGOC_EXPORT (bson_t *)
 mongoc_client_get_handshake_hello_response (mongoc_client_t *client,
-                                             uint32_t server_id,
-                                             bson_t *opts,
-                                             bson_error_t *error);
+                                            uint32_t server_id,
+                                            bson_t *opts,
+                                            bson_error_t *error);
 
 BSON_END_DECLS
 

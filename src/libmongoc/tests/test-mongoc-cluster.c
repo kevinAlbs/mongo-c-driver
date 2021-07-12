@@ -1734,10 +1734,12 @@ test_hello_on_unknown (void)
  * explicit server id) that is marked as "unknown" in the topology description.
  * Prior to the bug fix of CDRIVER-3404, a pooled client would erroneously
  * attempt to send the command.
- * 
+ *
  * Update: After applying the fix to CDRIVER-3653 this test was updated.
- * Connections will track their own server description from the handshake response.
- * Marking the server unknown in the shared topology description no longer affects
+ * Connections will track their own server description from the handshake
+ * response.
+ * Marking the server unknown in the shared topology description no longer
+ * affects
  * established connections.
  */
 void
@@ -1961,8 +1963,10 @@ test_cluster_install (TestSuite *suite)
                                 test_cluster_command_error_op_query);
    TestSuite_AddMockServerTest (
       suite, "/Cluster/hello_on_unknown/mock", test_hello_on_unknown);
-   TestSuite_AddLive (
-      suite, "/Cluster/cmd_on_unknown_serverid/pooled", test_cmd_on_unknown_serverid_pooled);
-   TestSuite_AddLive (
-      suite, "/Cluster/cmd_on_unknown_serverid/single", test_cmd_on_unknown_serverid_single);
+   TestSuite_AddLive (suite,
+                      "/Cluster/cmd_on_unknown_serverid/pooled",
+                      test_cmd_on_unknown_serverid_pooled);
+   TestSuite_AddLive (suite,
+                      "/Cluster/cmd_on_unknown_serverid/single",
+                      test_cmd_on_unknown_serverid_single);
 }

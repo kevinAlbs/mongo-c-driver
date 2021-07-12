@@ -2142,7 +2142,8 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
    /* Transfer ownership of the server description into the cluster node. */
    cluster_node->handshake_sd = sd;
    /* Copy the generation from the cluster node.
-    * TODO (CDRIVER-????) do not store the generation counter on the server description */
+    * TODO (CDRIVER-????) do not store the generation counter on the server
+    * description */
    cluster_node->handshake_sd->generation = generation;
 
    bson_destroy (&speculative_auth_response);
@@ -2388,7 +2389,8 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
    }
 
    if (scanner_node->stream) {
-      handshake_sd = mongoc_server_description_new_copy (scanner_node->handshake_sd);
+      handshake_sd =
+         mongoc_server_description_new_copy (scanner_node->handshake_sd);
    } else {
       if (!reconnect_ok) {
          stream_not_found (
@@ -2414,7 +2416,8 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
       }
       bson_free (address);
 
-      handshake_sd = mongoc_server_description_new_copy (scanner_node->handshake_sd);
+      handshake_sd =
+         mongoc_server_description_new_copy (scanner_node->handshake_sd);
    }
 
    if (handshake_sd->type == MONGOC_SERVER_UNKNOWN) {
@@ -2464,7 +2467,8 @@ mongoc_cluster_fetch_stream_single (mongoc_cluster_t *cluster,
       mongoc_server_description_destroy (handshake_sd);
       return NULL;
    }
-   /* TODO: (CDRIVER-????) do not store the generation counter as part of the server description. */
+   /* TODO: (CDRIVER-????) do not store the generation counter as part of the
+    * server description. */
    handshake_sd->generation = monitor_sd->generation;
    mongoc_server_description_destroy (monitor_sd);
 

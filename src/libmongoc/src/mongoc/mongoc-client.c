@@ -3173,7 +3173,7 @@ mongoc_client_get_handshake_hello_response (mongoc_client_t *client,
       mongoc_server_stream_cleanup (server_stream);
       return NULL;
    }
-      
+
    hello_response = bson_copy (&server_stream->sd->last_hello_response);
    mongoc_server_stream_cleanup (server_stream);
    return hello_response;

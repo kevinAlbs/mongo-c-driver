@@ -272,8 +272,8 @@ test_client_cmd_write_concern (void)
          "'writeConcern' : {'w' : 99 }}";
    future = future_client_command_simple (
       client, "test", tmp_bson (cmd), NULL, &reply, &error);
-   request =
-      mock_server_receives_command (server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
+   request = mock_server_receives_command (
+      server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
    BSON_ASSERT (request);
 
    mock_server_replies_ok_and_destroys (request);
@@ -285,8 +285,8 @@ test_client_cmd_write_concern (void)
    /* standalone response */
    future = future_client_command_simple (
       client, "test", tmp_bson (cmd), NULL, &reply, &error);
-   request =
-      mock_server_receives_command (server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
+   request = mock_server_receives_command (
+      server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
    BSON_ASSERT (request);
 
    mock_server_replies_simple (
@@ -302,8 +302,8 @@ test_client_cmd_write_concern (void)
    /* replicaset response */
    future = future_client_command_simple (
       client, "test", tmp_bson (cmd), NULL, &reply, &error);
-   request =
-      mock_server_receives_command (server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
+   request = mock_server_receives_command (
+      server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
    mock_server_replies_simple (
       request,
       "{ 'ok' : 1, 'n': 1, "
@@ -818,9 +818,15 @@ test_mongoc_client_authenticate_timeout (void *context)
 
 
 /* Update: this test was changed after CDRIVER-3653 was fixed.
- * Originally, the test used cursor operations, assuming changes in the min/maxWireVersion from the mock server would be re-evaluated on each cursor operation.
- * After CDRIVER-3653 was fixed, this is no longer true. The cursor will examine the server description associated with the connection handshake. If the connection has not been closed, changes from monitoring will not affect the connection's server description.
- * This test now uses mongoc_client_select_server to validate wire version checks. */
+ * Originally, the test used cursor operations, assuming changes in the
+ * min/maxWireVersion from the mock server would be re-evaluated on each cursor
+ * operation.
+ * After CDRIVER-3653 was fixed, this is no longer true. The cursor will examine
+ * the server description associated with the connection handshake. If the
+ * connection has not been closed, changes from monitoring will not affect the
+ * connection's server description.
+ * This test now uses mongoc_client_select_server to validate wire version
+ * checks. */
 static void
 test_wire_version (void)
 {
@@ -3992,23 +3998,28 @@ test_mongoc_client_timeout_ms (void)
    mongoc_client_destroy (client);
 
    /* Client gets timeout through URI */
-   client = test_framework_client_new ("mongodb://localhost/?timeoutms=100", NULL);
+   client =
+      test_framework_client_new ("mongodb://localhost/?timeoutms=100", NULL);
    BSON_ASSERT (mongoc_client_get_timeout_ms (client) == 100);
 
    mongoc_client_destroy (client);
 }
 
-void test_mongoc_client_get_handshake_hello_response_single (void) {
+void
+test_mongoc_client_get_handshake_hello_response_single (void)
+{
    mongoc_client_t *client;
    mongoc_server_description_t *sd;
    bson_t *hello_response;
    bson_error_t error = {0};
 
    client = test_framework_new_default_client ();
-   sd = mongoc_client_select_server (client, false /* for writes */, NULL /* read prefs */, &error);
+   sd = mongoc_client_select_server (
+      client, false /* for writes */, NULL /* read prefs */, &error);
    /* Invalidate the server in the shared topology. */
    mongoc_topology_invalidate_server (client->topology, sd->id, &error);
-   hello_response = mongoc_client_get_handshake_hello_response (client, sd->id, NULL /* opts */, &error);
+   hello_response = mongoc_client_get_handshake_hello_response (
+      client, sd->id, NULL /* opts */, &error);
    BSON_ASSERT (hello_response);
    ASSERT_MATCH (hello_response, "{'ok': 1}");
 
@@ -4017,7 +4028,9 @@ void test_mongoc_client_get_handshake_hello_response_single (void) {
    mongoc_client_destroy (client);
 }
 
-void test_mongoc_client_get_handshake_hello_response_pooled (void) {
+void
+test_mongoc_client_get_handshake_hello_response_pooled (void)
+{
    mongoc_client_pool_t *pool;
    mongoc_client_t *client;
    mongoc_server_description_t *sd;
@@ -4026,10 +4039,12 @@ void test_mongoc_client_get_handshake_hello_response_pooled (void) {
 
    pool = test_framework_new_default_client_pool ();
    client = mongoc_client_pool_pop (pool);
-   sd = mongoc_client_select_server (client, false /* for writes */, NULL /* read prefs */, &error);
+   sd = mongoc_client_select_server (
+      client, false /* for writes */, NULL /* read prefs */, &error);
    /* Invalidate the server in the shared topology. */
    mongoc_topology_invalidate_server (client->topology, sd->id, &error);
-   hello_response = mongoc_client_get_handshake_hello_response (client, sd->id, NULL /* opts */, &error);
+   hello_response = mongoc_client_get_handshake_hello_response (
+      client, sd->id, NULL /* opts */, &error);
    BSON_ASSERT (hello_response);
    ASSERT_MATCH (hello_response, "{'ok': 1}");
 
@@ -4333,6 +4348,10 @@ test_client_install (TestSuite *suite)
                                 "/Client/recv_network_error",
                                 test_mongoc_client_recv_network_error);
    TestSuite_Add (suite, "/Client/timeout_ms", test_mongoc_client_timeout_ms);
-   TestSuite_AddLive (suite, "/Client/get_handshake_hello_response/single", test_mongoc_client_get_handshake_hello_response_single);
-   TestSuite_AddLive (suite, "/Client/get_handshake_hello_response/pooled", test_mongoc_client_get_handshake_hello_response_pooled);
+   TestSuite_AddLive (suite,
+                      "/Client/get_handshake_hello_response/single",
+                      test_mongoc_client_get_handshake_hello_response_single);
+   TestSuite_AddLive (suite,
+                      "/Client/get_handshake_hello_response/pooled",
+                      test_mongoc_client_get_handshake_hello_response_pooled);
 }

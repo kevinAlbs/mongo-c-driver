@@ -33,7 +33,7 @@
       request_t *_request = mock_server_receives_command (                    \
          server,                                                              \
          "db",                                                                \
-         MONGOC_QUERY_SECONDARY_OK,                                               \
+         MONGOC_QUERY_SECONDARY_OK,                                           \
          "{ 'killCursors' : 'coll', 'cursors' : [ " #cursor_id " ] }");       \
       mock_server_replies_simple (_request,                                   \
                                   "{ 'cursorsKilled': [ " #cursor_id " ] }"); \
@@ -2493,7 +2493,8 @@ prose_test_17 (void)
    request = mock_server_receives_msg (
       server,
       MONGOC_QUERY_NONE,
-      tmp_bson ("{ 'killCursors': 'coll', 'cursors': [{ '$numberLong': '123'}]}"));
+      tmp_bson (
+         "{ 'killCursors': 'coll', 'cursors': [{ '$numberLong': '123'}]}"));
    mock_server_replies_ok_and_destroys (request);
 
    request = mock_server_receives_msg (
@@ -2579,7 +2580,8 @@ prose_test_18 (void)
    request = mock_server_receives_msg (
       server,
       MONGOC_QUERY_NONE,
-      tmp_bson ("{ 'killCursors': 'coll', 'cursors': [{ '$numberLong': '123'}]}"));
+      tmp_bson (
+         "{ 'killCursors': 'coll', 'cursors': [{ '$numberLong': '123'}]}"));
    mock_server_replies_ok_and_destroys (request);
 
    request = mock_server_receives_msg (

@@ -1049,7 +1049,8 @@ mongoc_client_session_start_transaction (mongoc_client_session_t *session,
    BSON_ASSERT (session);
 
    ret = true;
-   server_stream = mongoc_cluster_stream_for_writes (&session->client->cluster, session, NULL /* reply */, &error);
+   server_stream = mongoc_cluster_stream_for_writes (
+      &session->client->cluster, session, NULL /* reply */, &error);
    if (!server_stream) {
       ret = false;
       GOTO (done);
@@ -1057,7 +1058,8 @@ mongoc_client_session_start_transaction (mongoc_client_session_t *session,
 
 
    if (server_stream->sd->max_wire_version < 7 ||
-       (server_stream->sd->max_wire_version < 8 && server_stream->sd->type == MONGOC_SERVER_MONGOS)) {
+       (server_stream->sd->max_wire_version < 8 &&
+        server_stream->sd->type == MONGOC_SERVER_MONGOS)) {
       bson_set_error (error,
                       MONGOC_ERROR_TRANSACTION,
                       MONGOC_ERROR_TRANSACTION_INVALID_STATE,
