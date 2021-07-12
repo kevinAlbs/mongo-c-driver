@@ -2526,6 +2526,7 @@ done:
    return ret;
 }
 
+// TODO: this also needs to change.
 mongoc_server_stream_t *
 _mongoc_cluster_create_server_stream (mongoc_topology_t *topology,
                                       uint32_t server_id,

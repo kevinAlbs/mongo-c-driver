@@ -4006,56 +4006,68 @@ test_mongoc_client_timeout_ms (void)
 }
 
 void
-test_mongoc_client_get_handshake_hello_response_single (void* unused)
+test_mongoc_client_get_handshake_hello_response_single (void)
 {
    mongoc_client_t *client;
-   mongoc_server_description_t *sd;
-   bson_t *hello_response;
+   mongoc_server_description_t *monitor_sd;
+   mongoc_server_description_t *invalidated_sd;
+   mongoc_server_description_t *handshake_sd;
    bson_error_t error = {0};
 
    client = test_framework_new_default_client ();
-   sd = mongoc_client_select_server (
+   /* Perform server selection, which establishes a connection. */
+   monitor_sd = mongoc_client_select_server (
       client, false /* for writes */, NULL /* read prefs */, &error);
-   /* Invalidate the server in the shared topology. */
-   mongoc_topology_invalidate_server (client->topology, sd->id, &error);
-   hello_response = mongoc_client_get_handshake_hello_response (
-      client, sd->id, NULL /* opts */, &error);
-   ASSERT_OR_PRINT (NULL != hello_response, error);
-   ASSERT_MATCH (hello_response, "{'ok': 1}");
 
-   bson_destroy (hello_response);
-   mongoc_server_description_destroy (sd);
+   /* Invalidate the server. */
+   mongoc_topology_invalidate_server (client->topology, monitor_sd->id, &error);
+
+   /* Get the new invalidated server description from monitoring. */
+   invalidated_sd = mongoc_client_get_server_description (client, monitor_sd->id);
+   ASSERT_CMPSTR ("Unknown", mongoc_server_description_type (invalidated_sd));
+
+   /* But the previously established connection should have a valid server description. */
+   handshake_sd = mongoc_client_get_handshake_description (
+      client, monitor_sd->id, NULL /* opts */, &error);
+   BSON_ASSERT (0 != strcmp ("Unknown", mongoc_server_description_type (handshake_sd)));
+
+   mongoc_server_description_destroy (handshake_sd);
+   mongoc_server_description_destroy (invalidated_sd);
+   mongoc_server_description_destroy (monitor_sd);
    mongoc_client_destroy (client);
 }
 
 void
-test_mongoc_client_get_handshake_hello_response_pooled (void* unused)
+test_mongoc_client_get_handshake_hello_response_pooled (void)
 {
-   mongoc_client_pool_t *pool;
    mongoc_client_t *client;
-   mongoc_server_description_t *sd;
-   bson_t *hello_response;
+   mongoc_server_description_t *monitor_sd;
+   mongoc_server_description_t *handshake_sd;
    bson_error_t error = {0};
    bool ret;
 
-   pool = test_framework_new_default_client_pool ();
-   client = mongoc_client_pool_pop (pool);
-   sd = mongoc_client_select_server (
+   client = test_framework_new_default_client ();
+   monitor_sd = mongoc_client_select_server (
       client, false /* for writes */, NULL /* read prefs */, &error);
    /* Send a ping to establish a connection. */
-   ret = mongoc_client_command_simple_with_server_id (client, "admin", tmp_bson("{'ping': 1}"), NULL, sd->id, NULL /* reply */, &error);
+   ret = mongoc_client_command_simple_with_server_id (client,
+                                                      "admin",
+                                                      tmp_bson ("{'ping': 1}"),
+                                                      NULL,
+                                                      monitor_sd->id,
+                                                      NULL /* reply */,
+                                                      &error);
    ASSERT_OR_PRINT (ret, error);
-   /* Invalidate the server in the shared topology. */
-   mongoc_topology_invalidate_server (client->topology, sd->id, &error);
-   hello_response = mongoc_client_get_handshake_hello_response (
-      client, sd->id, NULL /* opts */, &error);
-   ASSERT_OR_PRINT (NULL != hello_response, error);
-   ASSERT_MATCH (hello_response, "{'ok': 1}");
+   BSON_ASSERT (MONGOC_SERVER_UNKNOWN ==
+                mongoc_server_description_type (monitor_sd));
+   handshake_sd = mongoc_client_get_handshake_description (
+      client, monitor_sd->id, NULL /* opts */, &error);
+   BSON_ASSERT (MONGOC_SERVER_UNKNOWN !=
+                mongoc_server_description_type (handshake_sd));
 
-   bson_destroy (hello_response);
-   mongoc_server_description_destroy (sd);
-   mongoc_client_pool_push (pool, client);
-   mongoc_client_pool_destroy (pool);
+   mongoc_server_description_destroy (handshake_sd);
+   mongoc_server_description_destroy (monitor_sd);
+   mongoc_client_destroy (client);
 }
 
 void

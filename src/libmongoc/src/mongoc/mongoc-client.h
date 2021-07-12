@@ -277,7 +277,8 @@ mongoc_client_set_server_api (mongoc_client_t *client,
                               const mongoc_server_api_t *api,
                               bson_error_t *error);
 
-/* Returns the connection's initial handshake response to a server.
+/* Returns a description constructed from the initial handshake
+ * response to a server.
  * - This will not attempt to establish a connection to the server if
  * one does not exist.
  * - To establish a connection on a single-threaded client, ensure the
@@ -286,8 +287,8 @@ mongoc_client_set_server_api (mongoc_client_t *client,
  * - To establish a connection on a pooled client, send a command
  * (e.g. ping) to the server.
  */
-MONGOC_EXPORT (bson_t *)
-mongoc_client_get_handshake_hello_response (mongoc_client_t *client,
+MONGOC_EXPORT (mongoc_server_description_t *)
+mongoc_client_get_handshake_description (mongoc_client_t *client,
                                             uint32_t server_id,
                                             bson_t *opts,
                                             bson_error_t *error);

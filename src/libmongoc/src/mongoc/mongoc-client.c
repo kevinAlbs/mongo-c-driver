@@ -3148,14 +3148,14 @@ mongoc_client_set_server_api (mongoc_client_t *client,
    return true;
 }
 
-bson_t *
-mongoc_client_get_handshake_hello_response (mongoc_client_t *client,
-                                            uint32_t server_id,
-                                            bson_t *opts,
-                                            bson_error_t *error)
+mongoc_server_description_t *
+mongoc_client_get_handshake_description (mongoc_client_t *client,
+                                         uint32_t server_id,
+                                         bson_t *opts,
+                                         bson_error_t *error)
 {
    mongoc_server_stream_t *server_stream;
-   bson_t *hello_response;
+   mongoc_server_description_t *sd;
 
    server_stream = mongoc_cluster_stream_for_server (&client->cluster,
                                                      server_id,
@@ -3167,12 +3167,7 @@ mongoc_client_get_handshake_hello_response (mongoc_client_t *client,
       return NULL;
    }
 
-   if (!server_stream->sd->has_hello_response) {
-      mongoc_server_stream_cleanup (server_stream);
-      return NULL;
-   }
-
-   hello_response = bson_copy (&server_stream->sd->last_hello_response);
+   sd = mongoc_server_description_new_copy (server_stream->sd);
    mongoc_server_stream_cleanup (server_stream);
-   return hello_response;
+   return sd;
 }
