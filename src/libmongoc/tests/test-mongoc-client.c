@@ -4006,7 +4006,7 @@ test_mongoc_client_timeout_ms (void)
 }
 
 void
-test_mongoc_client_get_handshake_hello_response_single (void)
+test_mongoc_client_get_handshake_hello_response_single (void* unused)
 {
    mongoc_client_t *client;
    mongoc_server_description_t *sd;
@@ -4029,18 +4029,22 @@ test_mongoc_client_get_handshake_hello_response_single (void)
 }
 
 void
-test_mongoc_client_get_handshake_hello_response_pooled (void)
+test_mongoc_client_get_handshake_hello_response_pooled (void* unused)
 {
    mongoc_client_pool_t *pool;
    mongoc_client_t *client;
    mongoc_server_description_t *sd;
    bson_t *hello_response;
    bson_error_t error = {0};
+   bool ret;
 
    pool = test_framework_new_default_client_pool ();
    client = mongoc_client_pool_pop (pool);
    sd = mongoc_client_select_server (
       client, false /* for writes */, NULL /* read prefs */, &error);
+   /* Send a ping to establish a connection. */
+   ret = mongoc_client_command_simple_with_server_id (client, "admin", tmp_bson("{'ping': 1}"), NULL, sd->id, NULL /* reply */, &error);
+   ASSERT_OR_PRINT (ret, error);
    /* Invalidate the server in the shared topology. */
    mongoc_topology_invalidate_server (client->topology, sd->id, &error);
    hello_response = mongoc_client_get_handshake_hello_response (
@@ -4348,6 +4352,7 @@ test_client_install (TestSuite *suite)
                                 "/Client/recv_network_error",
                                 test_mongoc_client_recv_network_error);
    TestSuite_Add (suite, "/Client/timeout_ms", test_mongoc_client_timeout_ms);
+   /* Skip the "get_handshake_hello_response" test if auth occurs. */
    TestSuite_AddLive (suite,
                       "/Client/get_handshake_hello_response/single",
                       test_mongoc_client_get_handshake_hello_response_single);

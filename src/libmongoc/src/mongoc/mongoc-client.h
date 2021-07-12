@@ -278,8 +278,13 @@ mongoc_client_set_server_api (mongoc_client_t *client,
                               bson_error_t *error);
 
 /* Returns the connection's initial handshake response to a server.
- * This will attempt to establish a connection to the server if one does not
- * exist.
+ * - This will not attempt to establish a connection to the server if
+ * one does not exist.
+ * - To establish a connection on a single-threaded client, ensure the
+ * server is selectable (the monitoring connection is the only
+ * connection). This can be done with mongoc_client_select_server.
+ * - To establish a connection on a pooled client, send a command
+ * (e.g. ping) to the server.
  */
 MONGOC_EXPORT (bson_t *)
 mongoc_client_get_handshake_hello_response (mongoc_client_t *client,

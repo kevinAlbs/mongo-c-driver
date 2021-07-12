@@ -280,7 +280,7 @@ _make_cursor (mongoc_change_stream_t *stream)
    }
 
    server_stream = mongoc_cluster_stream_for_reads (
-      &stream->client->cluster, NULL, cs, &reply, &stream->err);
+      &stream->client->cluster, stream->read_prefs, cs, &reply, &stream->err);
    if (!server_stream) {
       bson_destroy (&stream->err_doc);
       bson_copy_to (&reply, &stream->err_doc);

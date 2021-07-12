@@ -3159,7 +3159,7 @@ mongoc_client_get_handshake_hello_response (mongoc_client_t *client,
 
    server_stream = mongoc_cluster_stream_for_server (&client->cluster,
                                                      server_id,
-                                                     true,
+                                                     false /* reconnect */,
                                                      NULL /* client session */,
                                                      NULL /* reply */,
                                                      error);
