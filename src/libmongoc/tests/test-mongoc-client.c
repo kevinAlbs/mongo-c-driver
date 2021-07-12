@@ -272,8 +272,8 @@ test_client_cmd_write_concern (void)
          "'writeConcern' : {'w' : 99 }}";
    future = future_client_command_simple (
       client, "test", tmp_bson (cmd), NULL, &reply, &error);
-   request = mock_server_receives_command (
-      server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
+   request =
+      mock_server_receives_command (server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
    BSON_ASSERT (request);
 
    mock_server_replies_ok_and_destroys (request);
@@ -285,8 +285,8 @@ test_client_cmd_write_concern (void)
    /* standalone response */
    future = future_client_command_simple (
       client, "test", tmp_bson (cmd), NULL, &reply, &error);
-   request = mock_server_receives_command (
-      server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
+   request =
+      mock_server_receives_command (server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
    BSON_ASSERT (request);
 
    mock_server_replies_simple (
@@ -302,8 +302,8 @@ test_client_cmd_write_concern (void)
    /* replicaset response */
    future = future_client_command_simple (
       client, "test", tmp_bson (cmd), NULL, &reply, &error);
-   request = mock_server_receives_command (
-      server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
+   request =
+      mock_server_receives_command (server, "test", MONGOC_QUERY_SECONDARY_OK, cmd);
    mock_server_replies_simple (
       request,
       "{ 'ok' : 1, 'n': 1, "

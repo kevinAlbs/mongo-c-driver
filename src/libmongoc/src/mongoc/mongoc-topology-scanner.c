@@ -325,9 +325,8 @@ _begin_hello_cmd (mongoc_topology_scanner_node_t *node,
 
    if (node->last_used != -1 && node->last_failed == -1) {
       /* The node's been used before and not failed recently */
-      bson_copy_to (
-         _mongoc_topology_scanner_get_monitoring_cmd (ts, node->hello_ok),
-         &cmd);
+      bson_copy_to (_mongoc_topology_scanner_get_monitoring_cmd (ts, node->hello_ok),
+                    &cmd);
    } else {
       bson_copy_to (_mongoc_topology_scanner_get_handshake_cmd (ts), &cmd);
    }

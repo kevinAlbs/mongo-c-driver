@@ -33,7 +33,7 @@
       request_t *_request = mock_server_receives_command (                    \
          server,                                                              \
          "db",                                                                \
-         MONGOC_QUERY_SECONDARY_OK,                                           \
+         MONGOC_QUERY_SECONDARY_OK,                                               \
          "{ 'killCursors' : 'coll', 'cursors' : [ " #cursor_id " ] }");       \
       mock_server_replies_simple (_request,                                   \
                                   "{ 'cursorsKilled': [ " #cursor_id " ] }"); \
