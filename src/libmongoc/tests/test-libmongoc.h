@@ -264,4 +264,10 @@ test_framework_is_serverless (void);
 bool
 test_framework_is_loadbalanced (void);
 
+void
+test_framework_monitor_commands (mongoc_client_t *client);
+
+void
+test_framework_monitor_commands_pooled (mongoc_client_pool_t *pool);
+
 #endif

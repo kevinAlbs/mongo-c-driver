@@ -3015,7 +3015,74 @@ test_framework_skip_if_no_getlasterror (void) {
    return 0;
 }
 
+
 bool
 test_framework_is_loadbalanced (void) {
    return test_framework_getenv_bool ("MONGOC_TEST_LOADBALANCED");
+}
+
+static void
+command_started (const mongoc_apm_command_started_t *event)
+{
+   char *s;
+
+   s = bson_as_relaxed_extended_json (
+      mongoc_apm_command_started_get_command (event), NULL);
+   MONGOC_DEBUG ("Command %s started on %s:\n%s\n\n",
+           mongoc_apm_command_started_get_command_name (event),
+           mongoc_apm_command_started_get_host (event)->host,
+           s);
+
+   bson_free (s);
+}
+
+
+static void
+command_succeeded (const mongoc_apm_command_succeeded_t *event)
+{
+   char *s;
+
+   s = bson_as_relaxed_extended_json (
+      mongoc_apm_command_succeeded_get_reply (event), NULL);
+   MONGOC_DEBUG ("Command %s succeeded:\n%s\n\n",
+           mongoc_apm_command_succeeded_get_command_name (event),
+           s);
+
+   bson_free (s);
+}
+
+
+static void
+command_failed (const mongoc_apm_command_failed_t *event)
+{
+   bson_error_t error;
+
+   mongoc_apm_command_failed_get_error (event, &error);
+   MONGOC_DEBUG ("Command %s failed:\n\"%s\"\n\n",
+           mongoc_apm_command_failed_get_command_name (event),
+           error.message);
+}
+
+void
+test_framework_monitor_commands (mongoc_client_t *client) {
+   mongoc_apm_callbacks_t *callbacks;
+
+   callbacks = mongoc_apm_callbacks_new ();
+   mongoc_apm_set_command_started_cb (callbacks, command_started);
+   mongoc_apm_set_command_succeeded_cb (callbacks, command_succeeded);
+   mongoc_apm_set_command_failed_cb (callbacks, command_failed);
+   mongoc_client_set_apm_callbacks (client, callbacks, (void *) NULL);
+   mongoc_apm_callbacks_destroy (callbacks);
+}
+
+void
+test_framework_monitor_commands_pooled (mongoc_client_pool_t *pool) {
+   mongoc_apm_callbacks_t *callbacks;
+
+   callbacks = mongoc_apm_callbacks_new ();
+   mongoc_apm_set_command_started_cb (callbacks, command_started);
+   mongoc_apm_set_command_succeeded_cb (callbacks, command_succeeded);
+   mongoc_apm_set_command_failed_cb (callbacks, command_failed);
+   mongoc_client_pool_set_apm_callbacks (pool, callbacks, (void *) NULL);
+   mongoc_apm_callbacks_destroy (callbacks);
 }
