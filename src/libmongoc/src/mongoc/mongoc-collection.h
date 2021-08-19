@@ -351,6 +351,9 @@ mongoc_collection_estimated_document_count (
    bson_t *reply,
    bson_error_t *error);
 
+MONGOC_EXPORT (void)
+mongoc_collection_set_encryption_schema (mongoc_collection_t *coll, bson_t *schema);
+
 BSON_END_DECLS
 
 

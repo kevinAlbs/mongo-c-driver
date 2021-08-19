@@ -27,9 +27,6 @@
 #include "mongoc-host-list-private.h"
 #include "mongoc-stream-private.h"
 
-struct __mongoc_crypt_t {
-   mongocrypt_t *handle;
-};
 
 static void
 _log_callback (mongocrypt_log_level_t mongocrypt_log_level,

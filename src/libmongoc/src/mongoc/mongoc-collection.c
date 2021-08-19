@@ -39,6 +39,7 @@
 #include "mongoc-opts-private.h"
 #include "mongoc-write-command-private.h"
 #include "mongoc-error-private.h"
+#include "mongocrypt/mongocrypt.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "collection"
@@ -3584,4 +3585,24 @@ mongoc_collection_watch (const mongoc_collection_t *coll,
                          const bson_t *opts)
 {
    return _mongoc_change_stream_new_from_collection (coll, pipeline, opts);
+}
+
+void
+mongoc_collection_set_encryption_schema (mongoc_collection_t *coll, bson_t *schema) {
+   mongoc_client_t *client;
+   mongocrypt_binary_t *bin;
+   bson_t *temp_map;
+
+   client = coll->client;
+
+   /* TODO: do not use mongocrypt types. Pass this through to mongoc-client-side-encryption.h. */
+
+   temp_map = BCON_NEW (coll->ns, BCON_DOCUMENT(schema));
+   bin = mongocrypt_binary_new_from_data (bson_get_data(temp_map), temp_map->len);
+   MONGOC_DEBUG ("about to set schema map");
+   if (!mongocrypt_setopt_schema_map (coll->client->topology->crypt->handle, bin)) {
+      MONGOC_ERROR ("error setting schema map");
+   }
+   bson_destroy (temp_map);
+   mongocrypt_binary_destroy (bin);
 }

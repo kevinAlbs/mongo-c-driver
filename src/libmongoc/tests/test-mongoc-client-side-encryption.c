@@ -2215,6 +2215,104 @@ test_bypass_spawning_via_bypassAutoEncryption (void *unused)
    bson_destroy (kms_providers);
 }
 
+/* Check if the document in db.coll with _id of @id has an encrypted value for
+ * "encrypted_string" */
+static bool check_encrypted (char* id) {
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   mongoc_cursor_t *cursor;
+   const bson_t *doc;
+   bson_t *query;
+   bson_iter_t iter;
+   bool is_encrypted;
+
+   client = test_framework_new_default_client ();
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   query = BCON_NEW ("_id", BCON_UTF8(id));
+   cursor = mongoc_collection_find_with_opts (coll, query, NULL, NULL);
+   BSON_ASSERT (mongoc_cursor_next (cursor, &doc));
+   BSON_ASSERT (bson_iter_init_find (&iter, doc, "encrypted_string"));
+   is_encrypted = BSON_ITER_HOLDS_BINARY (&iter);
+
+   bson_destroy (query);
+   mongoc_cursor_destroy (cursor);
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+
+   return is_encrypted;
+}
+
+/* Test that it is possible to set a schema lazily. */
+static void
+_test_springPOC (void *ctx)
+{
+   mongoc_uri_t *uri;
+   mongoc_client_t *client;
+   mongoc_auto_encryption_opts_t *opts;
+   bson_t *datakey;
+   mongoc_collection_t *coll;
+   mongoc_collection_t *keyvault_coll;
+   bson_t *schema;
+   bson_error_t error;
+   bson_t *kms_providers;
+   bson_t* to_insert;
+
+   uri = test_framework_get_uri ();
+   client = test_framework_client_new_from_uri (uri, NULL);
+   test_framework_set_ssl_opts (client);
+   opts = mongoc_auto_encryption_opts_new ();
+
+   /* Do setup: create a data key and configure pool for auto encryption. */
+   keyvault_coll = mongoc_client_get_collection (client, "db", "keyvault");
+   (void) mongoc_collection_drop (keyvault_coll, NULL);
+   datakey = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/limits-key.json");
+   BSON_ASSERT (datakey);
+   ASSERT_OR_PRINT (
+      mongoc_collection_insert_one (
+         keyvault_coll, datakey, NULL /* opts */, NULL /* reply */, &error),
+      error);
+
+   _check_bypass (opts);
+
+   mongoc_auto_encryption_opts_set_keyvault_namespace (opts, "db", "keyvault");
+   kms_providers = _make_kms_providers (false /* aws */, true /* local */);
+   mongoc_auto_encryption_opts_set_kms_providers (opts, kms_providers);
+
+   if (!mongoc_client_enable_auto_encryption (client, opts, &error)) {
+      test_error ("could not enable auto encryption: %s", error.message);
+   }
+
+   coll = mongoc_client_get_collection (client, "db", "coll");
+   mongoc_collection_drop (coll, &error);
+
+   /* Insert a document - expect no encryption on "encrypted_string". */
+   to_insert = BCON_NEW ("encrypted_string", "foo", "_id", "A");
+   ASSERT_OR_PRINT (mongoc_collection_insert_one (coll, to_insert, NULL, NULL, &error), error);
+   bson_destroy (to_insert);
+
+   /* Set a schema on the collection - expect encryption on "encrypted_string". */
+   schema = get_bson_from_json_file (
+      "./src/libmongoc/tests/client_side_encryption_prose/schema.json");
+   BSON_ASSERT (schema);
+   mongoc_collection_set_encryption_schema (coll, schema);
+   to_insert = BCON_NEW ("encrypted_string", "foo", "_id", "B");
+   ASSERT_OR_PRINT (mongoc_collection_insert_one (coll, to_insert, NULL, NULL, &error), error);
+   bson_destroy (to_insert);
+
+   BSON_ASSERT (!check_encrypted ("A"));
+   BSON_ASSERT (check_encrypted ("B"));
+
+   mongoc_collection_destroy (coll);
+   mongoc_collection_destroy (keyvault_coll);
+   mongoc_client_destroy (client);
+   bson_destroy (schema);
+   bson_destroy (datakey);
+   mongoc_auto_encryption_opts_destroy (opts);
+   mongoc_uri_destroy (uri);
+   bson_destroy (kms_providers);
+}
+
 void
 test_client_side_encryption_install (TestSuite *suite)
 {
@@ -2314,4 +2412,10 @@ test_client_side_encryption_install (TestSuite *suite)
                       NULL,
                       test_framework_skip_if_no_client_side_encryption,
                       test_framework_skip_if_max_wire_version_less_than_8);
+   TestSuite_AddFull (suite,
+                      "/client_side_encryption/springPOC",
+                      _test_springPOC,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption);
 }

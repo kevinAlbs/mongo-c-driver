@@ -25,8 +25,14 @@
 
 #include "mongoc.h"
 
+#include <mongocrypt/mongocrypt.h>
+
 /* For interacting with libmongocrypt */
 typedef struct __mongoc_crypt_t _mongoc_crypt_t;
+
+struct __mongoc_crypt_t {
+   mongocrypt_t *handle;
+};
 
 /*
 Creates a new handle into libmongocrypt.

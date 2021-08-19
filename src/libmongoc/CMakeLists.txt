@@ -846,6 +846,7 @@ function (mongoc_add_test test use_shared)
       else ()
          target_link_libraries (${test} DbgHelp.dll)
       endif ()
+      target_include_directories(${test} PRIVATE ${LIBMONGOCRYPT_INCLUDE_DIRECTORIES})
       target_include_directories (${test} PRIVATE ${PROJECT_SOURCE_DIR}/tests)
       target_compile_definitions (${test}
          PUBLIC
