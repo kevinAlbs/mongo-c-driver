@@ -108,6 +108,8 @@ mongoc_apm_command_started_get_context (
 
 /* command-succeeded event fields */
 
+void foo ();
+
 MONGOC_EXPORT (int64_t)
 mongoc_apm_command_succeeded_get_duration (
    const mongoc_apm_command_succeeded_t *event);
