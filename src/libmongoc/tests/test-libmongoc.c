@@ -2328,6 +2328,177 @@ test_framework_resolve_path (const char *path, char *resolved)
 
 static char MONGOC_TEST_UNIQUE[32];
 
+static void
+server_changed (const mongoc_apm_server_changed_t *event)
+{
+   const mongoc_server_description_t *prev_sd, *new_sd;
+
+   prev_sd = mongoc_apm_server_changed_get_previous_description (event);
+   new_sd = mongoc_apm_server_changed_get_new_description (event);
+
+   MONGOC_ERROR ("server changed: %s %s -> %s",
+           mongoc_apm_server_changed_get_host (event)->host_and_port,
+           mongoc_server_description_type (prev_sd),
+           mongoc_server_description_type (new_sd));
+}
+
+
+static void
+server_opening (const mongoc_apm_server_opening_t *event)
+{
+   MONGOC_ERROR ("server opening: %s",
+           mongoc_apm_server_opening_get_host (event)->host_and_port);
+}
+
+
+static void
+server_closed (const mongoc_apm_server_closed_t *event)
+{
+   MONGOC_ERROR ("server closed: %s",
+           mongoc_apm_server_closed_get_host (event)->host_and_port);
+}
+
+
+static void
+topology_changed (const mongoc_apm_topology_changed_t *event)
+{
+   MONGOC_ERROR ("topology changed");
+}
+
+
+static void
+topology_opening (const mongoc_apm_topology_opening_t *event)
+{
+   MONGOC_ERROR ("topology opening");
+}
+
+
+static void
+topology_closed (const mongoc_apm_topology_closed_t *event)
+{
+   MONGOC_ERROR ("topology closed");
+}
+
+
+static void
+server_heartbeat_started (const mongoc_apm_server_heartbeat_started_t *event)
+{
+   MONGOC_ERROR ("%s heartbeat started",
+           mongoc_apm_server_heartbeat_started_get_host (event)->host_and_port);
+}
+
+
+static void
+server_heartbeat_succeeded (
+   const mongoc_apm_server_heartbeat_succeeded_t *event)
+{
+   char *reply;
+
+   reply = bson_as_canonical_extended_json (
+      mongoc_apm_server_heartbeat_succeeded_get_reply (event), NULL);
+
+   MONGOC_ERROR (
+      "%s heartbeat succeeded: %s",
+      mongoc_apm_server_heartbeat_succeeded_get_host (event)->host_and_port,
+      reply);
+
+   bson_free (reply);
+}
+
+
+static void
+server_heartbeat_failed (const mongoc_apm_server_heartbeat_failed_t *event)
+{
+   bson_error_t error;
+
+   mongoc_apm_server_heartbeat_failed_get_error (event, &error);
+
+   printf ("%s heartbeat failed: %s",
+           mongoc_apm_server_heartbeat_failed_get_host (event)->host_and_port,
+           error.message);
+}
+
+static void cdriver3636 (void) {
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   bson_t* query;
+   mongoc_cursor_t *cursor;
+   const bson_t *result;
+   bson_error_t error;
+   mongoc_read_prefs_t *read_prefs;
+   bson_t *failpoint;
+   mongoc_apm_callbacks_t *cbs;
+
+   client = mongoc_client_new ("mongodb://localhost:27017/"
+                               "?replicaSet=rs0&socketTimeoutMS=2&"
+                               "connectTimeoutMS=2&serverSelectionTimeoutMS=2");
+
+   cbs = mongoc_apm_callbacks_new ();
+   mongoc_apm_set_server_changed_cb (cbs, server_changed);
+   mongoc_apm_set_server_opening_cb (cbs, server_opening);
+   mongoc_apm_set_server_closed_cb (cbs, server_closed);
+   mongoc_apm_set_topology_changed_cb (cbs, topology_changed);
+   mongoc_apm_set_topology_opening_cb (cbs, topology_opening);
+   mongoc_apm_set_topology_closed_cb (cbs, topology_closed);
+   mongoc_apm_set_server_heartbeat_started_cb (cbs, server_heartbeat_started);
+   mongoc_apm_set_server_heartbeat_succeeded_cb (cbs,
+                                                 server_heartbeat_succeeded);
+   mongoc_apm_set_server_heartbeat_failed_cb (cbs, server_heartbeat_failed);
+   mongoc_client_set_apm_callbacks (client, cbs, NULL /* context */);
+
+   coll = mongoc_client_get_collection (client, "delay", "coll");
+   query = BCON_NEW ("k", "v");
+   read_prefs = mongoc_read_prefs_new (MONGOC_READ_SECONDARY);
+   mongoc_read_prefs_set_max_staleness_seconds (read_prefs, 90);
+
+   /* Configure a failpoint to simulate slow connections. */
+   failpoint = BCON_NEW ("configureFailPoint",
+                         "failCommand",
+                         "mode",
+                         "{",
+                         "times",
+                         BCON_INT32 (1),
+                         "}",
+                         "data",
+                         "{",
+                         "failCommands",
+                         "[",
+                         "find",
+                         "]",
+                         "closeConnection",
+                         BCON_BOOL (false),
+                         "blockConnection",
+                         BCON_BOOL (true),
+                         "blockTimeMS",
+                         BCON_INT32 (1000),
+                         "}");
+
+   while (true) {
+      bool ok;
+
+      ok = mongoc_client_command_simple (client, "admin", failpoint, NULL /* read prefs */, NULL /* reply */, &error);
+      if (!ok) {
+         MONGOC_ERROR ("error setting failpoint: %s", error.message);
+      }
+
+      cursor = mongoc_collection_find_with_opts (coll, query, NULL /* opts */, read_prefs);
+      mongoc_cursor_next (cursor, &result);
+      if (mongoc_cursor_error (cursor, &error)) {
+         MONGOC_ERROR ("mongoc_cursor_error: %s", error.message);
+         if (NULL != strstr (error.message, "Not all servers support maxStalenessSeconds")) {
+            test_error ("got it!");
+         }
+      }
+      mongoc_cursor_destroy (cursor);
+   }
+
+   bson_destroy (failpoint);
+   mongoc_read_prefs_destroy (read_prefs);
+   bson_destroy (query);
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -2353,6 +2524,8 @@ main (int argc, char *argv[])
 
    TestSuite_Init (&suite, "", argc, argv);
    TestSuite_Add (&suite, "/TestSuite/version_cmp", test_version_cmp);
+
+   TestSuite_Add (&suite, "/cdriver3636", cdriver3636);
 
    /* libbson */
 

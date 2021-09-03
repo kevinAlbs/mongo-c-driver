@@ -656,6 +656,10 @@ mongoc_topology_compatible (const mongoc_topology_description_t *td,
                          MONGOC_ERROR_COMMAND,
                          MONGOC_ERROR_PROTOCOL_BAD_WIRE_VERSION,
                          "Not all servers support maxStalenessSeconds");
+         /* Dump the server info. */
+         MONGOC_ERROR ("erroring here");
+         
+         mongoc_topology_description_dump (td);
          return false;
       }
 

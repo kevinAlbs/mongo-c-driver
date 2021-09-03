@@ -135,4 +135,6 @@ void
 mongoc_topology_description_update_cluster_time (
    mongoc_topology_description_t *td, const bson_t *reply);
 
+void mongoc_topology_description_dump (mongoc_topology_description_t *td);
+
 #endif /* MONGOC_TOPOLOGY_DESCRIPTION_PRIVATE_H */

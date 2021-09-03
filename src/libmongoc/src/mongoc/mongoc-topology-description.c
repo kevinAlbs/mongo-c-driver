@@ -2119,3 +2119,20 @@ mongoc_topology_description_get_servers (
 
    return sds;
 }
+
+void
+mongoc_topology_description_dump (mongoc_topology_description_t *td)
+{
+   int i;
+   mongoc_server_description_t *sd;
+
+   if (td->servers->items_len == 0) {
+      MONGOC_ERROR ("no servers available");
+   }
+
+   for (i = 0; (size_t) i < td->servers->items_len; i++) {
+      sd = (mongoc_server_description_t *) mongoc_set_get_item (td->servers, i);
+
+      MONGOC_ERROR ("server: %s is type %s and has maxWireVersion: %d", sd->host.host_and_port, mongoc_server_description_type (sd), sd->max_wire_version);
+   }
+}
