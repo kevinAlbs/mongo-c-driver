@@ -287,7 +287,10 @@ if [ -e pipe ]; then
    run_valgrind ./src/libmongoc/test-libmongoc --no-fork -d -F test-results.json 2>pipe
    rm pipe
 else
-   run_valgrind ./src/libmongoc/test-libmongoc --no-fork -d -F test-results.json
+   for i in $(seq 1 100); do
+      echo "Running test: $i"
+      run_valgrind ./src/libmongoc/test-libmongoc --no-fork -d -F test-results.json -l "/inheritance/db_write_cmd/writeConcern"
+   done
 fi
 
 # Check if the error.log exists, and is more than 0 byte
