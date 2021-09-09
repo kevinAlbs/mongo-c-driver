@@ -284,7 +284,10 @@ mkfifo pipe || true
 if [ -e pipe ]; then
    set +o xtrace
    tee error.log < pipe &
-   run_valgrind ./src/libmongoc/test-libmongoc --no-fork -d -F test-results.json 2>pipe
+   for i in $(seq 1 100); do
+      echo "Running test: $i"
+      run_valgrind ./src/libmongoc/test-libmongoc --no-fork -d -F test-results.json 2>pipe -l "/inheritance/db_write_cmd/writeConcern"
+   done
    rm pipe
 else
    for i in $(seq 1 100); do
