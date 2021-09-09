@@ -278,23 +278,11 @@ fi
 
 export MONGOC_TEST_SERVER_LOG=stdout
 
-# Write stderr to error.log and to console. Turn off tracing to avoid spurious
-# log messages that CHECK_LOG considers failures.
-mkfifo pipe || true
-if [ -e pipe ]; then
-   set +o xtrace
-   tee error.log < pipe &
-   for i in $(seq 1 100); do
-      echo "Running test: $i"
-      run_valgrind ./src/libmongoc/test-libmongoc --no-fork -d -F test-results.json 2>pipe -l "/inheritance/db_write_cmd/writeConcern"
-   done
-   rm pipe
-else
-   for i in $(seq 1 100); do
-      echo "Running test: $i"
-      run_valgrind ./src/libmongoc/test-libmongoc --no-fork -d -F test-results.json -l "/inheritance/db_write_cmd/writeConcern"
-   done
-fi
+set +o xtrace
+for i in $(seq 1 100); do
+   echo "Running test: $i"
+   run_valgrind ./src/libmongoc/test-libmongoc --no-fork -d -F test-results.json 2>pipe -l "/inheritance/db_write_cmd/writeConcern"
+done
 
 # Check if the error.log exists, and is more than 0 byte
 if [ -s error.log ]; then
