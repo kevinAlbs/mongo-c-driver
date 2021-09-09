@@ -279,7 +279,7 @@ fi
 export MONGOC_TEST_SERVER_LOG=stdout
 
 set +o xtrace
-for i in $(seq 1 100); do
+for i in $(seq 1 1000); do
    echo "Running test: $i"
    run_valgrind ./src/libmongoc/test-libmongoc --no-fork -d -F test-results.json 2>pipe -l "/inheritance/db_write_cmd/writeConcern"
 done
