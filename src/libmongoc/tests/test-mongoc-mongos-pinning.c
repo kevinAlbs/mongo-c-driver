@@ -22,6 +22,9 @@
 #include "test-libmongoc.h"
 #include "test-conveniences.h"
 
+#include "mongoc-topology-description-private.h"
+#include "/Users/kevin.albertson/code/c-bootstrap/util/monitoring.h"
+
 static void
 add_multiple_mongoses (mongoc_uri_t *uri)
 {
@@ -46,15 +49,20 @@ test_new_transaction_unpins (void *ctx)
    mongoc_cursor_t *cursor;
    bson_t *opts;
    int i;
+   mongoc_apm_callbacks_t *cbs;
 
    uri = test_framework_get_uri ();
    add_multiple_mongoses (uri);
+
+   cbs = mongoc_apm_callbacks_new ();
+   set_sdam_monitors (cbs);
 
    /* Increase localThresholdMS to avoid false positives. Nodes
       will be discovered with the first call to server selection. */
    mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_LOCALTHRESHOLDMS, 1000);
    client = test_framework_client_new_from_uri (uri, NULL);
    test_framework_set_ssl_opts (client);
+   mongoc_client_set_apm_callbacks (client, cbs, NULL);
 
    /* Create a collection. */
    coll = mongoc_client_get_collection (client, "test", "test");
@@ -88,11 +96,13 @@ test_new_transaction_unpins (void *ctx)
       ASSERT_OR_PRINT (
          mongoc_client_session_start_transaction (session, NULL, &error),
          error);
-
+      MONGOC_DEBUG ("start_transaction - session's server_id is: %" PRIu32, session->server_id);
       cursor =
          mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), opts, NULL);
       ASSERT (mongoc_cursor_next (cursor, &doc));
+      MONGOC_DEBUG ("find_with_opts – session's server_id is: %" PRIu32, session->server_id);
       mongoc_cursor_get_host (cursor, &cursor_host);
+      MONGOC_DEBUG ("selected host: %s", cursor_host.host_and_port);
       _mongoc_host_list_upsert (&servers, &cursor_host);
 
       ASSERT_OR_PRINT (
@@ -100,6 +110,8 @@ test_new_transaction_unpins (void *ctx)
          error);
 
       mongoc_cursor_destroy (cursor);
+
+      mongoc_topology_description_dump (client->topology->_shared_descr_.ptr);
    }
 
    ASSERT (_mongoc_host_list_length (servers) == 2);

@@ -171,4 +171,6 @@ void
 mongoc_topology_description_reconcile (mongoc_topology_description_t *td,
                                        mongoc_host_list_t *host_list);
 
+void
+mongoc_topology_description_dump (mongoc_topology_description_t *td);
 #endif /* MONGOC_TOPOLOGY_DESCRIPTION_PRIVATE_H */

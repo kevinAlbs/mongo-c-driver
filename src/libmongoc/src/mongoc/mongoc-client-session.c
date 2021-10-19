@@ -1690,7 +1690,7 @@ void
 _mongoc_client_session_unpin (mongoc_client_session_t *session)
 {
    BSON_ASSERT (session);
-
+   MONGOC_DEBUG ("unpin is called");
    session->server_id = 0;
 }
 
@@ -1699,7 +1699,7 @@ _mongoc_client_session_pin (mongoc_client_session_t *session,
                             uint32_t server_id)
 {
    BSON_ASSERT (session);
-
+   MONGOC_DEBUG ("pin is called with server_id=%" PRIu32, server_id);
    session->server_id = server_id;
 }
 

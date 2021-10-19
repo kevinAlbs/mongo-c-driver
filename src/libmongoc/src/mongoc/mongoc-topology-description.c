@@ -2359,3 +2359,17 @@ mongoc_topology_description_reconcile (mongoc_topology_description_t *td,
    mongoc_set_for_each (
       mc_tpld_servers (td), _remove_if_not_in_host_list_cb, &ctx);
 }
+
+static bool _dump_server (void *item, void *ctx) {
+   mongoc_server_description_t *sd;
+   
+   sd = (mongoc_server_description_t*)item;
+   MONGOC_DEBUG ("%s : %s", mongoc_server_description_host (sd)->host_and_port, mongoc_server_description_type (sd));
+   return true;
+}
+void
+mongoc_topology_description_dump (mongoc_topology_description_t *td) {
+   MONGOC_DEBUG ("topology description:");
+   mongoc_set_for_each (
+      mc_tpld_servers (td), _dump_server, NULL);
+}
