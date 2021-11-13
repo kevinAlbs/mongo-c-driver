@@ -39,7 +39,7 @@ variables:
 
           # Disable zstd. centos6-perf does not have libzstd installed.
           $CMAKE -DENABLE_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DENABLE_ZSTD=OFF -DCMAKE_INSTALL_PREFIX=mongoc . && make -j8 && make install
-          git clone git@github.com:mongodb/mongo-c-driver-performance.git
+          git clone git@github.com:kevinAlbs/mongo-c-driver-performance.git --branch findone_parallel.4105
           cd mongo-c-driver-performance
           $CMAKE -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../mongoc . && make -j8
 
