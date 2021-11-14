@@ -142,7 +142,7 @@ functions:
 
         echo "Running Benchmark tests "
         start_time=$(date +%s)
-        LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance --quick ./data
+        LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data
         set +o errexit
         result=$?
 
