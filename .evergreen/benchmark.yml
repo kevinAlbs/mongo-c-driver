@@ -21,7 +21,7 @@ variables:
     mongo_v32: &mongo_v32
       mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.2.10.tgz"
     mongo_v44: &mongo_v44
-      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-rhel62-v4.4-latest.tgz"
+      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1804-4.4.8.tgz"
 
   ## Common sets of CFLAGS
   cflags:
@@ -142,7 +142,7 @@ functions:
 
         echo "Running Benchmark tests "
         start_time=$(date +%s)
-        LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data
+        LD_LIBRARY_PATH=`pwd`/mongoc/lib:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data
         set +o errexit
         result=$?
 
@@ -265,7 +265,7 @@ buildvariants:
     <<: *mongo_v32
     <<: *benchmark_common
   run_on:
-     - rhel62-small
+     - ubuntu1804-large
   tasks: *benchmark_compile
 
 - name: c-driver-benchmark-mongo32
@@ -275,7 +275,7 @@ buildvariants:
     <<: *mongo_v32
     <<: *benchmark_common
   run_on:
-     - centos6-perf
+     - ubuntu1804-large
   tasks: *benchmark_tests
 
 - name: c-driver-benchmark-mongo44
@@ -285,5 +285,5 @@ buildvariants:
     <<: *mongo_v44
     <<: *benchmark_common
   run_on:
-     - centos6-perf
+     - ubuntu1804-large
   tasks: *benchmark_tests
