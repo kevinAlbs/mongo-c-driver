@@ -1,5 +1,5 @@
-if [ "$(basename $(pwd))" != "mongo-c-driver" ]; then
-    echo "Error: $0 must be run with mongo-c-driver as working directory."
+if [ "$(basename $(pwd))" != "mongo-c-driver" -a  "$(basename $(pwd))" != "mongoc" ]; then
+    echo "Error: $0 must be run with mongo-c-driver or mongoc as working directory."
     exit 1
 fi
 
