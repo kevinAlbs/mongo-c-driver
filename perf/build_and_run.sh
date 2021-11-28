@@ -11,6 +11,8 @@ MONGOC_INSTALL_PATH=${MONGOC_INSTALL_PATH:-$(pwd)/perf_install}
 SKIP_MONGOC_INSTALL=${SKIP_MONGOC_INSTALL:-OFF}
 GOOGLEBENCHMARK_PATH=${GOOGLEBENCHMARK_PATH:-$(pwd)/googlebenchmark}
 SKIP_GOOGLEBENCHMARK_INSTALL=${SKIP_GOOGLEBENCHMARK_INSTALL:-OFF}
+SKIP_PERF_BUILD=${SKIP_PERF_BUILD:-OFF}
+SKIP_PERF_RUN=${SKIP_PERF_RUN:-OFF}
 
 if [ "$SKIP_MONGOC_INSTALL" = "OFF" ]; then
     echo "Installing release C driver into $MONGOC_INSTALL_PATH"
@@ -45,3 +47,37 @@ if [ "$SKIP_GOOGLEBENCHMARK_INSTALL" = "OFF" ]; then
     $CMAKE --build "build" --config Release
     popd # $GOOGLEBENCHMARK_PATH
 fi
+
+if [ "$SKIP_PERF_BUILD" = "OFF" ]; then
+    echo "Building perf"
+    pushd perf
+    if [ ! -d cmake-build ]; then
+        mkdir cmake-build
+    fi
+    pushd cmake-build
+    $CMAKE \
+        -DCMAKE_PREFIX_PATH="$GOOGLEBENCHMARK_PATH/build;$MONGOC_INSTALL_PATH" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CXX_STANDARD=17 \
+        ..
+    $CMAKE --build . --target perf
+    popd # cmake-build
+    popd # perf
+
+fi
+
+if [ "$SKIP_PERF_RUN" = "OFF" ]; then
+    export DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:$MONGOC_INSTALL_PATH"
+    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$MONGOC_INSTALL_PATH"
+
+    echo "Running perf"
+    ./perf/cmake-build/perf \
+        --benchmark_out=./perf/googlebenchmark_results.json \
+        --benchmark_out_format=json \
+        --benchmark_repetitions=2
+        # TODO: update repetitions to 3, and add min_time
+        # --benchmark_repetitions=3 \
+        # --benchmark_min_time=10
+fi
+
+python3 ./perf/googlebenchmark_to_perfsend.py ./perf/googlebenchmark_results.json > ./perf/perfsend_results.json
