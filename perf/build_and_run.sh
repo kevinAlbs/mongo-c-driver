@@ -13,10 +13,13 @@ GOOGLEBENCHMARK_PATH=${GOOGLEBENCHMARK_PATH:-$(pwd)/googlebenchmark}
 SKIP_GOOGLEBENCHMARK_INSTALL=${SKIP_GOOGLEBENCHMARK_INSTALL:-OFF}
 SKIP_PERF_BUILD=${SKIP_PERF_BUILD:-OFF}
 SKIP_PERF_RUN=${SKIP_PERF_RUN:-OFF}
+SKIP_PERF_REPORT=${SKIP_PERF_REPORT:-OFF}
 
 if [ "$SKIP_MONGOC_INSTALL" = "OFF" ]; then
     echo "Installing release C driver into $MONGOC_INSTALL_PATH"
-    mkdir $MONGOC_INSTALL_PATH
+    if [ ! -d $MONGOC_INSTALL_PATH ]; then
+        mkdir $MONGOC_INSTALL_PATH
+    fi
     cd $MONGOC_INSTALL_PATH
 
     $CMAKE \
@@ -80,4 +83,7 @@ if [ "$SKIP_PERF_RUN" = "OFF" ]; then
         # --benchmark_min_time=10
 fi
 
-python3 ./perf/googlebenchmark_to_perfsend.py ./perf/googlebenchmark_results.json > ./perf/perfsend_results.json
+if [ "$SKIP_PERF_REPORT" = "OFF" ]; then
+    python3 ./perf/googlebenchmark_to_perfsend.py ./perf/googlebenchmark_results.json > ./perf/perfsend_results.json
+
+fi
