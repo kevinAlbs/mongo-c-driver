@@ -20,7 +20,7 @@ if [ "$SKIP_MONGOC_INSTALL" = "OFF" ]; then
     if [ ! -d $MONGOC_INSTALL_PATH ]; then
         mkdir $MONGOC_INSTALL_PATH
     fi
-    cd $MONGOC_INSTALL_PATH
+    pushd $MONGOC_INSTALL_PATH
 
     $CMAKE \
         -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF \
@@ -33,6 +33,7 @@ if [ "$SKIP_MONGOC_INSTALL" = "OFF" ]; then
         ..
 
     $CMAKE --build . --target install
+    popd # MONGOC_INSTALL_PATH
 fi
 
 if [ "$SKIP_GOOGLEBENCHMARK_INSTALL" = "OFF" ]; then
@@ -85,5 +86,4 @@ fi
 
 if [ "$SKIP_PERF_REPORT" = "OFF" ]; then
     python3 ./perf/googlebenchmark_to_perfsend.py ./perf/googlebenchmark_results.json > ./perf/perfsend_results.json
-
 fi
