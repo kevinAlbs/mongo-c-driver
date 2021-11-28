@@ -7,14 +7,15 @@ fi
 
 set -o xtrace # TODO: remove
 
-INSTALL_PATH=${INSTALL_PATH:-$(pwd)/perf_install}
-SKIP_INSTALL=${SKIP_INSTALL:-OFF}
+MONGOC_INSTALL_PATH=${MONGOC_INSTALL_PATH:-$(pwd)/perf_install}
+SKIP_MONGOC_INSTALL=${SKIP_MONGOC_INSTALL:-OFF}
+GOOGLEBENCHMARK_PATH=${GOOGLEBENCHMARK_PATH:-$(pwd)/googlebenchmark}
+SKIP_GOOGLEBENCHMARK_INSTALL=${SKIP_GOOGLEBENCHMARK_INSTALL:-OFF}
 
-# Install a release build.
-if [ "$SKIP_INSTALL" = "OFF" ]; then
-    echo "Installing release C driver into $INSTALL_PATH"
-    mkdir $INSTALL_PATH
-    cd $INSTALL_PATH
+if [ "$SKIP_MONGOC_INSTALL" = "OFF" ]; then
+    echo "Installing release C driver into $MONGOC_INSTALL_PATH"
+    mkdir $MONGOC_INSTALL_PATH
+    cd $MONGOC_INSTALL_PATH
 
     $CMAKE \
         -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF \
@@ -23,8 +24,24 @@ if [ "$SKIP_INSTALL" = "OFF" ]; then
         -DENABLE_EXAMPLES=OFF \
         -DENABLE_STATIC=ON \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=$INSTALL_PATH \
+        -DCMAKE_INSTALL_PREFIX=$MONGOC_INSTALL_PATH \
         ..
 
     $CMAKE --build . --target install
+fi
+
+if [ "$SKIP_GOOGLEBENCHMARK_INSTALL" = "OFF" ]; then
+    echo "Cloning Google Benchmark to $GOOGLEBENCHMARK_PATH"
+    git clone https://github.com/google/benchmark.git $GOOGLEBENCHMARK_PATH
+    pushd $GOOGLEBENCHMARK_PATH
+    mkdir build
+    pushd build
+    $CMAKE \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBENCHMARK_ENABLE_GTEST_TESTS=OFF \
+        -DCMAKE_CXX_STANDARD=17 \
+        ..
+    popd # build
+    $CMAKE --build "build" --config Release
+    popd # $GOOGLEBENCHMARK_PATH
 fi
