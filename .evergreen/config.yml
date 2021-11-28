@@ -26750,12 +26750,19 @@ tasks:
       SSL: nossl
 - name: perf
   commands:
+  - func: bootstrap mongo-orchestration
+    vars:
+      VERSION: latest
   - command: shell.exec
     params:
       working_dir: mongoc
       shell: bash
       script: |-
         ./perf/build_and_run.sh
+  - command: perf.send
+    params:
+      name: perf
+      file: mongo-c-driver/results.json
 buildvariants:
 - name: perf
   display_name: "Perf"
