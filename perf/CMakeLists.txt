@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.2)
+project (perf LANGUAGES CXX)
+add_executable (perf perf.cpp)
+find_package (benchmark REQUIRED)
+target_link_libraries (perf benchmark::benchmark)
+find_package (mongoc-1.0 REQUIRED)
+target_link_libraries (perf mongo::mongoc_shared)
