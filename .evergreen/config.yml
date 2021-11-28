@@ -26658,7 +26658,20 @@ tasks:
       AUTH: noauth
       LOADBALANCED: loadbalanced
       SSL: nossl
+- name: perf
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: mongoc
+      shell: bash
+      script: |-
+        ./perf/build_and_run.sh
 buildvariants:
+- name: perf
+  display_name: "Perf"
+  run_on: ubuntu1804-large
+  tasks:
+  - perf
 - name: releng
   display_name: '**Release Archive Creator'
   run_on: ubuntu1804-test
