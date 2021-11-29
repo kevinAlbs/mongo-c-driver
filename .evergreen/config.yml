@@ -26672,7 +26672,7 @@ tasks:
   - command: perf.send
     params:
       name: perf
-      file: mongo-c-driver/results.json
+      file: mongoc/perf/perfsend_results.json
 buildvariants:
 - name: perf
   display_name: "Perf"
