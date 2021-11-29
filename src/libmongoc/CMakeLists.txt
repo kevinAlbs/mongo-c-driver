@@ -922,6 +922,7 @@ set (test-libmongoc-sources
    ${PROJECT_SOURCE_DIR}/tests/mock_server/mock-server.c
    ${PROJECT_SOURCE_DIR}/tests/mock_server/request.c
    ${PROJECT_SOURCE_DIR}/tests/mock_server/sync-queue.c
+   ${PROJECT_SOURCE_DIR}/tests/mongoc-test-settings.c
    ${PROJECT_SOURCE_DIR}/tests/test-conveniences.c
    ${PROJECT_SOURCE_DIR}/tests/test-happy-eyeballs.c
    ${PROJECT_SOURCE_DIR}/tests/test-libmongoc.c

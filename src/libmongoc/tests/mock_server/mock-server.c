@@ -28,6 +28,7 @@
 #include "../test-conveniences.h"
 #include "../test-libmongoc.h"
 #include "../TestSuite.h"
+#include "../mongoc-test-settings.h"
 
 #ifdef BSON_HAVE_STRINGS_H
 #include <strings.h>
@@ -1020,9 +1021,18 @@ mock_server_receives_legacy_hello (mock_server_t *server,
       return NULL;
    }
 
+/* JFW: */
+fprintf(stderr, "JFW: mongoc_test_settings_legacy_hello_expect_ApiVersion = %d\n", mongoc_test_settings_legacy_hello_expect_ApiVersion);
+if(mongoc_test_settings_legacy_hello_expect_ApiVersion) {
+   formatted_command_json =
+      bson_strdup_printf ("{'%s': 1, 'maxAwaitTimeMS': { '$exists': false }, 'apiVersion': 1}",
+                          request->command_name);
+}
+else {
    formatted_command_json =
       bson_strdup_printf ("{'%s': 1, 'maxAwaitTimeMS': { '$exists': false }}",
                           request->command_name);
+}
 
    if (!request_matches_query (request,
                                "admin.$cmd",
