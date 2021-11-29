@@ -78,10 +78,11 @@ if [ "$SKIP_PERF_RUN" = "OFF" ]; then
     ./perf/cmake-build/perf \
         --benchmark_out=./perf/googlebenchmark_results.json \
         --benchmark_out_format=json \
-        --benchmark_repetitions=2
-        # TODO: update repetitions to 3, and add min_time
-        # --benchmark_repetitions=3 \
-        # --benchmark_min_time=10
+        --benchmark_repetitions=3 \
+        --benchmark_display_aggregates_only=true \
+        --benchmark_counters_tabular=true \
+        --benchmark_min_time=10
+        # TODO: add min_time
 fi
 
 if [ "$SKIP_PERF_REPORT" = "OFF" ]; then
