@@ -21,7 +21,6 @@
 #include "mock-server.h"
 #include "../test-conveniences.h"
 #include "../TestSuite.h"
-#include "../mongoc-test-settings.h"
 
 static bool
 is_command_ns (const char *ns);
@@ -211,8 +210,7 @@ request_matches_query (const request_t *request,
       goto done;
    }
 
-/* JFW: */
-   if ((request->opcode != MONGOC_OPCODE_QUERY) && mongoc_test_check_OPCODE_QUERY) {
+   if (request->opcode != MONGOC_OPCODE_QUERY) {
       test_error ("request's opcode does not match QUERY: %s", doc_as_json);
       goto done;
    }
