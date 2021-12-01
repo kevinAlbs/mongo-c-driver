@@ -3146,6 +3146,7 @@ mongoc_client_set_server_api (mongoc_client_t *client,
    return true;
 }
 
+/* Returns true if a specific server API has been set: */
 bool mongoc_client_uses_server_api(mongoc_client_t *client)
 {
  BSON_ASSERT_PARAM(client);
