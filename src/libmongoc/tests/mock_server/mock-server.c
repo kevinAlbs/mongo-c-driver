@@ -1017,6 +1017,7 @@ mock_server_receives_legacy_hello (mock_server_t *server,
 
    if (strcasecmp (request->command_name, "hello") &&
        strcasecmp (request->command_name, HANDSHAKE_CMD_LEGACY_HELLO)) {
+fprintf(stderr, "JFW: mock_server_receives_legacy_hello(): strings did NOT match; command name \"%s\"\n", request->command_name), fflush(stderr);
       request_destroy (request);
       return NULL;
    }
@@ -1042,6 +1043,7 @@ else {
                                match_json ? match_json : formatted_command_json,
                                NULL,
                                true)) {
+fprintf(stderr, "JFW: mock_server_receives_legacy_hello(): request_matches_query() failed\n"), fflush(stderr);
       request_destroy (request);
       request = NULL;
    }
@@ -1072,11 +1074,20 @@ else {
 request_t *
 mock_server_receives_hello (mock_server_t *server)
 {
-   return mock_server_receives_command (
+fprintf(stderr, "JFW: mock_server_receives_hello()"), fflush(stderr);
+
+request_t *result = 
+
+/*JFW:   return mock_server_receives_command ( */
+   mock_server_receives_command (
       server,
       "admin",
       MONGOC_QUERY_SECONDARY_OK,
       "{'hello': 1, 'maxAwaitTimeMS': { '$exists': false }}");
+
+ fprintf(stderr, "JFW: mock_server_receives_hello(): got %s back\n", result ? "a value" : "NULL"), fflush(stderr);
+
+ return result;
 }
 
 
