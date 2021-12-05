@@ -35,13 +35,14 @@ bool
 parallel_single_fixture_setup (parallel_single_fixture_t *fixture);
 
 bool
-parallel_single_fixture_teardown (parallel_single_fixture_t* fixture);
+parallel_single_fixture_teardown (parallel_single_fixture_t *fixture);
 
-const char*
+const char *
 parallel_single_fixture_get_error (parallel_single_fixture_t *fixture);
 
 bool
-parallel_single_fixture_ping (parallel_single_fixture_t *fixture, int thread_index);
+parallel_single_fixture_ping (parallel_single_fixture_t *fixture,
+                              int thread_index);
 
 #ifdef __cplusplus
 }

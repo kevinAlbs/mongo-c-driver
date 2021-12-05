@@ -17,11 +17,13 @@
 #ifndef PERF_DEFINES_H
 #define PERF_DEFINES_H
 
-/* MONGODB_URI_ENV is the name of an optional environment variable to set a custom URI. */
+/* MONGODB_URI_ENV is the name of an optional environment variable to set a
+ * custom URI. */
 /* If it is not set, the default URI is "mongodb://localhost:27017". */
 #define MONGODB_URI_ENV "MONGODB_URI"
 
-/* MONGODB_ERROR_NOT_FOUND is a server error code for "ns not found" to ignore if */
+/* MONGODB_ERROR_NOT_FOUND is a server error code for "ns not found" to ignore
+ * if */
 /* dropping an unknown collection. */
 #define MONGODB_ERROR_NOT_FOUND 26
 

@@ -18,86 +18,106 @@
 
 #include "parallel_pool.h"
 #include "parallel_single.h"
-class ParallelPoolFixture : public benchmark::Fixture {
-public:
-    virtual void SetUp (benchmark::State& state) {
-        if (state.thread_index() != 0) {
-            return;
-        }
-        this->fixture = parallel_pool_fixture_new ();
-        if (!parallel_pool_fixture_setup (this->fixture)) {
-            state.SkipWithError (parallel_pool_fixture_get_error (this->fixture));
-        }
-    }
-    virtual void TearDown (benchmark::State& state) {
-        if (state.thread_index() != 0) {
-            return;
-        }
-        if (!parallel_pool_fixture_teardown (this->fixture)) {
-            state.SkipWithError (parallel_pool_fixture_get_error (this->fixture));
-        }
-        parallel_pool_fixture_destroy (this->fixture);
-    }
-    parallel_pool_fixture_t *fixture;
+class ParallelPoolFixture : public benchmark::Fixture
+{
+ public:
+   virtual void
+   SetUp (benchmark::State &state)
+   {
+      if (state.thread_index () != 0) {
+         return;
+      }
+      this->fixture = parallel_pool_fixture_new ();
+      if (!parallel_pool_fixture_setup (this->fixture)) {
+         state.SkipWithError (parallel_pool_fixture_get_error (this->fixture));
+      }
+   }
+   virtual void
+   TearDown (benchmark::State &state)
+   {
+      if (state.thread_index () != 0) {
+         return;
+      }
+      if (!parallel_pool_fixture_teardown (this->fixture)) {
+         state.SkipWithError (parallel_pool_fixture_get_error (this->fixture));
+      }
+      parallel_pool_fixture_destroy (this->fixture);
+   }
+   parallel_pool_fixture_t *fixture;
 };
 
-BENCHMARK_DEFINE_F (ParallelPoolFixture, Ping) (benchmark::State& state) {
-    for (auto _ : state) {
-        if (!parallel_pool_fixture_ping (fixture, state.thread_index())) {
-            state.SkipWithError (parallel_pool_fixture_get_error (this->fixture));
-        }
-    }
-    state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
+BENCHMARK_DEFINE_F (ParallelPoolFixture, Ping) (benchmark::State &state)
+{
+   for (auto _ : state) {
+      if (!parallel_pool_fixture_ping (fixture, state.thread_index ())) {
+         state.SkipWithError (parallel_pool_fixture_get_error (this->fixture));
+      }
+   }
+   state.counters["ops_per_sec"] =
+      benchmark::Counter (state.iterations (), benchmark::Counter::kIsRate);
 }
 
-BENCHMARK_REGISTER_F (ParallelPoolFixture, Ping)->
-    Unit(benchmark::TimeUnit::kMicrosecond)->
-    UseRealTime()->
-    ThreadRange(1, 64);
+BENCHMARK_REGISTER_F (ParallelPoolFixture, Ping)
+   ->Unit (benchmark::TimeUnit::kMicrosecond)
+   ->UseRealTime ()
+   ->ThreadRange (1, 64);
 
-class ParallelSingleFixture : public benchmark::Fixture {
-public:
-    virtual void SetUp (benchmark::State& state) {
-        if (state.thread_index() != 0) {
-            return;
-        }
-        this->fixture = parallel_single_fixture_new ();
-        if (!parallel_single_fixture_setup (this->fixture)) {
-            state.SkipWithError (parallel_single_fixture_get_error (this->fixture));
-        }
-    }
-    virtual void TearDown (benchmark::State& state) {
-        if (state.thread_index() != 0) {
-            return;
-        }
-        if (!parallel_single_fixture_teardown (this->fixture)) {
-            state.SkipWithError (parallel_single_fixture_get_error (this->fixture));
-        }
-        parallel_single_fixture_destroy (this->fixture);
-    }
-    parallel_single_fixture_t *fixture;
+class ParallelSingleFixture : public benchmark::Fixture
+{
+ public:
+   virtual void
+   SetUp (benchmark::State &state)
+   {
+      if (state.thread_index () != 0) {
+         return;
+      }
+      this->fixture = parallel_single_fixture_new ();
+      if (!parallel_single_fixture_setup (this->fixture)) {
+         state.SkipWithError (
+            parallel_single_fixture_get_error (this->fixture));
+      }
+   }
+   virtual void
+   TearDown (benchmark::State &state)
+   {
+      if (state.thread_index () != 0) {
+         return;
+      }
+      if (!parallel_single_fixture_teardown (this->fixture)) {
+         state.SkipWithError (
+            parallel_single_fixture_get_error (this->fixture));
+      }
+      parallel_single_fixture_destroy (this->fixture);
+   }
+   parallel_single_fixture_t *fixture;
 };
 
-BENCHMARK_DEFINE_F (ParallelSingleFixture, Ping) (benchmark::State& state) {
-    for (auto _ : state) {
-        if (!parallel_single_fixture_ping (fixture, state.thread_index())) {
-            state.SkipWithError (parallel_single_fixture_get_error (this->fixture));
-        }
-    }
-    state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
+BENCHMARK_DEFINE_F (ParallelSingleFixture, Ping) (benchmark::State &state)
+{
+   for (auto _ : state) {
+      if (!parallel_single_fixture_ping (fixture, state.thread_index ())) {
+         state.SkipWithError (
+            parallel_single_fixture_get_error (this->fixture));
+      }
+   }
+   state.counters["ops_per_sec"] =
+      benchmark::Counter (state.iterations (), benchmark::Counter::kIsRate);
 }
 
-BENCHMARK_REGISTER_F (ParallelSingleFixture, Ping)->
-    Unit(benchmark::TimeUnit::kMicrosecond)->
-    UseRealTime()->
-    ThreadRange(1, 64);
+BENCHMARK_REGISTER_F (ParallelSingleFixture, Ping)
+   ->Unit (benchmark::TimeUnit::kMicrosecond)
+   ->UseRealTime ()
+   ->ThreadRange (1, 64);
 
-int main(int argc, char** argv) {                                     
-    mongoc_init ();
-    benchmark::Initialize(&argc, argv);                               
-    if (benchmark::ReportUnrecognizedArguments(argc, argv)) return 1; 
-    benchmark::RunSpecifiedBenchmarks();                              
-    benchmark::Shutdown();                                            
-    mongoc_cleanup ();
-    return 0;                                                           
+int
+main (int argc, char **argv)
+{
+   mongoc_init ();
+   benchmark::Initialize (&argc, argv);
+   if (benchmark::ReportUnrecognizedArguments (argc, argv))
+      return 1;
+   benchmark::RunSpecifiedBenchmarks ();
+   benchmark::Shutdown ();
+   mongoc_cleanup ();
+   return 0;
 }

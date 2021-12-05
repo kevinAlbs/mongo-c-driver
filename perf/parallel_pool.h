@@ -35,9 +35,9 @@ bool
 parallel_pool_fixture_setup (parallel_pool_fixture_t *fixture);
 
 bool
-parallel_pool_fixture_teardown (parallel_pool_fixture_t* fixture);
+parallel_pool_fixture_teardown (parallel_pool_fixture_t *fixture);
 
-const char*
+const char *
 parallel_pool_fixture_get_error (parallel_pool_fixture_t *fixture);
 
 bool
