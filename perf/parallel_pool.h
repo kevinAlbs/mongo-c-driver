@@ -23,6 +23,8 @@
 extern "C" {
 #endif
 
+/* parallel_pool_fixture contains a mongoc_client_pool. Enables testing
+ * performance of a mongoc_client_pool_t across multiple threads. */
 typedef struct _parallel_pool_fixture_t parallel_pool_fixture_t;
 
 parallel_pool_fixture_t *
@@ -40,6 +42,8 @@ parallel_pool_fixture_teardown (parallel_pool_fixture_t *fixture);
 const char *
 parallel_pool_fixture_get_error (parallel_pool_fixture_t *fixture);
 
+/* parallel_pool_fixture_ping pops a client from mongoc_client_pool and runs a
+ * "ping". */
 bool
 parallel_pool_fixture_ping (parallel_pool_fixture_t *fixture, int thread_index);
 
