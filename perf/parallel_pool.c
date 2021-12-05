@@ -27,7 +27,8 @@ struct _parallel_pool_fixture_t {
 };
 
 parallel_pool_fixture_t *
-parallel_pool_fixture_new () {
+parallel_pool_fixture_new ()
+{
    parallel_pool_fixture_t *fixture;
 
    fixture = bson_malloc0 (sizeof (parallel_pool_fixture_t));
@@ -36,7 +37,8 @@ parallel_pool_fixture_new () {
 }
 
 void
-parallel_pool_fixture_destroy (parallel_pool_fixture_t *fixture) {
+parallel_pool_fixture_destroy (parallel_pool_fixture_t *fixture)
+{
    if (!fixture) {
       return;
    }
@@ -53,7 +55,8 @@ parallel_pool_fixture_setup (parallel_pool_fixture_t *fixture)
    char *uristr = NULL;
    mongoc_client_t *clients[MONGOC_DEFAULT_MAX_POOL_SIZE] = {0};
    int i;
-   bson_t *logcmd = BCON_NEW ("setParameter", BCON_INT32(1), "logLevel", BCON_INT32(0));
+   bson_t *logcmd =
+      BCON_NEW ("setParameter", BCON_INT32 (1), "logLevel", BCON_INT32 (0));
 
    uristr = perf_getenv (MONGODB_URI_ENV);
    uri = uristr ? mongoc_uri_new (uristr)
@@ -61,7 +64,7 @@ parallel_pool_fixture_setup (parallel_pool_fixture_t *fixture)
    fixture->pool = mongoc_client_pool_new (uri);
 
    bson_init (&fixture->ping);
-   BCON_APPEND (&fixture->ping, "ping", BCON_INT32(1));
+   BCON_APPEND (&fixture->ping, "ping", BCON_INT32 (1));
 
    /* Pop all clients and run one operation to open all application connections.
     */
@@ -111,14 +114,16 @@ done:
 }
 
 bool
-parallel_pool_fixture_teardown (parallel_pool_fixture_t* fixture) {
+parallel_pool_fixture_teardown (parallel_pool_fixture_t *fixture)
+{
    bson_destroy (&fixture->ping);
    mongoc_client_pool_destroy (fixture->pool);
    return true;
 }
 
-const char*
-parallel_pool_fixture_get_error (parallel_pool_fixture_t *fixture) {
+const char *
+parallel_pool_fixture_get_error (parallel_pool_fixture_t *fixture)
+{
    return fixture->errmsg->str;
 }
 

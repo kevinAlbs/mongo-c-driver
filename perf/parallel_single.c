@@ -27,7 +27,8 @@ struct _parallel_single_fixture_t {
 };
 
 parallel_single_fixture_t *
-parallel_single_fixture_new () {
+parallel_single_fixture_new ()
+{
    parallel_single_fixture_t *fixture;
 
    fixture = bson_malloc0 (sizeof (parallel_single_fixture_t));
@@ -36,7 +37,8 @@ parallel_single_fixture_new () {
 }
 
 void
-parallel_single_fixture_destroy (parallel_single_fixture_t *fixture) {
+parallel_single_fixture_destroy (parallel_single_fixture_t *fixture)
+{
    if (!fixture) {
       return;
    }
@@ -52,14 +54,15 @@ parallel_single_fixture_setup (parallel_single_fixture_t *fixture)
    mongoc_uri_t *uri = NULL;
    char *uristr = NULL;
    int i;
-   bson_t *logcmd = BCON_NEW ("setParameter", BCON_INT32(1), "logLevel", BCON_INT32(0));
+   bson_t *logcmd =
+      BCON_NEW ("setParameter", BCON_INT32 (1), "logLevel", BCON_INT32 (0));
 
    uristr = perf_getenv (MONGODB_URI_ENV);
    uri = uristr ? mongoc_uri_new (uristr)
                 : mongoc_uri_new ("mongodb://localhost:27017");
 
    bson_init (&fixture->ping);
-   BCON_APPEND (&fixture->ping, "ping", BCON_INT32(1));
+   BCON_APPEND (&fixture->ping, "ping", BCON_INT32 (1));
 
    /* Run one operation to open all application connections on each client. */
    for (i = 0; i < MONGOC_DEFAULT_MAX_POOL_SIZE; i++) {
@@ -104,7 +107,8 @@ done:
 }
 
 bool
-parallel_single_fixture_teardown (parallel_single_fixture_t* fixture) {
+parallel_single_fixture_teardown (parallel_single_fixture_t *fixture)
+{
    int i;
 
    bson_destroy (&fixture->ping);
@@ -114,13 +118,15 @@ parallel_single_fixture_teardown (parallel_single_fixture_t* fixture) {
    return true;
 }
 
-const char*
-parallel_single_fixture_get_error (parallel_single_fixture_t *fixture) {
+const char *
+parallel_single_fixture_get_error (parallel_single_fixture_t *fixture)
+{
    return fixture->errmsg->str;
 }
 
 bool
-parallel_single_fixture_ping (parallel_single_fixture_t *fixture, int thread_index)
+parallel_single_fixture_ping (parallel_single_fixture_t *fixture,
+                              int thread_index)
 {
    bool ret = false;
    mongoc_client_t *client;
