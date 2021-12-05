@@ -17,7 +17,9 @@
 // Only 100 clients can be checked out of a pool concurrently.
 #define MONGOC_DEFAULT_MAX_POOL_SIZE 100
 
-class WorkloadFindFixture : public benchmark::Fixture {
+// ParallelPoolFixture creates a mongoc_client_pool_t for use in multi-threaded benchmarks.
+// The benchmark thread count must not exceed MONGOC_DEFAULT_MAX_POOL_SIZE.
+class ParallelPoolFixture : public benchmark::Fixture {
 public:
     /* SetUp creates pool_, warms up all client connections, and drops db.coll.
      * May be called by any thread in the benchmark. Skips if not the main thread. */
@@ -90,7 +92,7 @@ public:
 
 
 
-BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadPing) (benchmark::State& state) {
+BENCHMARK_DEFINE_F (ParallelPoolFixture, WorkloadPing) (benchmark::State& state) {
     bson_t cmd = BSON_INITIALIZER;
     bson_error_t error;
 
@@ -111,13 +113,14 @@ BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadPing) (benchmark::State& state)
     bson_destroy (&cmd);
 }
 
-BENCHMARK_REGISTER_F (WorkloadFindFixture, WorkloadPing)->
+BENCHMARK_REGISTER_F (ParallelPoolFixture, WorkloadPing)->
     Unit(benchmark::TimeUnit::kMicrosecond)->
     UseRealTime()->
     ThreadRange(1, 64);
     // ->MinTime(10); - may help with stability.
 
-class WorkloadFindSingleFixture : public benchmark::Fixture {
+// ParallelSingleFixture creates multiple single-threaded mongoc_client_t for use in multi-threaded benchmarks.
+class ParallelSingleFixture : public benchmark::Fixture {
 public:
     /* SetUp creates pool_, warms up all client connections, and drops db.coll.
      * May be called by any thread in the benchmark. Skips if not the main thread. */
@@ -141,7 +144,7 @@ public:
         {
             clients_[i] = mongoc_client_new_from_uri(uri);
             if (!clients_[i]) {
-                state.SkipWithError("unable to pop client in mongoc_client_pool_pop");
+                state.SkipWithError("unable to create client");
                 return; // TODO: do not leak clients.
             }
         }
@@ -190,7 +193,7 @@ public:
 
 
 
-BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadPing) (benchmark::State& state) {
+BENCHMARK_DEFINE_F (ParallelSingleFixture, WorkloadPing) (benchmark::State& state) {
     bson_t cmd = BSON_INITIALIZER;
     bson_error_t error;
     BCON_APPEND (&cmd, "ping", BCON_INT32(1));
@@ -209,7 +212,7 @@ BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadPing) (benchmark::State& 
     bson_destroy (&cmd);
 }
 
-BENCHMARK_REGISTER_F (WorkloadFindSingleFixture, WorkloadPing)->
+BENCHMARK_REGISTER_F (ParallelSingleFixture, WorkloadPing)->
     Unit(benchmark::TimeUnit::kMicrosecond)->
     UseRealTime()->
     ThreadRange(1, 64);
