@@ -5,18 +5,23 @@
 #include <cstdlib>
 #include <cstring>
 
+// MONGODB_URI_ENV is the name of an optional environment variable to set a custom URI.
+// If it is not set, the default URI is "mongodb://localhost:27017".
 #define MONGODB_URI_ENV "MONGODB_URI"
 
+// MONGODB_ERROR_NOT_FOUND is a server error code for "ns not found" to ignore if
+// dropping an unknown collection.
 #define MONGODB_ERROR_NOT_FOUND 26
+
 // libmongoc uses a max client pool size of 100 by default.
 // Only 100 clients can be checked out of a pool concurrently.
 #define MONGOC_DEFAULT_MAX_POOL_SIZE 100
 
 class WorkloadFindFixture : public benchmark::Fixture {
 public:
-    /* BeforeLoop creates pool_, warms up all client connections, and drops db.coll.
+    /* SetUp creates pool_, warms up all client connections, and drops db.coll.
      * May be called by any thread in the benchmark. Skips if not the main thread. */
-    void BeforeLoop (benchmark::State& state) {
+    virtual void SetUp (benchmark::State& state) {
         bson_error_t error;
         mongoc_uri_t *uri;
         const char *uristr = std::getenv(MONGODB_URI_ENV);
@@ -73,7 +78,7 @@ public:
         bson_destroy (logcmd);
     }
     
-    void AfterLoop (benchmark::State& state) {
+    virtual void TearDown (benchmark::State& state) {
         if (state.thread_index() == 0) {
             mongoc_client_pool_destroy(pool_);
         }
@@ -87,7 +92,6 @@ BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadFind) (benchmark::State& state)
     bson_error_t error;
     BCON_APPEND (&filter, "_id", BCON_INT32(0));
 
-    this->BeforeLoop (state);
     for (auto _ : state) {
         mongoc_client_t *client;
         mongoc_collection_t *coll;
@@ -110,7 +114,6 @@ BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadFind) (benchmark::State& state)
         mongoc_client_pool_push(pool_, client);
     }
     state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
-    this->AfterLoop (state);
     bson_destroy (&filter);
 }
 
@@ -128,7 +131,6 @@ BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadPing) (benchmark::State& state)
     BCON_APPEND (&cmd, "ping", BCON_INT32(1));
     prefs = mongoc_read_prefs_new (MONGOC_READ_NEAREST);
 
-    this->BeforeLoop (state);
     for (auto _ : state) {
         mongoc_client_t *client;
 
@@ -141,7 +143,6 @@ BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadPing) (benchmark::State& state)
         mongoc_client_pool_push(pool_, client);
     }
     state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
-    this->AfterLoop (state);
     bson_destroy (&cmd);
     mongoc_read_prefs_destroy (prefs);
 }
@@ -154,9 +155,9 @@ BENCHMARK_REGISTER_F (WorkloadFindFixture, WorkloadPing)->
 
 class WorkloadFindSingleFixture : public benchmark::Fixture {
 public:
-    /* BeforeLoop creates pool_, warms up all client connections, and drops db.coll.
+    /* SetUp creates pool_, warms up all client connections, and drops db.coll.
      * May be called by any thread in the benchmark. Skips if not the main thread. */
-    void BeforeLoop (benchmark::State& state) {
+    virtual void SetUp (benchmark::State& state) {
         bson_error_t error;
         mongoc_uri_t *uri;
         const char *uristr = std::getenv(MONGODB_URI_ENV);
@@ -211,7 +212,7 @@ public:
         mongoc_uri_destroy(uri);
     }
     
-    void AfterLoop (benchmark::State& state) {
+    virtual void TearDown (benchmark::State& state) {
         if (state.thread_index() == 0) {
             for (int i = 0; i < MONGOC_DEFAULT_MAX_POOL_SIZE; i++) {
                 mongoc_client_destroy (clients_[i]);
@@ -230,7 +231,6 @@ BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadFind) (benchmark::State& 
 
     prefs = mongoc_read_prefs_new (MONGOC_READ_NEAREST);
 
-    this->BeforeLoop (state);
     for (auto _ : state) {
         mongoc_client_t *client;
         mongoc_collection_t *coll;
@@ -252,7 +252,6 @@ BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadFind) (benchmark::State& 
         mongoc_collection_destroy(coll);
     }
     state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
-    this->AfterLoop (state);
     bson_destroy (&filter);
     mongoc_read_prefs_destroy (prefs);
 }
@@ -271,7 +270,6 @@ BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadPing) (benchmark::State& 
 
     prefs = mongoc_read_prefs_new (MONGOC_READ_NEAREST);
 
-    this->BeforeLoop (state);
     for (auto _ : state) {
         mongoc_client_t *client;
 
@@ -282,7 +280,6 @@ BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadPing) (benchmark::State& 
 
     }
     state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
-    this->AfterLoop (state);
     bson_destroy (&cmd);
     mongoc_read_prefs_destroy (prefs);
 }
