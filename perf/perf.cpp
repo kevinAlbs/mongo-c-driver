@@ -92,7 +92,7 @@ public:
 
 
 
-BENCHMARK_DEFINE_F (ParallelPoolFixture, WorkloadPing) (benchmark::State& state) {
+BENCHMARK_DEFINE_F (ParallelPoolFixture, Ping) (benchmark::State& state) {
     bson_t cmd = BSON_INITIALIZER;
     bson_error_t error;
 
@@ -113,7 +113,7 @@ BENCHMARK_DEFINE_F (ParallelPoolFixture, WorkloadPing) (benchmark::State& state)
     bson_destroy (&cmd);
 }
 
-BENCHMARK_REGISTER_F (ParallelPoolFixture, WorkloadPing)->
+BENCHMARK_REGISTER_F (ParallelPoolFixture, Ping)->
     Unit(benchmark::TimeUnit::kMicrosecond)->
     UseRealTime()->
     ThreadRange(1, 64);
@@ -193,7 +193,7 @@ public:
 
 
 
-BENCHMARK_DEFINE_F (ParallelSingleFixture, WorkloadPing) (benchmark::State& state) {
+BENCHMARK_DEFINE_F (ParallelSingleFixture, Ping) (benchmark::State& state) {
     bson_t cmd = BSON_INITIALIZER;
     bson_error_t error;
     BCON_APPEND (&cmd, "ping", BCON_INT32(1));
@@ -212,7 +212,7 @@ BENCHMARK_DEFINE_F (ParallelSingleFixture, WorkloadPing) (benchmark::State& stat
     bson_destroy (&cmd);
 }
 
-BENCHMARK_REGISTER_F (ParallelSingleFixture, WorkloadPing)->
+BENCHMARK_REGISTER_F (ParallelSingleFixture, Ping)->
     Unit(benchmark::TimeUnit::kMicrosecond)->
     UseRealTime()->
     ThreadRange(1, 64);
