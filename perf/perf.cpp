@@ -142,6 +142,137 @@ BENCHMARK_REGISTER_F (WorkloadFindFixture, WorkloadPing)->
     ThreadRange(1, 64);
     // ->MinTime(10); - may help with stability.
 
+class WorkloadFindSingleFixture : public benchmark::Fixture {
+public:
+    /* BeforeLoop creates pool_, warms up all client connections, and drops db.coll.
+     * May be called by any thread in the benchmark. Skips if not the main thread. */
+    void BeforeLoop (benchmark::State& state) {
+        bson_error_t error;
+        mongoc_uri_t *uri;
+        const char *uristr = std::getenv(MONGODB_URI_ENV);
+        mongoc_collection_t *coll;
+        int i;
+
+        // Skip if not the main thread.
+        if (state.thread_index() != 0) {
+            return;
+        }
+
+        uri = uristr ? mongoc_uri_new(uristr) : mongoc_uri_new("mongodb://localhost:27017");
+
+        // Pop all clients and run one operation to open all application connections.
+        for (i = 0; i < MONGOC_DEFAULT_MAX_POOL_SIZE; i++)
+        {
+            clients_[i] = mongoc_client_new_from_uri(uri);
+            if (!clients_[i]) {
+                state.SkipWithError("unable to pop client in mongoc_client_pool_pop");
+                return; // TODO: do not leak clients.
+            }
+        }
+
+        // Use one client to drop the db.coll collection.
+        coll = mongoc_client_get_collection(clients_[0], "db", "coll");
+        if (!mongoc_collection_drop(coll, &error) && error.code != MONGODB_ERROR_NOT_FOUND) {
+            state.SkipWithError("error in mongoc_collection_drop"); // TODO: include error.message.
+            return; // TODO: do not leak clients or coll.
+        }
+        mongoc_collection_destroy (coll);
+
+        for (i = 0; i < MONGOC_DEFAULT_MAX_POOL_SIZE; i++)
+        {
+            bson_t *cmd = BCON_NEW("ping", BCON_INT32(1));
+
+            if (!mongoc_client_command_simple(clients_[i], "db", cmd, NULL /* read_prefs */, NULL /* reply */, &error)) {
+                state.SkipWithError("error in mongoc_client_command_simple");
+            }
+            bson_destroy(cmd);
+        }
+
+        mongoc_uri_destroy(uri);
+    }
+    
+    void AfterLoop (benchmark::State& state) {
+        if (state.thread_index() == 0) {
+            for (int i = 0; i < MONGOC_DEFAULT_MAX_POOL_SIZE; i++) {
+                mongoc_client_destroy (clients_[i]);
+            }
+        }
+    }
+
+    mongoc_client_t *clients_[MONGOC_DEFAULT_MAX_POOL_SIZE];
+};
+
+BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadFind) (benchmark::State& state) {
+    bson_t filter = BSON_INITIALIZER;
+    bson_error_t error;
+    mongoc_read_prefs_t *prefs;
+    BCON_APPEND (&filter, "_id", BCON_INT32(0));
+
+    prefs = mongoc_read_prefs_new (MONGOC_READ_NEAREST);
+
+    this->BeforeLoop (state);
+    for (auto _ : state) {
+        mongoc_client_t *client;
+        mongoc_collection_t *coll;
+        mongoc_cursor_t *cursor;
+        const bson_t *doc;
+
+        client = this->clients_[state.thread_index()];
+        coll = mongoc_client_get_collection(client, "db", "coll");
+        cursor = mongoc_collection_find_with_opts(coll, &filter, NULL /* opts */, prefs);
+        if (mongoc_cursor_next(cursor, &doc)) {
+            state.SkipWithError("unexpected document returned from mongoc_cursor_next");
+        }
+
+        if (mongoc_cursor_error(cursor, &error)) {
+            state.SkipWithError("error in mongoc_cursor_next"); // TODO: include error.message.
+        }
+
+        mongoc_cursor_destroy(cursor);
+        mongoc_collection_destroy(coll);
+    }
+    state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
+    this->AfterLoop (state);
+    bson_destroy (&filter);
+    mongoc_read_prefs_destroy (prefs);
+}
+
+BENCHMARK_REGISTER_F (WorkloadFindSingleFixture, WorkloadFind)->
+    Unit(benchmark::TimeUnit::kMicrosecond)->
+    UseRealTime()->
+    ThreadRange(1, 64);
+    // ->MinTime(10); - may help with stability.
+
+BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadPing) (benchmark::State& state) {
+    bson_t cmd = BSON_INITIALIZER;
+    bson_error_t error;
+    mongoc_read_prefs_t *prefs;
+    BCON_APPEND (&cmd, "ping", BCON_INT32(1));
+
+    prefs = mongoc_read_prefs_new (MONGOC_READ_NEAREST);
+
+    this->BeforeLoop (state);
+    for (auto _ : state) {
+        mongoc_client_t *client;
+
+        client = this->clients_[state.thread_index()];
+        if (!mongoc_client_command_simple (client, "db", &cmd, prefs, NULL /* reply */, &error)) {
+            state.SkipWithError("error in mongoc_cursor_next"); // TODO: include error.message.
+        }
+
+    }
+    state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
+    this->AfterLoop (state);
+    bson_destroy (&cmd);
+    mongoc_read_prefs_destroy (prefs);
+}
+
+BENCHMARK_REGISTER_F (WorkloadFindSingleFixture, WorkloadPing)->
+    Unit(benchmark::TimeUnit::kMicrosecond)->
+    UseRealTime()->
+    ThreadRange(1, 64);
+    // ->MinTime(10); - may help with stability.
+
 int main(int argc, char** argv) {                                     
     mongoc_init ();
     benchmark::Initialize(&argc, argv);                               
