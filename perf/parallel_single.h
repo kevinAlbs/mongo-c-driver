@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef PARALLEL_SINGLE_H
+#define PARALLEL_SINGLE_H
 
 #include <mongoc/mongoc.h>
 
@@ -45,3 +46,5 @@ parallel_single_fixture_ping (parallel_single_fixture_t *fixture, int thread_ind
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* PARALLEL_SINGLE_H */

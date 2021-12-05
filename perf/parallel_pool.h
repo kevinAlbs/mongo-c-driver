@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef PARALLEL_POOL_H
+#define PARALLEL_POOL_H
 
 #include <mongoc/mongoc.h>
 
@@ -45,3 +46,5 @@ parallel_pool_fixture_ping (parallel_pool_fixture_t *fixture, int thread_index);
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* PARALLEL_POOL_H */
