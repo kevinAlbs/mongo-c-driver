@@ -87,41 +87,8 @@ public:
     mongoc_client_pool_t *pool_;
 };
 
-BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadFind) (benchmark::State& state) {
-    bson_t filter = BSON_INITIALIZER;
-    bson_error_t error;
-    BCON_APPEND (&filter, "_id", BCON_INT32(0));
 
-    for (auto _ : state) {
-        mongoc_client_t *client;
-        mongoc_collection_t *coll;
-        mongoc_cursor_t *cursor;
-        const bson_t *doc;
 
-        client = mongoc_client_pool_pop(pool_);
-        coll = mongoc_client_get_collection(client, "db", "coll");
-        cursor = mongoc_collection_find_with_opts(coll, &filter, NULL /* opts */, NULL /* read_prefs */);
-        if (mongoc_cursor_next(cursor, &doc)) {
-            state.SkipWithError("unexpected document returned from mongoc_cursor_next");
-        }
-
-        if (mongoc_cursor_error(cursor, &error)) {
-            state.SkipWithError("error in mongoc_cursor_next"); // TODO: include error.message.
-        }
-
-        mongoc_cursor_destroy(cursor);
-        mongoc_collection_destroy(coll);
-        mongoc_client_pool_push(pool_, client);
-    }
-    state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
-    bson_destroy (&filter);
-}
-
-BENCHMARK_REGISTER_F (WorkloadFindFixture, WorkloadFind)->
-    Unit(benchmark::TimeUnit::kMicrosecond)->
-    UseRealTime()->
-    ThreadRange(1, 64);
-    // ->MinTime(10); - may help with stability.
 
 BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadPing) (benchmark::State& state) {
     bson_t cmd = BSON_INITIALIZER;
@@ -220,41 +187,8 @@ public:
     mongoc_client_t *clients_[MONGOC_DEFAULT_MAX_POOL_SIZE];
 };
 
-BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadFind) (benchmark::State& state) {
-    bson_t filter = BSON_INITIALIZER;
-    bson_error_t error;
-    BCON_APPEND (&filter, "_id", BCON_INT32(0));
 
 
-    for (auto _ : state) {
-        mongoc_client_t *client;
-        mongoc_collection_t *coll;
-        mongoc_cursor_t *cursor;
-        const bson_t *doc;
-
-        client = this->clients_[state.thread_index()];
-        coll = mongoc_client_get_collection(client, "db", "coll");
-        cursor = mongoc_collection_find_with_opts(coll, &filter, NULL /* opts */, NULL /* prefs */);
-        if (mongoc_cursor_next(cursor, &doc)) {
-            state.SkipWithError("unexpected document returned from mongoc_cursor_next");
-        }
-
-        if (mongoc_cursor_error(cursor, &error)) {
-            state.SkipWithError("error in mongoc_cursor_next"); // TODO: include error.message.
-        }
-
-        mongoc_cursor_destroy(cursor);
-        mongoc_collection_destroy(coll);
-    }
-    state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
-    bson_destroy (&filter);
-}
-
-BENCHMARK_REGISTER_F (WorkloadFindSingleFixture, WorkloadFind)->
-    Unit(benchmark::TimeUnit::kMicrosecond)->
-    UseRealTime()->
-    ThreadRange(1, 64);
-    // ->MinTime(10); - may help with stability.
 
 BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadPing) (benchmark::State& state) {
     bson_t cmd = BSON_INITIALIZER;
