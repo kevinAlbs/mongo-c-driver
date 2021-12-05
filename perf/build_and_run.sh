@@ -1,11 +1,16 @@
+# build_and_run.sh is meant to be run on Evergreen. May be run locally. Does the following:
+# - Installs the C driver.
+# - Installs Google Benchmark.
+# - Builds `perf`
+# - Runs `perf`
+# - Outputs results of `perf` for Evergreen's perf.send command.
+
 if [ "$(basename $(pwd))" != "mongo-c-driver" -a  "$(basename $(pwd))" != "mongoc" ]; then
     echo "Error: $0 must be run with mongo-c-driver or mongoc as working directory."
     exit 1
 fi
 
 . ./.evergreen/find-cmake.sh
-
-set -o xtrace # TODO: remove
 
 MONGOC_INSTALL_PATH=${MONGOC_INSTALL_PATH:-$(pwd)/perf_install}
 SKIP_MONGOC_INSTALL=${SKIP_MONGOC_INSTALL:-OFF}
@@ -24,10 +29,8 @@ if [ "$SKIP_MONGOC_INSTALL" = "OFF" ]; then
 
     $CMAKE \
         -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF \
-        -DENABLE_SHM_COUNTERS=OFF \
         -DENABLE_TESTS=OFF \
         -DENABLE_EXAMPLES=OFF \
-        -DENABLE_STATIC=ON \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=$MONGOC_INSTALL_PATH \
         ..
@@ -82,7 +85,6 @@ if [ "$SKIP_PERF_RUN" = "OFF" ]; then
         --benchmark_display_aggregates_only=true \
         --benchmark_counters_tabular=true \
         --benchmark_min_time=10
-        # TODO: add min_time
 fi
 
 if [ "$SKIP_PERF_REPORT" = "OFF" ]; then
