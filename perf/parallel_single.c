@@ -53,11 +53,13 @@ parallel_single_fixture_setup (parallel_single_fixture_t *fixture)
    char *uristr = NULL;
    int i;
    bson_t *logcmd = BCON_NEW ("setParameter", BCON_INT32(1), "logLevel", BCON_INT32(0));
-   bson_t *pingcmd = BCON_NEW ("ping", BCON_INT32 (1));
 
    uristr = perf_getenv (MONGODB_URI_ENV);
    uri = uristr ? mongoc_uri_new (uristr)
                 : mongoc_uri_new ("mongodb://localhost:27017");
+
+   bson_init (&fixture->ping);
+   BCON_APPEND (&fixture->ping, "ping", BCON_INT32(1));
 
    /* Run one operation to open all application connections on each client. */
    for (i = 0; i < MONGOC_DEFAULT_MAX_POOL_SIZE; i++) {
@@ -65,7 +67,7 @@ parallel_single_fixture_setup (parallel_single_fixture_t *fixture)
 
       if (!mongoc_client_command_simple (fixture->clients[i],
                                          "db",
-                                         pingcmd,
+                                         &fixture->ping,
                                          NULL /* read_prefs */,
                                          NULL /* reply */,
                                          &error)) {
@@ -92,11 +94,8 @@ parallel_single_fixture_setup (parallel_single_fixture_t *fixture)
       goto done;
    }
 
-   bson_init (&fixture->ping);
-   BCON_APPEND (&fixture->ping, "ping", BCON_INT32(1));
    ret = true;
 done:
-   bson_destroy (pingcmd);
    bson_free (uristr);
    bson_destroy (logcmd);
    mongoc_uri_destroy (uri);
