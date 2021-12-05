@@ -23,6 +23,9 @@
 extern "C" {
 #endif
 
+/* mongoc_client_pool_t contains an array of single-threaded mongoc_client_t.
+ * Serves as a baseline to compare multi-threaded performance of a
+ * mongoc_client_pool_t. */
 typedef struct _parallel_single_fixture_t parallel_single_fixture_t;
 
 parallel_single_fixture_t *
@@ -40,6 +43,8 @@ parallel_single_fixture_teardown (parallel_single_fixture_t *fixture);
 const char *
 parallel_single_fixture_get_error (parallel_single_fixture_t *fixture);
 
+/* parallel_single_fixture_ping uses mongoc_client_t identified by the
+ * thread_index and runs a "ping". */
 bool
 parallel_single_fixture_ping (parallel_single_fixture_t *fixture,
                               int thread_index);

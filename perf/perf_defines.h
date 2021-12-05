@@ -23,8 +23,7 @@
 #define MONGODB_URI_ENV "MONGODB_URI"
 
 /* MONGODB_ERROR_NOT_FOUND is a server error code for "ns not found" to ignore
- * if */
-/* dropping an unknown collection. */
+ * if dropping an unknown collection. */
 #define MONGODB_ERROR_NOT_FOUND 26
 
 /* libmongoc uses a max client pool size of 100 by default. */
