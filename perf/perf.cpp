@@ -126,17 +126,15 @@ BENCHMARK_REGISTER_F (WorkloadFindFixture, WorkloadFind)->
 BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadPing) (benchmark::State& state) {
     bson_t cmd = BSON_INITIALIZER;
     bson_error_t error;
-    mongoc_read_prefs_t *prefs;
 
     BCON_APPEND (&cmd, "ping", BCON_INT32(1));
-    prefs = mongoc_read_prefs_new (MONGOC_READ_NEAREST);
 
     for (auto _ : state) {
         mongoc_client_t *client;
 
         client = mongoc_client_pool_pop(pool_);
 
-        if (!mongoc_client_command_simple (client, "db", &cmd, prefs, NULL /* reply */, &error)) {
+        if (!mongoc_client_command_simple (client, "db", &cmd, NULL /* read prefs */, NULL /* reply */, &error)) {
             state.SkipWithError("error in mongoc_client_command_simple"); // TODO: include error.message.
         }
 
@@ -144,7 +142,6 @@ BENCHMARK_DEFINE_F (WorkloadFindFixture, WorkloadPing) (benchmark::State& state)
     }
     state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
     bson_destroy (&cmd);
-    mongoc_read_prefs_destroy (prefs);
 }
 
 BENCHMARK_REGISTER_F (WorkloadFindFixture, WorkloadPing)->
@@ -226,10 +223,8 @@ public:
 BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadFind) (benchmark::State& state) {
     bson_t filter = BSON_INITIALIZER;
     bson_error_t error;
-    mongoc_read_prefs_t *prefs;
     BCON_APPEND (&filter, "_id", BCON_INT32(0));
 
-    prefs = mongoc_read_prefs_new (MONGOC_READ_NEAREST);
 
     for (auto _ : state) {
         mongoc_client_t *client;
@@ -239,7 +234,7 @@ BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadFind) (benchmark::State& 
 
         client = this->clients_[state.thread_index()];
         coll = mongoc_client_get_collection(client, "db", "coll");
-        cursor = mongoc_collection_find_with_opts(coll, &filter, NULL /* opts */, prefs);
+        cursor = mongoc_collection_find_with_opts(coll, &filter, NULL /* opts */, NULL /* prefs */);
         if (mongoc_cursor_next(cursor, &doc)) {
             state.SkipWithError("unexpected document returned from mongoc_cursor_next");
         }
@@ -253,7 +248,6 @@ BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadFind) (benchmark::State& 
     }
     state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
     bson_destroy (&filter);
-    mongoc_read_prefs_destroy (prefs);
 }
 
 BENCHMARK_REGISTER_F (WorkloadFindSingleFixture, WorkloadFind)->
@@ -265,23 +259,20 @@ BENCHMARK_REGISTER_F (WorkloadFindSingleFixture, WorkloadFind)->
 BENCHMARK_DEFINE_F (WorkloadFindSingleFixture, WorkloadPing) (benchmark::State& state) {
     bson_t cmd = BSON_INITIALIZER;
     bson_error_t error;
-    mongoc_read_prefs_t *prefs;
     BCON_APPEND (&cmd, "ping", BCON_INT32(1));
 
-    prefs = mongoc_read_prefs_new (MONGOC_READ_NEAREST);
 
     for (auto _ : state) {
         mongoc_client_t *client;
 
         client = this->clients_[state.thread_index()];
-        if (!mongoc_client_command_simple (client, "db", &cmd, prefs, NULL /* reply */, &error)) {
+        if (!mongoc_client_command_simple (client, "db", &cmd, NULL /* read prefs */, NULL /* reply */, &error)) {
             state.SkipWithError("error in mongoc_cursor_next"); // TODO: include error.message.
         }
 
     }
     state.counters["ops_per_sec"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
     bson_destroy (&cmd);
-    mongoc_read_prefs_destroy (prefs);
 }
 
 BENCHMARK_REGISTER_F (WorkloadFindSingleFixture, WorkloadPing)->
