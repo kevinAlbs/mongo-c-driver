@@ -1143,4 +1143,18 @@ class LoadBalancedTask(MatrixTask):
 
 all_tasks = chain(all_tasks, LoadBalancedTask.matrix())
 
+class PerfTask(Task):
+    def __init__(self, **kwargs):
+
+        super(PerfTask, self).__init__(commands=[
+            func('bootstrap mongo-orchestration', VERSION='latest'),
+            shell_mongoc('./perf/build_and_run.sh'),
+            OD([('command', 'perf.send'), ('params', OD([('name', 'perf'), ('file', 'mongoc/perf/perfsend_results.json')]))])])
+
+    @property
+    def name(self):
+        return 'perf'
+
+all_tasks = chain(all_tasks, [PerfTask()])
+
 all_tasks = list(all_tasks)

@@ -671,5 +671,6 @@ all_variants = [
         ['debug-compile-nosasl-openssl',
          'debug-compile-nosasl-nossl',
          '.versioned-api'],
-        {})
+        {}),
+    Variant('perf', 'Perf', 'ubuntu1804-large', ['perf'])
 ]
