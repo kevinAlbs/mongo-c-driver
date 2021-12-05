@@ -18,6 +18,7 @@
 
 #include "parallel_pool.h"
 #include "parallel_single.h"
+
 class ParallelPoolFixture : public benchmark::Fixture
 {
  public:
