@@ -35,7 +35,7 @@ if [ "$SKIP_MONGOC_INSTALL" = "OFF" ]; then
         -DCMAKE_INSTALL_PREFIX=$MONGOC_INSTALL_PATH \
         ..
 
-    $CMAKE --build . --target install
+    $CMAKE --build . --config Release --target install
     popd # MONGOC_INSTALL_PATH
 fi
 
@@ -67,7 +67,7 @@ if [ "$SKIP_PERF_BUILD" = "OFF" ]; then
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=17 \
         ..
-    $CMAKE --build . --target perf
+    $CMAKE --build . --config Release --target perf
     popd # cmake-build
     popd # perf
 
