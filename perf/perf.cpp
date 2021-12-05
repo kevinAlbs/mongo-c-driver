@@ -23,6 +23,7 @@ public:
         mongoc_client_t *clients[MONGOC_DEFAULT_MAX_POOL_SIZE];
         mongoc_collection_t *coll;
         int i;
+        bson_t * logcmd = BCON_NEW ("setParameter", BCON_INT32(1), "logLevel", BCON_INT32(0));
 
         // Skip if not the main thread.
         if (state.thread_index() != 0) {
@@ -51,6 +52,13 @@ public:
         }
         mongoc_collection_destroy (coll);
 
+        // Disable verbose logging. Verbose logging increases server latency of a single "ping" or "find" operation.
+        if (!mongoc_client_command_simple (clients[0], "admin", logcmd, NULL /* read prefs */, NULL /* reply */, &error)) {
+            MONGOC_ERROR ("error disabling verbose logging in mongoc_client_command_simple: %s", error.message);
+            state.SkipWithError("error disabling verbose logging in mongoc_client_command_simple");
+            return; // TODO: do not leak clients or coll.
+        }
+
         for (i = 0; i < MONGOC_DEFAULT_MAX_POOL_SIZE; i++)
         {
             bson_t *cmd = BCON_NEW("ping", BCON_INT32(1));
@@ -61,6 +69,8 @@ public:
             mongoc_client_pool_push(pool_, clients[i]);
             bson_destroy(cmd);
         }
+
+        bson_destroy (logcmd);
     }
     
     void AfterLoop (benchmark::State& state) {
@@ -152,6 +162,7 @@ public:
         const char *uristr = std::getenv(MONGODB_URI_ENV);
         mongoc_collection_t *coll;
         int i;
+        bson_t * logcmd = BCON_NEW ("setParameter", BCON_INT32(1), "logLevel", BCON_INT32(0));
 
         // Skip if not the main thread.
         if (state.thread_index() != 0) {
@@ -178,6 +189,13 @@ public:
         }
         mongoc_collection_destroy (coll);
 
+        // Disable verbose logging. Verbose logging increases server latency of a single "ping" or "find" operation.
+        if (!mongoc_client_command_simple (clients_[0], "admin", logcmd, NULL /* read prefs */, NULL /* reply */, &error)) {
+            MONGOC_ERROR ("error disabling verbose logging in mongoc_client_command_simple: %s", error.message);
+            state.SkipWithError("error disabling verbose logging in mongoc_client_command_simple");
+            return; // TODO: do not leak clients or coll.
+        }
+
         for (i = 0; i < MONGOC_DEFAULT_MAX_POOL_SIZE; i++)
         {
             bson_t *cmd = BCON_NEW("ping", BCON_INT32(1));
@@ -187,6 +205,8 @@ public:
             }
             bson_destroy(cmd);
         }
+
+        bson_destroy (logcmd);
 
         mongoc_uri_destroy(uri);
     }
