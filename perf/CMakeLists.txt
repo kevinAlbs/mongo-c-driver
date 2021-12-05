@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.2)
-project (perf LANGUAGES CXX)
-add_executable (perf perf.cpp)
+project (perf LANGUAGES CXX C)
+add_executable (perf perf.cpp parallel_pool.c parallel_single.c)
 find_package (benchmark REQUIRED)
 target_link_libraries (perf benchmark::benchmark)
 find_package (mongoc-1.0 REQUIRED)
 target_link_libraries (perf mongo::mongoc_shared)
+
+# add_executable (perfc runner.c parallel_pool.c)
+# target_link_libraries (perfc mongo::mongoc_shared)
