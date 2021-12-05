@@ -5,6 +5,3 @@ find_package (benchmark REQUIRED)
 target_link_libraries (perf benchmark::benchmark)
 find_package (mongoc-1.0 REQUIRED)
 target_link_libraries (perf mongo::mongoc_shared)
-
-# add_executable (perfc runner.c parallel_pool.c)
-# target_link_libraries (perfc mongo::mongoc_shared)
