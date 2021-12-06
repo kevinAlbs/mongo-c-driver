@@ -87,7 +87,7 @@ functions:
         set -o verbose
         set -o errexit
         rm -rf mongo-c-driver*
-        curl --retry 5 http://s3.amazonaws.com/mciuploads/mongo-c-driver/c-driver-benchmark-compile/${revision}/artifacts/${file}.tar.gz -o c-perf-binaries.tar.gz -sS --max-time 120
+        curl --retry 5 http://s3.amazonaws.com/mciuploads/mongo-c-driver/${compile_variant}/${revision}/artifacts/${file}.tar.gz -o c-perf-binaries.tar.gz -sS --max-time 120
         ${decompress} c-perf-binaries.tar.gz
         rm c-perf-binaries.tar.gz
 
@@ -290,6 +290,7 @@ buildvariants:
     <<: *mongo_v32
     <<: *benchmark_common
     file: c-binaries-centos6
+    compile_variant: c-driver-benchmark-compile
   run_on:
      - centos6-perf
   tasks: *benchmark_tests
@@ -301,6 +302,7 @@ buildvariants:
     <<: *mongo_v44
     <<: *benchmark_common
     file: c-binaries-centos6
+    compile_variant: c-driver-benchmark-compile
   run_on:
      - centos6-perf
   tasks: *benchmark_tests
@@ -312,6 +314,7 @@ buildvariants:
     <<: *mongo_v50_ubuntu
     <<: *benchmark_common
     file: c-binaries-ubuntu1804
+    compile_variant: c-driver-benchmark-mongo50-ubuntu1804
   run_on:
      - ubuntu1804-large
   tasks:
