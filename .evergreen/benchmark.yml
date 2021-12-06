@@ -255,6 +255,8 @@ tasks:
         - func: "send dashboard data"
 
     - name: BenchMarkTestsUbuntu1804
+      depends_on:
+        - compile
       commands:
         - func: "fetch artifacts"
         - func: "fetch mongodb"
