@@ -27152,6 +27152,14 @@ buildvariants:
   - debug-compile-aws
   - test-aws-openssl-regular-4.4
   - test-aws-openssl-regular-latest
+- name: macos_m1
+  display_name: 'macOS m1 (Apple LLVM)'
+  expansions:
+    CC: clang
+  run_on: macos-1100-arm64
+  tasks:
+  - debug-compile-sasl-darwinssl
+  - test-latest-server-auth-sasl-darwinssl
 - name: windows-2017-32
   display_name: Windows (i686) (VS 2017)
   expansions:
