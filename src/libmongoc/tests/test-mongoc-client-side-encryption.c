@@ -2410,6 +2410,8 @@ static mongoc_client_encryption_t *
 _make_kms_certificate_client_encryption (mongoc_client_t *client,
                                          bson_error_t *error)
 {
+   mongoc_client_encryption_t *client_encryption;
+
    mongoc_client_encryption_opts_t *client_encryption_opts =
       mongoc_client_encryption_opts_new ();
 
@@ -2443,7 +2445,7 @@ _make_kms_certificate_client_encryption (mongoc_client_t *client,
    mongoc_client_encryption_opts_set_keyvault_client (client_encryption_opts,
                                                       client);
 
-   mongoc_client_encryption_t *client_encryption =
+   client_encryption =
       mongoc_client_encryption_new (client_encryption_opts, error);
    ASSERT_OR_PRINT (client_encryption, (*error));
 
@@ -2504,7 +2506,11 @@ test_kms_tls_cert_valid (void *unused)
 static void
 test_kms_tls_cert_expired (void *unused)
 {
+   bool ret;
+
    bson_error_t error;
+
+   bson_value_t keyid;
 
    mongoc_client_t *client = test_framework_new_default_client ();
 
@@ -2521,8 +2527,7 @@ test_kms_tls_cert_expired (void *unused)
                 "89fcc2c4-08b0-4bd9-9f25-e30687b580d0', "
                 "'endpoint': '127.0.0.1:8000' }"));
 
-   bson_value_t keyid;
-   bool ret = mongoc_client_encryption_create_datakey (
+   ret = mongoc_client_encryption_create_datakey (
       client_encryption, "aws", opts, &keyid, &error);
 
    BSON_ASSERT (!ret);
@@ -2546,7 +2551,11 @@ test_kms_tls_cert_expired (void *unused)
 static void
 test_kms_tls_cert_wrong_host (void *unused)
 {
+   bool ret;
+
    bson_error_t error;
+
+   bson_value_t keyid;
 
    mongoc_client_t *client = test_framework_new_default_client ();
 
@@ -2563,8 +2572,7 @@ test_kms_tls_cert_wrong_host (void *unused)
                 "89fcc2c4-08b0-4bd9-9f25-e30687b580d0', "
                 "'endpoint': '127.0.0.1:8001' }"));
 
-   bson_value_t keyid;
-   bool ret = mongoc_client_encryption_create_datakey (
+   ret = mongoc_client_encryption_create_datakey (
       client_encryption, "aws", opts, &keyid, &error);
 
    BSON_ASSERT (!ret);
