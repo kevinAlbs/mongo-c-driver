@@ -175,7 +175,7 @@ _test_mongoc_server_api_client_pool_once (void)
 }
 
 static void
-_test_mongoc_server_api_client_uses (void)
+_test_mongoc_client_uses_server_api (void)
 {
    mongoc_client_t *client0; /* versioned */
    mongoc_client_t *client1; /* not versioned */
@@ -220,4 +220,6 @@ test_client_versioned_api_install (TestSuite *suite)
    TestSuite_Add (suite, "/VersionedApi/copy", _test_mongoc_server_api_copy);
    TestSuite_Add (
       suite, "/VersionedApi/setters", _test_mongoc_server_api_setters);
+   TestSuite_Add (
+      suite, "VersionedApi/private/client_uses_server_api", _test_mongoc_client_uses_server_api);
 }
