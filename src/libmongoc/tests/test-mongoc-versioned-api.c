@@ -174,6 +174,23 @@ _test_mongoc_server_api_client_pool_once (void)
    mongoc_uri_destroy (uri);
 }
 
+static void
+_test_mongoc_server_api_client_uses (void)
+{
+   mongoc_client_t *client;
+   mongoc_server_api_t *api;
+   bson_error_t error;
+
+   client = mongoc_client_new ("mongodb://localhost");
+   BSON_ASSERT (!client->api);
+
+   api = mongoc_server_api_new (MONGOC_SERVER_API_V1);
+
+   ASSERT_OR_PRINT (mongoc_client_set_server_api (client, api, &error), error);
+
+   ASSERT(mongoc_client_uses_server_api(client));
+}
+ 
 void
 test_client_versioned_api_install (TestSuite *suite)
 {
