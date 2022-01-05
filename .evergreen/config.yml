@@ -22,8 +22,8 @@ functions:
       script: |-
         set -o errexit
         # TODO: CDRIVER-3573 do not hardcode the version.
-        if [ -n "${github_pr_number}" -o "${is_patch}" = "true" ]; then
-           # This is a GitHub PR or patch build, probably branched from master
+        if [ -n "${github_pr_number}" -o "${is_patch}" = "true" -o "${project}" = "mongo-c-driver-release" ]; then
+           # This is a GitHub PR, patch build, or release branch.
            VERSION_CURRENT="1.18.0"
            echo $VERSION_CURRENT > "VERSION_CURRENT"
            VERSION=$VERSION_CURRENT-${version_id}
