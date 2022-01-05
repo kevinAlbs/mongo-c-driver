@@ -930,6 +930,8 @@ mock_server_receives_command (mock_server_t *server,
 
    request = mock_server_receives_request (server);
 
+//JFW: request_matches_query checks for OP_QUERY:
+//JFW: request_matches_msg checks for OP_MSG(!):
    if (request &&
        !request_matches_query (
           request, ns, flags, 0, 1, formatted_command_json, NULL, true)) {
@@ -986,7 +988,48 @@ _mock_server_receives_msg (mock_server_t *server, uint32_t flags, ...)
 
 /*--------------------------------------------------------------------------
  *
- * mock_server_receives_hello --
+ * mock_server_receives_query --
+ *
+ *       Pop a client request if one is enqueued, or wait up to
+ *       request_timeout_ms for the client to send a request.
+ *
+ * Returns:
+ *       A request you must request_destroy, or NULL if the request does
+ *       not match.
+ *
+ * Side effects:
+ *       Logs if the current request is not a query (using OP_QUERY) 
+ *       matching ns, flags, skip, n_return, query_json, and fields_json.
+ *
+ *--------------------------------------------------------------------------
+ */
+
+request_t *
+mock_server_receives_query (mock_server_t *server,
+                            const char *ns,
+                            mongoc_query_flags_t flags,
+                            uint32_t skip,
+                            int32_t n_return,
+                            const char *query_json,
+                            const char *fields_json)
+{
+   request_t *request;
+
+   request = mock_server_receives_request (server);
+
+   if (request &&
+       !request_matches_query (
+          request, ns, flags, skip, n_return, query_json, fields_json, false)) {
+      request_destroy (request);
+      return NULL;
+   }
+
+   return request;
+}
+
+/*--------------------------------------------------------------------------
+ *
+ * mock_server_receives_legacy_hello --
  *
  *       Pop a client non-streaming hello call if one is enqueued,
  *       or wait up to request_timeout_ms for the client to send a request.
@@ -996,7 +1039,8 @@ _mock_server_receives_msg (mock_server_t *server, uint32_t flags, ...)
  *       request is not a hello command.
  *
  * Side effects:
- *       Logs if the current request is not a hello command.
+ *       Logs if the current request is not a legacy hello command ("isMaster")
+ *       using OP_QUERY.
  *
  *--------------------------------------------------------------------------
  */
@@ -1014,6 +1058,7 @@ mock_server_receives_legacy_hello (mock_server_t *server,
       return NULL;
    }
 
+fprintf(stderr, "JFW: strange compare against \"%s\"\n", request->command_name), fflush(stderr);
    if (strcasecmp (request->command_name, "hello") &&
        strcasecmp (request->command_name, HANDSHAKE_CMD_LEGACY_HELLO)) {
       request_destroy (request);
@@ -1023,7 +1068,7 @@ mock_server_receives_legacy_hello (mock_server_t *server,
    formatted_command_json =
       bson_strdup_printf ("{'%s': 1, 'maxAwaitTimeMS': { '$exists': false }}",
                           request->command_name);
-
+//JFW: request_matches_query checks for OP_QUERY
    if (!request_matches_query (request,
                                "admin.$cmd",
                                MONGOC_QUERY_SECONDARY_OK,
@@ -1054,7 +1099,7 @@ mock_server_receives_legacy_hello (mock_server_t *server,
  *       request is not a hello command.
  *
  * Side effects:
- *       Logs if the current request is not a hello command.
+ *       Logs if the current request is a hello command using OP_QUERY.
  *
  *--------------------------------------------------------------------------
  */
@@ -1062,6 +1107,7 @@ mock_server_receives_legacy_hello (mock_server_t *server,
 request_t *
 mock_server_receives_hello (mock_server_t *server)
 {
+fprintf(stderr, "JFW: mock_server_receives_hello() about to call mock_server_receives_command()\n"), fflush(stderr);
    return mock_server_receives_command (
       server,
       "admin",
@@ -1069,48 +1115,32 @@ mock_server_receives_hello (mock_server_t *server)
       "{'hello': 1, 'maxAwaitTimeMS': { '$exists': false }}");
 }
 
-
 /*--------------------------------------------------------------------------
  *
- * mock_server_receives_query --
+ * mock_server_receives_hello_op_msg --
  *
- *       Pop a client request if one is enqueued, or wait up to
- *       request_timeout_ms for the client to send a request.
+ *       Pop a client non-streaming hello call if one is enqueued,
+ *       or wait up to request_timeout_ms for the client to send a request.
  *
  * Returns:
- *       A request you must request_destroy, or NULL if the request does
- *       not match.
+ *       A request you must request_destroy, or NULL if the current
+ *       request is not a hello command.
  *
  * Side effects:
- *       Logs if the current request is not a query matching ns, flags,
- *       skip, n_return, query_json, and fields_json.
+ *       Logs if the current request is a hello command using OP_MSG.
  *
  *--------------------------------------------------------------------------
  */
 
 request_t *
-mock_server_receives_query (mock_server_t *server,
-                            const char *ns,
-                            mongoc_query_flags_t flags,
-                            uint32_t skip,
-                            int32_t n_return,
-                            const char *query_json,
-                            const char *fields_json)
+mock_server_receives_hello_op_msg (mock_server_t *server)
 {
-   request_t *request;
-
-   request = mock_server_receives_request (server);
-
-   if (request &&
-       !request_matches_query (
-          request, ns, flags, skip, n_return, query_json, fields_json, false)) {
-      request_destroy (request);
-      return NULL;
-   }
-
-   return request;
+fprintf(stderr, "JFW: mock_server_receives_hello_op_msg() about to call mock_server_receives_msg()\n"), fflush(stderr);
+   return _mock_server_receives_msg(
+      server,
+      0, 
+      "{'hello': 1, 'maxAwaitTimeMS': { '$exists': false }}");
 }
-
 
 /*--------------------------------------------------------------------------
  *

@@ -2262,13 +2262,17 @@ _test_hello_versioned_api (bool pooled)
          client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
    }
 
-   request = mock_server_receives_hello (server);
+//JFW: mock_server_receives_hello() calls mock_server_receives_command(), which checks for OP_QUERY:
+// JFW: request = mock_server_receives_hello (server);
+// JFW:           ^^^^^^^^^^^^^^^^^^^^^^^^^^ what's different between receives_legacy_hello()??
+request = mock_server_receives_hello_op_msg (server);
    BSON_ASSERT (request);
    BSON_ASSERT (bson_has_field (request_get_doc (request, 0), "apiVersion"));
    mock_server_replies_simple (request, hello);
    request_destroy (request);
 
    if (!pooled) {
+//JFW: mock_server_receives_command() checks for OP_QUERY
       request = mock_server_receives_command (
          server, "admin", MONGOC_QUERY_SECONDARY_OK, "{'ping': 1}");
       mock_server_replies_ok_and_destroys (request);
