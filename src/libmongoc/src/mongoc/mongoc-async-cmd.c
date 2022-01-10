@@ -23,6 +23,7 @@
 #include "mongoc-error.h"
 #include "mongoc-opcode.h"
 #include "mongoc-rpc-private.h"
+#include "mongoc-flags-private.h"
 #include "mongoc-stream-private.h"
 #include "mongoc-server-description-private.h"
 #include "mongoc-topology-scanner-private.h"
@@ -134,20 +135,65 @@ mongoc_async_cmd_run (mongoc_async_cmd_t *acmd)
 }
 
 void
-_mongoc_async_cmd_init_send (mongoc_async_cmd_t *acmd, const char *dbname)
+_mongoc_async_cmd_init_send (const mongoc_opcode_t cmd_opcode, mongoc_async_cmd_t *acmd, const char *dbname)
 {
+fprintf(stderr, "JFW: mongoc_async_cmd_init_send()\n"), fflush(stderr);
+
+// JFW: consider changing the name because this is ONLY meant for hello... (see original comments below)
+
+
+/* JFW: the extant code sets this to zero, as do other example that I see... but I don't see where in gets
+set later? Is 0 magic??  (the docs say it should be set "https://docs.mongodb.com/manual/reference/mongodb-wire-protocol/#std-label-wp-message-header"-- units are bytes); my assumption is that this gets set elsewhere, once all the setup is collected: */
+   acmd->rpc.header.msg_len = 0; 
+   acmd->rpc.header.request_id = ++acmd->async->request_id; /* JFW: in _server_monitor_awaitable_hello_send(), this is postfix++ */
+   acmd->rpc.header.response_to = 0;
+
+   if(MONGOC_OPCODE_QUERY == cmd_opcode) {
+fprintf(stderr, "JFW: mongoc_async_cmd_init_send(): setting up OPCODE_QUERY\n"), fflush(stderr);
+
    acmd->ns = bson_strdup_printf ("%s.$cmd", dbname);
 
-   acmd->rpc.header.msg_len = 0;
-   acmd->rpc.header.request_id = ++acmd->async->request_id;
-   acmd->rpc.header.response_to = 0;
-   acmd->rpc.header.opcode = MONGOC_OPCODE_QUERY;
+   acmd->rpc.header.opcode = MONGOC_OPCODE_QUERY;    
    acmd->rpc.query.flags = MONGOC_QUERY_SECONDARY_OK;
    acmd->rpc.query.collection = acmd->ns;
    acmd->rpc.query.skip = 0;
    acmd->rpc.query.n_return = -1;
    acmd->rpc.query.query = bson_get_data (&acmd->cmd);
    acmd->rpc.query.fields = NULL;
+   }
+
+
+/*JFW: these are from mongoc-server-monitor.c's *polling hello*, maybe it needs different setup? */
+if(MONGOC_OPCODE_MSG == cmd_opcode) { 
+fprintf(stderr, "JFW: mongoc_async_cmd_init_send(): setting up OPCODE_MSG\n"), fflush(stderr);
+/* JFW: I think these get generated from the ".def" files in the source directory-- but they don't
+match the documentation at "https://docs.mongodb.com/manual/reference/mongodb-wire-protocol/", so
+it's puzzling:
+RPC(
+  msg,
+  INT32_FIELD(msg_len)
+  INT32_FIELD(request_id)
+  INT32_FIELD(response_to)
+  INT32_FIELD(opcode)
+  ENUM_FIELD(flags)
+  SECTION_ARRAY_FIELD(sections)
+
+...I don't know how they get distributed by the metaprogramming yet.
+*/
+
+   acmd->rpc.header.opcode = MONGOC_OPCODE_MSG;    
+
+   acmd->rpc.msg.msg_len = 0;
+   acmd->rpc.msg.flags = 0; /* other flags, like MONGOC_MSG_EXHAUST_ALLOWED, as per _server_monitor_awaitable_hello_send(), fail validation */
+   acmd->rpc.msg.n_sections = 1;
+   acmd->rpc.msg.sections[0].payload_type = 0;
+   acmd->rpc.msg.sections[0].payload.bson_document = bson_get_data (&acmd->cmd);
+
+/*JFW: note that _server_monitor_polling_hello() goes on to call _server_monitor_send_and_recv_opquery(); 
+_server_monitor_awaitable_hello_send() uses OP_MSG, then waits for _server_monitor_awaitable_hello_recv() */
+}
+
+_mongoc_array_init(&acmd->array, sizeof(mongoc_iovec_t)); /* JFW: as per _server_monitor_awaitable_hello_send(); needs to get destroyed at some point, I don't see code for that in here */
 
    /* This will always be hello, which are not allowed to be compressed */
    _mongoc_rpc_gather (&acmd->rpc, &acmd->array);
@@ -155,6 +201,9 @@ _mongoc_async_cmd_init_send (mongoc_async_cmd_t *acmd, const char *dbname)
    acmd->niovec = acmd->array.len;
    _mongoc_rpc_swab_to_le (&acmd->rpc);
    acmd->bytes_written = 0;
+
+
+fprintf(stderr, "JFW: mongoc_async_cmd_init_send(): DONE\n"), fflush(stderr);
 }
 
 void
@@ -182,6 +231,7 @@ mongoc_async_cmd_new (mongoc_async_t *async,
                       void *setup_ctx,
                       const char *dbname,
                       const bson_t *cmd,
+                      const mongoc_opcode_t cmd_opcode, /* OP_QUERY or OP_MSG */
                       mongoc_async_cmd_cb_t cb,
                       void *cb_data,
                       int64_t timeout_msec)
@@ -190,6 +240,8 @@ mongoc_async_cmd_new (mongoc_async_t *async,
 
    BSON_ASSERT (cmd);
    BSON_ASSERT (dbname);
+
+fprintf(stderr, "JFW: in mongoc_async_cmd_new()\n"), fflush(stderr);
 
    acmd = (mongoc_async_cmd_t *) bson_malloc0 (sizeof (*acmd));
    acmd->async = async;
@@ -208,7 +260,7 @@ mongoc_async_cmd_new (mongoc_async_t *async,
    _mongoc_array_init (&acmd->array, sizeof (mongoc_iovec_t));
    _mongoc_buffer_init (&acmd->buffer, NULL, 0, NULL, NULL);
 
-   _mongoc_async_cmd_init_send (acmd, dbname);
+   _mongoc_async_cmd_init_send (cmd_opcode, acmd, dbname);
 
    _mongoc_async_cmd_state_start (acmd, is_setup_done);
 

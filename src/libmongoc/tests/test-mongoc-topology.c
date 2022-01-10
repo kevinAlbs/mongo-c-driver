@@ -2226,12 +2226,14 @@ _test_hello_versioned_api (bool pooled)
    mongoc_uri_t *uri;
    mongoc_client_pool_t *pool;
    mongoc_client_t *client;
-   char *hello;
+   char *hello_reply; /* the server's reply to the OP_MSG hello request */
    future_t *future;
    request_t *request;
    bson_error_t error;
    mongoc_server_api_version_t version;
    mongoc_server_api_t *api;
+
+fprintf(stderr, "JFW: _test_hello_versioned_api()\n"), fflush(stderr);
 
    server = mock_server_new ();
    mock_server_run (server);
@@ -2247,17 +2249,21 @@ _test_hello_versioned_api (bool pooled)
       client = test_framework_client_new_from_uri (uri, api);
    }
 
-   hello = bson_strdup_printf ("{'ok': 1,"
+/* JFW: from _test_hello_ok(): */
+   hello_reply = bson_strdup_printf ("{'ok': 1,"
                                " 'isWritablePrimary': true,"
+                               " 'helloOk': true,"
                                " 'setName': 'rs',"
                                " 'minWireVersion': 2,"
-                               " 'maxWireVersion': 5,"
+                               " 'maxWireVersion': 6,"
                                " 'hosts': ['%s']}",
                                mock_server_get_host_and_port (server));
 
    /* For client pools, the first handshake happens when the client is popped.
     * For non-pooled clients, send a ping command to trigger a handshake. */
    if (!pooled) {
+fprintf(stderr, "JFW: at the !pooled check\n"), fflush(stderr);
+
       future = future_client_command_simple (
          client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
    }
@@ -2265,21 +2271,32 @@ _test_hello_versioned_api (bool pooled)
 //JFW: mock_server_receives_hello() calls mock_server_receives_command(), which checks for OP_QUERY:
 // JFW: request = mock_server_receives_hello (server);
 // JFW:           ^^^^^^^^^^^^^^^^^^^^^^^^^^ what's different between receives_legacy_hello()??
+// JFW:           ...answer: two ways to set up "legacy" hello-- legacy and "extra legacy".
+
 request = mock_server_receives_hello_op_msg (server);
    BSON_ASSERT (request);
    BSON_ASSERT (bson_has_field (request_get_doc (request, 0), "apiVersion"));
-   mock_server_replies_simple (request, hello);
+   BSON_ASSERT (bson_has_field (request_get_doc (request, 0), "helloOk"));
+   mock_server_replies_simple (request, hello_reply); 
    request_destroy (request);
 
    if (!pooled) {
-//JFW: mock_server_receives_command() checks for OP_QUERY
+fprintf(stderr, "JFW: test-mongoc-topology(): second !pooled check: about to call mock_server_recieves_msg()\n"), fflush(stderr);
+
+   request = mock_server_receives_msg (
+      server, MONGOC_QUERY_NONE, tmp_bson ("{'ping': 1}"));
+
+/*
+//JFW: mock_server_receives_command() checks for OPCODE_QUERY-- and also the command-format:
       request = mock_server_receives_command (
          server, "admin", MONGOC_QUERY_SECONDARY_OK, "{'ping': 1}");
+*/
       mock_server_replies_ok_and_destroys (request);
       BSON_ASSERT (future_get_bool (future));
       future_destroy (future);
    }
 
+fprintf(stderr, "JFW: back from the future (after initial ping)\n"), fflush(stderr);
    if (pooled) {
       mongoc_client_pool_push (pool, client);
       mongoc_client_pool_destroy (pool);
@@ -2290,7 +2307,7 @@ request = mock_server_receives_hello_op_msg (server);
    mongoc_server_api_destroy (api);
    mongoc_uri_destroy (uri);
    mock_server_destroy (server);
-   bson_free (hello);
+   bson_free (hello_reply);
 }
 
 static void

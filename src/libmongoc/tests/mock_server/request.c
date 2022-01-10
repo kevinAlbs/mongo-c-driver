@@ -22,6 +22,8 @@
 #include "../test-conveniences.h"
 #include "../TestSuite.h"
 
+#include "../bsonutil/bson-val.h"
+
 
 static bool
 is_command_ns (const char *ns);
@@ -55,6 +57,34 @@ static char *
 update_flags_str (uint32_t flags);
 static char *
 delete_flags_str (uint32_t flags);
+
+void JFW_dump_request_t(const request_t *r)
+{
+
+/*
+typedef struct _request_t {
+   uint8_t *data;
+   size_t data_len;
+   mongoc_rpc_t request_rpc;
+   mongoc_opcode_t opcode; // copied from rpc for convenience 
+   struct _mock_server_t *server;
+   mongoc_stream_t *client;
+   uint16_t client_port;
+   bool is_command;
+   char *command_name;
+   char *as_str;
+   mongoc_array_t docs; // array of bson_t pointers 
+   sync_queue_t *replies;
+} request_t;
+*/
+
+ fprintf(stderr, "JFW: dump_request_t():\n");
+
+fprintf(stderr, "%s\n", r->as_str);
+
+ fprintf(stderr, "-- JFW: end request_t.\n"), fflush(stderr);
+}
+
 
 request_t *
 request_new (const mongoc_buffer_t *buffer,
@@ -541,6 +571,7 @@ request_matches_msg (const request_t *request,
 {
    const bson_t *doc;
    const bson_t *pattern;
+   bson_error_t bson_error;
    bool is_command_doc;
    int i;
 
@@ -549,16 +580,30 @@ request_matches_msg (const request_t *request,
       test_error ("%s", "request's opcode does not match OP_MSG");
    }
 
+fprintf(stderr, "JFW: in request_matches_msg(): about to validate %ld docs\n", n_docs), fflush(stderr);
+fprintf(stderr, "JFW: %s\n", request->as_str), fflush(stderr);
+/* JFW: JFW_dump_request_t(request); */
+
+
    BSON_ASSERT (request->docs.len >= 1);
 
    for (i = 0; i < n_docs; i++) {
       pattern = docs[i];
 
+/* JFW: 
+if(!bson_validate_with_error(pattern, BSON_VALIDATE_EMPTY_KEYS | BSON_VALIDATE_UTF8,
+                             &bson_error)) {
+   fprintf (
+      stderr, "JFW: bson_error at doc %d:\n%d.%d: %s\n", i, bson_error.domain, bson_error.code, bson_error.message), fflush(stderr);
+}*/
+
+fprintf(stderr, "JFW: about to call bson_validate():\n"), fflush(stderr);
       /* make sure the pattern is reasonable, e.g. that we didn't pass a string
        * instead of a bson_t* by mistake */
       BSON_ASSERT (bson_validate (
-         pattern, BSON_VALIDATE_EMPTY_KEYS | BSON_VALIDATE_UTF8, NULL));
+         pattern, BSON_VALIDATE_EMPTY_KEYS | BSON_VALIDATE_UTF8, NULL)); 
 
+fprintf(stderr, "JFW: validation ok at doc %d of %ld\n", i, n_docs), fflush(stderr);
       if (i > request->docs.len) {
          fprintf (stderr,
                   "Expected at least %d documents in request, got %d\n",
@@ -570,9 +615,15 @@ request_matches_msg (const request_t *request,
       doc = request_get_doc (request, i);
       /* pass is_command=true for first doc, including "find" command */
       is_command_doc = (i == 0);
+fprintf(stderr, "JFW: is_command_doc == %s\n", is_command_doc ? "true" : "false"), fflush(stderr);
       assert_match_bson (doc, pattern, is_command_doc);
+fprintf(stderr, "JFW: assert_match_bson() OK\n"), fflush(stderr);
+
+/* JFW: with this in place, hello works... 
+fprintf(stderr, "JFW: REMOVE THIS BREAK\n"), fflush(stderr); break; // JFW: removeme  */
    }
 
+fprintf(stderr, "JFW: after doc validation\n"), fflush(stderr);
    if (n_docs < request->docs.len) {
       fprintf (stderr,
                "Expected %d documents in request, got %d\n",
@@ -628,6 +679,7 @@ request_matches_msgv (const request_t *request, uint32_t flags, va_list *args)
       }
    }
 
+fprintf(stderr, "JFW: request_matches_msgv() allocated a total of %ld docs\n", n_docs), fflush(stderr);
    r = request_matches_msg (request, flags, (const bson_t **) docs, n_docs);
    bson_free (docs);
    return r;

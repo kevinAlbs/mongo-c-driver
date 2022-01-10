@@ -3374,6 +3374,7 @@ _bson_iter_validate_corrupt (const bson_iter_t *iter, void *data)
 {
    bson_validate_state_t *state = data;
 
+fprintf(stderr, "JFW: _bson_iter_validate_corrupt()\n"), fflush(stderr);
    state->err_offset = iter->err_off;
    VALIDATION_ERR (BSON_VALIDATE_NONE, "%s", "corrupt BSON");
 }
@@ -3537,6 +3538,7 @@ _bson_validate_internal (const bson_t *bson, bson_validate_state_t *state)
    memset (&state->error, 0, sizeof state->error);
 
    if (!bson_iter_init (&iter, bson)) {
+fprintf(stderr, "JFW: _bson_validate_internal(): can't initialize bson iterator\n"), fflush(stderr);
       state->err_offset = 0;
       VALIDATION_ERR (BSON_VALIDATE_NONE, "%s", "corrupt BSON");
    } else {

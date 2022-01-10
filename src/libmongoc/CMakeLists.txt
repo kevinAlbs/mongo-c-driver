@@ -968,6 +968,7 @@ set (test-libmongoc-sources
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-handshake.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-hedged-reads.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-http.c
+   ${PROJECT_SOURCE_DIR}/tests/test-mongoc-hello.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-interrupt.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-linux-distro-scanner.c
    ${PROJECT_SOURCE_DIR}/tests/test-mongoc-list.c

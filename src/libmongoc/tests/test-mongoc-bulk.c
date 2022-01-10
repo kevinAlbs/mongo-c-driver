@@ -3411,6 +3411,8 @@ execute_numerous_bulk_op (mock_server_t *server,
    const bson_t *docs[4];
    int i, j;
 
+fprintf(stderr, "JFW: execute_numerous_bulk_op()\n"), fflush(stderr);
+
    future = future_bulk_operation_execute (bulk, NULL, &error);
 
    /* accept anything for the command body */

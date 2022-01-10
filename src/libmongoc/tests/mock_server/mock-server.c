@@ -871,6 +871,7 @@ request_assert_no_duplicate_keys (request_t *request)
 }
 
 
+/* JFW: note that mock-rs.c has another, similar function of the same name: */
 request_t *
 mock_server_receives_request (mock_server_t *server)
 {
@@ -878,9 +879,13 @@ mock_server_receives_request (mock_server_t *server)
    int64_t request_timeout_msec;
    request_t *r;
 
+fprintf(stderr, "JFW: mock_server_receives_request(): 0\n"), fflush(stderr);
    q = mock_server_get_queue (server);
+fprintf(stderr, "JFW: mock_server_receives_request(): 1\n"), fflush(stderr);
    request_timeout_msec = mock_server_get_request_timeout_msec (server);
+fprintf(stderr, "JFW: mock_server_receives_request(): 3\n"), fflush(stderr);
    r = (request_t *) q_get (q, request_timeout_msec);
+fprintf(stderr, "JFW: mock_server_receives_request(): 4 (r == %p)\n", (void *)r), fflush(stderr);
    if (r) {
       request_assert_no_duplicate_keys (r);
    }
@@ -930,8 +935,6 @@ mock_server_receives_command (mock_server_t *server,
 
    request = mock_server_receives_request (server);
 
-//JFW: request_matches_query checks for OP_QUERY:
-//JFW: request_matches_msg checks for OP_MSG(!):
    if (request &&
        !request_matches_query (
           request, ns, flags, 0, 1, formatted_command_json, NULL, true)) {
@@ -972,8 +975,13 @@ _mock_server_receives_msg (mock_server_t *server, uint32_t flags, ...)
    va_list args;
    bool r;
 
-   request = mock_server_receives_request (server);
+fprintf(stderr, "JFW: _mock_server_receives_msg(): about to call mock-server_receives_request()\n"), fflush(stderr);
+   request = mock_server_receives_request (server); 
+fprintf(stderr, "JFW: _mock_server_receives_msg(): back from mock_server_receives_request().\n"), fflush(stderr);
 
+BSON_ASSERT(request);
+
+fprintf(stderr, "JFW: _mock_server_receives_msg(): calling request_matches_msgv()...\n"), fflush(stderr);
    va_start (args, flags);
    r = request_matches_msgv (request, flags, &args);
    va_end (args);
@@ -985,6 +993,31 @@ _mock_server_receives_msg (mock_server_t *server, uint32_t flags, ...)
 
    return request;
 }
+
+/* JFW: delete this function (hack for single doc) */
+request_t *
+_mock_server_receives_msg_JFW (mock_server_t *server, uint32_t flags, bson_t *doc)
+{
+   request_t *request;
+   va_list args;
+   bool r;
+
+   bson_t *docs[] = { doc, NULL };
+
+   request = mock_server_receives_request (server);
+
+   r = request_matches_msg (request, flags, (const bson_t **)docs, 1);
+
+   if (!r) {
+fprintf(stderr, "JFW: request_matches_msg(): FAILED\n"), fflush(stderr);
+      request_destroy (request);
+      return NULL;
+   }
+
+fprintf(stderr, "JFW: request_matches_msg(): OK\n"), fflush(stderr);
+   return request;
+}
+
 
 /*--------------------------------------------------------------------------
  *
@@ -1058,7 +1091,6 @@ mock_server_receives_legacy_hello (mock_server_t *server,
       return NULL;
    }
 
-fprintf(stderr, "JFW: strange compare against \"%s\"\n", request->command_name), fflush(stderr);
    if (strcasecmp (request->command_name, "hello") &&
        strcasecmp (request->command_name, HANDSHAKE_CMD_LEGACY_HELLO)) {
       request_destroy (request);
@@ -1068,7 +1100,7 @@ fprintf(stderr, "JFW: strange compare against \"%s\"\n", request->command_name),
    formatted_command_json =
       bson_strdup_printf ("{'%s': 1, 'maxAwaitTimeMS': { '$exists': false }}",
                           request->command_name);
-//JFW: request_matches_query checks for OP_QUERY
+//JFW: note that request_matches_query checks for OP_QUERY
    if (!request_matches_query (request,
                                "admin.$cmd",
                                MONGOC_QUERY_SECONDARY_OK,
@@ -1108,6 +1140,7 @@ request_t *
 mock_server_receives_hello (mock_server_t *server)
 {
 fprintf(stderr, "JFW: mock_server_receives_hello() about to call mock_server_receives_command()\n"), fflush(stderr);
+/* JFW: interestingly, notice that there's no tmp_bson() call here: */
    return mock_server_receives_command (
       server,
       "admin",
@@ -1135,11 +1168,32 @@ fprintf(stderr, "JFW: mock_server_receives_hello() about to call mock_server_rec
 request_t *
 mock_server_receives_hello_op_msg (mock_server_t *server)
 {
-fprintf(stderr, "JFW: mock_server_receives_hello_op_msg() about to call mock_server_receives_msg()\n"), fflush(stderr);
+/* JFW: bson_t *p = tmp_bson("{'hello': 1, 'maxAwaitTimeMS': { '$exists': false }}");  */
+
+bson_t *p = tmp_bson("{'hello': 1, 'helloOk': true, 'maxAwaitTimeMS': { '$exists': false }}"); 
+
+fprintf(stderr, "JFW: mock_server_receives_hello_op_msg() about to call mock_server_receives_msg_JFW()\n"), fflush(stderr);
+
+/* JFW: this is a hack, but I so far am not sure what's causing the strangeness with the variadic version: 
+   _mock_server_receives_msg_JFW() is a non-variadic version of that function. Using the extra pointer variable
+   makes no difference vs. passing tmp_bson() directly (to either function):
+*/
+   return _mock_server_receives_msg_JFW(server, 0, p);
+
+/* JFW: trying to force doc count:    
+   return _mock_server_receives_msg_JFW(server, 0, 
+      tmp_bson("{'hello': 1, 'maxAwaitTimeMS': { '$exists': false }}"));
+*/
+
+/* JFW: original: for some reason, this gets high document counts:
+	- enough that I suspect stack corruption: I was able to change code in the
+	caller that causes the count to change at a distance...
+	- the original didn't have tmp_bson()
    return _mock_server_receives_msg(
       server,
       0, 
-      "{'hello': 1, 'maxAwaitTimeMS': { '$exists': false }}");
+      tmp_bson("{'hello': 1, 'maxAwaitTimeMS': { '$exists': false }}"));
+*/
 }
 
 /*--------------------------------------------------------------------------
