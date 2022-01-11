@@ -989,6 +989,19 @@ _mongoc_rpc_get_first_document (mongoc_rpc_t *rpc, bson_t *reply)
        _mongoc_rpc_reply_get_first (&rpc->reply, reply)) {
       return true;
    }
+   // else if (rpc->header.opcode == MONGOC_OPCODE_MSG) {
+   //    int32_t len;
+
+   //    if (rpc->msg.sections[0].payload_type != 0) {
+   //       return false;
+   //    }
+
+   //    memcpy (&len, rpc->msg.sections[0].payload.bson_document, 4);
+   //    bson_init_static (reply,
+   //       rpc->msg.sections[0].payload.bson_document,
+   //       len);
+   //    return true;
+   // }
 
    return false;
 }

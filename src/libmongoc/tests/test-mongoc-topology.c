@@ -2273,7 +2273,7 @@ fprintf(stderr, "JFW: at the !pooled check\n"), fflush(stderr);
 // JFW:           ^^^^^^^^^^^^^^^^^^^^^^^^^^ what's different between receives_legacy_hello()??
 // JFW:           ...answer: two ways to set up "legacy" hello-- legacy and "extra legacy".
 
-request = mock_server_receives_hello_op_msg (server);
+   request = mock_server_receives_hello_op_msg (server);
    BSON_ASSERT (request);
    BSON_ASSERT (bson_has_field (request_get_doc (request, 0), "apiVersion"));
    BSON_ASSERT (bson_has_field (request_get_doc (request, 0), "helloOk"));
@@ -2283,6 +2283,10 @@ request = mock_server_receives_hello_op_msg (server);
    if (!pooled) {
 fprintf(stderr, "JFW: test-mongoc-topology(): second !pooled check: about to call mock_server_recieves_msg()\n"), fflush(stderr);
 
+   /* If an error occurs before sending a "ping", the future resolves early with an error.
+    * If there is no error sending a ping, future_get_bool will hang. */
+   bool result = future_get_bool (future);
+   printf ("future got error: %s\n", error.message);
    request = mock_server_receives_msg (
       server, MONGOC_QUERY_NONE, tmp_bson ("{'ping': 1}"));
 
