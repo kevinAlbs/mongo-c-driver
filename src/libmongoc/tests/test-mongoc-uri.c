@@ -2701,6 +2701,16 @@ test_casing_options (void)
    mongoc_uri_destroy (uri);
 }
 
+static void
+test_srv_with_loadbalanced (void) {
+   mongoc_uri_t *uri;
+   bson_error_t error = {0};
+
+   uri = mongoc_uri_new_with_error ("mongodb+srv://test4.test.build.10gen.cc/?loadBalanced=true", &error);
+   ASSERT_OR_PRINT (uri, error);
+   mongoc_uri_destroy (uri);
+}
+
 void
 test_uri_install (TestSuite *suite)
 {
@@ -2735,4 +2745,5 @@ test_uri_install (TestSuite *suite)
                   "/Uri/one_tls_option_enables_tls",
                   test_one_tls_option_enables_tls);
    TestSuite_Add (suite, "/Uri/options_casing", test_casing_options);
+   TestSuite_Add (suite, "/Uri/srv_with_loadbalanced", test_srv_with_loadbalanced);
 }
