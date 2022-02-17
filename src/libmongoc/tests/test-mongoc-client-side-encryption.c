@@ -2519,7 +2519,7 @@ test_kms_tls_cert_expired (void *unused)
       tmp_bson ("{ 'region': 'us-east-1', 'key': "
                 "'arn:aws:kms:us-east-1:579766882180:key/"
                 "89fcc2c4-08b0-4bd9-9f25-e30687b580d0', "
-                "'endpoint': '127.0.0.1:8000' }"));
+                "'endpoint': '127.0.0.1:9000' }"));
 
    bson_value_t keyid;
    bool ret = mongoc_client_encryption_create_datakey (
@@ -2561,7 +2561,7 @@ test_kms_tls_cert_wrong_host (void *unused)
       tmp_bson ("{ 'region': 'us-east-1', 'key': "
                 "'arn:aws:kms:us-east-1:579766882180:key/"
                 "89fcc2c4-08b0-4bd9-9f25-e30687b580d0', "
-                "'endpoint': '127.0.0.1:8001' }"));
+                "'endpoint': '127.0.0.1:9001' }"));
 
    bson_value_t keyid;
    bool ret = mongoc_client_encryption_create_datakey (
@@ -2633,7 +2633,7 @@ _tls_test_make_client_encryption (mongoc_client_t *keyvault_client,
       bson_concat (kms_providers,
                    tmp_bson ("{'azure': {'tenantId': '%s', 'clientId': '%s', "
                              "'clientSecret': '%s', "
-                             "'identityPlatformEndpoint': '127.0.0.1:8002' }}",
+                             "'identityPlatformEndpoint': '127.0.0.1:9002' }}",
                              mongoc_test_azure_tenant_id,
                              mongoc_test_azure_client_id,
                              mongoc_test_azure_client_secret));
@@ -2646,7 +2646,7 @@ _tls_test_make_client_encryption (mongoc_client_t *keyvault_client,
 
       bson_concat (kms_providers,
                    tmp_bson ("{'gcp': { 'email': '%s', 'privateKey': '%s', "
-                             "'endpoint': '127.0.0.1:8002' }}",
+                             "'endpoint': '127.0.0.1:9002' }}",
                              mongoc_test_gcp_email,
                              mongoc_test_gcp_privatekey));
       bson_concat (
@@ -2672,13 +2672,13 @@ _tls_test_make_client_encryption (mongoc_client_t *keyvault_client,
       bson_concat (kms_providers,
                    tmp_bson ("{'azure': {'tenantId': '%s', 'clientId': '%s', "
                              "'clientSecret': '%s', "
-                             "'identityPlatformEndpoint': '127.0.0.1:8002'}}",
+                             "'identityPlatformEndpoint': '127.0.0.1:9002'}}",
                              mongoc_test_azure_tenant_id,
                              mongoc_test_azure_client_id,
                              mongoc_test_azure_client_secret));
       bson_concat (kms_providers,
                    tmp_bson ("{'gcp': { 'email': '%s', 'privateKey': '%s', "
-                             "'endpoint': '127.0.0.1:8002'}}",
+                             "'endpoint': '127.0.0.1:9002'}}",
                              mongoc_test_gcp_email,
                              mongoc_test_gcp_privatekey));
       bson_concat (kms_providers,
@@ -2693,7 +2693,7 @@ _tls_test_make_client_encryption (mongoc_client_t *keyvault_client,
       bson_concat (kms_providers,
                    tmp_bson ("{'azure': {'tenantId': '%s', 'clientId': '%s', "
                              "'clientSecret': '%s', "
-                             "'identityPlatformEndpoint': '127.0.0.1:8000'}}",
+                             "'identityPlatformEndpoint': '127.0.0.1:9000'}}",
                              mongoc_test_azure_tenant_id,
                              mongoc_test_azure_client_id,
                              mongoc_test_azure_client_secret));
@@ -2702,14 +2702,14 @@ _tls_test_make_client_encryption (mongoc_client_t *keyvault_client,
 
       bson_concat (kms_providers,
                    tmp_bson ("{'gcp': { 'email': '%s', 'privateKey': '%s', "
-                             "'endpoint': '127.0.0.1:8000'}}",
+                             "'endpoint': '127.0.0.1:9000'}}",
                              mongoc_test_gcp_email,
                              mongoc_test_gcp_privatekey));
       bson_concat (tls_opts,
                    tmp_bson ("{'gcp': {'tlsCaFile': '%s'} }", ca_file));
 
       bson_concat (kms_providers,
-                   tmp_bson ("{'kmip': { 'endpoint': '127.0.0.1:8000' }}"));
+                   tmp_bson ("{'kmip': { 'endpoint': '127.0.0.1:9000' }}"));
       bson_concat (tls_opts,
                    tmp_bson ("{'kmip': {'tlsCaFile': '%s'} }", ca_file));
    } else if (test_ce == INVALID_HOSTNAME) {
@@ -2722,7 +2722,7 @@ _tls_test_make_client_encryption (mongoc_client_t *keyvault_client,
       bson_concat (kms_providers,
                    tmp_bson ("{'azure': {'tenantId': '%s', 'clientId': '%s', "
                              "'clientSecret': '%s', "
-                             "'identityPlatformEndpoint': '127.0.0.1:8001' }}",
+                             "'identityPlatformEndpoint': '127.0.0.1:9001' }}",
                              mongoc_test_azure_tenant_id,
                              mongoc_test_azure_client_id,
                              mongoc_test_azure_client_secret));
@@ -2731,14 +2731,14 @@ _tls_test_make_client_encryption (mongoc_client_t *keyvault_client,
 
       bson_concat (kms_providers,
                    tmp_bson ("{'gcp': { 'email': '%s', 'privateKey': '%s', "
-                             "'endpoint': '127.0.0.1:8001' }}",
+                             "'endpoint': '127.0.0.1:9001' }}",
                              mongoc_test_gcp_email,
                              mongoc_test_gcp_privatekey));
       bson_concat (tls_opts,
                    tmp_bson ("{'gcp': {'tlsCaFile': '%s'} }", ca_file));
 
       bson_concat (kms_providers,
-                   tmp_bson ("{'kmip': { 'endpoint': '127.0.0.1:8001' }}"));
+                   tmp_bson ("{'kmip': { 'endpoint': '127.0.0.1:9001' }}"));
       bson_concat (tls_opts,
                    tmp_bson ("{'kmip': {'tlsCaFile': '%s'} }", ca_file));
    } else {
@@ -2838,7 +2838,7 @@ test_kms_tls_options (void *unused)
       tmp_bson ("{ 'region': 'us-east-1', 'key': "
                 "'arn:aws:kms:us-east-1:579766882180:key/"
                 "89fcc2c4-08b0-4bd9-9f25-e30687b580d0', 'endpoint': "
-                "'127.0.0.1:8002' }"));
+                "'127.0.0.1:9002' }"));
    res = mongoc_client_encryption_create_datakey (
       client_encryption_no_client_cert, "aws", dkopts, &keyid, &error);
    ASSERT_ERROR_CONTAINS (
@@ -2854,7 +2854,7 @@ test_kms_tls_options (void *unused)
       tmp_bson ("{ 'region': 'us-east-1', 'key': "
                 "'arn:aws:kms:us-east-1:579766882180:key/"
                 "89fcc2c4-08b0-4bd9-9f25-e30687b580d0', 'endpoint': "
-                "'127.0.0.1:8002' }"));
+                "'127.0.0.1:9002' }"));
    res = mongoc_client_encryption_create_datakey (
       client_encryption_with_tls, "aws", dkopts, &keyid, &error);
    ASSERT_ERROR_CONTAINS (error,
@@ -2872,7 +2872,7 @@ test_kms_tls_options (void *unused)
       tmp_bson ("{ 'region': 'us-east-1', 'key': "
                 "'arn:aws:kms:us-east-1:579766882180:key/"
                 "89fcc2c4-08b0-4bd9-9f25-e30687b580d0', 'endpoint': "
-                "'127.0.0.1:8000' }"));
+                "'127.0.0.1:9000' }"));
    res = mongoc_client_encryption_create_datakey (
       client_encryption_expired, "aws", dkopts, &keyid, &error);
    ASSERT_EXPIRED (error);
@@ -2887,7 +2887,7 @@ test_kms_tls_options (void *unused)
       tmp_bson ("{ 'region': 'us-east-1', 'key': "
                 "'arn:aws:kms:us-east-1:579766882180:key/"
                 "89fcc2c4-08b0-4bd9-9f25-e30687b580d0', 'endpoint': "
-                "'127.0.0.1:8001' }"));
+                "'127.0.0.1:9001' }"));
    res = mongoc_client_encryption_create_datakey (
       client_encryption_invalid_hostname, "aws", dkopts, &keyid, &error);
    ASSERT_INVALID_HOSTNAME (error);
