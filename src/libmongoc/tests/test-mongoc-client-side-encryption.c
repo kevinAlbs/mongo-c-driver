@@ -3181,6 +3181,176 @@ test_kms_tls_options_extra_rejected (void *unused)
    mongoc_client_destroy (keyvault_client);
 }
 
+
+static char *
+bin_to_hex (const uint8_t *buf, size_t len)
+{
+   char *hex_chars = malloc (len * 2 + 1);
+
+   char *p = hex_chars;
+   size_t i;
+
+   for (i = 0; i < len; i++) {
+      p += sprintf (p, "%02x", buf[i]);
+   }
+
+   *p = '\0';
+
+   return hex_chars;
+}
+
+
+static void
+test_custom_key_material (void *unused)
+{
+   mongoc_client_t *client;
+   mongoc_client_encryption_t *client_encryption;
+   mongoc_collection_t *coll;
+   bson_error_t error;
+   bson_t *kms_providers;
+   mongoc_client_encryption_opts_t *client_encryption_opts;
+   bson_value_t originalKeyID = {0};
+   bson_value_t newKeyID = {0};
+
+   /* Test setup */
+   /* Create a MongoClient without encryption enabled (referred to as client).
+    */
+   client = test_framework_new_default_client ();
+
+   /* Using client, drop the collection keyvault.datakeys. */
+   coll = mongoc_client_get_collection (client, "keyvault", "datakeys");
+   (void) mongoc_collection_drop (coll, NULL);
+   mongoc_collection_destroy (coll);
+
+   kms_providers = _make_kms_providers (true, true);
+
+   /* Create a ClientEncryption object (referred to as client_encryption) */
+   client_encryption_opts = mongoc_client_encryption_opts_new ();
+   mongoc_client_encryption_opts_set_kms_providers (client_encryption_opts,
+                                                    kms_providers);
+   mongoc_client_encryption_opts_set_keyvault_namespace (
+      client_encryption_opts, "keyvault", "datakeys");
+   mongoc_client_encryption_opts_set_keyvault_client (client_encryption_opts,
+                                                      client);
+   client_encryption =
+      mongoc_client_encryption_new (client_encryption_opts, &error);
+   ASSERT_OR_PRINT (client_encryption, error);
+
+   /* Create a new data key with a custom key material. */
+   {
+      mongoc_client_encryption_datakey_opts_t *dkopts =
+         mongoc_client_encryption_datakey_opts_new ();
+      const char *keymaterial_data =
+         "\xc4\xf4\xc0\x8c\x14\x46\xe4\x98\x8f\x9b\xe7\x77\x7e\x3e\x97\x2e\x2d"
+         "\xaa\xe4\x33\x17\x51\x2f\xdf\xd5\xff\x92\x30\x09\x61\x87\x09\x21\x0d"
+         "\x12\xf4\x92\xbf\x2b\xf4\x60\xcb\x20\x64\xc0\x1a\x5b\xc2\xf8\x75\x63"
+         "\x48\x88\x1d\x2f\xe4\x4a\xc1\x90\xaf\xa5\x74\xb2\xc5\x32\x02\x59\x25"
+         "\xd3\x51\x8b\x16\x60\xfc\xae\xdc\x8a\x07\x6e\xe0\x59\x76\x6c\x36\x7d"
+         "\xa3\x37\x5a\x17\x11\x22\x06\xcc\x45\xe5\x39";
+
+      mongoc_client_encryption_datakey_opts_set_keymaterial (
+         dkopts, (const uint8_t *) keymaterial_data, 96);
+      ASSERT_OR_PRINT (
+         mongoc_client_encryption_create_datakey (
+            client_encryption, "local", dkopts, &originalKeyID, &error),
+         error);
+      mongoc_client_encryption_datakey_opts_destroy (dkopts);
+   }
+
+   /* Copy the data key to a new data key with a fixed ID. */
+   {
+      mongoc_collection_t *keyvault_coll;
+
+      bson_t originalKey = BSON_INITIALIZER;
+      bson_t newKey = BSON_INITIALIZER;
+      bson_t filter = BSON_INITIALIZER;
+
+      BSON_APPEND_VALUE (&filter, "_id", &originalKeyID);
+
+      keyvault_coll =
+         mongoc_client_get_collection (client, "keyvault", "datakeys");
+      /* Get the originalKey document. */
+      {
+         mongoc_cursor_t *cursor;
+         const bson_t *got;
+
+         cursor = mongoc_collection_find_with_opts (keyvault_coll,
+                                                    tmp_bson ("{}"),
+                                                    NULL /* opts */,
+                                                    NULL /* read prefs */);
+         ASSERT (mongoc_cursor_next (cursor, &got));
+         bson_copy_to (got, &originalKey);
+         mongoc_cursor_destroy (cursor);
+      }
+
+      /* Copy and set a fixed _id. */
+      {
+         newKeyID.value_type = BSON_TYPE_BINARY;
+         newKeyID.value.v_binary.subtype = BSON_SUBTYPE_UUID;
+         /* Use all 0's for UUID. */
+         newKeyID.value.v_binary.data = bson_malloc0 (16);
+         newKeyID.value.v_binary.data_len = 16;
+         bson_copy_to_excluding_noinit (&originalKey, &newKey, "_id", NULL);
+
+         BSON_APPEND_VALUE (&newKey, "_id", &newKeyID);
+         ASSERT_OR_PRINT (mongoc_collection_insert_one (keyvault_coll,
+                                                        &newKey,
+                                                        NULL /* opts */,
+                                                        NULL /* reply */,
+                                                        &error),
+                          error);
+      }
+
+      /* Deterministically encrypt a value with newKeyID. */
+      {
+         mongoc_client_encryption_encrypt_opts_t *eopts =
+            mongoc_client_encryption_encrypt_opts_new ();
+         bson_value_t to_encrypt = {0};
+         bson_value_t ciphertext = {0};
+
+         to_encrypt.value_type = BSON_TYPE_UTF8;
+         to_encrypt.value.v_utf8.str = bson_strdup ("hello");
+         to_encrypt.value.v_utf8.len = strlen (to_encrypt.value.v_utf8.str);
+
+         mongoc_client_encryption_encrypt_opts_set_keyid (eopts, &newKeyID);
+         mongoc_client_encryption_encrypt_opts_set_algorithm (
+            eopts, MONGOC_AEAD_AES_256_CBC_HMAC_SHA_512_DETERMINISTIC);
+         ASSERT_OR_PRINT (
+            mongoc_client_encryption_encrypt (
+               client_encryption, &to_encrypt, eopts, &ciphertext, &error),
+            error);
+
+
+         {
+            const char *expect_hex =
+               "01000000000000000000000000000000000277f254a6879eb9078c9dbf48e90"
+               "70b9c3b562358259a8ac6f584cd55e4d29cbdb1ca9504937a2ecccf0cf42a5d"
+               "1baf63652418d556a575525432d50cb098f27d";
+            char *got_hex = bin_to_hex (ciphertext.value.v_binary.data,
+                                        ciphertext.value.v_binary.data_len);
+            ASSERT_CMPSTR (expect_hex, got_hex);
+            bson_free (got_hex);
+         }
+
+         bson_value_destroy (&ciphertext);
+         bson_value_destroy (&to_encrypt);
+         mongoc_client_encryption_encrypt_opts_destroy (eopts);
+      }
+
+      bson_destroy (&filter);
+      bson_destroy (&newKey);
+      bson_destroy (&originalKey);
+      mongoc_collection_destroy (keyvault_coll);
+   }
+
+   bson_value_destroy (&originalKeyID);
+   bson_destroy (kms_providers);
+   mongoc_client_encryption_opts_destroy (client_encryption_opts);
+   mongoc_client_destroy (client);
+   mongoc_client_encryption_destroy (client_encryption);
+}
+
+
 void
 test_client_side_encryption_install (TestSuite *suite)
 {
@@ -3316,6 +3486,13 @@ test_client_side_encryption_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/client_side_encryption/kms_tls_options/extra_rejected",
                       test_kms_tls_options_extra_rejected,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption);
+
+   TestSuite_AddFull (suite,
+                      "/client_side_encryption/custom_key_material",
+                      test_custom_key_material,
                       NULL,
                       NULL,
                       test_framework_skip_if_no_client_side_encryption);
