@@ -3309,7 +3309,7 @@ test_custom_key_material (void *unused)
          bson_value_t ciphertext = {0};
 
          to_encrypt.value_type = BSON_TYPE_UTF8;
-         to_encrypt.value.v_utf8.str = bson_strdup ("hello");
+         to_encrypt.value.v_utf8.str = bson_strdup ("test");
          to_encrypt.value.v_utf8.len = strlen (to_encrypt.value.v_utf8.str);
 
          mongoc_client_encryption_encrypt_opts_set_keyid (eopts, &newKeyID);
@@ -3323,9 +3323,9 @@ test_custom_key_material (void *unused)
 
          {
             const char *expect_hex =
-               "01000000000000000000000000000000000277f254a6879eb9078c9dbf48e90"
-               "70b9c3b562358259a8ac6f584cd55e4d29cbdb1ca9504937a2ecccf0cf42a5d"
-               "1baf63652418d556a575525432d50cb098f27d";
+               "010000000000000000000000000000000002cf464e2eeba11188bcd3b6574dd"
+               "85baa12da4b6fedf702e27c99e7358c22c3bf5def9418219e8cfda602d61f67"
+               "0b30a367ba4652902e3679148672173373e3ac";
             char *got_hex = bin_to_hex (ciphertext.value.v_binary.data,
                                         ciphertext.value.v_binary.data_len);
             ASSERT_CMPSTR (expect_hex, got_hex);
