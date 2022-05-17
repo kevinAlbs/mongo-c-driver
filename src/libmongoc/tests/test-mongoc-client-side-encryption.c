@@ -3337,6 +3337,7 @@ test_custom_key_material (void *unused)
          mongoc_client_encryption_encrypt_opts_destroy (eopts);
       }
 
+      bson_value_destroy (&newKeyID);
       bson_destroy (&filter);
       bson_destroy (&newKey);
       bson_destroy (&originalKey);
