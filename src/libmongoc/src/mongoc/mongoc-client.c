@@ -26,6 +26,7 @@
 #if defined(MONGOC_HAVE_RES_NSEARCH) || defined(MONGOC_HAVE_RES_SEARCH)
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include <netinet/in.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
 #define BSON_INSIDE
