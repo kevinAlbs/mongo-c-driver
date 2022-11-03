@@ -653,6 +653,9 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
    char portstr[8];
    int s;
 
+   const char *last_error_hint = "";
+   int last_error_errno = 0;
+
    ENTRY;
 
    BSON_ASSERT (connecttimeoutms);
@@ -688,6 +691,7 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
        */
       if (!(sock = mongoc_socket_new (
                rp->ai_family, rp->ai_socktype, rp->ai_protocol))) {
+         last_error_hint = "error in mongoc_socket_new";
          continue;
       }
 
@@ -698,20 +702,31 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms,
       if (0 !=
           mongoc_socket_connect (
              sock, rp->ai_addr, (mongoc_socklen_t) rp->ai_addrlen, expire_at)) {
+         last_error_hint = "error in mongoc_socket_connect";
+         last_error_errno = mongoc_socket_errno (sock);
          mongoc_socket_destroy (sock);
          sock = NULL;
          continue;
       }
 
+      last_error_hint = "";
+
       break;
    }
 
    if (!sock) {
-      bson_set_error (error,
-                      MONGOC_ERROR_STREAM,
-                      MONGOC_ERROR_STREAM_CONNECT,
-                      "Failed to connect to target host: %s",
-                      host->host_and_port);
+      char errno_str[32] = {0};
+      bson_strerror_r (last_error_errno, errno_str, sizeof (errno_str));
+
+      bson_set_error (
+         error,
+         MONGOC_ERROR_STREAM,
+         MONGOC_ERROR_STREAM_CONNECT,
+         "Failed to connect to target host: %s, error hint: %s, errno: %d (%s)",
+         host->host_and_port,
+         last_error_hint,
+         last_error_errno,
+         last_error_errno ? errno_str : "(No errno)");
       freeaddrinfo (result);
       RETURN (NULL);
    }
