@@ -767,11 +767,9 @@ retryable_writes_prose_test_3 (void *ctx)
    mongoc_collection_insert_one (
       coll, tmp_bson ("{'x': 1}"), NULL /* opts */, &reply, &error);
 
-   // the original error code is returned
-   ASSERT_ERROR_CONTAINS (error,
-                          MONGOC_ERROR_SERVER,
-                          write_concern_error_code,
-                          "Unknown command error");
+   ASSERT_MATCH (&reply,
+                 "{'insertedCount': 1, 'writeConcernErrors': [{ 'code': 91, "
+                 "'errorLabels': ['RetryableWriteError']}]}");
 
    deactivate_fail_points (client, server_id); // disable the fail point
    bson_destroy (&reply);
