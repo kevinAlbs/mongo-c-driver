@@ -3727,7 +3727,7 @@ typedef struct {
 static ree_fixture *
 range_explicit_encryption_setup (const char *typeStr)
 {
-   ree_fixture *reef = (ree_fixture *) bson_malloc0 (sizeof (ree_fixture));
+   ree_fixture *reef = bson_malloc0 (sizeof (ree_fixture));
    reef->typeStr = typeStr;
    reef->fieldName = bson_strdup_printf ("encrypted%s", typeStr);
    char *filepath =
@@ -4133,7 +4133,7 @@ static void
 test_range_explicit_encryption_case3 (void *ctx)
 {
    // Case 3: can find encrypted range and return the minimum
-   const char *typeStr = (const char *) ctx;
+   const char *typeStr = ctx;
    ree_fixture *reef = range_explicit_encryption_setup (typeStr);
    bool ok;
    bson_error_t error;
@@ -4184,7 +4184,7 @@ static void
 test_range_explicit_encryption_case4 (void *ctx)
 {
    // Case 4: can find encrypted range with an open range query
-   const char *typeStr = (const char *) ctx;
+   const char *typeStr = ctx;
    ree_fixture *reef = range_explicit_encryption_setup (typeStr);
    bool ok;
    bson_error_t error;
