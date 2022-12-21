@@ -2328,6 +2328,126 @@ test_find_error_is_alive (void)
    mongoc_client_destroy (client);
 }
 
+static void
+heartbeat_started_cb (const mongoc_apm_server_heartbeat_started_t *e)
+{
+   if (test_framework_getenv_bool ("VERBOSE")) {
+      MONGOC_DEBUG ("heartbeat_started_cb");
+   }
+}
+
+static void
+heartbeat_failed_cb (const mongoc_apm_server_heartbeat_failed_t *e)
+{
+   if (test_framework_getenv_bool ("VERBOSE")) {
+      MONGOC_DEBUG ("heartbeat_failed_cb");
+   }
+}
+
+static void
+heartbeat_succeeded_cb (const mongoc_apm_server_heartbeat_succeeded_t *e)
+{
+   if (test_framework_getenv_bool ("VERBOSE")) {
+      MONGOC_DEBUG ("heartbeat_succeeded_cb");
+   }
+}
+
+static void
+test_cursor_splunkd (void)
+{
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   bson_error_t err;
+   bool ok;
+   int64_t runtime_secs;
+   int64_t start_us;
+   int64_t tick_secs;
+   mongoc_apm_callbacks_t *cbs;
+
+   cbs = mongoc_apm_callbacks_new ();
+   mongoc_apm_set_server_heartbeat_started_cb (cbs, heartbeat_started_cb);
+   mongoc_apm_set_server_heartbeat_failed_cb (cbs, heartbeat_failed_cb);
+   mongoc_apm_set_server_heartbeat_succeeded_cb (cbs, heartbeat_succeeded_cb);
+
+   client = test_framework_new_default_client ();
+   mongoc_client_set_apm_callbacks (client, cbs, NULL);
+
+   // Set min heartbeat frequency msec to 1 so test does not wait for 500ms
+   // between failed server selection.
+   client->topology->min_heartbeat_frequency_msec = 1;
+   // Bypass the five second cooldown between network errors.
+   _mongoc_topology_bypass_cooldown (client->topology);
+
+   coll = mongoc_client_get_collection (client, "test", "test");
+   runtime_secs = test_framework_getenv_int64 ("RUNTIME_SECS", 30);
+   start_us = bson_get_monotonic_time ();
+   tick_secs = 0;
+
+   mongoc_collection_drop (coll, NULL);
+   // Insert four documents.
+   for (int i = 0; i < 4; i++) {
+      ok = mongoc_collection_insert_one (coll,
+                                         tmp_bson ("{'_id': %d}", i),
+                                         NULL /* opts */,
+                                         NULL /* reply */,
+                                         &err);
+      ASSERT_OR_PRINT (ok, err);
+   }
+
+   while (true) {
+      int32_t expect_i = 0;
+      const bson_t *got;
+      mongoc_cursor_t *cursor;
+
+      cursor = mongoc_collection_find_with_opts (
+         coll,
+         tmp_bson ("{}"),
+         tmp_bson ("{'sort': {'_id': 1}, 'batchSize': 2}"),
+         NULL /* read prefs */);
+      if (mongoc_cursor_error (cursor, &err)) {
+         MONGOC_ERROR ("mongoc_collection_find_with_opts got error: %s\n",
+                       err.message);
+         goto loop_end;
+      }
+
+      while (mongoc_cursor_next (cursor, &got)) {
+         bson_iter_t iter;
+         if (!bson_iter_init_find (&iter, got, "_id")) {
+            test_error ("expected doc to have _id, got: %s\n", tmp_json (got));
+         }
+         if (!BSON_ITER_HOLDS_INT32 (&iter)) {
+            test_error ("expected _id to be int32, got: %s\n", tmp_json (got));
+         }
+         ASSERT_CMPINT32 (expect_i, ==, bson_iter_int32 (&iter));
+         expect_i++;
+      }
+
+      if (mongoc_cursor_error (cursor, &err)) {
+         MONGOC_ERROR ("mongoc_cursor_next got error: %s\n", err.message);
+         goto loop_end;
+      }
+
+   loop_end:
+      mongoc_cursor_destroy (cursor);
+      int64_t duration_secs =
+         (bson_get_monotonic_time () - start_us) / (1000 * 1000);
+      if (duration_secs > runtime_secs) {
+         MONGOC_DEBUG ("RUNTIME_SECS exceeded. Exitting loop.");
+         fflush (stdout);
+         break;
+      }
+      if (duration_secs > tick_secs + 5) {
+         MONGOC_DEBUG ("%" PRId64 "secs have elapsed", duration_secs);
+         fflush (stdout);
+         tick_secs = duration_secs;
+      }
+   }
+
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+   mongoc_apm_callbacks_destroy (cbs);
+}
+
 
 void
 test_cursor_install (TestSuite *suite)
@@ -2414,4 +2534,5 @@ test_cursor_install (TestSuite *suite)
       suite, "/Cursor/error_document/command", test_error_document_command);
    TestSuite_AddLive (
       suite, "/Cursor/find_error/is_alive", test_find_error_is_alive);
+   TestSuite_AddLive (suite, "/Cursor/splunkd", test_cursor_splunkd);
 }
