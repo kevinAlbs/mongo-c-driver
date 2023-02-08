@@ -78,6 +78,10 @@ _mongoc_aws_credentials_obtain (mongoc_uri_t *uri,
                                 bson_error_t *error);
 
 void
+_mongoc_aws_credentials_copy_to (const _mongoc_aws_credentials_t *src,
+                                 _mongoc_aws_credentials_t *dst);
+
+void
 _mongoc_aws_credentials_cleanup (_mongoc_aws_credentials_t *creds);
 
 bool

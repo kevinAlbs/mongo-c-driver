@@ -1014,6 +1014,19 @@ _mongoc_aws_credentials_cleanup (_mongoc_aws_credentials_t *creds)
 }
 
 void
+_mongoc_aws_credentials_copy_to (const _mongoc_aws_credentials_t *src,
+                                 _mongoc_aws_credentials_t *dst)
+{
+   BSON_ASSERT_PARAM (src);
+   BSON_ASSERT_PARAM (dst);
+
+   dst->access_key_id = bson_strdup (src->access_key_id);
+   dst->secret_access_key = bson_strdup (src->secret_access_key);
+   dst->session_token = bson_strdup (src->session_token);
+   dst->expiration_ms = src->expiration_ms;
+}
+
+void
 _mongoc_aws_credentials_cache_init (_mongoc_aws_credentials_cache_t *cache)
 {
    BSON_ASSERT_PARAM (cache);
