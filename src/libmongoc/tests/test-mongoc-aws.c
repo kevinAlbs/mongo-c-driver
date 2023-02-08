@@ -277,10 +277,25 @@ test_derive_region (void *unused)
 static void
 test_aws_cache (void)
 {
+   struct timeval now;
+   ASSERT_CMPINT (0, ==, bson_gettimeofday (&now));
+   uint64_t now_ms = (1000 * now.tv_sec) + (now.tv_usec / 1000);
+
    _mongoc_aws_credentials_t valid_creds = {0};
    valid_creds.access_key_id = bson_strdup ("access_key_id");
    valid_creds.secret_access_key = bson_strdup ("secret_access_key");
    valid_creds.session_token = bson_strdup ("session_token");
+   // Set expiration to one minute after window.
+   valid_creds.expiration_ms =
+      now_ms + MONGOC_AWS_CREDENTIALS_EXPIRATION_WINDOW_MS + (60 * 1000);
+
+   _mongoc_aws_credentials_t expired_creds = {0};
+   expired_creds.access_key_id = bson_strdup ("access_key_id");
+   expired_creds.secret_access_key = bson_strdup ("secret_access_key");
+   expired_creds.session_token = bson_strdup ("session_token");
+   // Set expiration to one minute before window.
+   expired_creds.expiration_ms =
+      now_ms + MONGOC_AWS_CREDENTIALS_EXPIRATION_WINDOW_MS - (60 * 1000);
 
    _mongoc_aws_credentials_cache_t cache;
 
@@ -315,8 +330,29 @@ test_aws_cache (void)
    }
 
    // Expect expired credentials are not added to cache.
+   {
+      _mongoc_aws_credentials_t got = {0};
+      _mongoc_aws_credentials_cache_put (&cache, &expired_creds);
+      bool found = _mongoc_aws_credentials_cache_get (&cache, &got);
+      ASSERT (!found);
+   }
+
+   // Expect credentials that expire are not returned from cache.
+   {
+      _mongoc_aws_credentials_t got = {0};
+      _mongoc_aws_credentials_cache_put (&cache, &valid_creds);
+      bool found = _mongoc_aws_credentials_cache_get (&cache, &got);
+      ASSERT (found);
+
+      // Manually expire the credentials.
+      cache.cached.value.expiration_ms = expired_creds.expiration_ms;
+      found = _mongoc_aws_credentials_cache_get (&cache, &got);
+      ASSERT (!found);
+      _mongoc_aws_credentials_cleanup (&got);
+   }
 
    _mongoc_aws_credentials_cache_cleanup (&cache);
+   _mongoc_aws_credentials_cleanup (&expired_creds);
    _mongoc_aws_credentials_cleanup (&valid_creds);
 }
 
