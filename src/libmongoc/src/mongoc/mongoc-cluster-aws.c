@@ -1018,3 +1018,42 @@ fail:
 }
 
 #endif /* MONGOC_ENABLE_MONGODB_AWS_AUTH */
+
+
+void
+_mongoc_aws_credentials_cache_init (_mongoc_aws_credentials_cache_t *cache)
+{
+   BSON_ASSERT_PARAM (cache);
+}
+
+void
+_mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_cache_t *cache,
+                                   _mongoc_aws_credentials_t *creds)
+{
+   BSON_ASSERT_PARAM (cache);
+   BSON_ASSERT_PARAM (creds);
+}
+
+bool
+_mongoc_aws_credentials_cache_get (const _mongoc_aws_credentials_cache_t *cache,
+                                   _mongoc_aws_credentials_t *creds)
+{
+   BSON_ASSERT_PARAM (cache);
+   BSON_ASSERT_PARAM (creds);
+   return false;
+}
+
+void
+_mongoc_aws_credentials_cache_clear (
+   const _mongoc_aws_credentials_cache_t *cache)
+{
+   BSON_ASSERT_PARAM (cache);
+}
+
+void
+_mongoc_aws_credentials_cache_cleanup (_mongoc_aws_credentials_cache_t *cache)
+{
+   if (!cache) {
+      return;
+   }
+}

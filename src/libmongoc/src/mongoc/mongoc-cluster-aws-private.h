@@ -36,6 +36,42 @@ typedef struct {
    char *session_token;
 } _mongoc_aws_credentials_t;
 
+// _mongoc_aws_credentials_cache_t is a thread-safe cache of AWS credentials.
+typedef struct {
+   struct {
+      _mongoc_aws_credentials_t value;
+      bool set;
+   } cached;
+   bson_mutex_t mutex; // guards cached.
+} _mongoc_aws_credentials_cache_t;
+
+
+// _mongoc_aws_credentials_cache_init initializes `cache`.
+void
+_mongoc_aws_credentials_cache_init (_mongoc_aws_credentials_cache_t *cache);
+
+// _mongoc_aws_credentials_cache_put adds credentials into `cache`.
+void
+_mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_cache_t *cache,
+                                   _mongoc_aws_credentials_t *creds);
+
+// _mongoc_aws_credentials_cache_get returns true if cached credentials were
+// retrieved. Retrieved credentials are copied to `creds`. Returns false if
+// there are no valid cached credentials.
+bool
+_mongoc_aws_credentials_cache_get (const _mongoc_aws_credentials_cache_t *cache,
+                                   _mongoc_aws_credentials_t *creds);
+
+// _mongoc_aws_credentials_cache_clear clears credentials in `cache`.
+void
+_mongoc_aws_credentials_cache_clear (
+   const _mongoc_aws_credentials_cache_t *cache);
+
+// _mongoc_aws_credentials_cache_cleanup frees data for `cache`.
+void
+_mongoc_aws_credentials_cache_cleanup (_mongoc_aws_credentials_cache_t *cache);
+
+
 bool
 _mongoc_aws_credentials_obtain (mongoc_uri_t *uri,
                                 _mongoc_aws_credentials_t *creds,

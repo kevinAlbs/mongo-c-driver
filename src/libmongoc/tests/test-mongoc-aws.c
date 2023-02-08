@@ -272,6 +272,54 @@ test_derive_region (void *unused)
 #undef WITH_LEN
 }
 
+// test_aws_cache unit tests the _mongoc_aws_credentials_cache_t. It does not
+// require libmongoc to be built with MONGOC_ENABLE_MONGODB_AWS_AUTH.
+static void
+test_aws_cache (void)
+{
+   _mongoc_aws_credentials_t valid_creds = {0};
+   valid_creds.access_key_id = bson_strdup ("access_key_id");
+   valid_creds.secret_access_key = bson_strdup ("secret_access_key");
+   valid_creds.session_token = bson_strdup ("session_token");
+
+   _mongoc_aws_credentials_cache_t cache;
+
+   _mongoc_aws_credentials_cache_init (&cache);
+
+   // Expect `get` to return nothing initially.
+   {
+      _mongoc_aws_credentials_t got = {0};
+      bool found = _mongoc_aws_credentials_cache_get (&cache, &got);
+      ASSERT (!found);
+   }
+
+   // Expect `get` to return after valid credentials are added with `put`.
+   {
+      _mongoc_aws_credentials_t got = {0};
+      _mongoc_aws_credentials_cache_put (&cache, &valid_creds);
+      bool found = _mongoc_aws_credentials_cache_get (&cache, &got);
+      ASSERT (found);
+      ASSERT_CMPSTR (got.access_key_id, valid_creds.access_key_id);
+      ASSERT_CMPSTR (got.secret_access_key, valid_creds.secret_access_key);
+      ASSERT_CMPSTR (got.session_token, valid_creds.session_token);
+      _mongoc_aws_credentials_cleanup (&got);
+   }
+
+   // Expect `clear` to clear cached credentials.
+   {
+      _mongoc_aws_credentials_t got = {0};
+      _mongoc_aws_credentials_cache_put (&cache, &valid_creds);
+      _mongoc_aws_credentials_cache_clear (&cache);
+      bool found = _mongoc_aws_credentials_cache_get (&cache, &got);
+      ASSERT (!found);
+   }
+
+   // Expect expired credentials are not added to cache.
+
+   _mongoc_aws_credentials_cache_cleanup (&cache);
+   _mongoc_aws_credentials_cleanup (&valid_creds);
+}
+
 void
 test_aws_install (TestSuite *suite)
 {
@@ -294,4 +342,5 @@ test_aws_install (TestSuite *suite)
                       NULL /* dtor */,
                       NULL /* ctx */,
                       test_framework_skip_if_no_aws);
+   TestSuite_Add (suite, "/aws/cache", test_aws_cache);
 }
