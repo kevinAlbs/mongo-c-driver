@@ -1026,12 +1026,13 @@ _mongoc_aws_credentials_copy_to (const _mongoc_aws_credentials_t *src,
    dst->expiration_ms = src->expiration_ms;
 }
 
-void
-_mongoc_aws_credentials_cache_init (_mongoc_aws_credentials_cache_t *cache)
+_mongoc_aws_credentials_cache_t *
+_mongoc_aws_credentials_cache_new (void)
 {
-   BSON_ASSERT_PARAM (cache);
-   *cache = (_mongoc_aws_credentials_cache_t){0};
+   _mongoc_aws_credentials_cache_t *cache =
+      bson_malloc0 (sizeof (_mongoc_aws_credentials_cache_t));
    bson_mutex_init (&cache->mutex);
+   return cache;
 }
 
 static bool
@@ -1104,7 +1105,7 @@ _mongoc_aws_credentials_cache_clear (_mongoc_aws_credentials_cache_t *cache)
 }
 
 void
-_mongoc_aws_credentials_cache_cleanup (_mongoc_aws_credentials_cache_t *cache)
+_mongoc_aws_credentials_cache_destroy (_mongoc_aws_credentials_cache_t *cache)
 {
    if (!cache) {
       return;
@@ -1113,4 +1114,5 @@ _mongoc_aws_credentials_cache_cleanup (_mongoc_aws_credentials_cache_t *cache)
       _mongoc_aws_credentials_cleanup (&cache->cached.value);
    }
    bson_mutex_destroy (&cache->mutex);
+   bson_free (cache);
 }

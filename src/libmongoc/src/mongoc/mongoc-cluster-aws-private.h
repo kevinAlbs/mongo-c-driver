@@ -44,7 +44,7 @@ typedef struct {
 #define MONGOC_AWS_CREDENTIALS_EXPIRATION_WINDOW_MS 60 * 5 * 1000
 
 // _mongoc_aws_credentials_cache_t is a thread-safe cache of AWS credentials.
-typedef struct {
+typedef struct _mongoc_aws_credentials_cache_t {
    struct {
       _mongoc_aws_credentials_t value;
       bool set;
@@ -53,9 +53,9 @@ typedef struct {
 } _mongoc_aws_credentials_cache_t;
 
 
-// _mongoc_aws_credentials_cache_init initializes `cache`.
-void
-_mongoc_aws_credentials_cache_init (_mongoc_aws_credentials_cache_t *cache);
+// _mongoc_aws_credentials_cache_new creates a new cache.
+_mongoc_aws_credentials_cache_t *
+_mongoc_aws_credentials_cache_new (void);
 
 // _mongoc_aws_credentials_cache_put adds credentials into `cache`.
 void
@@ -73,9 +73,9 @@ _mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_cache_t *cache,
 void
 _mongoc_aws_credentials_cache_clear (_mongoc_aws_credentials_cache_t *cache);
 
-// _mongoc_aws_credentials_cache_cleanup frees data for `cache`.
+// _mongoc_aws_credentials_cache_destroy frees data for `cache`.
 void
-_mongoc_aws_credentials_cache_cleanup (_mongoc_aws_credentials_cache_t *cache);
+_mongoc_aws_credentials_cache_destroy (_mongoc_aws_credentials_cache_t *cache);
 
 
 bool
