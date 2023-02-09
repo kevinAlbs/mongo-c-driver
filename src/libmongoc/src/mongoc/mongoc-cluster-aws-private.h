@@ -43,8 +43,9 @@ typedef struct {
 
 #define MONGOC_AWS_CREDENTIALS_EXPIRATION_WINDOW_MS 60 * 5 * 1000
 
-// _mongoc_aws_credentials_cache_t is a thread-safe cache of AWS credentials.
-typedef struct _mongoc_aws_credentials_cache_t {
+// _mongoc_aws_credentials_cache_t is a thread-safe global cache of AWS
+// credentials.
+typedef struct {
    struct {
       _mongoc_aws_credentials_t value;
       bool set;
@@ -52,30 +53,32 @@ typedef struct _mongoc_aws_credentials_cache_t {
    bson_mutex_t mutex; // guards cached.
 } _mongoc_aws_credentials_cache_t;
 
+extern _mongoc_aws_credentials_cache_t mongoc_aws_credentials_cache;
 
-// _mongoc_aws_credentials_cache_new creates a new cache.
-_mongoc_aws_credentials_cache_t *
-_mongoc_aws_credentials_cache_new (void);
 
-// _mongoc_aws_credentials_cache_put adds credentials into `cache`.
+// _mongoc_aws_credentials_cache_init initializes the global
+// `mongoc_aws_credentials_cache. It is expected to be called by mongoc_init.
 void
-_mongoc_aws_credentials_cache_put (_mongoc_aws_credentials_cache_t *cache,
-                                   const _mongoc_aws_credentials_t *creds);
+_mongoc_aws_credentials_cache_init (void);
+
+// _mongoc_aws_credentials_cache_put adds credentials into the global cache.
+void
+_mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_t *creds);
 
 // _mongoc_aws_credentials_cache_get returns true if cached credentials were
 // retrieved. Retrieved credentials are copied to `creds`. Returns false if
 // there are no valid cached credentials.
 bool
-_mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_cache_t *cache,
-                                   _mongoc_aws_credentials_t *creds);
+_mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds);
 
-// _mongoc_aws_credentials_cache_clear clears credentials in `cache`.
+// _mongoc_aws_credentials_cache_clear clears credentials in the global cache
 void
-_mongoc_aws_credentials_cache_clear (_mongoc_aws_credentials_cache_t *cache);
+_mongoc_aws_credentials_cache_clear (void);
 
-// _mongoc_aws_credentials_cache_destroy frees data for `cache`.
+// _mongoc_aws_credentials_cache_cleanup frees data for the global cache.
+// It is expected to be called by mongoc_cleanup.
 void
-_mongoc_aws_credentials_cache_destroy (_mongoc_aws_credentials_cache_t *cache);
+_mongoc_aws_credentials_cache_cleanup (void);
 
 
 bool

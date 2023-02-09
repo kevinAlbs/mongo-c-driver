@@ -1026,13 +1026,13 @@ _mongoc_aws_credentials_copy_to (const _mongoc_aws_credentials_t *src,
    dst->expiration_ms = src->expiration_ms;
 }
 
-_mongoc_aws_credentials_cache_t *
-_mongoc_aws_credentials_cache_new (void)
+_mongoc_aws_credentials_cache_t mongoc_aws_credentials_cache;
+
+void
+_mongoc_aws_credentials_cache_init (void)
 {
-   _mongoc_aws_credentials_cache_t *cache =
-      bson_malloc0 (sizeof (_mongoc_aws_credentials_cache_t));
+   _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
    bson_mutex_init (&cache->mutex);
-   return cache;
 }
 
 static bool
@@ -1050,17 +1050,16 @@ check_expired (const _mongoc_aws_credentials_t *creds)
 }
 
 void
-_mongoc_aws_credentials_cache_put (_mongoc_aws_credentials_cache_t *cache,
-                                   const _mongoc_aws_credentials_t *creds)
+_mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_t *creds)
 {
-   BSON_ASSERT_PARAM (cache);
+   _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
    BSON_ASSERT_PARAM (creds);
 
    if (check_expired (creds)) {
       // Do not add expired credentials.
       return;
    }
-   _mongoc_aws_credentials_cache_clear (cache);
+   _mongoc_aws_credentials_cache_clear ();
    bson_mutex_lock (&cache->mutex);
    _mongoc_aws_credentials_copy_to (creds, &cache->cached.value);
    cache->cached.set = true;
@@ -1068,10 +1067,9 @@ _mongoc_aws_credentials_cache_put (_mongoc_aws_credentials_cache_t *cache,
 }
 
 bool
-_mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_cache_t *cache,
-                                   _mongoc_aws_credentials_t *creds)
+_mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds)
 {
-   BSON_ASSERT_PARAM (cache);
+   _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
    BSON_ASSERT_PARAM (creds);
    bool found_valid = false;
    bool expired = false;
@@ -1085,16 +1083,16 @@ _mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_cache_t *cache,
    }
    bson_mutex_unlock (&cache->mutex);
    if (expired) {
-      _mongoc_aws_credentials_cache_clear (cache);
+      _mongoc_aws_credentials_cache_clear ();
       return false;
    }
    return found_valid;
 }
 
 void
-_mongoc_aws_credentials_cache_clear (_mongoc_aws_credentials_cache_t *cache)
+_mongoc_aws_credentials_cache_clear (void)
 {
-   BSON_ASSERT_PARAM (cache);
+   _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
 
    bson_mutex_lock (&cache->mutex);
    if (cache->cached.set) {
@@ -1105,14 +1103,11 @@ _mongoc_aws_credentials_cache_clear (_mongoc_aws_credentials_cache_t *cache)
 }
 
 void
-_mongoc_aws_credentials_cache_destroy (_mongoc_aws_credentials_cache_t *cache)
+_mongoc_aws_credentials_cache_cleanup (void)
 {
-   if (!cache) {
-      return;
-   }
+   _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
    if (cache->cached.set) {
       _mongoc_aws_credentials_cleanup (&cache->cached.value);
    }
    bson_mutex_destroy (&cache->mutex);
-   bson_free (cache);
 }

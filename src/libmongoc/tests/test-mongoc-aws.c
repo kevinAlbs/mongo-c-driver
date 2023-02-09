@@ -297,22 +297,21 @@ test_aws_cache (void)
    expired_creds.expiration_ms =
       now_ms + MONGOC_AWS_CREDENTIALS_EXPIRATION_WINDOW_MS - (60 * 1000);
 
-   _mongoc_aws_credentials_cache_t *cache;
-
-   cache = _mongoc_aws_credentials_cache_new ();
+   _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
+   _mongoc_aws_credentials_cache_clear ();
 
    // Expect `get` to return nothing initially.
    {
       _mongoc_aws_credentials_t got = {0};
-      bool found = _mongoc_aws_credentials_cache_get (cache, &got);
+      bool found = _mongoc_aws_credentials_cache_get (&got);
       ASSERT (!found);
    }
 
    // Expect `get` to return after valid credentials are added with `put`.
    {
       _mongoc_aws_credentials_t got = {0};
-      _mongoc_aws_credentials_cache_put (cache, &valid_creds);
-      bool found = _mongoc_aws_credentials_cache_get (cache, &got);
+      _mongoc_aws_credentials_cache_put (&valid_creds);
+      bool found = _mongoc_aws_credentials_cache_get (&got);
       ASSERT (found);
       ASSERT_CMPSTR (got.access_key_id, valid_creds.access_key_id);
       ASSERT_CMPSTR (got.secret_access_key, valid_creds.secret_access_key);
@@ -323,35 +322,35 @@ test_aws_cache (void)
    // Expect `clear` to clear cached credentials.
    {
       _mongoc_aws_credentials_t got = {0};
-      _mongoc_aws_credentials_cache_put (cache, &valid_creds);
-      _mongoc_aws_credentials_cache_clear (cache);
-      bool found = _mongoc_aws_credentials_cache_get (cache, &got);
+      _mongoc_aws_credentials_cache_put (&valid_creds);
+      _mongoc_aws_credentials_cache_clear ();
+      bool found = _mongoc_aws_credentials_cache_get (&got);
       ASSERT (!found);
    }
 
    // Expect expired credentials are not added to cache.
    {
       _mongoc_aws_credentials_t got = {0};
-      _mongoc_aws_credentials_cache_put (cache, &expired_creds);
-      bool found = _mongoc_aws_credentials_cache_get (cache, &got);
+      _mongoc_aws_credentials_cache_put (&expired_creds);
+      bool found = _mongoc_aws_credentials_cache_get (&got);
       ASSERT (!found);
    }
 
    // Expect credentials that expire are not returned from cache.
    {
       _mongoc_aws_credentials_t got = {0};
-      _mongoc_aws_credentials_cache_put (cache, &valid_creds);
-      bool found = _mongoc_aws_credentials_cache_get (cache, &got);
+      _mongoc_aws_credentials_cache_put (&valid_creds);
+      bool found = _mongoc_aws_credentials_cache_get (&got);
       ASSERT (found);
 
       // Manually expire the credentials.
       cache->cached.value.expiration_ms = expired_creds.expiration_ms;
-      found = _mongoc_aws_credentials_cache_get (cache, &got);
+      found = _mongoc_aws_credentials_cache_get (&got);
       ASSERT (!found);
       _mongoc_aws_credentials_cleanup (&got);
    }
 
-   _mongoc_aws_credentials_cache_destroy (cache);
+   _mongoc_aws_credentials_cache_clear ();
    _mongoc_aws_credentials_cleanup (&expired_creds);
    _mongoc_aws_credentials_cleanup (&valid_creds);
 }
