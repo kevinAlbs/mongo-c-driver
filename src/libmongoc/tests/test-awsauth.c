@@ -168,6 +168,7 @@ test_cache (const mongoc_uri_t *uri)
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
+      _mongoc_aws_credentials_cleanup (&creds);
       mongoc_client_destroy (client);
    }
    // Override the cached credentials with an "Expiration" that is within one
@@ -198,8 +199,10 @@ test_cache (const mongoc_uri_t *uri)
          !creds_eq (&first_cached, &mongoc_aws_credentials_cache.cached.value),
          "%s",
          "expected unequal credentials, got equal");
+      _mongoc_aws_credentials_cleanup (&creds);
       mongoc_client_destroy (client);
    }
+   _mongoc_aws_credentials_cleanup (&first_cached);
 
    // TODO implement the following tests:
 
