@@ -252,6 +252,9 @@ test_cache_with_env (const mongoc_uri_t *uri)
               "setting environment variables\n");
    }
 
+   // Clear the cache.
+   _mongoc_aws_credentials_cache_clear ();
+
    // Create a new client.
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
@@ -334,6 +337,9 @@ test_cache_with_env (const mongoc_uri_t *uri)
                "failed to unsetenv: %s",
                strerror (errno));
    }
+
+   // Clear the cache.
+   _mongoc_aws_credentials_cache_clear ();
 
    // Create a new client.
    {
