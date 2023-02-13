@@ -1120,6 +1120,9 @@ _mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds)
          found_valid = true;
          _mongoc_aws_credentials_copy_to (&cache->cached.value, creds);
       }
+   } else {
+      // Zero creds, so callers can safely call _mongoc_aws_credentials_cleanup.
+      *creds = (_mongoc_aws_credentials_t){0};
    }
    bson_mutex_unlock (&cache->mutex);
    if (expired) {

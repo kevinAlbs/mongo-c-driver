@@ -68,6 +68,7 @@ _mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_t *creds);
 // _mongoc_aws_credentials_cache_get returns true if cached credentials were
 // retrieved. Retrieved credentials are copied to `creds`. Returns false if
 // there are no valid cached credentials.
+// Callers are expected to call _mongoc_aws_credentials_cleanup on `creds`.
 bool
 _mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds);
 
