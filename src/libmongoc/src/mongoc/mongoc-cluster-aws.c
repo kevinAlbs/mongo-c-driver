@@ -999,6 +999,9 @@ _mongoc_cluster_auth_node_aws (mongoc_cluster_t *cluster,
 
    ret = true;
 fail:
+   if (!ret) {
+      _mongoc_aws_credentials_cache_clear ();
+   }
    _mongoc_aws_credentials_cleanup (&creds);
    bson_free (sts_fqdn);
    bson_free (region);
