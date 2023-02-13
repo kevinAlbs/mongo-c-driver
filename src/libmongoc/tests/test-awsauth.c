@@ -322,7 +322,7 @@ test_cache_with_env (const mongoc_uri_t *uri)
       mongoc_client_destroy (client);
    }
 
-   // Clear environment variables.
+   // Clear the AWS environment variables.
    {
       ASSERTF (0 == unsetenv ("AWS_ACCESS_KEY_ID"),
                "failed to unsetenv: %s",
@@ -368,7 +368,7 @@ test_cache_with_env (const mongoc_uri_t *uri)
       mongoc_client_destroy (client);
    }
 
-   // Clear environment variables.
+   // Clear the AWS environment variables.
    {
       ASSERTF (0 == unsetenv ("AWS_ACCESS_KEY_ID"),
                "failed to unsetenv: %s",
