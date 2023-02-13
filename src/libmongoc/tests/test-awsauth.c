@@ -144,8 +144,8 @@ can_setenv (void)
 //    return ret;
 // }
 
-static void
-do_find (mongoc_client_t *client, const char *expect_error_message)
+static bool
+do_find (mongoc_client_t *client, bson_error_t *error)
 {
    bson_t *filter = bson_new ();
    mongoc_collection_t *coll =
@@ -155,23 +155,11 @@ do_find (mongoc_client_t *client, const char *expect_error_message)
    const bson_t *doc;
    while (mongoc_cursor_next (cursor, &doc))
       ;
-   bson_error_t error;
-   if (NULL == expect_error_message) {
-      ASSERTF (!mongoc_cursor_error (cursor, &error),
-               "unexpected error in mongoc_cursor_next: %s",
-               error.message);
-   } else {
-      ASSERTF (mongoc_cursor_error (cursor, &error),
-               "%s",
-               "expected error on mongoc_cursor_next, but got success");
-      ASSERTF (NULL != strstr (error.message, expect_error_message),
-               "expected error to contain '%s', but got '%s'",
-               expect_error_message,
-               error.message);
-   }
+   bool ok = !mongoc_cursor_error (cursor, error);
    mongoc_cursor_destroy (cursor);
    mongoc_collection_destroy (coll);
    bson_destroy (filter);
+   return ok;
 }
 
 // test_cache implements the "Cached Credentials" tests from the specification.
@@ -190,7 +178,9 @@ test_cache (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      do_find (client, NULL /* expect success */);
+      bson_error_t error;
+      ASSERTF (
+         do_find (client, &error), "expected success, got: %s", error.message);
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
@@ -216,7 +206,9 @@ test_cache (const mongoc_uri_t *uri)
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
-      do_find (client, NULL /* expect success */);
+      bson_error_t error;
+      ASSERTF (
+         do_find (client, &error), "expected success, got: %s", error.message);
 
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
@@ -247,13 +239,19 @@ test_cache (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      do_find (client, "Authentication failed");
+      bson_error_t error;
+      ASSERT (!do_find (client, &error));
+      ASSERTF (NULL != strstr (error.message, "Authentication failed"),
+               "Expected error to contain '%s', but got '%s'",
+               "Authentication failed",
+               error.message);
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (!found);
       _mongoc_aws_credentials_cleanup (&creds);
 
-      do_find (client, NULL /* expect success */);
+      ASSERTF (
+         do_find (client, &error), "expected success, got: %s", error.message);
       found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
       _mongoc_aws_credentials_cleanup (&creds);
@@ -274,7 +272,9 @@ test_cache (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      do_find (client, NULL /* expect success */);
+      bson_error_t error;
+      ASSERTF (
+         do_find (client, &error), "expected success, got: %s", error.message);
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
@@ -302,7 +302,8 @@ test_cache (const mongoc_uri_t *uri)
 
       _mongoc_aws_credentials_cache_clear ();
 
-      do_find (client, NULL /* expect success */);
+      ASSERTF (
+         do_find (client, &error), "expected success, got: %s", error.message);
       found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (!found);
       _mongoc_aws_credentials_cleanup (&creds);
@@ -318,7 +319,9 @@ test_cache (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      do_find (client, NULL /* expect success */);
+      bson_error_t error;
+      ASSERTF (
+         do_find (client, &error), "expected success, got: %s", error.message);
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (!found);
@@ -335,7 +338,12 @@ test_cache (const mongoc_uri_t *uri)
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
-      do_find (client, "Authentication failed");
+      bson_error_t error;
+      ASSERT (!do_find (client, &error));
+      ASSERTF (NULL != strstr (error.message, "Authentication failed"),
+               "Expected error to contain '%s', but got '%s'",
+               "Authentication failed",
+               error.message);
       mongoc_client_destroy (client);
    }
 
@@ -359,7 +367,9 @@ test_cache (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      do_find (client, NULL /* expect success */);
+      bson_error_t error;
+      ASSERTF (
+         do_find (client, &error), "expected success, got: %s", error.message);
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
@@ -373,7 +383,9 @@ test_cache (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      do_find (client, NULL /* expect success */);
+      bson_error_t error;
+      ASSERTF (
+         do_find (client, &error), "expected success, got: %s", error.message);
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
