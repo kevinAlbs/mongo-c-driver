@@ -126,24 +126,6 @@ can_setenv (void)
    return true;
 }
 
-// typedef struct {
-//    char str[1024];
-// } creds_str_ret;
-
-// static creds_str_ret
-// creds_str (_mongoc_aws_credentials_t *creds)
-// {
-//    creds_str_ret ret;
-//    bson_snprintf (ret.str,
-//                   sizeof (ret.str),
-//                   "access_key_id=%s, secret_access_key=%s, session_token=%s,
-//                   " "expiration_ms=%" PRId64, creds->access_key_id,
-//                   creds->secret_access_key,
-//                   creds->session_token,
-//                   creds->expiration_ms);
-//    return ret;
-// }
-
 static bool
 do_find (mongoc_client_t *client, bson_error_t *error)
 {
