@@ -129,7 +129,7 @@ creds_eq (_mongoc_aws_credentials_t *a, _mongoc_aws_credentials_t *b)
 // }
 
 static void
-do_find (mongoc_client_t *client)
+do_find (mongoc_client_t *client, const char *expect_error_message)
 {
    bson_t *filter = bson_new ();
    mongoc_collection_t *coll =
@@ -140,9 +140,19 @@ do_find (mongoc_client_t *client)
    while (mongoc_cursor_next (cursor, &doc))
       ;
    bson_error_t error;
-   ASSERTF (!mongoc_cursor_error (cursor, &error),
-            "unexpected error in mongoc_cursor_next: %s\n",
-            error.message);
+   if (NULL == expect_error_message) {
+      ASSERTF (!mongoc_cursor_error (cursor, &error),
+               "unexpected error in mongoc_cursor_next: %s",
+               error.message);
+   } else {
+      ASSERTF (mongoc_cursor_error (cursor, &error),
+               "%s",
+               "expected error on mongoc_cursor_next, but got success");
+      ASSERTF (NULL != strstr (error.message, expect_error_message),
+               "expected error to contain '%s', but got '%s'",
+               expect_error_message,
+               error.message);
+   }
    mongoc_cursor_destroy (cursor);
    mongoc_collection_destroy (coll);
    bson_destroy (filter);
@@ -164,7 +174,7 @@ test_cache (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      do_find (client);
+      do_find (client, NULL /* expect success */);
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
@@ -190,7 +200,7 @@ test_cache (const mongoc_uri_t *uri)
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
-      do_find (client);
+      do_find (client, NULL /* expect success */);
 
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
@@ -212,6 +222,28 @@ test_cache (const mongoc_uri_t *uri)
    // Ensure that the cache has been cleared.
    // Ensure that a subsequent ``find`` operation succeeds.
    // Ensure that the cache has been set.
+   {
+      ASSERT (mongoc_aws_credentials_cache.cached.set);
+      bson_free (mongoc_aws_credentials_cache.cached.value.access_key_id);
+      mongoc_aws_credentials_cache.cached.value.access_key_id =
+         bson_strdup ("invalid");
+
+      mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+      ASSERT (client);
+
+      do_find (client, "Authentication failed");
+      _mongoc_aws_credentials_t creds;
+      bool found = _mongoc_aws_credentials_cache_get (&creds);
+      ASSERT (!found);
+      _mongoc_aws_credentials_cleanup (&creds);
+
+      do_find (client, NULL /* expect success */);
+      found = _mongoc_aws_credentials_cache_get (&creds);
+      ASSERT (found);
+      _mongoc_aws_credentials_cleanup (&creds);
+
+      mongoc_client_destroy (client);
+   }
 
    // Create a new client.
    // Ensure that a ``find`` operation adds credentials to the cache.
