@@ -165,6 +165,9 @@ do_find (mongoc_client_t *client, bson_error_t *error)
 static void
 test_cache (const mongoc_uri_t *uri)
 {
+   bson_error_t error;
+   _mongoc_aws_credentials_t creds;
+
    // TODO: consider conditioning this test to only run in expected
    // environments.
 
@@ -177,10 +180,8 @@ test_cache (const mongoc_uri_t *uri)
       ASSERT (client);
 
       // Ensure that a ``find`` operation adds credentials to the cache.
-      bson_error_t error;
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
-      _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
       _mongoc_aws_credentials_cleanup (&creds);
@@ -204,12 +205,10 @@ test_cache (const mongoc_uri_t *uri)
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
-      bson_error_t error;
       // Ensure that a ``find`` operation updates the credentials in the cache.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
 
-      _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
       ASSERTF (
@@ -235,13 +234,11 @@ test_cache (const mongoc_uri_t *uri)
       ASSERT (client);
 
       // Ensure that a ``find`` operation results in an error.
-      bson_error_t error;
       ASSERT (!do_find (client, &error));
       ASSERTF (NULL != strstr (error.message, "Authentication failed"),
                "Expected error to contain '%s', but got '%s'",
                "Authentication failed",
                error.message);
-      _mongoc_aws_credentials_t creds;
 
       // Ensure that the cache has been cleared.
 
@@ -265,6 +262,9 @@ test_cache (const mongoc_uri_t *uri)
 static void
 test_cache_with_env (const mongoc_uri_t *uri)
 {
+   bson_error_t error;
+   _mongoc_aws_credentials_t creds;
+
    if (!can_setenv ()) {
       printf ("Process is unable to setenv. Skipping tests that require "
               "setting environment variables\n");
@@ -275,11 +275,9 @@ test_cache_with_env (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      bson_error_t error;
       // Ensure that a ``find`` operation adds credentials to the cache.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
-      _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
       _mongoc_aws_credentials_cleanup (&creds);
@@ -314,13 +312,10 @@ test_cache_with_env (const mongoc_uri_t *uri)
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
-
-      bson_error_t error;
       // Ensure that a ``find`` operation succeeds and does not add credentials
       // to the cache.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
-      _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (!found);
       _mongoc_aws_credentials_cleanup (&creds);
@@ -336,7 +331,6 @@ test_cache_with_env (const mongoc_uri_t *uri)
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
-      bson_error_t error;
       // Ensure that a ``find`` operation results in an error.
       ASSERT (!do_find (client, &error));
       ASSERTF (NULL != strstr (error.message, "Authentication failed"),
@@ -364,11 +358,9 @@ test_cache_with_env (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      bson_error_t error;
       // Ensure that a ``find`` operation adds credentials to the cache.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
-      _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
       _mongoc_aws_credentials_cleanup (&creds);
@@ -385,11 +377,9 @@ test_cache_with_env (const mongoc_uri_t *uri)
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
-      bson_error_t error;
       // Ensure that a ``find`` operation succeeds.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
-      _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
       _mongoc_aws_credentials_cleanup (&creds);
