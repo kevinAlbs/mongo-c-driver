@@ -17,6 +17,7 @@
 // test-awsauth.c tests authentication with the MONGODB-AWS authMechanism.
 // It may be run in an AWS ECS task or EC2 instance.
 
+#define _POSIX_C_SOURCE 200112L // Required for setenv with glibc.
 #include <mongoc/mongoc.h>
 #include "mongoc-cluster-aws-private.h"
 #include "mongoc-client-private.h"
@@ -105,6 +106,21 @@ creds_eq (_mongoc_aws_credentials_t *a, _mongoc_aws_credentials_t *b)
       return false;
    }
    if (a->expiration_ms != b->expiration_ms) {
+      return false;
+   }
+   return true;
+}
+
+// can_setenv returns true if process is able to set environment variables and
+// get them back.
+static bool
+can_setenv (void)
+{
+   if (0 != setenv ("MONGOC_TEST_CANARY", "VALUE", 1)) {
+      return false;
+   }
+   char *got = getenv ("MONGOC_TEST_CANARY");
+   if (NULL == got) {
       return false;
    }
    return true;
@@ -245,19 +261,138 @@ test_cache (const mongoc_uri_t *uri)
       mongoc_client_destroy (client);
    }
 
+   if (!can_setenv ()) {
+      printf ("Process is unable to setenv. Skipping tests that require "
+              "dynamic environment variables\n");
+   }
+
    // Create a new client.
    // Ensure that a ``find`` operation adds credentials to the cache.
    // Set the AWS environment variables based on the cached credentials.
    // Clear the cache.
+   {
+      mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+      ASSERT (client);
+
+      do_find (client, NULL /* expect success */);
+      _mongoc_aws_credentials_t creds;
+      bool found = _mongoc_aws_credentials_cache_get (&creds);
+      ASSERT (found);
+      _mongoc_aws_credentials_cleanup (&creds);
+
+      ASSERTF (
+         0 == setenv ("AWS_ACCESS_KEY_ID",
+                      mongoc_aws_credentials_cache.cached.value.access_key_id,
+                      1),
+         "failed to setenv: %s",
+         strerror (errno));
+      ASSERTF (
+         0 ==
+            setenv ("AWS_SECRET_ACCESS_KEY",
+                    mongoc_aws_credentials_cache.cached.value.secret_access_key,
+                    1),
+         "failed to setenv: %s",
+         strerror (errno));
+      ASSERTF (
+         0 == setenv ("AWS_SESSION_TOKEN",
+                      mongoc_aws_credentials_cache.cached.value.session_token,
+                      1),
+         "failed to setenv: %s",
+         strerror (errno));
+
+      _mongoc_aws_credentials_cache_clear ();
+
+      do_find (client, NULL /* expect success */);
+      found = _mongoc_aws_credentials_cache_get (&creds);
+      ASSERT (!found);
+      _mongoc_aws_credentials_cleanup (&creds);
+
+      mongoc_client_destroy (client);
+   }
+
+   // Create a new client.
    // Ensure that a ``find`` operation succeeds and does not add credentials to
    // the cache.
    // Set the AWS environment variables to invalid values.
+   {
+      mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+      ASSERT (client);
+
+      do_find (client, NULL /* expect success */);
+      _mongoc_aws_credentials_t creds;
+      bool found = _mongoc_aws_credentials_cache_get (&creds);
+      ASSERT (!found);
+      _mongoc_aws_credentials_cleanup (&creds);
+      ASSERTF (0 == setenv ("AWS_ACCESS_KEY_ID", "invalid", 1),
+               "failed to setenv: %s",
+               strerror (errno));
+      mongoc_client_destroy (client);
+   }
+
+
+   // Create a new client.
    // Ensure that a ``find`` operation results in an error.
+   {
+      mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+      ASSERT (client);
+      do_find (client, "Authentication failed");
+      mongoc_client_destroy (client);
+   }
+
+   // Clear environment variables.
+   {
+      ASSERTF (0 == unsetenv ("AWS_ACCESS_KEY_ID"),
+               "failed to unsetenv: %s",
+               strerror (errno));
+      ASSERTF (0 == unsetenv ("AWS_SECRET_ACCESS_KEY"),
+               "failed to unsetenv: %s",
+               strerror (errno));
+      ASSERTF (0 == unsetenv ("AWS_SESSION_TOKEN"),
+               "failed to unsetenv: %s",
+               strerror (errno));
+   }
 
    // Create a new client.
    // Ensure that a ``find`` operation adds credentials to the cache.
    // Set the AWS environment variables to invalid values.
+   {
+      mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+      ASSERT (client);
+
+      do_find (client, NULL /* expect success */);
+      _mongoc_aws_credentials_t creds;
+      bool found = _mongoc_aws_credentials_cache_get (&creds);
+      ASSERT (found);
+      _mongoc_aws_credentials_cleanup (&creds);
+      mongoc_client_destroy (client);
+   }
+
+   // Create a new client.
    // Ensure that a ``find`` operation succeeds.
+   {
+      mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+      ASSERT (client);
+
+      do_find (client, NULL /* expect success */);
+      _mongoc_aws_credentials_t creds;
+      bool found = _mongoc_aws_credentials_cache_get (&creds);
+      ASSERT (found);
+      _mongoc_aws_credentials_cleanup (&creds);
+      mongoc_client_destroy (client);
+   }
+
+   // Clear environment variables.
+   {
+      ASSERTF (0 == unsetenv ("AWS_ACCESS_KEY_ID"),
+               "failed to unsetenv: %s",
+               strerror (errno));
+      ASSERTF (0 == unsetenv ("AWS_SECRET_ACCESS_KEY"),
+               "failed to unsetenv: %s",
+               strerror (errno));
+      ASSERTF (0 == unsetenv ("AWS_SESSION_TOKEN"),
+               "failed to unsetenv: %s",
+               strerror (errno));
+   }
 }
 
 int
