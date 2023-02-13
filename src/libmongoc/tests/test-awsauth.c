@@ -162,7 +162,6 @@ do_find (mongoc_client_t *client, bson_error_t *error)
    return ok;
 }
 
-// test_cache implements the "Cached Credentials" tests from the specification.
 static void
 test_cache (const mongoc_uri_t *uri)
 {
@@ -173,11 +172,11 @@ test_cache (const mongoc_uri_t *uri)
    _mongoc_aws_credentials_cache_clear ();
 
    // Create a new client.
-   // Ensure that a ``find`` operation adds credentials to the cache.
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
+      // Ensure that a ``find`` operation adds credentials to the cache.
       bson_error_t error;
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
@@ -202,11 +201,11 @@ test_cache (const mongoc_uri_t *uri)
    }
 
    // Create a new client.
-   // Ensure that a ``find`` operation updates the credentials in the cache.
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
       bson_error_t error;
+      // Ensure that a ``find`` operation updates the credentials in the cache.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
 
@@ -222,23 +221,20 @@ test_cache (const mongoc_uri_t *uri)
    }
    _mongoc_aws_credentials_cleanup (&first_cached);
 
-   // TODO implement the following tests:
-
    // Poison the cache with an invalid access key id.
-   // Create a new client.
-   // Ensure that a ``find`` operation results in an error.
-   // Ensure that the cache has been cleared.
-   // Ensure that a subsequent ``find`` operation succeeds.
-   // Ensure that the cache has been set.
    {
       ASSERT (mongoc_aws_credentials_cache.cached.set);
       bson_free (mongoc_aws_credentials_cache.cached.value.access_key_id);
       mongoc_aws_credentials_cache.cached.value.access_key_id =
          bson_strdup ("invalid");
+   }
 
+   // Create a new client.
+   {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
+      // Ensure that a ``find`` operation results in an error.
       bson_error_t error;
       ASSERT (!do_find (client, &error));
       ASSERTF (NULL != strstr (error.message, "Authentication failed"),
@@ -246,33 +242,41 @@ test_cache (const mongoc_uri_t *uri)
                "Authentication failed",
                error.message);
       _mongoc_aws_credentials_t creds;
+
+      // Ensure that the cache has been cleared.
+
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (!found);
       _mongoc_aws_credentials_cleanup (&creds);
 
+      // Ensure that a subsequent ``find`` operation succeeds.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
+
+      // Ensure that the cache has been set.
       found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
       _mongoc_aws_credentials_cleanup (&creds);
 
       mongoc_client_destroy (client);
    }
+}
 
+static void
+test_cache_with_env (const mongoc_uri_t *uri)
+{
    if (!can_setenv ()) {
       printf ("Process is unable to setenv. Skipping tests that require "
-              "dynamic environment variables\n");
+              "setting environment variables\n");
    }
 
    // Create a new client.
-   // Ensure that a ``find`` operation adds credentials to the cache.
-   // Set the AWS environment variables based on the cached credentials.
-   // Clear the cache.
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
       bson_error_t error;
+      // Ensure that a ``find`` operation adds credentials to the cache.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
       _mongoc_aws_credentials_t creds;
@@ -280,6 +284,7 @@ test_cache (const mongoc_uri_t *uri)
       ASSERT (found);
       _mongoc_aws_credentials_cleanup (&creds);
 
+      // Set the AWS environment variables based on the cached credentials.
       ASSERTF (
          0 == setenv ("AWS_ACCESS_KEY_ID",
                       mongoc_aws_credentials_cache.cached.value.access_key_id,
@@ -300,45 +305,39 @@ test_cache (const mongoc_uri_t *uri)
          "failed to setenv: %s",
          strerror (errno));
 
+      // Clear the cache.
       _mongoc_aws_credentials_cache_clear ();
-
-      ASSERTF (
-         do_find (client, &error), "expected success, got: %s", error.message);
-      found = _mongoc_aws_credentials_cache_get (&creds);
-      ASSERT (!found);
-      _mongoc_aws_credentials_cleanup (&creds);
-
       mongoc_client_destroy (client);
    }
 
    // Create a new client.
-   // Ensure that a ``find`` operation succeeds and does not add credentials to
-   // the cache.
-   // Set the AWS environment variables to invalid values.
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
       bson_error_t error;
+      // Ensure that a ``find`` operation succeeds and does not add credentials
+      // to the cache.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
       _mongoc_aws_credentials_t creds;
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (!found);
       _mongoc_aws_credentials_cleanup (&creds);
-      ASSERTF (0 == setenv ("AWS_ACCESS_KEY_ID", "invalid", 1),
-               "failed to setenv: %s",
-               strerror (errno));
       mongoc_client_destroy (client);
    }
 
+   // Set the AWS environment variables to invalid values.
+   ASSERTF (0 == setenv ("AWS_ACCESS_KEY_ID", "invalid", 1),
+            "failed to setenv: %s",
+            strerror (errno));
 
    // Create a new client.
-   // Ensure that a ``find`` operation results in an error.
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
       bson_error_t error;
+      // Ensure that a ``find`` operation results in an error.
       ASSERT (!do_find (client, &error));
       ASSERTF (NULL != strstr (error.message, "Authentication failed"),
                "Expected error to contain '%s', but got '%s'",
@@ -361,13 +360,12 @@ test_cache (const mongoc_uri_t *uri)
    }
 
    // Create a new client.
-   // Ensure that a ``find`` operation adds credentials to the cache.
-   // Set the AWS environment variables to invalid values.
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
       bson_error_t error;
+      // Ensure that a ``find`` operation adds credentials to the cache.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
       _mongoc_aws_credentials_t creds;
@@ -377,13 +375,18 @@ test_cache (const mongoc_uri_t *uri)
       mongoc_client_destroy (client);
    }
 
+   // Set the AWS environment variables to invalid values.
+   ASSERTF (0 == setenv ("AWS_ACCESS_KEY_ID", "invalid", 1),
+            "failed to setenv: %s",
+            strerror (errno));
+
    // Create a new client.
-   // Ensure that a ``find`` operation succeeds.
    {
       mongoc_client_t *client = mongoc_client_new_from_uri (uri);
       ASSERT (client);
 
       bson_error_t error;
+      // Ensure that a ``find`` operation succeeds.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
       _mongoc_aws_credentials_t creds;
@@ -441,7 +444,10 @@ main (int argc, char *argv[])
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
    db = mongoc_client_get_database (client, "test");
    test_auth (db, expect_failure);
+   // The test_cache_* functions implement the "Cached Credentials" tests from
+   // the specification.
    test_cache (uri);
+   test_cache_with_env (uri);
 
    mongoc_database_destroy (db);
    mongoc_uri_destroy (uri);
