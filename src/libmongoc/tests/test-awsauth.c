@@ -21,6 +21,7 @@
 #include <mongoc/mongoc.h>
 #include "mongoc-cluster-aws-private.h"
 #include "mongoc-client-private.h"
+#include "mongoc-util-private.h" // _mongoc_getenv
 
 // Ensure stdout and stderr are flushed prior to possible following abort().
 #define MONGOC_STDERR_PRINTF(format, ...)    \
@@ -111,18 +112,51 @@ creds_eq (_mongoc_aws_credentials_t *a, _mongoc_aws_credentials_t *b)
    return true;
 }
 
+// _mongoc_setenv sets an environment variable. Returns false on failure.
+static bool
+_mongoc_setenv (const char *name, const char *value)
+{
+#ifdef _WIN32
+   char *envstring;
+
+   envstring = bson_strdup_printf ("%s=%s", name, value);
+   if (0 != _putenv (envstring)) {
+      return false;
+   }
+
+   return true;
+#else
+
+   if (0 != setenv (name, value, 1)) {
+      return false;
+   }
+
+   return true;
+#endif
+}
+
+// clear_env sets all AWS environment variables to empty strings.
+static void
+clear_env (void)
+{
+   ASSERT (_mongoc_setenv ("AWS_ACCESS_KEY_ID", ""));
+   ASSERT (_mongoc_setenv ("AWS_SECRET_ACCESS_KEY", ""));
+   ASSERT (_mongoc_setenv ("AWS_SESSION_TOKEN", ""));
+}
+
 // can_setenv returns true if process is able to set environment variables and
 // get them back.
 static bool
 can_setenv (void)
 {
-   if (0 != setenv ("MONGOC_TEST_CANARY", "VALUE", 1)) {
+   if (0 != _mongoc_setenv ("MONGOC_TEST_CANARY", "VALUE")) {
       return false;
    }
-   char *got = getenv ("MONGOC_TEST_CANARY");
+   char *got = _mongoc_getenv ("MONGOC_TEST_CANARY");
    if (NULL == got) {
       return false;
    }
+   bson_free (got);
    return true;
 }
 
@@ -138,7 +172,9 @@ caching_expected (const mongoc_uri_t *uri)
       // are not cached.
       return false;
    }
-   if (NULL != getenv ("AWS_ACCESS_KEY_ID")) {
+   char *got = _mongoc_getenv ("AWS_ACCESS_KEY_ID");
+   if (NULL != got) {
+      bson_free (got);
       // AWS credentials passed in environment are not cached.
       return false;
    }
@@ -297,25 +333,15 @@ test_cache_with_env (const mongoc_uri_t *uri)
       _mongoc_aws_credentials_cleanup (&creds);
 
       // Set the AWS environment variables based on the cached credentials.
-      ASSERTF (
-         0 == setenv ("AWS_ACCESS_KEY_ID",
-                      mongoc_aws_credentials_cache.cached.value.access_key_id,
-                      1),
-         "failed to setenv: %s",
-         strerror (errno));
-      ASSERTF (
-         0 ==
-            setenv ("AWS_SECRET_ACCESS_KEY",
-                    mongoc_aws_credentials_cache.cached.value.secret_access_key,
-                    1),
-         "failed to setenv: %s",
-         strerror (errno));
-      ASSERTF (
-         0 == setenv ("AWS_SESSION_TOKEN",
-                      mongoc_aws_credentials_cache.cached.value.session_token,
-                      1),
-         "failed to setenv: %s",
-         strerror (errno));
+      ASSERT (_mongoc_setenv (
+         "AWS_ACCESS_KEY_ID",
+         mongoc_aws_credentials_cache.cached.value.access_key_id));
+      ASSERT (_mongoc_setenv (
+         "AWS_SECRET_ACCESS_KEY",
+         mongoc_aws_credentials_cache.cached.value.secret_access_key));
+      ASSERT (_mongoc_setenv (
+         "AWS_SESSION_TOKEN",
+         mongoc_aws_credentials_cache.cached.value.session_token));
 
       // Clear the cache.
       _mongoc_aws_credentials_cache_clear ();
@@ -337,9 +363,7 @@ test_cache_with_env (const mongoc_uri_t *uri)
    }
 
    // Set the AWS environment variables to invalid values.
-   ASSERTF (0 == setenv ("AWS_ACCESS_KEY_ID", "invalid", 1),
-            "failed to setenv: %s",
-            strerror (errno));
+   ASSERT (_mongoc_setenv ("AWS_ACCESS_KEY_ID", "invalid"));
 
    // Create a new client.
    {
@@ -355,17 +379,7 @@ test_cache_with_env (const mongoc_uri_t *uri)
    }
 
    // Clear the AWS environment variables.
-   {
-      ASSERTF (0 == unsetenv ("AWS_ACCESS_KEY_ID"),
-               "failed to unsetenv: %s",
-               strerror (errno));
-      ASSERTF (0 == unsetenv ("AWS_SECRET_ACCESS_KEY"),
-               "failed to unsetenv: %s",
-               strerror (errno));
-      ASSERTF (0 == unsetenv ("AWS_SESSION_TOKEN"),
-               "failed to unsetenv: %s",
-               strerror (errno));
-   }
+   clear_env();
 
    // Clear the cache.
    _mongoc_aws_credentials_cache_clear ();
@@ -385,9 +399,7 @@ test_cache_with_env (const mongoc_uri_t *uri)
    }
 
    // Set the AWS environment variables to invalid values.
-   ASSERTF (0 == setenv ("AWS_ACCESS_KEY_ID", "invalid", 1),
-            "failed to setenv: %s",
-            strerror (errno));
+   ASSERT (_mongoc_setenv ("AWS_ACCESS_KEY_ID", "invalid"));
 
    // Create a new client.
    {
@@ -404,17 +416,7 @@ test_cache_with_env (const mongoc_uri_t *uri)
    }
 
    // Clear the AWS environment variables.
-   {
-      ASSERTF (0 == unsetenv ("AWS_ACCESS_KEY_ID"),
-               "failed to unsetenv: %s",
-               strerror (errno));
-      ASSERTF (0 == unsetenv ("AWS_SECRET_ACCESS_KEY"),
-               "failed to unsetenv: %s",
-               strerror (errno));
-      ASSERTF (0 == unsetenv ("AWS_SESSION_TOKEN"),
-               "failed to unsetenv: %s",
-               strerror (errno));
-   }
+   clear_env();
 }
 
 int
