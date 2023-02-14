@@ -379,7 +379,7 @@ test_cache_with_env (const mongoc_uri_t *uri)
    }
 
    // Clear the AWS environment variables.
-   clear_env();
+   clear_env ();
 
    // Clear the cache.
    _mongoc_aws_credentials_cache_clear ();
@@ -416,7 +416,7 @@ test_cache_with_env (const mongoc_uri_t *uri)
    }
 
    // Clear the AWS environment variables.
-   clear_env();
+   clear_env ();
 }
 
 int
@@ -453,10 +453,12 @@ main (int argc, char *argv[])
    mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
    db = mongoc_client_get_database (client, "test");
    test_auth (db, expect_failure);
-   // The test_cache_* functions implement the "Cached Credentials" tests from
-   // the specification.
-   test_cache (uri);
-   test_cache_with_env (uri);
+   if (!expect_failure) {
+      // The test_cache_* functions implement the "Cached Credentials" tests
+      // from the specification.
+      test_cache (uri);
+      test_cache_with_env (uri);
+   }
 
    mongoc_database_destroy (db);
    mongoc_uri_destroy (uri);
