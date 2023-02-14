@@ -250,6 +250,7 @@ test_cache_with_env (const mongoc_uri_t *uri)
    if (!can_setenv ()) {
       printf ("Process is unable to setenv. Skipping tests that require "
               "setting environment variables\n");
+      return;
    }
 
    // Clear the cache.
