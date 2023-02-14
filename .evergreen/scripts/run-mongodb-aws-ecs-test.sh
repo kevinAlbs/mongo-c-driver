@@ -12,7 +12,7 @@ LD_LIBRARY_PATH+=":/root/mongoc/src/libbson"
 
 expect_success() {
   echo "Should succeed:"
-  if ! /root/mongoc/src/libmongoc/test-awsauth "${1:?}"; then
+  if ! /root/mongoc/src/libmongoc/test-awsauth "${1:?}" "EXPECT_SUCCESS"; then
     echo "Unexpected auth failure" 1>&2
     exit 1
   fi
