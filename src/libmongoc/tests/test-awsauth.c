@@ -126,6 +126,25 @@ can_setenv (void)
    return true;
 }
 
+// caching_expected returns true if MONGODB-AWS authentication is expected to
+// cache credentials. Caching is expected when credentials are not passed
+// through the URI or environment variables.
+static bool
+caching_expected (const mongoc_uri_t *uri)
+{
+   if (mongoc_uri_get_username (uri)) {
+      // AWS credentials in the URI like:
+      // "mongodb://<access_key>:<secret_key>@mongodb.example.com/?authMechanism=MONGODB-AWS"
+      // are not cached.
+      return false;
+   }
+   if (NULL != getenv ("AWS_ACCESS_KEY_ID")) {
+      // AWS credentials passed in environment are not cached.
+      return false;
+   }
+   return true;
+}
+
 static bool
 do_find (mongoc_client_t *client, bson_error_t *error)
 {
@@ -150,8 +169,11 @@ test_cache (const mongoc_uri_t *uri)
    bson_error_t error;
    _mongoc_aws_credentials_t creds;
 
-   // TODO: consider conditioning this test to only run in expected
-   // environments.
+   if (!caching_expected (uri)) {
+      printf ("Caching credentials is not expected. Skipping tests expecting "
+              "credential caching.\n");
+      return;
+   }
 
    // Clear the cache.
    _mongoc_aws_credentials_cache_clear ();
@@ -246,6 +268,12 @@ test_cache_with_env (const mongoc_uri_t *uri)
 {
    bson_error_t error;
    _mongoc_aws_credentials_t creds;
+
+   if (!caching_expected (uri)) {
+      printf ("Caching credentials is not expected. Skipping tests expecting "
+              "credential caching.\n");
+      return;
+   }
 
    if (!can_setenv ()) {
       printf ("Process is unable to setenv. Skipping tests that require "
