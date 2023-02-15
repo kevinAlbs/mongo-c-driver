@@ -181,6 +181,7 @@ caching_expected (const mongoc_uri_t *uri)
    return true;
 }
 
+// do_find runs a find command. Returns false and sets `error` on error.
 static bool
 do_find (mongoc_client_t *client, bson_error_t *error)
 {
@@ -248,7 +249,6 @@ test_cache (const mongoc_uri_t *uri)
       // Ensure that a ``find`` operation updates the credentials in the cache.
       ASSERTF (
          do_find (client, &error), "expected success, got: %s", error.message);
-
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (found);
       ASSERTF (
@@ -281,7 +281,6 @@ test_cache (const mongoc_uri_t *uri)
                error.message);
 
       // Ensure that the cache has been cleared.
-
       bool found = _mongoc_aws_credentials_cache_get (&creds);
       ASSERT (!found);
       _mongoc_aws_credentials_cleanup (&creds);
@@ -449,7 +448,6 @@ test_multithreaded (const mongoc_uri_t *uri)
    }
 
    // Verify that credentials are cached.
-
    if (caching_expected (uri)) {
       // Assert credentials are cached.
       _mongoc_aws_credentials_t creds;
