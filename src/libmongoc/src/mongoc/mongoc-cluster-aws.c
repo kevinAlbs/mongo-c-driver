@@ -612,8 +612,6 @@ _mongoc_aws_credentials_obtain (mongoc_uri_t *uri,
       if (!_creds_empty (creds)) {
          if (creds->expiration_ms != 0) {
             // Only try to cache credentials if an expiration time is included.
-            // Satisfies this specified requirement: "Credentials that are
-            // retreived from environment variables MUST NOT be cached."
             _mongoc_aws_credentials_cache_put_nolock (creds);
          }
          _mongoc_aws_credentials_cache_unlock ();
@@ -628,8 +626,6 @@ _mongoc_aws_credentials_obtain (mongoc_uri_t *uri,
       if (!_creds_empty (creds)) {
          if (creds->expiration_ms != 0) {
             // Only try to cache credentials if an expiration time is included.
-            // Satisfies this specified requirement: "Credentials that are
-            // retreived from environment variables MUST NOT be cached."
             _mongoc_aws_credentials_cache_put_nolock (creds);
          }
          _mongoc_aws_credentials_cache_unlock ();
