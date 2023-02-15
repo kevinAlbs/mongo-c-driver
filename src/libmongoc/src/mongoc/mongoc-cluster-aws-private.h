@@ -55,7 +55,6 @@ typedef struct {
 
 extern _mongoc_aws_credentials_cache_t mongoc_aws_credentials_cache;
 
-
 // _mongoc_aws_credentials_cache_init initializes the global
 // `mongoc_aws_credentials_cache. It is expected to be called by mongoc_init.
 void
@@ -69,7 +68,7 @@ _mongoc_aws_credentials_cache_lock (void);
 void
 _mongoc_aws_credentials_cache_unlock (void);
 
-// _mongoc_aws_credentials_cache_put_nolock  is a non locking variant of
+// _mongoc_aws_credentials_cache_put_nolock is a non-locking variant of
 // _mongoc_aws_credentials_cache_put.
 void
 _mongoc_aws_credentials_cache_put_nolock (
@@ -79,7 +78,7 @@ _mongoc_aws_credentials_cache_put_nolock (
 void
 _mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_t *creds);
 
-// _mongoc_aws_credentials_cache_get_nolock is a non locking variant of
+// _mongoc_aws_credentials_cache_get_nolock is a non-locking variant of
 // _mongoc_aws_credentials_cache_get.
 bool
 _mongoc_aws_credentials_cache_get_nolock (_mongoc_aws_credentials_t *creds);
@@ -91,7 +90,7 @@ _mongoc_aws_credentials_cache_get_nolock (_mongoc_aws_credentials_t *creds);
 bool
 _mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds);
 
-// _mongoc_aws_credentials_cache_clear_nolock is the non locking variant of
+// _mongoc_aws_credentials_cache_clear_nolock is the non-locking variant of
 // _mongoc_aws_credentials_cache_clear
 void
 _mongoc_aws_credentials_cache_clear_nolock (void);
