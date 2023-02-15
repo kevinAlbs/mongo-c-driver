@@ -61,9 +61,28 @@ extern _mongoc_aws_credentials_cache_t mongoc_aws_credentials_cache;
 void
 _mongoc_aws_credentials_cache_init (void);
 
+// _mongoc_aws_credentials_cache_lock exclusively locks the cache.
+void
+_mongoc_aws_credentials_cache_lock (void);
+
+// _mongoc_aws_credentials_cache_unlock unlocks the cache.
+void
+_mongoc_aws_credentials_cache_unlock (void);
+
+// _mongoc_aws_credentials_cache_put_nolock  is a non locking variant of
+// _mongoc_aws_credentials_cache_put.
+void
+_mongoc_aws_credentials_cache_put_nolock (
+   const _mongoc_aws_credentials_t *creds);
+
 // _mongoc_aws_credentials_cache_put adds credentials into the global cache.
 void
 _mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_t *creds);
+
+// _mongoc_aws_credentials_cache_get_nolock is a non locking variant of
+// _mongoc_aws_credentials_cache_get.
+bool
+_mongoc_aws_credentials_cache_get_nolock (_mongoc_aws_credentials_t *creds);
 
 // _mongoc_aws_credentials_cache_get returns true if cached credentials were
 // retrieved. Retrieved credentials are copied to `creds`. Returns false if

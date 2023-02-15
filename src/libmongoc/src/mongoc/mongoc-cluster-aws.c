@@ -1122,7 +1122,22 @@ check_expired (const _mongoc_aws_credentials_t *creds)
 }
 
 void
-_mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_t *creds)
+_mongoc_aws_credentials_cache_lock (void)
+{
+   _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
+   bson_mutex_lock (&cache->mutex);
+}
+
+void
+_mongoc_aws_credentials_cache_unlock (void)
+{
+   _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
+   bson_mutex_unlock (&cache->mutex);
+}
+
+void
+_mongoc_aws_credentials_cache_put_nolock (
+   const _mongoc_aws_credentials_t *creds)
 {
    _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
    BSON_ASSERT_PARAM (creds);
@@ -1138,8 +1153,16 @@ _mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_t *creds)
    bson_mutex_unlock (&cache->mutex);
 }
 
+void
+_mongoc_aws_credentials_cache_put (const _mongoc_aws_credentials_t *creds)
+{
+   _mongoc_aws_credentials_cache_lock ();
+   _mongoc_aws_credentials_cache_put_nolock (creds);
+   _mongoc_aws_credentials_cache_unlock ();
+}
+
 bool
-_mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds)
+_mongoc_aws_credentials_cache_get_nolock (_mongoc_aws_credentials_t *creds)
 {
    _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
    BSON_ASSERT_PARAM (creds);
@@ -1162,6 +1185,15 @@ _mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds)
       return false;
    }
    return found_valid;
+}
+
+bool
+_mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds)
+{
+   _mongoc_aws_credentials_cache_lock ();
+   bool got = _mongoc_aws_credentials_cache_get_nolock (creds);
+   _mongoc_aws_credentials_cache_unlock ();
+   return got;
 }
 
 void
