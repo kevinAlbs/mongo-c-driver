@@ -18,6 +18,7 @@
 // It may be run in an AWS ECS task or EC2 instance.
 
 #define _POSIX_C_SOURCE 200112L // Required for setenv with glibc.
+#include "common-thread-private.h"
 #include <mongoc/mongoc.h>
 #include "mongoc-cluster-aws-private.h"
 #include "mongoc-client-private.h"
@@ -419,6 +420,46 @@ test_cache_with_env (const mongoc_uri_t *uri)
    clear_env ();
 }
 
+BSON_THREAD_FUN (auth_fn, uri_void)
+{
+   bson_error_t error;
+   const mongoc_uri_t *uri = uri_void;
+
+   mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+   ASSERT (client);
+
+   // Ensure that a ``find`` operation succeeds.
+   ASSERTF (
+      do_find (client, &error), "expected success, got: %s", error.message);
+   mongoc_client_destroy (client);
+
+   BSON_THREAD_RETURN;
+}
+
+static void
+test_multithreaded (const mongoc_uri_t *uri)
+{
+   // Test authenticating in many threads concurrently.
+   bson_thread_t threads[64];
+   for (size_t i = 0; i < sizeof threads / sizeof threads[0]; i++) {
+      ASSERT (0 == mcommon_thread_create (&threads[i], auth_fn, (void *) uri));
+   }
+
+   for (size_t i = 0; i < sizeof threads / sizeof threads[0]; i++) {
+      ASSERT (0 == mcommon_thread_join (threads[i]));
+   }
+
+   // Verify that credentials are cached.
+
+   if (caching_expected (uri)) {
+      // Assert credentials are cached.
+      _mongoc_aws_credentials_t creds;
+      bool found = _mongoc_aws_credentials_cache_get (&creds);
+      ASSERT (found);
+      _mongoc_aws_credentials_cleanup (&creds);
+   }
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -458,6 +499,7 @@ main (int argc, char *argv[])
       // from the specification.
       test_cache (uri);
       test_cache_with_env (uri);
+      test_multithreaded (uri);
    }
 
    mongoc_database_destroy (db);
