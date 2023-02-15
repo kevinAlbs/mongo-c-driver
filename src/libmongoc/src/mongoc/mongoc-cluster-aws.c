@@ -311,11 +311,9 @@ expiration_to_ms (const char *expiration_str,
    char *date_doc_str;
    bool ret = false;
 
-   // Expiration is an ISO-8601 string. Example: "2023-02-07T20:04:27Z".
    // libbson has private API `_bson_iso8601_date_parse` to parse ISO-8601
    // strings. The private API is inaccessible to libmongoc.
    // Create a temporary bson document with a $date to parse.
-
    date_doc_str = bson_strdup_printf ("{\"Expiration\" : {\"$date\" : \"%s\"}}",
                                       expiration_str);
 
