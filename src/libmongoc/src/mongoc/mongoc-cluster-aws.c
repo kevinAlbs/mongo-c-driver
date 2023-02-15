@@ -1146,11 +1146,9 @@ _mongoc_aws_credentials_cache_put_nolock (
       // Do not add expired credentials.
       return;
    }
-   _mongoc_aws_credentials_cache_clear ();
-   bson_mutex_lock (&cache->mutex);
+   _mongoc_aws_credentials_cache_clear_nolock ();
    _mongoc_aws_credentials_copy_to (creds, &cache->cached.value);
    cache->cached.set = true;
-   bson_mutex_unlock (&cache->mutex);
 }
 
 void
@@ -1168,7 +1166,6 @@ _mongoc_aws_credentials_cache_get_nolock (_mongoc_aws_credentials_t *creds)
    BSON_ASSERT_PARAM (creds);
    bool found_valid = false;
    bool expired = false;
-   bson_mutex_lock (&cache->mutex);
    if (cache->cached.set) {
       expired = check_expired (&cache->cached.value);
       if (!expired) {
@@ -1179,9 +1176,8 @@ _mongoc_aws_credentials_cache_get_nolock (_mongoc_aws_credentials_t *creds)
       // Zero creds, so callers can safely call _mongoc_aws_credentials_cleanup.
       *creds = (_mongoc_aws_credentials_t){0};
    }
-   bson_mutex_unlock (&cache->mutex);
    if (expired) {
-      _mongoc_aws_credentials_cache_clear ();
+      _mongoc_aws_credentials_cache_clear_nolock ();
       return false;
    }
    return found_valid;
@@ -1197,16 +1193,22 @@ _mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds)
 }
 
 void
-_mongoc_aws_credentials_cache_clear (void)
+_mongoc_aws_credentials_cache_clear_nolock (void)
 {
    _mongoc_aws_credentials_cache_t *cache = &mongoc_aws_credentials_cache;
 
-   bson_mutex_lock (&cache->mutex);
    if (cache->cached.set) {
       _mongoc_aws_credentials_cleanup (&cache->cached.value);
    }
    cache->cached.set = false;
-   bson_mutex_unlock (&cache->mutex);
+}
+
+void
+_mongoc_aws_credentials_cache_clear (void)
+{
+   _mongoc_aws_credentials_cache_lock ();
+   _mongoc_aws_credentials_cache_clear_nolock ();
+   _mongoc_aws_credentials_cache_unlock ();
 }
 
 void

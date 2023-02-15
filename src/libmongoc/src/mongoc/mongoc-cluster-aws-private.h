@@ -91,6 +91,11 @@ _mongoc_aws_credentials_cache_get_nolock (_mongoc_aws_credentials_t *creds);
 bool
 _mongoc_aws_credentials_cache_get (_mongoc_aws_credentials_t *creds);
 
+// _mongoc_aws_credentials_cache_clear_nolock is the non locking variant of
+// _mongoc_aws_credentials_cache_clear
+void
+_mongoc_aws_credentials_cache_clear_nolock (void);
+
 // _mongoc_aws_credentials_cache_clear clears credentials in the global cache
 void
 _mongoc_aws_credentials_cache_clear (void);
