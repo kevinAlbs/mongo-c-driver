@@ -296,6 +296,42 @@ fail:
    return ret;
 }
 
+// parse_expiration parses the "Expiration" string value returned from an ECS or
+// EC2 response. "Expiration" is expected to be an ISO-8601 string. Example:
+// "2023-02-07T20:04:27Z". On success, `expiration_ms` is set to the expiration
+// time as milliseconds from the Unix epoch.
+static bool
+expiration_to_ms (const char *expiration_str,
+                  int64_t *expiration_ms,
+                  bson_error_t *error)
+{
+   bson_error_t json_err;
+   bson_t date_doc;
+   bson_iter_t date_iter;
+   char *date_doc_str;
+   bool ret = false;
+
+   // Expiration is an ISO-8601 string. Example: "2023-02-07T20:04:27Z".
+   // libbson has private API `_bson_iso8601_date_parse` to parse ISO-8601
+   // strings. The private API is inaccessible to libmongoc.
+   // Create a temporary bson document with a $date to parse.
+
+   date_doc_str = bson_strdup_printf ("{\"Expiration\" : {\"$date\" : \"%s\"}}",
+                                      expiration_str);
+
+   if (!bson_init_from_json (&date_doc, date_doc_str, -1, &json_err)) {
+      bson_free (date_doc_str);
+      AUTH_ERROR_AND_FAIL ("failed to parse Expiration: %s", json_err.message);
+   }
+   BSON_ASSERT (bson_iter_init_find (&date_iter, &date_doc, "Expiration"));
+   *expiration_ms = bson_iter_date_time (&date_iter);
+   bson_free (date_doc_str);
+   bson_destroy (&date_doc);
+   ret = true;
+fail:
+   return ret;
+}
+
 static bool
 _obtain_creds_from_ecs (_mongoc_aws_credentials_t *creds, bson_error_t *error)
 {
@@ -353,29 +389,10 @@ _obtain_creds_from_ecs (_mongoc_aws_credentials_t *creds, bson_error_t *error)
    int64_t expiration_ms = 0;
    if (bson_iter_init_find_case (&iter, response_json, "Expiration") &&
        BSON_ITER_HOLDS_UTF8 (&iter)) {
-      bson_error_t json_err;
-      bson_t date_doc;
-      bson_iter_t date_iter;
-      char *date_doc_str;
-
-      // Expiration is an ISO-8601 string. Example: "2023-02-07T20:04:27Z".
-      // libbson has private API `_bson_iso8601_date_parse` to parse ISO-8601
-      // strings. The private API is inaccessible to libmongoc.
-      // Create a temporary bson document with a $date to parse.
-
-      date_doc_str =
-         bson_strdup_printf ("{\"Expiration\" : {\"$date\" : \"%s\"}}",
-                             bson_iter_utf8 (&iter, NULL));
-
-      if (!bson_init_from_json (&date_doc, date_doc_str, -1, &json_err)) {
-         bson_free (date_doc_str);
-         AUTH_ERROR_AND_FAIL ("failed to parse Expiration: %s",
-                              json_err.message);
+      if (!expiration_to_ms (
+             bson_iter_utf8 (&iter, NULL), &expiration_ms, error)) {
+         goto fail;
       }
-      BSON_ASSERT (bson_iter_init_find (&date_iter, &date_doc, "Expiration"));
-      expiration_ms = bson_iter_date_time (&date_iter);
-      bson_free (date_doc_str);
-      bson_destroy (&date_doc);
    }
 
    if (!_validate_and_set_creds (ecs_access_key_id,
@@ -501,29 +518,10 @@ _obtain_creds_from_ec2 (_mongoc_aws_credentials_t *creds, bson_error_t *error)
    int64_t expiration_ms = 0;
    if (bson_iter_init_find_case (&iter, response_json, "Expiration") &&
        BSON_ITER_HOLDS_UTF8 (&iter)) {
-      bson_error_t json_err;
-      bson_t date_doc;
-      bson_iter_t date_iter;
-      char *date_doc_str;
-
-      // Expiration is an ISO-8601 string. Example: "2023-02-07T20:04:27Z".
-      // libbson has private API `_bson_iso8601_date_parse` to parse ISO-8601
-      // strings. The private API is inaccessible to libmongoc.
-      // Create a temporary bson document with a $date to parse.
-
-      date_doc_str =
-         bson_strdup_printf ("{\"Expiration\" : {\"$date\" : \"%s\"}}",
-                             bson_iter_utf8 (&iter, NULL));
-
-      if (!bson_init_from_json (&date_doc, date_doc_str, -1, &json_err)) {
-         bson_free (date_doc_str);
-         AUTH_ERROR_AND_FAIL ("failed to parse Expiration: %s",
-                              json_err.message);
+      if (!expiration_to_ms (
+             bson_iter_utf8 (&iter, NULL), &expiration_ms, error)) {
+         goto fail;
       }
-      BSON_ASSERT (bson_iter_init_find (&date_iter, &date_doc, "Expiration"));
-      expiration_ms = bson_iter_date_time (&date_iter);
-      bson_free (date_doc_str);
-      bson_destroy (&date_doc);
    }
 
    if (!_validate_and_set_creds (ec2_access_key_id,
