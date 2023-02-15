@@ -571,7 +571,10 @@ _mongoc_aws_credentials_obtain (mongoc_uri_t *uri,
    creds->secret_access_key = NULL;
    creds->session_token = NULL;
 
-   // Check cache.
+   // Check cache before enviroment variables. This is required by the
+   // specification: "Even if the environment variables are present in
+   // subsequent authorization attempts, the driver MUST use the cached
+   // credentials"
    if (_mongoc_aws_credentials_cache_get (creds)) {
       goto succeed;
    }
@@ -594,31 +597,55 @@ _mongoc_aws_credentials_obtain (mongoc_uri_t *uri,
       goto succeed;
    }
 
-   TRACE ("%s", "checking ECS metadata for credentials");
-   if (!_obtain_creds_from_ecs (creds, error)) {
-      goto fail;
-   }
-   if (!_creds_empty (creds)) {
-      goto succeed;
-   }
+   // Try to fetch credentials from cacheable sources: ECS or EC2.
+   // Lock the cache to prevent duplicate requests.
+   {
+      _mongoc_aws_credentials_cache_lock ();
 
-   TRACE ("%s", "checking EC2 metadata for credentials");
-   if (!_obtain_creds_from_ec2 (creds, error)) {
-      goto fail;
-   }
-   if (!_creds_empty (creds)) {
-      goto succeed;
+      // Check again if credentials have been cached.
+      if (_mongoc_aws_credentials_cache_get_nolock (creds)) {
+         _mongoc_aws_credentials_cache_unlock ();
+         goto succeed;
+      }
+
+      TRACE ("%s", "checking ECS metadata for credentials");
+      if (!_obtain_creds_from_ecs (creds, error)) {
+         _mongoc_aws_credentials_cache_unlock ();
+         goto fail;
+      }
+      if (!_creds_empty (creds)) {
+         if (creds->expiration_ms != 0) {
+            // Only try to cache credentials if an expiration time is included.
+            // Satisfies this specified requirement: "Credentials that are
+            // retreived from environment variables MUST NOT be cached."
+            _mongoc_aws_credentials_cache_put_nolock (creds);
+         }
+         _mongoc_aws_credentials_cache_unlock ();
+         goto succeed;
+      }
+
+      TRACE ("%s", "checking EC2 metadata for credentials");
+      if (!_obtain_creds_from_ec2 (creds, error)) {
+         _mongoc_aws_credentials_cache_unlock ();
+         goto fail;
+      }
+      if (!_creds_empty (creds)) {
+         if (creds->expiration_ms != 0) {
+            // Only try to cache credentials if an expiration time is included.
+            // Satisfies this specified requirement: "Credentials that are
+            // retreived from environment variables MUST NOT be cached."
+            _mongoc_aws_credentials_cache_put_nolock (creds);
+         }
+         _mongoc_aws_credentials_cache_unlock ();
+         goto succeed;
+      }
+
+      _mongoc_aws_credentials_cache_unlock ();
    }
 
    AUTH_ERROR_AND_FAIL ("unable to get credentials\n");
 
 succeed:
-   if (creds->expiration_ms != 0) {
-      // Only try to cache credentials if an expiration time is included.
-      // Satisfies this specified requirement: "Credentials that are retreived
-      // from environment variables MUST NOT be cached."
-      _mongoc_aws_credentials_cache_put (creds);
-   }
    ret = true;
 fail:
    return ret;
