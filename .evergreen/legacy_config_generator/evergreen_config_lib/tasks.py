@@ -944,7 +944,6 @@ class IPTask(MatrixTask):
 all_tasks = chain(all_tasks, IPTask.matrix())
 
 aws_compile_task = NamedTask('debug-compile-aws', commands=[shell_mongoc('''
-        set -o errexit
         # Compile test-awsauth. Disable unnecessary dependencies since test-awsauth is copied to a remote Ubuntu 18.04 ECS cluster for testing, which may not have all dependent libraries.
         . .evergreen/scripts/find-cmake.sh
         export CC='${CC}'
