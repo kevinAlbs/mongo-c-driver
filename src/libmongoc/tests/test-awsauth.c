@@ -17,7 +17,6 @@
 // test-awsauth.c tests authentication with the MONGODB-AWS authMechanism.
 // It may be run in an AWS ECS task or EC2 instance.
 
-#define _POSIX_C_SOURCE 200112L // Required for setenv with glibc.
 #include "common-thread-private.h"
 #include <mongoc/mongoc.h>
 #include "mongoc-cluster-aws-private.h"
