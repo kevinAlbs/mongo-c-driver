@@ -149,7 +149,7 @@ clear_env (void)
 static bool
 can_setenv (void)
 {
-   if (0 != _mongoc_setenv ("MONGOC_TEST_CANARY", "VALUE")) {
+   if (!_mongoc_setenv ("MONGOC_TEST_CANARY", "VALUE")) {
       return false;
    }
    char *got = _mongoc_getenv ("MONGOC_TEST_CANARY");
