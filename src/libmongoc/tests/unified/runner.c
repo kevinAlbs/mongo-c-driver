@@ -245,7 +245,6 @@ on_topology_changed (const mongoc_apm_topology_changed_t *event)
    sds = mongoc_topology_description_get_servers (td, &sds_len);
    for (i = 0; i < sds_len; i++) {
       uint32_t server_id = mongoc_server_description_id (sds[i]);
-      MONGOC_DEBUG ("topology changed, adding server id: %d", (int) server_id);
       _mongoc_array_append_val (&test_runner->server_ids, server_id);
    }
    mongoc_server_descriptions_destroy_all (sds, sds_len);
@@ -1878,4 +1877,6 @@ test_install_unified (TestSuite *suite)
    run_unified_tests (suite, JSON_DIR, "retryable_reads/unified");
 
    run_unified_tests (suite, JSON_DIR, "retryable_writes/unified");
+
+   run_unified_tests (suite, JSON_DIR, "index-management");
 }
