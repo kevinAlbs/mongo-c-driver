@@ -6225,6 +6225,143 @@ test_hint_is_validated_countDocuments (void)
    mongoc_client_destroy (client);
 }
 
+static void
+test_collection_create_search_index (void)
+{
+   // Test success.
+   {
+      mock_server_t *mock_server =
+         mock_server_with_auto_hello (WIRE_VERSION_MAX);
+      mock_server_run (mock_server);
+      mongoc_client_t *client =
+         mongoc_client_new_from_uri (mock_server_get_uri (mock_server));
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      mongoc_search_index_model_t *sim =
+         mongoc_search_index_model_new ("myname", tmp_bson ("{'foo': 'bar'}"));
+      bson_t reply;
+      bson_error_t error;
+      char *outname;
+      future_t *future = future_collection_create_search_index (
+         coll, sim, NULL /* opts */, &reply, &error, &outname);
+      request_t *request = mock_server_receives_msg (
+         mock_server,
+         MONGOC_MSG_NONE,
+         tmp_bson ("{'createSearchIndexes': 'coll'}"));
+      mock_server_replies_opmsg (
+         request, MONGOC_MSG_NONE, tmp_bson ("{'ok': 1, 'name': 'myname'}"));
+      ASSERT_OR_PRINT (future_get_bool (future), error);
+      ASSERT_CMPSTR (outname, "myname");
+      ASSERT_MATCH (&reply, "{'ok': 1, 'name': 'myname'}");
+      request_destroy (request);
+      future_destroy (future);
+      bson_free (outname);
+      bson_destroy (&reply);
+      mongoc_search_index_model_destroy (sim);
+      mongoc_collection_destroy (coll);
+      mongoc_client_destroy (client);
+      mock_server_destroy (mock_server);
+   }
+   // Test a NULL `reply`.
+   {
+      mock_server_t *mock_server =
+         mock_server_with_auto_hello (WIRE_VERSION_MAX);
+      mock_server_run (mock_server);
+      mongoc_client_t *client =
+         mongoc_client_new_from_uri (mock_server_get_uri (mock_server));
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      mongoc_search_index_model_t *sim =
+         mongoc_search_index_model_new ("myname", tmp_bson ("{'foo': 'bar'}"));
+      bson_error_t error;
+      char *outname;
+      future_t *future = future_collection_create_search_index (
+         coll, sim, NULL /* opts */, NULL, &error, &outname);
+      request_t *request = mock_server_receives_msg (
+         mock_server,
+         MONGOC_MSG_NONE,
+         tmp_bson ("{'createSearchIndexes': 'coll'}"));
+      mock_server_replies_opmsg (
+         request, MONGOC_MSG_NONE, tmp_bson ("{'ok': 1, 'name': 'myname'}"));
+      ASSERT_OR_PRINT (future_get_bool (future), error);
+      ASSERT_CMPSTR (outname, "myname");
+      request_destroy (request);
+      future_destroy (future);
+      bson_free (outname);
+      mongoc_search_index_model_destroy (sim);
+      mongoc_collection_destroy (coll);
+      mongoc_client_destroy (client);
+      mock_server_destroy (mock_server);
+   }
+   // Test a NULL `outname`.
+   {
+      mock_server_t *mock_server =
+         mock_server_with_auto_hello (WIRE_VERSION_MAX);
+      mock_server_run (mock_server);
+      mongoc_client_t *client =
+         mongoc_client_new_from_uri (mock_server_get_uri (mock_server));
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      mongoc_search_index_model_t *sim =
+         mongoc_search_index_model_new ("myname", tmp_bson ("{'foo': 'bar'}"));
+      bson_t reply;
+      bson_error_t error;
+      future_t *future = future_collection_create_search_index (
+         coll, sim, NULL /* opts */, &reply, &error, NULL);
+      request_t *request = mock_server_receives_msg (
+         mock_server,
+         MONGOC_MSG_NONE,
+         tmp_bson ("{'createSearchIndexes': 'coll'}"));
+      mock_server_replies_opmsg (
+         request, MONGOC_MSG_NONE, tmp_bson ("{'ok': 1, 'name': 'myname'}"));
+      ASSERT_OR_PRINT (future_get_bool (future), error);
+      ASSERT_MATCH (&reply, "{'ok': 1, 'name': 'myname'}");
+      request_destroy (request);
+      future_destroy (future);
+      bson_destroy (&reply);
+      mongoc_search_index_model_destroy (sim);
+      mongoc_collection_destroy (coll);
+      mongoc_client_destroy (client);
+      mock_server_destroy (mock_server);
+   }
+   // Test a NULL `name`.
+   {
+      mock_server_t *mock_server =
+         mock_server_with_auto_hello (WIRE_VERSION_MAX);
+      mock_server_run (mock_server);
+      mongoc_client_t *client =
+         mongoc_client_new_from_uri (mock_server_get_uri (mock_server));
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      mongoc_search_index_model_t *sim =
+         mongoc_search_index_model_new (NULL, tmp_bson ("{'foo': 'bar'}"));
+      bson_t reply;
+      bson_error_t error;
+      char *outname;
+      future_t *future = future_collection_create_search_index (
+         coll, sim, NULL /* opts */, &reply, &error, &outname);
+      request_t *request = mock_server_receives_msg (
+         mock_server,
+         MONGOC_MSG_NONE,
+         tmp_bson ("{'createSearchIndexes': 'coll'}"));
+      mock_server_replies_opmsg (request,
+                                 MONGOC_MSG_NONE,
+                                 tmp_bson ("{'ok': 1, 'name': 'defaultname'}"));
+      ASSERT_OR_PRINT (future_get_bool (future), error);
+      ASSERT_CMPSTR (outname, "defaultname");
+      ASSERT_MATCH (&reply, "{'ok': 1, 'name': 'defaultname'}");
+      request_destroy (request);
+      future_destroy (future);
+      bson_free (outname);
+      bson_destroy (&reply);
+      mongoc_search_index_model_destroy (sim);
+      mongoc_collection_destroy (coll);
+      mongoc_client_destroy (client);
+      mock_server_destroy (mock_server);
+   }
+   // Test extra options are appended.
+}
+
 void
 test_collection_install (TestSuite *suite)
 {
@@ -6468,4 +6605,7 @@ test_collection_install (TestSuite *suite)
    TestSuite_AddLive (suite,
                       "/Collection/hint_is_validated/countDocuments",
                       test_hint_is_validated_countDocuments);
+   TestSuite_AddMockServerTest (suite,
+                                "/collection/create_search_index",
+                                test_collection_create_search_index);
 }

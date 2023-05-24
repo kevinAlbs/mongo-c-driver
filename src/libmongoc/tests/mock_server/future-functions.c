@@ -1310,6 +1310,30 @@ BSON_THREAD_FUN (background_mongoc_collection_estimated_document_count, data)
    BSON_THREAD_RETURN;
 }
 
+static
+BSON_THREAD_FUN (background_mongoc_collection_create_search_index, data)
+{
+   future_t *future = (future_t *) data;
+   future_value_t return_value;
+
+   return_value.type = future_value_bool_type;
+
+   future_value_set_bool (
+      &return_value,
+      mongoc_collection_create_search_index (
+         future_value_get_mongoc_collection_ptr (future_get_param (future, 0)),
+         future_value_get_const_mongoc_search_index_model_ptr (future_get_param (future, 1)),
+         future_value_get_const_mongoc_create_search_index_options_ptr (future_get_param (future, 2)),
+         future_value_get_bson_ptr (future_get_param (future, 3)),
+         future_value_get_bson_error_ptr (future_get_param (future, 4)),
+         future_value_get_char_ptr_ptr (future_get_param (future, 5))
+      ));
+
+   future_resolve (future, return_value);
+
+   BSON_THREAD_RETURN;
+}
+
 
 
 future_t *
@@ -2921,6 +2945,40 @@ future_collection_estimated_document_count (
       future_get_param (future, 4), error);
    
    future_start (future, background_mongoc_collection_estimated_document_count);
+   return future;
+}
+
+future_t *
+future_collection_create_search_index (
+   mongoc_collection_ptr coll,
+   const_mongoc_search_index_model_ptr sim,
+   const_mongoc_create_search_index_options_ptr opts,
+   bson_ptr server_reply,
+   bson_error_ptr error,
+   char_ptr_ptr outname)
+{
+   future_t *future = future_new (future_value_bool_type,
+                                  6);
+   
+   future_value_set_mongoc_collection_ptr (
+      future_get_param (future, 0), coll);
+   
+   future_value_set_const_mongoc_search_index_model_ptr (
+      future_get_param (future, 1), sim);
+   
+   future_value_set_const_mongoc_create_search_index_options_ptr (
+      future_get_param (future, 2), opts);
+   
+   future_value_set_bson_ptr (
+      future_get_param (future, 3), server_reply);
+   
+   future_value_set_bson_error_ptr (
+      future_get_param (future, 4), error);
+   
+   future_value_set_char_ptr_ptr (
+      future_get_param (future, 5), outname);
+   
+   future_start (future, background_mongoc_collection_create_search_index);
    return future;
 }
 

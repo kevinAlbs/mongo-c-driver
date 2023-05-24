@@ -102,6 +102,10 @@ typedef_list = [
     typedef("const_mongoc_read_prefs_ptr", "const mongoc_read_prefs_t *"),
     typedef("const_mongoc_write_concern_ptr",
             "const mongoc_write_concern_t *"),
+    typedef("const_mongoc_create_search_index_options_ptr",
+            "const mongoc_create_search_index_options_t *"),
+    typedef("const_mongoc_search_index_model_ptr",
+            "const mongoc_search_index_model_t *")
 ]
 
 type_list = [T.name for T in typedef_list]
@@ -546,6 +550,16 @@ future_functions = [
                      param("const_mongoc_read_prefs_ptr", "read_prefs"),
                      param("bson_ptr", "reply"),
                      param("bson_error_ptr", "error")]),
+
+    future_function("bool",
+                    "mongoc_collection_create_search_index",
+                    [param("mongoc_collection_ptr", "coll"),
+                     param("const_mongoc_search_index_model_ptr", "sim"),
+                     param("const_mongoc_create_search_index_options_ptr", "opts"),
+                     param("bson_ptr", "server_reply"),
+                     param("bson_error_ptr", "error"),
+                     param("char_ptr_ptr", "outname")
+                     ]),
 ]
 
 for fn in future_functions:

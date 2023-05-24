@@ -621,5 +621,17 @@ future_collection_estimated_document_count (
 );
 
 
+future_t *
+future_collection_create_search_index (
+
+   mongoc_collection_ptr coll,
+   const_mongoc_search_index_model_ptr sim,
+   const_mongoc_create_search_index_options_ptr opts,
+   bson_ptr server_reply,
+   bson_error_ptr error,
+   char_ptr_ptr outname
+);
+
+
 
 #endif /* FUTURE_FUNCTIONS_H */
