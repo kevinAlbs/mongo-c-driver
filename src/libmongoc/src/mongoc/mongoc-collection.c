@@ -3726,3 +3726,115 @@ mongoc_collection_watch (const mongoc_collection_t *coll,
 {
    return _mongoc_change_stream_new_from_collection (coll, pipeline, opts);
 }
+
+struct _mongoc_search_index_model {
+   char *name;
+   bson_t definition;
+};
+
+struct _mongoc_create_search_index_options {
+   // placeholder is unused to bypass the warning:
+   // 'empty struct is a GNU extension`
+   char placeholder;
+};
+
+mongoc_search_index_model_t *
+mongoc_search_index_model_new (const char *name, const bson_t *definition)
+{
+   // `name` is optional.
+   BSON_ASSERT_PARAM (definition);
+
+   mongoc_search_index_model_t *sim =
+      bson_malloc (sizeof (mongoc_search_index_model_t));
+   // `name` may be NULL, causing bson_strdup to return NULL.
+   sim->name = bson_strdup (name);
+   bson_copy_to (definition, &sim->definition);
+   return sim;
+}
+
+void
+mongoc_search_index_model_destroy (mongoc_search_index_model_t *sim)
+{
+   if (sim) {
+      bson_free (sim->name);
+      bson_destroy (&sim->definition);
+   }
+   bson_free (sim);
+}
+
+bool
+mongoc_collection_create_search_index (
+   mongoc_collection_t *coll,
+   const mongoc_search_index_model_t *sim,
+   const mongoc_create_search_index_options_t *opts,
+   bson_t *server_reply,
+   bson_error_t *error,
+   char **outname)
+{
+   BSON_ASSERT_PARAM (coll);
+   BSON_ASSERT_PARAM (sim);
+   // `opts` is optional.
+   // `server_reply` is optional.
+   BSON_ASSERT_PARAM (error);
+   // `outname` is optional.
+
+   bool ok = false;
+   bson_t cmd = BSON_INITIALIZER;
+   bson_t local_reply = BSON_INITIALIZER;
+   bson_t *reply;
+
+   if (!server_reply) {
+      reply = &local_reply;
+   } else {
+      reply = server_reply;
+   }
+   // Caller expects `server_reply` to always be initialized.
+   bson_init (reply);
+
+   // Caller expects `outname` to always be safe to free.
+   if (outname) {
+      *outname = NULL;
+   }
+
+   // Build command.
+   bsonBuildAppend (
+      cmd,
+      kv ("createSearchIndexes", cstr (coll->collection)),
+      kv ("indexes",
+          array (doc (
+             kv ("definition", bson (sim->definition)),
+             if (sim->name != NULL, then (kv ("name", cstr (sim->name))))))));
+   if (bsonBuildError != NULL) {
+      bson_set_error (error,
+                      MONGOC_ERROR_BSON,
+                      MONGOC_ERROR_BSON_INVALID,
+                      "Error building 'createSearchIndexes' command: %s",
+                      bsonBuildError);
+      goto done;
+   }
+
+   if (!mongoc_collection_command_simple (
+          coll, &cmd, NULL /* read_prefs */, reply, error)) {
+      goto done;
+   }
+
+   if (outname) {
+      // Get "name" from `reply`.
+      bsonParse (*reply,
+                 require (keyWithType ("name", utf8), storeStrDup (*outname)));
+      if (bsonParseError) {
+         bson_set_error (error,
+                         MONGOC_ERROR_BSON,
+                         MONGOC_ERROR_BSON_INVALID,
+                         "Error parsing server reply: %s",
+                         bsonBuildError);
+         goto done;
+      }
+   }
+
+   ok = true;
+done:
+   bson_destroy (&local_reply);
+   bson_destroy (&cmd);
+   return ok;
+}

@@ -355,6 +355,27 @@ mongoc_collection_estimated_document_count (
    bson_t *reply,
    bson_error_t *error);
 
+typedef struct _mongoc_search_index_model mongoc_search_index_model_t;
+
+BSON_EXPORT (mongoc_search_index_model_t *)
+mongoc_search_index_model_new (const char *name, const bson_t *definition)
+   BSON_GNUC_WARN_UNUSED_RESULT;
+
+BSON_EXPORT (void)
+mongoc_search_index_model_destroy (mongoc_search_index_model_t *sim);
+
+typedef struct _mongoc_create_search_index_options
+   mongoc_create_search_index_options_t;
+
+BSON_EXPORT (bool)
+mongoc_collection_create_search_index (
+   mongoc_collection_t *coll,
+   const mongoc_search_index_model_t *sim,
+   const mongoc_create_search_index_options_t *opts,
+   bson_t *server_reply,
+   bson_error_t *error,
+   char **outname);
+
 BSON_END_DECLS
 
 
