@@ -514,6 +514,16 @@ future_get_const_mongoc_drop_search_index_options_ptr (future_t *future)
    FUTURE_TIMEOUT_ABORT;
 }
 
+const_mongoc_list_search_index_options_ptr
+future_get_const_mongoc_list_search_index_options_ptr (future_t *future)
+{
+   if (future_wait (future)) {
+      return future_value_get_const_mongoc_list_search_index_options_ptr (&future->return_value);
+   }
+
+   FUTURE_TIMEOUT_ABORT;
+}
+
 
 future_t *
 future_new (future_value_type_t return_type, int argc)

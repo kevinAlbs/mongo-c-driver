@@ -6505,6 +6505,67 @@ test_collection_drop_search_index (void)
    }
 }
 
+static void
+test_collection_list_search_indexes (void)
+{
+   // Test success.
+   {
+      mock_server_t *mock_server =
+         mock_server_with_auto_hello (WIRE_VERSION_MAX);
+      mock_server_run (mock_server);
+      mongoc_client_t *client =
+         mongoc_client_new_from_uri (mock_server_get_uri (mock_server));
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      bson_error_t error;
+      mongoc_cursor_t *cursor = mongoc_collection_list_search_indexes (
+         coll, "name", tmp_bson ("{'batchSize': 1}"), NULL /* opts */);
+      const bson_t *got;
+      future_t *future = future_cursor_next (cursor, &got);
+      request_t *request = mock_server_receives_msg (
+         mock_server, MONGOC_MSG_NONE, tmp_bson ("{'aggregate': 'coll'}"));
+      mock_server_replies_opmsg (
+         request, MONGOC_MSG_NONE, tmp_bson (BSON_STR ({
+            "ok" : 1,
+            "cursor" : {
+               "id" : {"$numberLong" : "0"},
+               "ns" : "db.coll",
+               "firstBatch" : [
+                  {
+                     "id" : "1",
+                     "name" : "name1",
+                     "status" : "INITIAL SYNC",
+                     "definition" : {"mappings" : {"dynamic" : true}}
+                  },
+                  {
+                     "id" : "1",
+                     "name" : "name2",
+                     "status" : "INITIAL SYNC",
+                     "definition" : {"mappings" : {"dynamic" : true}}
+                  }
+               ]
+            }
+         })));
+      if (!future_get_bool (future)) {
+         // cursor may not have an error if the future operation timed out.
+         mongoc_cursor_error (cursor, &error);
+         test_error ("future_cursor_next failed: %s", error.message);
+      }
+      request_destroy (request);
+      future_destroy (future);
+      ASSERT_MATCH (got, "{'name': 'name1'}");
+      if (!mongoc_cursor_next (cursor, &got)) {
+         ASSERT (mongoc_cursor_error (cursor, &error));
+         test_error ("failed to get next document: %s", error.message);
+      }
+
+      mongoc_cursor_destroy (cursor);
+      mongoc_collection_destroy (coll);
+      mongoc_client_destroy (client);
+      mock_server_destroy (mock_server);
+   }
+}
+
 void
 test_collection_install (TestSuite *suite)
 {
@@ -6760,4 +6821,7 @@ test_collection_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite,
                                 "/collection/search_index/drop",
                                 test_collection_drop_search_index);
+   TestSuite_AddMockServerTest (suite,
+                                "/collection/search_index/list",
+                                test_collection_list_search_indexes);
 }

@@ -3775,7 +3775,7 @@ mongoc_collection_create_search_index (
    BSON_ASSERT_PARAM (sim);
    // `opts` is optional.
    // `server_reply` is optional.
-   BSON_ASSERT_PARAM (error);
+   // `error` is optional.
    // `outname` is optional.
 
    bool ok = false;
@@ -3837,7 +3837,7 @@ mongoc_collection_create_search_indexes (
    BSON_ASSERT_PARAM (sims);
    // `opts` is optional.
    // `server_reply` is optional.
-   BSON_ASSERT_PARAM (error);
+   // `error` is optional.
    // `outnames` is optional.
    // `n_outnames` is optional.
 
@@ -3958,7 +3958,7 @@ mongoc_collection_update_search_index (
    BSON_ASSERT_PARAM (definition);
    // `opts` is optional.
    // `server_reply` is optional.
-   BSON_ASSERT_PARAM (error);
+   // `error` is optional.
 
    bool ok = false;
    bson_t cmd = BSON_INITIALIZER;
@@ -4002,7 +4002,7 @@ mongoc_collection_drop_search_index (
    BSON_ASSERT_PARAM (name);
    // `opts` is optional.
    // `server_reply` is optional.
-   BSON_ASSERT_PARAM (error);
+   // `error` is optional.
 
    bool ok = false;
    bson_t cmd = BSON_INITIALIZER;
@@ -4031,4 +4031,36 @@ done:
    bson_destroy (&local_reply);
    bson_destroy (&cmd);
    return ok;
+}
+
+mongoc_cursor_t *
+mongoc_collection_list_search_indexes (
+   mongoc_collection_t *coll,
+   const char *name,
+   const bson_t *aggregate_opts,
+   const mongoc_list_search_index_options_t *opts)
+{
+   BSON_ASSERT_PARAM (coll);
+   // `name` is optional.
+   // `aggregte_opts` is optional.
+   // `opts` is optional.
+   bson_t pipeline = BSON_INITIALIZER;
+   bson_t stage;
+   bson_t listSearchIndexes;
+
+   // Build pipeline.
+   BSON_ASSERT (BSON_APPEND_DOCUMENT_BEGIN (&pipeline, "0", &stage));
+   BSON_ASSERT (BSON_APPEND_DOCUMENT_BEGIN (
+      &stage, "$listSearchIndexes", &listSearchIndexes));
+   if (name) {
+      BSON_ASSERT (BSON_APPEND_UTF8 (&listSearchIndexes, "name", name));
+   }
+   BSON_ASSERT (bson_append_document_end (&stage, &listSearchIndexes));
+   BSON_ASSERT (bson_append_document_end (&pipeline, &stage));
+
+   mongoc_cursor_t *cursor = mongoc_collection_aggregate (
+      coll, MONGOC_QUERY_NONE, &pipeline, aggregate_opts, NULL /* read_prefs*/);
+
+   bson_destroy (&pipeline);
+   return cursor;
 }
