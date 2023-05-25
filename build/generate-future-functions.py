@@ -109,7 +109,9 @@ typedef_list = [
     typedef("const_mongoc_search_index_model_ptr",
             "const mongoc_search_index_model_t *"),
     typedef("mongoc_search_index_model_ptr_ptr",
-            "mongoc_search_index_model_t **")
+            "mongoc_search_index_model_t **"),
+    typedef("const_mongoc_update_search_index_options_ptr",
+            "const mongoc_update_search_index_options_t *"),
 ]
 
 type_list = [T.name for T in typedef_list]
@@ -575,6 +577,16 @@ future_functions = [
                      param("bson_error_ptr", "error"),
                      param("char_ptr_ptr_ptr", "outnames"),
                      param("size_t_ptr", "n_outnames")
+                     ]),
+
+    future_function("bool",
+                    "mongoc_collection_update_search_index",
+                    [param("mongoc_collection_ptr", "coll"),
+                     param("char_ptr", "name"),
+                     param("const_bson_ptr", "definition"),
+                     param("const_mongoc_update_search_index_options_ptr", "opts"),
+                     param("bson_ptr", "server_reply"),
+                     param("bson_error_ptr", "error"),
                      ]),
 ]
 

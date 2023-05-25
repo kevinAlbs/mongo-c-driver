@@ -3943,3 +3943,49 @@ done:
    bson_destroy (&cmd);
    return ok;
 }
+
+bool
+mongoc_collection_update_search_index (
+   mongoc_collection_t *coll,
+   const char *name,
+   const bson_t *definition,
+   const mongoc_update_search_index_options_t *opts,
+   bson_t *server_reply,
+   bson_error_t *error)
+{
+   BSON_ASSERT_PARAM (coll);
+   BSON_ASSERT_PARAM (name);
+   BSON_ASSERT_PARAM (definition);
+   // `opts` is optional.
+   // `server_reply` is optional.
+   BSON_ASSERT_PARAM (error);
+
+   bool ok = false;
+   bson_t cmd = BSON_INITIALIZER;
+   bson_t local_reply = BSON_INITIALIZER;
+   bson_t *reply;
+
+   if (!server_reply) {
+      reply = &local_reply;
+   } else {
+      reply = server_reply;
+   }
+   // Caller expects `server_reply` to always be initialized.
+   bson_init (reply);
+
+   // Build command.
+   BSON_ASSERT (BSON_APPEND_UTF8 (&cmd, "updateSearchIndex", coll->collection));
+   BSON_ASSERT (BSON_APPEND_UTF8 (&cmd, "name", name));
+   BSON_ASSERT (BSON_APPEND_DOCUMENT (&cmd, "definition", definition));
+
+   if (!mongoc_collection_command_simple (
+          coll, &cmd, NULL /* read_prefs */, reply, error)) {
+      goto done;
+   }
+
+   ok = true;
+done:
+   bson_destroy (&local_reply);
+   bson_destroy (&cmd);
+   return ok;
+}

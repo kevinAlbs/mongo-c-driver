@@ -387,6 +387,18 @@ mongoc_collection_create_search_indexes (
    char ***outnames,
    size_t *n_outnames);
 
+typedef struct _mongoc_update_search_index_options
+   mongoc_update_search_index_options_t;
+
+BSON_EXPORT (bool)
+mongoc_collection_update_search_index (
+   mongoc_collection_t *coll,
+   const char *name,
+   const bson_t *definition,
+   const mongoc_update_search_index_options_t *opts,
+   bson_t *server_reply,
+   bson_error_t *error);
+
 BSON_END_DECLS
 
 

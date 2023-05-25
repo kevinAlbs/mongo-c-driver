@@ -647,5 +647,17 @@ future_collection_create_search_indexes (
 );
 
 
+future_t *
+future_collection_update_search_index (
+
+   mongoc_collection_ptr coll,
+   char_ptr name,
+   const_bson_ptr definition,
+   const_mongoc_update_search_index_options_ptr opts,
+   bson_ptr server_reply,
+   bson_error_ptr error
+);
+
+
 
 #endif /* FUTURE_FUNCTIONS_H */

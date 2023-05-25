@@ -6436,6 +6436,43 @@ test_collection_create_search_indexes (void)
    }
 }
 
+static void
+test_collection_update_search_index (void)
+{
+   // Test success.
+   {
+      mock_server_t *mock_server =
+         mock_server_with_auto_hello (WIRE_VERSION_MAX);
+      mock_server_run (mock_server);
+      mongoc_client_t *client =
+         mongoc_client_new_from_uri (mock_server_get_uri (mock_server));
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      bson_t reply;
+      bson_error_t error;
+      future_t *future =
+         future_collection_update_search_index (coll,
+                                                "name",
+                                                tmp_bson ("{'foo': 'bar'}"),
+                                                NULL /* opts */,
+                                                &reply,
+                                                &error);
+      request_t *request =
+         mock_server_receives_msg (mock_server,
+                                   MONGOC_MSG_NONE,
+                                   tmp_bson ("{'updateSearchIndex': 'coll'}"));
+      mock_server_replies_opmsg (
+         request, MONGOC_MSG_NONE, tmp_bson (BSON_STR ({"ok" : 1})));
+      ASSERT (future_wait (future));
+      request_destroy (request);
+      future_destroy (future);
+      bson_destroy (&reply);
+      mongoc_collection_destroy (coll);
+      mongoc_client_destroy (client);
+      mock_server_destroy (mock_server);
+   }
+}
+
 void
 test_collection_install (TestSuite *suite)
 {
@@ -6685,4 +6722,7 @@ test_collection_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite,
                                 "/collection/create_search_indexes",
                                 test_collection_create_search_indexes);
+   TestSuite_AddMockServerTest (suite,
+                                "/collection/update_search_index",
+                                test_collection_update_search_index);
 }
