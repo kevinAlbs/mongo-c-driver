@@ -52,9 +52,11 @@ typedef_list = [
     typedef("bool", None),
     typedef("char_ptr", "char *"),
     typedef("char_ptr_ptr", "char **"),
+    typedef("char_ptr_ptr_ptr", "char ***"),
     typedef("int", None),
     typedef("int64_t", None),
     typedef("size_t", None),
+    typedef("size_t_ptr", "size_t *"),
     typedef("ssize_t", None),
     typedef("uint32_t", None),
     typedef("void_ptr",  "void *"),
@@ -105,7 +107,9 @@ typedef_list = [
     typedef("const_mongoc_create_search_index_options_ptr",
             "const mongoc_create_search_index_options_t *"),
     typedef("const_mongoc_search_index_model_ptr",
-            "const mongoc_search_index_model_t *")
+            "const mongoc_search_index_model_t *"),
+    typedef("mongoc_search_index_model_ptr_ptr",
+            "mongoc_search_index_model_t **")
 ]
 
 type_list = [T.name for T in typedef_list]
@@ -559,6 +563,18 @@ future_functions = [
                      param("bson_ptr", "server_reply"),
                      param("bson_error_ptr", "error"),
                      param("char_ptr_ptr", "outname")
+                     ]),
+
+    future_function("bool",
+                    "mongoc_collection_create_search_indexes",
+                    [param("mongoc_collection_ptr", "coll"),
+                     param("mongoc_search_index_model_ptr_ptr", "sims"),
+                     param("size_t", "n_sims"),
+                     param("const_mongoc_create_search_index_options_ptr", "opts"),
+                     param("bson_ptr", "server_reply"),
+                     param("bson_error_ptr", "error"),
+                     param("char_ptr_ptr_ptr", "outnames"),
+                     param("size_t_ptr", "n_outnames")
                      ]),
 ]
 

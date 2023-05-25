@@ -633,5 +633,19 @@ future_collection_create_search_index (
 );
 
 
+future_t *
+future_collection_create_search_indexes (
+
+   mongoc_collection_ptr coll,
+   mongoc_search_index_model_ptr_ptr sims,
+   size_t n_sims,
+   const_mongoc_create_search_index_options_ptr opts,
+   bson_ptr server_reply,
+   bson_error_ptr error,
+   char_ptr_ptr_ptr outnames,
+   size_t_ptr n_outnames
+);
+
+
 
 #endif /* FUTURE_FUNCTIONS_H */

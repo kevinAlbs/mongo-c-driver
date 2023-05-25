@@ -20,6 +20,8 @@
 
 typedef char * char_ptr;
 typedef char ** char_ptr_ptr;
+typedef char *** char_ptr_ptr_ptr;
+typedef size_t * size_t_ptr;
 typedef void * void_ptr;
 typedef const char * const_char_ptr;
 typedef bool * bool_ptr;
@@ -51,15 +53,18 @@ typedef const mongoc_read_prefs_t * const_mongoc_read_prefs_ptr;
 typedef const mongoc_write_concern_t * const_mongoc_write_concern_ptr;
 typedef const mongoc_create_search_index_options_t * const_mongoc_create_search_index_options_ptr;
 typedef const mongoc_search_index_model_t * const_mongoc_search_index_model_ptr;
+typedef mongoc_search_index_model_t ** mongoc_search_index_model_ptr_ptr;
 
 typedef enum {
    future_value_no_type = 0,
    future_value_bool_type,
    future_value_char_ptr_type,
    future_value_char_ptr_ptr_type,
+   future_value_char_ptr_ptr_ptr_type,
    future_value_int_type,
    future_value_int64_t_type,
    future_value_size_t_type,
+   future_value_size_t_ptr_type,
    future_value_ssize_t_type,
    future_value_uint32_t_type,
    future_value_void_ptr_type,
@@ -97,6 +102,7 @@ typedef enum {
    future_value_const_mongoc_write_concern_ptr_type,
    future_value_const_mongoc_create_search_index_options_ptr_type,
    future_value_const_mongoc_search_index_model_ptr_type,
+   future_value_mongoc_search_index_model_ptr_ptr_type,
    future_value_void_type,
 
 } future_value_type_t;
@@ -108,9 +114,11 @@ typedef struct _future_value_t
       bool bool_value;
       char_ptr char_ptr_value;
       char_ptr_ptr char_ptr_ptr_value;
+      char_ptr_ptr_ptr char_ptr_ptr_ptr_value;
       int int_value;
       int64_t int64_t_value;
       size_t size_t_value;
+      size_t_ptr size_t_ptr_value;
       ssize_t ssize_t_value;
       uint32_t uint32_t_value;
       void_ptr void_ptr_value;
@@ -148,6 +156,7 @@ typedef struct _future_value_t
       const_mongoc_write_concern_ptr const_mongoc_write_concern_ptr_value;
       const_mongoc_create_search_index_options_ptr const_mongoc_create_search_index_options_ptr_value;
       const_mongoc_search_index_model_ptr const_mongoc_search_index_model_ptr_value;
+      mongoc_search_index_model_ptr_ptr mongoc_search_index_model_ptr_ptr_value;
 
    } value;
 } future_value_t;
@@ -192,6 +201,15 @@ future_value_get_char_ptr_ptr (
    future_value_t *future_value);
 
 void
+future_value_set_char_ptr_ptr_ptr(
+   future_value_t *future_value,
+   char_ptr_ptr_ptr value);
+
+char_ptr_ptr_ptr
+future_value_get_char_ptr_ptr_ptr (
+   future_value_t *future_value);
+
+void
 future_value_set_int(
    future_value_t *future_value,
    int value);
@@ -216,6 +234,15 @@ future_value_set_size_t(
 
 size_t
 future_value_get_size_t (
+   future_value_t *future_value);
+
+void
+future_value_set_size_t_ptr(
+   future_value_t *future_value,
+   size_t_ptr value);
+
+size_t_ptr
+future_value_get_size_t_ptr (
    future_value_t *future_value);
 
 void
@@ -549,6 +576,15 @@ future_value_set_const_mongoc_search_index_model_ptr(
 
 const_mongoc_search_index_model_ptr
 future_value_get_const_mongoc_search_index_model_ptr (
+   future_value_t *future_value);
+
+void
+future_value_set_mongoc_search_index_model_ptr_ptr(
+   future_value_t *future_value,
+   mongoc_search_index_model_ptr_ptr value);
+
+mongoc_search_index_model_ptr_ptr
+future_value_get_mongoc_search_index_model_ptr_ptr (
    future_value_t *future_value);
 
 

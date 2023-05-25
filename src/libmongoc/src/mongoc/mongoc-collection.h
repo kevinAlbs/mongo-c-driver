@@ -376,6 +376,17 @@ mongoc_collection_create_search_index (
    bson_error_t *error,
    char **outname);
 
+BSON_EXPORT (bool)
+mongoc_collection_create_search_indexes (
+   mongoc_collection_t *coll,
+   mongoc_search_index_model_t **sims,
+   size_t n_sims,
+   const mongoc_create_search_index_options_t *opts,
+   bson_t *server_reply,
+   bson_error_t *error,
+   char ***outnames,
+   size_t *n_outnames);
+
 BSON_END_DECLS
 
 

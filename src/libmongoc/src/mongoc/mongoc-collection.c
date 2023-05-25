@@ -3838,3 +3838,125 @@ done:
    bson_destroy (&cmd);
    return ok;
 }
+
+bool
+mongoc_collection_create_search_indexes (
+   mongoc_collection_t *coll,
+   mongoc_search_index_model_t **sims,
+   size_t n_sims,
+   const mongoc_create_search_index_options_t *opts,
+   bson_t *server_reply,
+   bson_error_t *error,
+   char ***outnames,
+   size_t *n_outnames)
+{
+   BSON_ASSERT_PARAM (coll);
+   BSON_ASSERT_PARAM (sims);
+   // `opts` is optional.
+   // `server_reply` is optional.
+   BSON_ASSERT_PARAM (error);
+   // `outnames` is optional.
+   // `n_outnames` is optional.
+
+   bool ok = false;
+   bson_t cmd = BSON_INITIALIZER;
+   bson_t local_reply = BSON_INITIALIZER;
+   bson_t *reply;
+
+   if (!server_reply) {
+      reply = &local_reply;
+   } else {
+      reply = server_reply;
+   }
+   // Caller expects `server_reply` to always be initialized.
+   bson_init (reply);
+
+   // Caller expects `outnames` to always be safe to free.
+   if (outnames) {
+      *outnames = NULL;
+      BSON_ASSERT_PARAM (n_outnames);
+      *n_outnames = 0;
+   }
+
+   // Build command.
+   BSON_ASSERT (
+      BSON_APPEND_UTF8 (&cmd, "createSearchIndexes", coll->collection));
+   bson_t indexes;
+   BSON_ASSERT (BSON_APPEND_ARRAY_BEGIN (&cmd, "indexes", &indexes));
+   for (size_t idx = 0; idx < n_sims; idx++) {
+      BSON_ASSERT (bson_in_range_uint32_t_unsigned (idx));
+      uint32_t idx_u32 = (uint32_t) idx;
+      char str[16];
+      const char *key;
+
+      bson_uint32_to_string (idx_u32, &key, str, sizeof str);
+      bson_t index;
+      mongoc_search_index_model_t *sim = sims[idx];
+      BSON_ASSERT (BSON_APPEND_DOCUMENT_BEGIN (&indexes, key, &index));
+      BSON_ASSERT (
+         BSON_APPEND_DOCUMENT (&index, "definition", &sim->definition));
+      if (sim->name) {
+         BSON_ASSERT (BSON_APPEND_UTF8 (&index, "name", sim->name));
+      }
+      BSON_ASSERT (bson_append_document_end (&indexes, &index));
+   }
+   BSON_ASSERT (bson_append_array_end (&cmd, &indexes));
+
+   if (!mongoc_collection_command_simple (
+          coll, &cmd, NULL /* read_prefs */, reply, error)) {
+      goto done;
+   }
+
+   if (outnames) {
+      // Get "names" from `reply`.
+      // Example reply:
+      // {
+      //   ok: 1,
+      //   indexesCreated: [
+      //     {
+      //       id: "<index Id>",
+      //       name: "<index name>"
+      //     }
+      //   ]
+      // }
+
+      // Count the number of `name`.
+      size_t count = 0;
+      bsonParse (*reply,
+                 require (keyWithType ("indexesCreated", array),
+                          visitEach (do (count++))));
+      if (bsonParseError != NULL) {
+         bson_set_error (error,
+                         MONGOC_ERROR_BSON,
+                         MONGOC_ERROR_BSON_INVALID,
+                         "Error parsing 'createSearchIndexes' reply: %s",
+                         bsonParseError);
+      }
+
+      // Allocate `outnames` and zero initialize. Zero initialize so it is safe
+      // for callers to call `bson_free` on all entries.
+      *outnames = bson_malloc0 (sizeof (char *) * count);
+      *n_outnames = count;
+      size_t tail_idx = 0;
+      bsonParse (*reply,
+                 require (keyWithType ("indexesCreated", array),
+                          visitEach (parse (require (
+                             keyWithType ("name", utf8),
+                             do ((*outnames)[tail_idx] = bson_strdup (
+                                    bson_iter_utf8 (&bsonVisitIter, NULL));
+                                 tail_idx++))))));
+      if (bsonParseError != NULL) {
+         bson_set_error (error,
+                         MONGOC_ERROR_BSON,
+                         MONGOC_ERROR_BSON_INVALID,
+                         "Error parsing 'createSearchIndexes' reply: %s",
+                         bsonParseError);
+      }
+   }
+
+   ok = true;
+done:
+   bson_destroy (&local_reply);
+   bson_destroy (&cmd);
+   return ok;
+}

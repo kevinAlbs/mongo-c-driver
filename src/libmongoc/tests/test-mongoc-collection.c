@@ -6359,7 +6359,70 @@ test_collection_create_search_index (void)
       mongoc_client_destroy (client);
       mock_server_destroy (mock_server);
    }
-   // Test extra options are appended.
+}
+
+static void
+test_collection_create_search_indexes (void)
+{
+   // Test success.
+   {
+      mock_server_t *mock_server =
+         mock_server_with_auto_hello (WIRE_VERSION_MAX);
+      mock_server_run (mock_server);
+      mongoc_client_t *client =
+         mongoc_client_new_from_uri (mock_server_get_uri (mock_server));
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      mongoc_search_index_model_t **sims =
+         bson_malloc (sizeof (mongoc_search_index_model_t *) * 2);
+      sims[0] =
+         mongoc_search_index_model_new ("myname", tmp_bson ("{'foo': 'bar1'}"));
+      sims[1] =
+         mongoc_search_index_model_new ("myname", tmp_bson ("{'foo': 'bar2'}"));
+      const size_t n_sims = 2;
+      bson_t reply;
+      bson_error_t error;
+      char **outnames;
+      size_t n_outnames;
+      future_t *future =
+         future_collection_create_search_indexes (coll,
+                                                  sims,
+                                                  n_sims,
+                                                  NULL /* opts */,
+                                                  &reply,
+                                                  &error,
+                                                  &outnames,
+                                                  &n_outnames);
+      request_t *request = mock_server_receives_msg (
+         mock_server,
+         MONGOC_MSG_NONE,
+         tmp_bson ("{'createSearchIndexes': 'coll'}"));
+      mock_server_replies_opmsg (request, MONGOC_MSG_NONE, tmp_bson (BSON_STR ({
+                                    "ok" : 1,
+                                    "indexesCreated" : [
+                                       {"id" : "1", "name" : "name1"},
+                                       {"id" : "2", "name" : "name2"}
+                                    ]
+                                 })));
+      ASSERT_OR_PRINT (future_get_bool (future), error);
+      ASSERT_CMPSIZE_T (n_outnames, ==, 2);
+      ASSERT_CMPSTR (outnames[0], "name1");
+      ASSERT_CMPSTR (outnames[1], "name2");
+      request_destroy (request);
+      future_destroy (future);
+      for (size_t i = 0; i < n_outnames; i++) {
+         bson_free (outnames[i]);
+      }
+      bson_free (outnames);
+      bson_destroy (&reply);
+      for (size_t i = 0; i < n_sims; i++) {
+         mongoc_search_index_model_destroy (sims[i]);
+      }
+      bson_free (sims);
+      mongoc_collection_destroy (coll);
+      mongoc_client_destroy (client);
+      mock_server_destroy (mock_server);
+   }
 }
 
 void
@@ -6608,4 +6671,7 @@ test_collection_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite,
                                 "/collection/create_search_index",
                                 test_collection_create_search_index);
+   TestSuite_AddMockServerTest (suite,
+                                "/collection/create_search_indexes",
+                                test_collection_create_search_indexes);
 }

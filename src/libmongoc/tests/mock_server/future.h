@@ -51,6 +51,9 @@ future_get_char_ptr (future_t *future);
 char_ptr_ptr
 future_get_char_ptr_ptr (future_t *future);
 
+char_ptr_ptr_ptr
+future_get_char_ptr_ptr_ptr (future_t *future);
+
 int
 future_get_int (future_t *future);
 
@@ -59,6 +62,9 @@ future_get_int64_t (future_t *future);
 
 size_t
 future_get_size_t (future_t *future);
+
+size_t_ptr
+future_get_size_t_ptr (future_t *future);
 
 ssize_t
 future_get_ssize_t (future_t *future);
@@ -170,6 +176,9 @@ future_get_const_mongoc_create_search_index_options_ptr (future_t *future);
 
 const_mongoc_search_index_model_ptr
 future_get_const_mongoc_search_index_model_ptr (future_t *future);
+
+mongoc_search_index_model_ptr_ptr
+future_get_mongoc_search_index_model_ptr_ptr (future_t *future);
 
 
 void future_destroy (future_t *future);

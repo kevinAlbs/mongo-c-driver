@@ -64,6 +64,16 @@ future_get_char_ptr_ptr (future_t *future)
    FUTURE_TIMEOUT_ABORT;
 }
 
+char_ptr_ptr_ptr
+future_get_char_ptr_ptr_ptr (future_t *future)
+{
+   if (future_wait (future)) {
+      return future_value_get_char_ptr_ptr_ptr (&future->return_value);
+   }
+
+   FUTURE_TIMEOUT_ABORT;
+}
+
 int
 future_get_int (future_t *future)
 {
@@ -89,6 +99,16 @@ future_get_size_t (future_t *future)
 {
    if (future_wait (future)) {
       return future_value_get_size_t (&future->return_value);
+   }
+
+   FUTURE_TIMEOUT_ABORT;
+}
+
+size_t_ptr
+future_get_size_t_ptr (future_t *future)
+{
+   if (future_wait (future)) {
+      return future_value_get_size_t_ptr (&future->return_value);
    }
 
    FUTURE_TIMEOUT_ABORT;
@@ -459,6 +479,16 @@ future_get_const_mongoc_search_index_model_ptr (future_t *future)
 {
    if (future_wait (future)) {
       return future_value_get_const_mongoc_search_index_model_ptr (&future->return_value);
+   }
+
+   FUTURE_TIMEOUT_ABORT;
+}
+
+mongoc_search_index_model_ptr_ptr
+future_get_mongoc_search_index_model_ptr_ptr (future_t *future)
+{
+   if (future_wait (future)) {
+      return future_value_get_mongoc_search_index_model_ptr_ptr (&future->return_value);
    }
 
    FUTURE_TIMEOUT_ABORT;
