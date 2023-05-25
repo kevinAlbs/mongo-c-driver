@@ -399,6 +399,17 @@ mongoc_collection_update_search_index (
    bson_t *server_reply,
    bson_error_t *error);
 
+typedef struct _mongoc_drop_search_index_options
+   mongoc_drop_search_index_options_t;
+
+BSON_EXPORT (bool)
+mongoc_collection_drop_search_index (
+   mongoc_collection_t *coll,
+   const char *name,
+   const mongoc_drop_search_index_options_t *opts,
+   bson_t *server_reply,
+   bson_error_t *error);
+
 BSON_END_DECLS
 
 

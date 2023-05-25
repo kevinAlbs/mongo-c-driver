@@ -686,3 +686,17 @@ future_value_get_const_mongoc_update_search_index_options_ptr (future_value_t *f
    return future_value->value.const_mongoc_update_search_index_options_ptr_value;
 }
 
+void
+future_value_set_const_mongoc_drop_search_index_options_ptr (future_value_t *future_value, const_mongoc_drop_search_index_options_ptr value)
+{
+   future_value->type = future_value_const_mongoc_drop_search_index_options_ptr_type;
+   future_value->value.const_mongoc_drop_search_index_options_ptr_value = value;
+}
+
+const_mongoc_drop_search_index_options_ptr
+future_value_get_const_mongoc_drop_search_index_options_ptr (future_value_t *future_value)
+{
+   BSON_ASSERT (future_value->type == future_value_const_mongoc_drop_search_index_options_ptr_type);
+   return future_value->value.const_mongoc_drop_search_index_options_ptr_value;
+}
+

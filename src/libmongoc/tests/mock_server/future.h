@@ -183,6 +183,9 @@ future_get_mongoc_search_index_model_ptr_ptr (future_t *future);
 const_mongoc_update_search_index_options_ptr
 future_get_const_mongoc_update_search_index_options_ptr (future_t *future);
 
+const_mongoc_drop_search_index_options_ptr
+future_get_const_mongoc_drop_search_index_options_ptr (future_t *future);
+
 
 void future_destroy (future_t *future);
 

@@ -659,5 +659,16 @@ future_collection_update_search_index (
 );
 
 
+future_t *
+future_collection_drop_search_index (
+
+   mongoc_collection_ptr coll,
+   char_ptr name,
+   const_mongoc_drop_search_index_options_ptr opts,
+   bson_ptr server_reply,
+   bson_error_ptr error
+);
+
+
 
 #endif /* FUTURE_FUNCTIONS_H */
