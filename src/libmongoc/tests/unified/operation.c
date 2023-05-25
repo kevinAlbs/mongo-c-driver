@@ -3559,7 +3559,7 @@ operation_createSearchIndex (test_t *test,
    bson_t *cmd = bson_new ();
 
    // Parse arguments.
-   bson_parser_doc (bp, "definition", &model);
+   bson_parser_doc (bp, "model", &model);
    if (!bson_parser_parse (bp, op->arguments, error)) {
       goto done;
    }
@@ -3574,17 +3574,11 @@ operation_createSearchIndex (test_t *test,
       goto done;
    }
 
-   // Build command.
-   bsonBuildAppend (
-      *cmd,
-      kv ("createSearchIndexes", cstr (coll->collection)),
-      kv ("indexes",
-          array (doc (kv ("definition", bson (*definition)),
-                      if (name != NULL, then (kv ("name", cstr (name))))))));
-   ASSERT (!bsonBuildError);
-
-   mongoc_collection_command_simple (
-      coll, cmd, NULL /* read_prefs */, NULL /* reply */, &op_error);
+   mongoc_search_index_model_t *sim =
+      mongoc_search_index_model_new (name, definition);
+   mongoc_collection_create_search_index (
+      coll, sim, NULL /* opts */, &op_reply, &op_error, NULL /* outname */);
+   mongoc_search_index_model_destroy (sim);
    result_from_val_and_reply (result, NULL, &op_reply, &op_error);
    ret = true;
 done:
@@ -3608,9 +3602,11 @@ operation_createSearchIndexes (test_t *test,
    bson_error_t op_error;
    bson_t op_reply = BSON_INITIALIZER;
    bson_t *cmd = bson_new ();
+   mongoc_search_index_model_t **sims = NULL;
+   size_t n_sims = 0;
 
    // Parse arguments.
-   bson_parser_array (bp, "indexDefinitions", &models);
+   bson_parser_array (bp, "models", &models);
    if (!bson_parser_parse (bp, op->arguments, error)) {
       goto done;
    }
@@ -3620,17 +3616,47 @@ operation_createSearchIndexes (test_t *test,
       goto done;
    }
 
-   // Build command.
-   bsonBuildAppend (*cmd,
-                    kv ("createSearchIndexes", cstr (coll->collection)),
-                    kv ("indexes", bsonArray (*models)));
-   ASSERT (!bsonBuildError);
+   bson_iter_t iter;
+   BSON_FOREACH (models, iter)
+   {
+      n_sims++;
+   }
 
-   mongoc_collection_command_simple (
-      coll, cmd, NULL /* read_prefs */, NULL /* reply */, &op_error);
+   sims = bson_malloc (sizeof (mongoc_search_index_model_t *));
+   size_t tail_idx = 0;
+   BSON_FOREACH (models, iter)
+   {
+      bson_t model_bson;
+      bson_t *definition = NULL;
+      char *name = NULL;
+      bson_iter_bson (&iter, &model_bson);
+      bson_parser_t *bp_model = bson_parser_new ();
+      bson_parser_doc (bp_model, "definition", &definition);
+      bson_parser_utf8_optional (bp_model, "name", &name);
+      if (!bson_parser_parse (bp_model, &model_bson, error)) {
+         goto done;
+      }
+      sims[tail_idx] = mongoc_search_index_model_new (name, definition);
+      bson_parser_destroy_with_parsed_fields (bp_model);
+      tail_idx++;
+   }
+
+   mongoc_collection_create_search_indexes (coll,
+                                            sims,
+                                            n_sims,
+                                            NULL /* opts */,
+                                            &op_reply,
+                                            &op_error,
+                                            NULL /* outnames */,
+                                            NULL /* n_outnames */);
+
    result_from_val_and_reply (result, NULL, &op_reply, &op_error);
    ret = true;
 done:
+   for (size_t i = 0; i < n_sims; i++) {
+      mongoc_search_index_model_destroy (sims[i]);
+   }
+   bson_free (sims);
    bson_destroy (cmd);
    bson_parser_destroy_with_parsed_fields (bp);
    bson_destroy (&op_reply);
@@ -3652,7 +3678,7 @@ operation_dropSearchIndex (test_t *test,
    bson_t *cmd = bson_new ();
 
    // Parse arguments.
-   bson_parser_utf8 (bp, "indexName", &name);
+   bson_parser_utf8 (bp, "name", &name);
    if (!bson_parser_parse (bp, op->arguments, error)) {
       goto done;
    }
@@ -3662,14 +3688,8 @@ operation_dropSearchIndex (test_t *test,
       goto done;
    }
 
-   // Build command.
-   bsonBuildAppend (*cmd,
-                    kv ("dropSearchIndex", cstr (coll->collection)),
-                    kv ("name", cstr (name)));
-   ASSERT (!bsonBuildError);
-
-   mongoc_collection_command_simple (
-      coll, cmd, NULL /* read_prefs */, NULL /* reply */, &op_error);
+   mongoc_collection_drop_search_index (
+      coll, name, NULL /* opts */, &op_reply, &op_error);
    result_from_val_and_reply (result, NULL, &op_reply, &op_error);
    ret = true;
 done:
@@ -3695,8 +3715,8 @@ operation_listSearchIndexes (test_t *test,
 
    // Parse arguments.
    if (op->arguments) {
-      bson_parser_utf8 (bp, "indexName", &name);
-      bson_parser_doc_optional (bp, "options", &aggregateOptions);
+      bson_parser_utf8 (bp, "name", &name);
+      bson_parser_doc_optional (bp, "aggregationOptions", &aggregateOptions);
       if (!bson_parser_parse (bp, op->arguments, error)) {
          goto done;
       }
@@ -3707,21 +3727,8 @@ operation_listSearchIndexes (test_t *test,
       goto done;
    }
 
-   // Build command.
-   bsonBuildAppend (
-      *pipeline,
-      kv ("pipeline",
-          array (doc (kv ("$listSearchIndexes",
-                          if (name != NULL,
-                              then (doc (kv ("name", cstr (name)))),
-                              else (doc ())))))));
-   ASSERT (!bsonBuildError);
-
-   cursor = mongoc_collection_aggregate (coll,
-                                         MONGOC_QUERY_NONE,
-                                         pipeline,
-                                         aggregateOptions /* opts */,
-                                         NULL /* read_prefs */);
+   cursor = mongoc_collection_list_search_indexes (
+      coll, name, aggregateOptions, NULL /* opts */);
 
    result_from_cursor (result, cursor);
    ret = true;
@@ -3749,7 +3756,7 @@ operation_updateSearchIndex (test_t *test,
 
    // Parse arguments.
    bson_parser_doc (bp, "definition", &definition);
-   bson_parser_utf8_optional (bp, "indexName", &name);
+   bson_parser_utf8_optional (bp, "name", &name);
    if (!bson_parser_parse (bp, op->arguments, error)) {
       goto done;
    }
@@ -3759,15 +3766,8 @@ operation_updateSearchIndex (test_t *test,
       goto done;
    }
 
-   // Build command.
-   bsonBuildAppend (*cmd,
-                    kv ("updateSearchIndex", cstr (coll->collection)),
-                    kv ("definition", bson (*definition)),
-                    if (name != NULL, then (kv ("name", cstr (name)))));
-   ASSERT (!bsonBuildError);
-
-   mongoc_collection_command_simple (
-      coll, cmd, NULL /* read_prefs */, NULL /* reply */, &op_error);
+   mongoc_collection_update_search_index (
+      coll, name, definition, NULL /* opts */, &op_reply, &op_error);
    result_from_val_and_reply (result, NULL, &op_reply, &op_error);
    ret = true;
 done:
