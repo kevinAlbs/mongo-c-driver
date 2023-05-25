@@ -3779,63 +3779,46 @@ mongoc_collection_create_search_index (
    // `outname` is optional.
 
    bool ok = false;
-   bson_t cmd = BSON_INITIALIZER;
-   bson_t local_reply = BSON_INITIALIZER;
-   bson_t *reply;
-
-   if (!server_reply) {
-      reply = &local_reply;
-   } else {
-      reply = server_reply;
+   char **outnames = NULL;
+   size_t n_outnames = 0;
+   if (!mongoc_collection_create_search_indexes (
+          coll,
+          (mongoc_search_index_model_t **) &sim,
+          1,
+          opts,
+          server_reply,
+          error,
+          &outnames,
+          &n_outnames)) {
+      goto done;
    }
-   // Caller expects `server_reply` to always be initialized.
-   bson_init (reply);
 
-   // Caller expects `outname` to always be safe to free.
    if (outname) {
+      // Set `outname` to NULL so it is always safe to free from caller.
       *outname = NULL;
-   }
 
-   // Build command.
-   bsonBuildAppend (
-      cmd,
-      kv ("createSearchIndexes", cstr (coll->collection)),
-      kv ("indexes",
-          array (doc (
-             kv ("definition", bson (sim->definition)),
-             if (sim->name != NULL, then (kv ("name", cstr (sim->name))))))));
-   if (bsonBuildError != NULL) {
-      bson_set_error (error,
-                      MONGOC_ERROR_BSON,
-                      MONGOC_ERROR_BSON_INVALID,
-                      "Error building 'createSearchIndexes' command: %s",
-                      bsonBuildError);
-      goto done;
-   }
-
-   if (!mongoc_collection_command_simple (
-          coll, &cmd, NULL /* read_prefs */, reply, error)) {
-      goto done;
-   }
-
-   if (outname) {
-      // Get "name" from `reply`.
-      bsonParse (*reply,
-                 require (keyWithType ("name", utf8), storeStrDup (*outname)));
-      if (bsonParseError) {
-         bson_set_error (error,
-                         MONGOC_ERROR_BSON,
-                         MONGOC_ERROR_BSON_INVALID,
-                         "Error parsing server reply: %s",
-                         bsonBuildError);
+      // `n_outnames` may be 0 on error.
+      if (n_outnames == 0) {
          goto done;
       }
+      if (n_outnames > 1) {
+         bson_set_error (
+            error,
+            MONGOC_ERROR_BSON,
+            MONGOC_ERROR_BSON_INVALID,
+            "'createSearchIndexes' reply included %zu `name`. Expected 1",
+            n_outnames);
+         goto done;
+      }
+      *outname = bson_strdup (outnames[0]);
    }
 
    ok = true;
 done:
-   bson_destroy (&local_reply);
-   bson_destroy (&cmd);
+   for (size_t i = 0; i < n_outnames; i++) {
+      bson_free (outnames[i]);
+   }
+   bson_free (outnames);
    return ok;
 }
 

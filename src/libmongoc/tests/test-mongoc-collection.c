@@ -6249,10 +6249,13 @@ test_collection_create_search_index (void)
          MONGOC_MSG_NONE,
          tmp_bson ("{'createSearchIndexes': 'coll'}"));
       mock_server_replies_opmsg (
-         request, MONGOC_MSG_NONE, tmp_bson ("{'ok': 1, 'name': 'myname'}"));
+         request, MONGOC_MSG_NONE, tmp_bson (BSON_STR ({
+            "ok" : 1,
+            "indexesCreated" : [ {"id" : "1", "name" : "myname"} ]
+         })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
       ASSERT_CMPSTR (outname, "myname");
-      ASSERT_MATCH (&reply, "{'ok': 1, 'name': 'myname'}");
+      ASSERT_MATCH (&reply, "{'ok': 1 }");
       request_destroy (request);
       future_destroy (future);
       bson_free (outname);
@@ -6282,7 +6285,10 @@ test_collection_create_search_index (void)
          MONGOC_MSG_NONE,
          tmp_bson ("{'createSearchIndexes': 'coll'}"));
       mock_server_replies_opmsg (
-         request, MONGOC_MSG_NONE, tmp_bson ("{'ok': 1, 'name': 'myname'}"));
+         request, MONGOC_MSG_NONE, tmp_bson (BSON_STR ({
+            "ok" : 1,
+            "indexesCreated" : [ {"id" : "1", "name" : "myname"} ]
+         })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
       ASSERT_CMPSTR (outname, "myname");
       request_destroy (request);
@@ -6313,9 +6319,12 @@ test_collection_create_search_index (void)
          MONGOC_MSG_NONE,
          tmp_bson ("{'createSearchIndexes': 'coll'}"));
       mock_server_replies_opmsg (
-         request, MONGOC_MSG_NONE, tmp_bson ("{'ok': 1, 'name': 'myname'}"));
+         request, MONGOC_MSG_NONE, tmp_bson (BSON_STR ({
+            "ok" : 1,
+            "indexesCreated" : [ {"id" : "1", "name" : "myname"} ]
+         })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
-      ASSERT_MATCH (&reply, "{'ok': 1, 'name': 'myname'}");
+      ASSERT_MATCH (&reply, "{'ok': 1 }");
       request_destroy (request);
       future_destroy (future);
       bson_destroy (&reply);
@@ -6344,12 +6353,14 @@ test_collection_create_search_index (void)
          mock_server,
          MONGOC_MSG_NONE,
          tmp_bson ("{'createSearchIndexes': 'coll'}"));
-      mock_server_replies_opmsg (request,
-                                 MONGOC_MSG_NONE,
-                                 tmp_bson ("{'ok': 1, 'name': 'defaultname'}"));
+      mock_server_replies_opmsg (
+         request, MONGOC_MSG_NONE, tmp_bson (BSON_STR ({
+            "ok" : 1,
+            "indexesCreated" : [ {"id" : "1", "name" : "defaultname"} ]
+         })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
       ASSERT_CMPSTR (outname, "defaultname");
-      ASSERT_MATCH (&reply, "{'ok': 1, 'name': 'defaultname'}");
+      ASSERT_MATCH (&reply, "{'ok': 1 }");
       request_destroy (request);
       future_destroy (future);
       bson_free (outname);
