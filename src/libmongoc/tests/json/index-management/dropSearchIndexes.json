@@ -1,6 +1,6 @@
 {
-  "description": "dropSearchIndexes",
-  "schemaVersion": "1.10",
+  "description": "dropSearchIndex",
+  "schemaVersion": "1.4",
   "createEntities": [
     {
       "client": {
@@ -45,7 +45,7 @@
           "name": "dropSearchIndex",
           "object": "collection0",
           "arguments": {
-            "indexName": "test index"
+            "name": "test index"
           },
           "expectError": {
             "isError": true
@@ -55,7 +55,6 @@
       "expectEvents": [
         {
           "client": "client0",
-          "ignoreExtraEvents": true,
           "events": [
             {
               "commandStartedEvent": {
