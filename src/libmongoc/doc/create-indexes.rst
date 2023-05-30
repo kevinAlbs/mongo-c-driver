@@ -23,3 +23,16 @@ Example
 .. literalinclude:: ../examples/example-create-indexes.c
    :language: c
    :caption: example-create-indexes.c
+
+Creating Search Indexes
+=======================
+
+To create an Atlas search index, use the ``createSearchIndexes`` command.
+See `the MongoDB Manual entry for the createSearchIndexes command <https://www.mongodb.com/docs/upcoming/reference/command/createSearchIndexes/>`_ for details.
+
+Example
+-------
+
+.. literalinclude:: ../examples/example-create-search-indexes.c
+   :language: c
+   :caption: example-create-search-indexes.c
