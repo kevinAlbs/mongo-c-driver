@@ -3789,100 +3789,33 @@ mongoc_search_index_model_destroy (mongoc_search_index_model_t *sim)
    bson_free (sim);
 }
 
-struct _mongoc_string_list_t {
-   mongoc_array_t list;
-};
-
-mongoc_string_list_t *
-mongoc_string_list_new (void)
-{
-   mongoc_string_list_t *sl = bson_malloc (sizeof (mongoc_string_list_t));
-   _mongoc_array_init (&sl->list, sizeof (char *));
-   return sl;
-}
-
-BSON_EXPORT (const char *)
-mongoc_string_list_get (const mongoc_string_list_t *sl, size_t i)
-{
-   BSON_ASSERT_PARAM (sl);
-   BSON_ASSERT (i < sl->list.len);
-   return _mongoc_array_index (&sl->list, char *, i);
-}
-
-BSON_EXPORT (size_t)
-mongoc_string_list_size (const mongoc_string_list_t *sl)
-{
-   BSON_ASSERT_PARAM (sl);
-   return sl->list.len;
-}
-
-BSON_EXPORT (void)
-mongoc_string_list_destroy (mongoc_string_list_t *sl)
-{
-   if (!sl) {
-      return;
-   }
-   size_t i;
-   for (i = 0; i < sl->list.len; i++) {
-      char *got = _mongoc_array_index (&sl->list, char *, i);
-      bson_free (got);
-   }
-   _mongoc_array_destroy (&sl->list);
-   bson_free (sl);
-}
-
 bool
 mongoc_collection_create_search_index (
    mongoc_collection_t *coll,
    const mongoc_search_index_model_t *sim,
    const mongoc_create_search_index_options_t *opts,
    bson_t *server_reply,
-   bson_error_t *error,
-   char **outname)
+   bson_error_t *error)
 {
    BSON_ASSERT_PARAM (coll);
    BSON_ASSERT_PARAM (sim);
    // `opts` is optional.
    // `server_reply` is optional.
    // `error` is optional.
-   // `outname` is optional.
 
    bool ok = false;
-   mongoc_string_list_t *outnames = mongoc_string_list_new ();
    if (!mongoc_collection_create_search_indexes (
           coll,
           (mongoc_search_index_model_t **) &sim,
           1,
           opts,
           server_reply,
-          error,
-          outnames)) {
+          error)) {
       goto done;
-   }
-
-   if (outname) {
-      // Set `outname` to NULL so it is always safe to free from caller.
-      *outname = NULL;
-
-      // There may be no returned outnames on error.
-      if (mongoc_string_list_size (outnames) == 0) {
-         goto done;
-      }
-      if (mongoc_string_list_size (outnames) > 1) {
-         bson_set_error (
-            error,
-            MONGOC_ERROR_BSON,
-            MONGOC_ERROR_BSON_INVALID,
-            "'createSearchIndexes' reply included %zu `name`. Expected 1",
-            mongoc_string_list_size (outnames));
-         goto done;
-      }
-      *outname = bson_strdup (mongoc_string_list_get (outnames, 0));
    }
 
    ok = true;
 done:
-   mongoc_string_list_destroy (outnames);
    return ok;
 }
 
@@ -3893,16 +3826,13 @@ mongoc_collection_create_search_indexes (
    size_t n_sims,
    const mongoc_create_search_index_options_t *opts,
    bson_t *server_reply,
-   bson_error_t *error,
-   mongoc_string_list_t *outnames)
+   bson_error_t *error)
 {
    BSON_ASSERT_PARAM (coll);
    BSON_ASSERT_PARAM (sims);
    // `opts` is optional.
    // `server_reply` is optional.
    // `error` is optional.
-   // `outnames` is optional.
-   // `n_outnames` is optional.
 
    bool ok = false;
    bson_t cmd = BSON_INITIALIZER;
@@ -3948,35 +3878,6 @@ mongoc_collection_create_search_indexes (
                                              reply,
                                              error)) {
       goto done;
-   }
-
-   if (outnames) {
-      // Get "names" from `reply`.
-      // Example reply:
-      // {
-      //   ok: 1,
-      //   indexesCreated: [
-      //     {
-      //       id: "<index Id>",
-      //       name: "<index name>"
-      //     }
-      //   ]
-      // }
-      bsonParse (*reply,
-                 require (keyWithType ("indexesCreated", array),
-                          visitEach (parse (require (
-                             keyWithType ("name", utf8), do ({
-                                char *got = bson_strdup (
-                                   bson_iter_utf8 (&bsonVisitIter, NULL));
-                                _mongoc_array_append_val (&outnames->list, got);
-                             }))))));
-      if (bsonParseError != NULL) {
-         bson_set_error (error,
-                         MONGOC_ERROR_BSON,
-                         MONGOC_ERROR_BSON_INVALID,
-                         "Error parsing 'createSearchIndexes' reply: %s",
-                         bsonParseError);
-      }
    }
 
    ok = true;

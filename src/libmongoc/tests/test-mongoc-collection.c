@@ -6241,9 +6241,8 @@ test_collection_create_search_index (void)
          mongoc_search_index_model_new ("myname", tmp_bson ("{'foo': 'bar'}"));
       bson_t reply;
       bson_error_t error;
-      char *outname;
       future_t *future = future_collection_create_search_index (
-         coll, sim, NULL /* opts */, &reply, &error, &outname);
+         coll, sim, NULL /* opts */, &reply, &error);
       request_t *request = mock_server_receives_msg (
          mock_server,
          MONGOC_MSG_NONE,
@@ -6254,11 +6253,9 @@ test_collection_create_search_index (void)
             "indexesCreated" : [ {"id" : "1", "name" : "myname"} ]
          })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
-      ASSERT_CMPSTR (outname, "myname");
       ASSERT_MATCH (&reply, "{'ok': 1 }");
       request_destroy (request);
       future_destroy (future);
-      bson_free (outname);
       bson_destroy (&reply);
       mongoc_search_index_model_destroy (sim);
       mongoc_collection_destroy (coll);
@@ -6277,9 +6274,8 @@ test_collection_create_search_index (void)
       mongoc_search_index_model_t *sim =
          mongoc_search_index_model_new ("myname", tmp_bson ("{'foo': 'bar'}"));
       bson_error_t error;
-      char *outname;
       future_t *future = future_collection_create_search_index (
-         coll, sim, NULL /* opts */, NULL, &error, &outname);
+         coll, sim, NULL /* opts */, NULL, &error);
       request_t *request = mock_server_receives_msg (
          mock_server,
          MONGOC_MSG_NONE,
@@ -6290,10 +6286,8 @@ test_collection_create_search_index (void)
             "indexesCreated" : [ {"id" : "1", "name" : "myname"} ]
          })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
-      ASSERT_CMPSTR (outname, "myname");
       request_destroy (request);
       future_destroy (future);
-      bson_free (outname);
       mongoc_search_index_model_destroy (sim);
       mongoc_collection_destroy (coll);
       mongoc_client_destroy (client);
@@ -6313,7 +6307,7 @@ test_collection_create_search_index (void)
       bson_t reply;
       bson_error_t error;
       future_t *future = future_collection_create_search_index (
-         coll, sim, NULL /* opts */, &reply, &error, NULL);
+         coll, sim, NULL /* opts */, &reply, &error);
       request_t *request = mock_server_receives_msg (
          mock_server,
          MONGOC_MSG_NONE,
@@ -6346,9 +6340,8 @@ test_collection_create_search_index (void)
          mongoc_search_index_model_new (NULL, tmp_bson ("{'foo': 'bar'}"));
       bson_t reply;
       bson_error_t error;
-      char *outname;
       future_t *future = future_collection_create_search_index (
-         coll, sim, NULL /* opts */, &reply, &error, &outname);
+         coll, sim, NULL /* opts */, &reply, &error);
       request_t *request = mock_server_receives_msg (
          mock_server,
          MONGOC_MSG_NONE,
@@ -6359,11 +6352,9 @@ test_collection_create_search_index (void)
             "indexesCreated" : [ {"id" : "1", "name" : "defaultname"} ]
          })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
-      ASSERT_CMPSTR (outname, "defaultname");
       ASSERT_MATCH (&reply, "{'ok': 1 }");
       request_destroy (request);
       future_destroy (future);
-      bson_free (outname);
       bson_destroy (&reply);
       mongoc_search_index_model_destroy (sim);
       mongoc_collection_destroy (coll);
@@ -6390,7 +6381,6 @@ test_collection_create_search_index (void)
          mongoc_create_search_index_options_new ();
       bson_t reply;
       bson_error_t error;
-      char *outname;
       mongoc_client_session_t *session;
       // Start a session and append the session to options.
       {
@@ -6405,7 +6395,7 @@ test_collection_create_search_index (void)
          bson_destroy (&session_bson);
       }
       future_t *future = future_collection_create_search_index (
-         coll, sim, csio, &reply, &error, &outname);
+         coll, sim, csio, &reply, &error);
       // Expect 'lsid' field to be sent from session.
       request_t *request = mock_server_receives_msg (
          mock_server,
@@ -6418,11 +6408,9 @@ test_collection_create_search_index (void)
             "indexesCreated" : [ {"id" : "1", "name" : "myname"} ]
          })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
-      ASSERT_CMPSTR (outname, "myname");
       ASSERT_MATCH (&reply, "{'ok': 1 }");
       request_destroy (request);
       future_destroy (future);
-      bson_free (outname);
       bson_destroy (&reply);
       mongoc_client_session_destroy (session);
       mongoc_create_search_index_options_destroy (csio);
@@ -6454,9 +6442,8 @@ test_collection_create_search_indexes (void)
       const size_t n_sims = 2;
       bson_t reply;
       bson_error_t error;
-      mongoc_string_list_t *outnames = mongoc_string_list_new ();
       future_t *future = future_collection_create_search_indexes (
-         coll, sims, n_sims, NULL /* opts */, &reply, &error, outnames);
+         coll, sims, n_sims, NULL /* opts */, &reply, &error);
       request_t *request = mock_server_receives_msg (
          mock_server,
          MONGOC_MSG_NONE,
@@ -6469,12 +6456,8 @@ test_collection_create_search_indexes (void)
                                     ]
                                  })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
-      ASSERT_CMPSIZE_T (mongoc_string_list_size (outnames), ==, 2);
-      ASSERT_CMPSTR (mongoc_string_list_get (outnames, 0), "name1");
-      ASSERT_CMPSTR (mongoc_string_list_get (outnames, 1), "name2");
       request_destroy (request);
       future_destroy (future);
-      mongoc_string_list_destroy (outnames);
       bson_destroy (&reply);
       for (size_t i = 0; i < n_sims; i++) {
          mongoc_search_index_model_destroy (sims[i]);

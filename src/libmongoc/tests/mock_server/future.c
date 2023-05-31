@@ -414,16 +414,6 @@ future_get_mongoc_remove_flags_t (future_t *future)
    FUTURE_TIMEOUT_ABORT;
 }
 
-mongoc_string_list_ptr
-future_get_mongoc_string_list_ptr (future_t *future)
-{
-   if (future_wait (future)) {
-      return future_value_get_mongoc_string_list_ptr (&future->return_value);
-   }
-
-   FUTURE_TIMEOUT_ABORT;
-}
-
 const_mongoc_find_and_modify_opts_ptr
 future_get_const_mongoc_find_and_modify_opts_ptr (future_t *future)
 {

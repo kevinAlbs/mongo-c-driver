@@ -156,9 +156,6 @@ future_get_mongoc_change_stream_ptr (future_t *future);
 mongoc_remove_flags_t
 future_get_mongoc_remove_flags_t (future_t *future);
 
-mongoc_string_list_ptr
-future_get_mongoc_string_list_ptr (future_t *future);
-
 const_mongoc_find_and_modify_opts_ptr
 future_get_const_mongoc_find_and_modify_opts_ptr (future_t *future);
 

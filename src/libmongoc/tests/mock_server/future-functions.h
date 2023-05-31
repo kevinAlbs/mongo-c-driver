@@ -628,8 +628,7 @@ future_collection_create_search_index (
    const_mongoc_search_index_model_ptr sim,
    const_mongoc_create_search_index_options_ptr opts,
    bson_ptr server_reply,
-   bson_error_ptr error,
-   char_ptr_ptr outname
+   bson_error_ptr error
 );
 
 
@@ -641,8 +640,7 @@ future_collection_create_search_indexes (
    size_t n_sims,
    const_mongoc_create_search_index_options_ptr opts,
    bson_ptr server_reply,
-   bson_error_ptr error,
-   mongoc_string_list_ptr outnames
+   bson_error_ptr error
 );
 
 

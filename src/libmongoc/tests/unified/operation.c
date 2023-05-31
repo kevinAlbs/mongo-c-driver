@@ -3577,7 +3577,7 @@ operation_createSearchIndex (test_t *test,
    mongoc_search_index_model_t *sim =
       mongoc_search_index_model_new (name, definition);
    mongoc_collection_create_search_index (
-      coll, sim, NULL /* opts */, &op_reply, &op_error, NULL /* outname */);
+      coll, sim, NULL /* opts */, &op_reply, &op_error);
    mongoc_search_index_model_destroy (sim);
    result_from_val_and_reply (result, NULL, &op_reply, &op_error);
    ret = true;
@@ -3641,13 +3641,8 @@ operation_createSearchIndexes (test_t *test,
       tail_idx++;
    }
 
-   mongoc_collection_create_search_indexes (coll,
-                                            sims,
-                                            n_sims,
-                                            NULL /* opts */,
-                                            &op_reply,
-                                            &op_error,
-                                            NULL /* outnames */);
+   mongoc_collection_create_search_indexes (
+      coll, sims, n_sims, NULL /* opts */, &op_reply, &op_error);
 
    result_from_val_and_reply (result, NULL, &op_reply, &op_error);
    ret = true;
