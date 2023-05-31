@@ -27,12 +27,35 @@ Example
 Creating Search Indexes
 =======================
 
-To create an Atlas search index, use the ``createSearchIndexes`` command.
-See `the MongoDB Manual entry for the createSearchIndexes command <https://www.mongodb.com/docs/current/reference/command/createSearchIndexes/>`_ for details.
-
-Example
--------
+To create an Atlas Search Index, use the createSearchIndexes command:
 
 .. literalinclude:: ../examples/example-create-search-indexes.c
    :language: c
-   :caption: example-create-search-indexes.c
+   :start-after: // Create an Atlas Search Index ... begin
+   :end-before: // Create an Atlas Search Index ... end
+   :dedent: 6
+
+To list Atlas Search Indexes, use the $listSearchIndexes aggregation stage:
+
+.. literalinclude:: ../examples/example-create-search-indexes.c
+   :language: c
+   :start-after: // List Atlas Search Indexes ... begin
+   :end-before: // List Atlas Search Indexes ... end
+   :dedent: 6
+
+To update an Atlas Search Index, use the updateSearchIndex command:
+
+.. literalinclude:: ../examples/example-create-search-indexes.c
+   :language: c
+   :start-after: // Update an Atlas Search Index ... begin
+   :end-before: // Update an Atlas Search Index ... end
+   :dedent: 6
+
+To drop an Atlas Search Index, use the dropSearchIndex command:
+
+.. literalinclude:: ../examples/example-create-search-indexes.c
+   :language: c
+   :start-after: // Drop an Atlas Search Index ... begin
+   :end-before: // Drop an Atlas Search Index ... end
+   :dedent: 6
+

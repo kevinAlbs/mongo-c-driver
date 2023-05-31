@@ -55,8 +55,8 @@ main (int argc, char *argv[])
 
    coll = mongoc_client_get_collection (client, "test", "test");
 
-   // Create an Atlas Search Index.
    {
+      // Create an Atlas Search Index ... begin
       const char *cmd_str = BSON_STR ({
          "createSearchIndexes" : "test",
          "indexes" : [ {
@@ -72,10 +72,11 @@ main (int argc, char *argv[])
       }
       printf ("Created index: \"test index\"\n");
       bson_destroy (&cmd);
+      // Create an Atlas Search Index ... end
    }
 
-   // List Atlas Search Indexes.
    {
+      // List Atlas Search Indexes ... begin
       const char *pipeline_str =
          BSON_STR ({"pipeline" : [ {"$listSearchIndexes" : {}} ]});
       bson_t pipeline;
@@ -86,6 +87,7 @@ main (int argc, char *argv[])
                                       &pipeline,
                                       NULL /* opts */,
                                       NULL /* read_prefs */);
+      bson_destroy (&pipeline);
       printf ("Listing indexes:\n");
       const bson_t *got;
       while (mongoc_cursor_next (cursor, &got)) {
@@ -93,16 +95,16 @@ main (int argc, char *argv[])
          printf ("  %s\n", got_str);
          bson_free (got_str);
       }
-      bson_destroy (&pipeline);
       if (mongoc_cursor_error (cursor, &error)) {
          mongoc_cursor_destroy (cursor);
          FAILNOW ("Failed to run $listSearchIndexes: %s", error.message);
       }
       mongoc_cursor_destroy (cursor);
+      // List Atlas Search Indexes ... end
    }
 
-   // Update an Atlas Search Index.
    {
+      // Update an Atlas Search Index ... begin
       const char *cmd_str = BSON_STR ({
          "updateSearchIndex" : "test",
          "definition" : {},
@@ -116,10 +118,11 @@ main (int argc, char *argv[])
       }
       printf ("Updated index: \"test index\"\n");
       bson_destroy (&cmd);
+      // Update an Atlas Search Index ... end
    }
 
-   // Drop an Atlas Search Index.
    {
+      // Drop an Atlas Search Index ... begin
       const char *cmd_str =
          BSON_STR ({"dropSearchIndex" : "test", "name" : "test index"});
       bson_t cmd;
@@ -130,6 +133,7 @@ main (int argc, char *argv[])
       }
       printf ("Dropped index: \"test index\"\n");
       bson_destroy (&cmd);
+      // Drop an Atlas Search Index ... end
    }
 
    ok = true;
