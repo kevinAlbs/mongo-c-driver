@@ -28,7 +28,7 @@ Creating Search Indexes
 =======================
 
 To create an Atlas search index, use the ``createSearchIndexes`` command.
-See `the MongoDB Manual entry for the createSearchIndexes command <https://www.mongodb.com/docs/upcoming/reference/command/createSearchIndexes/>`_ for details.
+See `the MongoDB Manual entry for the createSearchIndexes command <https://www.mongodb.com/docs/current/reference/command/createSearchIndexes/>`_ for details.
 
 Example
 -------
