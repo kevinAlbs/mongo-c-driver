@@ -6874,7 +6874,7 @@ test_collection_install (TestSuite *suite)
                                 "/collection/search_index/create",
                                 test_collection_create_search_index);
    TestSuite_AddMockServerTest (suite,
-                                "/collection/search_index/create_s",
+                                "/collection/search_indexes/create",
                                 test_collection_create_search_indexes);
    TestSuite_AddMockServerTest (suite,
                                 "/collection/search_index/update",

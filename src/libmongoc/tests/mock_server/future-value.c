@@ -701,16 +701,16 @@ future_value_get_const_mongoc_drop_search_index_options_ptr (future_value_t *fut
 }
 
 void
-future_value_set_const_mongoc_list_search_index_options_ptr (future_value_t *future_value, const_mongoc_list_search_index_options_ptr value)
+future_value_set_const_mongoc_list_search_indexes_options_ptr (future_value_t *future_value, const_mongoc_list_search_indexes_options_ptr value)
 {
-   future_value->type = future_value_const_mongoc_list_search_index_options_ptr_type;
-   future_value->value.const_mongoc_list_search_index_options_ptr_value = value;
+   future_value->type = future_value_const_mongoc_list_search_indexes_options_ptr_type;
+   future_value->value.const_mongoc_list_search_indexes_options_ptr_value = value;
 }
 
-const_mongoc_list_search_index_options_ptr
-future_value_get_const_mongoc_list_search_index_options_ptr (future_value_t *future_value)
+const_mongoc_list_search_indexes_options_ptr
+future_value_get_const_mongoc_list_search_indexes_options_ptr (future_value_t *future_value)
 {
-   BSON_ASSERT (future_value->type == future_value_const_mongoc_list_search_index_options_ptr_type);
-   return future_value->value.const_mongoc_list_search_index_options_ptr_value;
+   BSON_ASSERT (future_value->type == future_value_const_mongoc_list_search_indexes_options_ptr_type);
+   return future_value->value.const_mongoc_list_search_indexes_options_ptr_value;
 }
 

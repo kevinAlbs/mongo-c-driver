@@ -4139,22 +4139,22 @@ done:
    return ok;
 }
 
-struct _mongoc_list_search_index_options {
+struct _mongoc_list_search_indexes_options {
    bson_t extra;
 };
 
-mongoc_list_search_index_options_t *
-mongoc_list_search_index_options_new (void)
+mongoc_list_search_indexes_options_t *
+mongoc_list_search_indexes_options_new (void)
 {
-   mongoc_list_search_index_options_t *opts =
-      bson_malloc (sizeof (mongoc_list_search_index_options_t));
+   mongoc_list_search_indexes_options_t *opts =
+      bson_malloc (sizeof (mongoc_list_search_indexes_options_t));
    bson_init (&opts->extra);
    return opts;
 }
 
 void
-mongoc_list_search_index_options_append (
-   mongoc_list_search_index_options_t *opts, const bson_t *extra)
+mongoc_list_search_indexes_options_append (
+   mongoc_list_search_indexes_options_t *opts, const bson_t *extra)
 {
    BSON_ASSERT_PARAM (opts);
    BSON_ASSERT_PARAM (extra);
@@ -4162,8 +4162,8 @@ mongoc_list_search_index_options_append (
 }
 
 void
-mongoc_list_search_index_options_destroy (
-   mongoc_list_search_index_options_t *opts)
+mongoc_list_search_indexes_options_destroy (
+   mongoc_list_search_indexes_options_t *opts)
 {
    if (!opts) {
       return;
@@ -4177,7 +4177,7 @@ mongoc_collection_list_search_indexes (
    mongoc_collection_t *coll,
    const char *name,
    const bson_t *aggregate_opts,
-   const mongoc_list_search_index_options_t *opts)
+   const mongoc_list_search_indexes_options_t *opts)
 {
    BSON_ASSERT_PARAM (coll);
    // `name` is optional.

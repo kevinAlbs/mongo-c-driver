@@ -444,25 +444,25 @@ mongoc_collection_drop_search_index (
    bson_error_t *error);
 
 typedef struct _mongoc_drop_search_index_options
-   mongoc_list_search_index_options_t;
+   mongoc_list_search_indexes_options_t;
 
-BSON_EXPORT (mongoc_list_search_index_options_t *)
-mongoc_list_search_index_options_new (void);
-
-BSON_EXPORT (void)
-mongoc_list_search_index_options_append (
-   mongoc_list_search_index_options_t *opts, const bson_t *extra);
+BSON_EXPORT (mongoc_list_search_indexes_options_t *)
+mongoc_list_search_indexes_options_new (void);
 
 BSON_EXPORT (void)
-mongoc_list_search_index_options_destroy (
-   mongoc_list_search_index_options_t *opts);
+mongoc_list_search_indexes_options_append (
+   mongoc_list_search_indexes_options_t *opts, const bson_t *extra);
+
+BSON_EXPORT (void)
+mongoc_list_search_indexes_options_destroy (
+   mongoc_list_search_indexes_options_t *opts);
 
 BSON_EXPORT (mongoc_cursor_t *)
 mongoc_collection_list_search_indexes (
    mongoc_collection_t *coll,
    const char *name,
    const bson_t *aggregate_opts,
-   const mongoc_list_search_index_options_t *opts);
+   const mongoc_list_search_indexes_options_t *opts);
 
 BSON_END_DECLS
 

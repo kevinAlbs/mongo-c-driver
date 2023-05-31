@@ -514,11 +514,11 @@ future_get_const_mongoc_drop_search_index_options_ptr (future_t *future)
    FUTURE_TIMEOUT_ABORT;
 }
 
-const_mongoc_list_search_index_options_ptr
-future_get_const_mongoc_list_search_index_options_ptr (future_t *future)
+const_mongoc_list_search_indexes_options_ptr
+future_get_const_mongoc_list_search_indexes_options_ptr (future_t *future)
 {
    if (future_wait (future)) {
-      return future_value_get_const_mongoc_list_search_index_options_ptr (&future->return_value);
+      return future_value_get_const_mongoc_list_search_indexes_options_ptr (&future->return_value);
    }
 
    FUTURE_TIMEOUT_ABORT;

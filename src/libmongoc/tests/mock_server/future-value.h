@@ -56,7 +56,7 @@ typedef const mongoc_search_index_model_t * const_mongoc_search_index_model_ptr;
 typedef mongoc_search_index_model_t ** mongoc_search_index_model_ptr_ptr;
 typedef const mongoc_update_search_index_options_t * const_mongoc_update_search_index_options_ptr;
 typedef const mongoc_drop_search_index_options_t * const_mongoc_drop_search_index_options_ptr;
-typedef const mongoc_list_search_index_options_t * const_mongoc_list_search_index_options_ptr;
+typedef const mongoc_list_search_indexes_options_t * const_mongoc_list_search_indexes_options_ptr;
 
 typedef enum {
    future_value_no_type = 0,
@@ -108,7 +108,7 @@ typedef enum {
    future_value_mongoc_search_index_model_ptr_ptr_type,
    future_value_const_mongoc_update_search_index_options_ptr_type,
    future_value_const_mongoc_drop_search_index_options_ptr_type,
-   future_value_const_mongoc_list_search_index_options_ptr_type,
+   future_value_const_mongoc_list_search_indexes_options_ptr_type,
    future_value_void_type,
 
 } future_value_type_t;
@@ -165,7 +165,7 @@ typedef struct _future_value_t
       mongoc_search_index_model_ptr_ptr mongoc_search_index_model_ptr_ptr_value;
       const_mongoc_update_search_index_options_ptr const_mongoc_update_search_index_options_ptr_value;
       const_mongoc_drop_search_index_options_ptr const_mongoc_drop_search_index_options_ptr_value;
-      const_mongoc_list_search_index_options_ptr const_mongoc_list_search_index_options_ptr_value;
+      const_mongoc_list_search_indexes_options_ptr const_mongoc_list_search_indexes_options_ptr_value;
 
    } value;
 } future_value_t;
@@ -615,12 +615,12 @@ future_value_get_const_mongoc_drop_search_index_options_ptr (
    future_value_t *future_value);
 
 void
-future_value_set_const_mongoc_list_search_index_options_ptr(
+future_value_set_const_mongoc_list_search_indexes_options_ptr(
    future_value_t *future_value,
-   const_mongoc_list_search_index_options_ptr value);
+   const_mongoc_list_search_indexes_options_ptr value);
 
-const_mongoc_list_search_index_options_ptr
-future_value_get_const_mongoc_list_search_index_options_ptr (
+const_mongoc_list_search_indexes_options_ptr
+future_value_get_const_mongoc_list_search_indexes_options_ptr (
    future_value_t *future_value);
 
 

@@ -676,7 +676,7 @@ future_collection_list_search_indexes (
    mongoc_collection_ptr coll,
    char_ptr name,
    const_bson_ptr aggregate_opts,
-   const_mongoc_list_search_index_options_ptr opts
+   const_mongoc_list_search_indexes_options_ptr opts
 );
 
 
