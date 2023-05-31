@@ -3647,8 +3647,7 @@ operation_createSearchIndexes (test_t *test,
                                             NULL /* opts */,
                                             &op_reply,
                                             &op_error,
-                                            NULL /* outnames */,
-                                            NULL /* n_outnames */);
+                                            NULL /* outnames */);
 
    result_from_val_and_reply (result, NULL, &op_reply, &op_error);
    ret = true;

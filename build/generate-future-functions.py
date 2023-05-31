@@ -52,7 +52,6 @@ typedef_list = [
     typedef("bool", None),
     typedef("char_ptr", "char *"),
     typedef("char_ptr_ptr", "char **"),
-    typedef("char_ptr_ptr_ptr", "char ***"),
     typedef("int", None),
     typedef("int64_t", None),
     typedef("size_t", None),
@@ -96,6 +95,7 @@ typedef_list = [
     typedef("mongoc_write_concern_ptr", "mongoc_write_concern_t *"),
     typedef("mongoc_change_stream_ptr", "mongoc_change_stream_t *"),
     typedef("mongoc_remove_flags_t", None),
+    typedef("mongoc_string_list_ptr", "mongoc_string_list_t *"),
 
     # Const libmongoc.
     typedef("const_mongoc_find_and_modify_opts_ptr",
@@ -579,8 +579,7 @@ future_functions = [
                      param("const_mongoc_create_search_index_options_ptr", "opts"),
                      param("bson_ptr", "server_reply"),
                      param("bson_error_ptr", "error"),
-                     param("char_ptr_ptr_ptr", "outnames"),
-                     param("size_t_ptr", "n_outnames")
+                     param("mongoc_string_list_ptr", "outnames"),
                      ]),
 
     future_function("bool",

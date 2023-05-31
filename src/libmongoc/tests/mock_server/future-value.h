@@ -20,7 +20,6 @@
 
 typedef char * char_ptr;
 typedef char ** char_ptr_ptr;
-typedef char *** char_ptr_ptr_ptr;
 typedef size_t * size_t_ptr;
 typedef void * void_ptr;
 typedef const char * const_char_ptr;
@@ -47,6 +46,7 @@ typedef mongoc_server_description_t * mongoc_server_description_ptr;
 typedef mongoc_topology_t * mongoc_topology_ptr;
 typedef mongoc_write_concern_t * mongoc_write_concern_ptr;
 typedef mongoc_change_stream_t * mongoc_change_stream_ptr;
+typedef mongoc_string_list_t * mongoc_string_list_ptr;
 typedef const mongoc_find_and_modify_opts_t * const_mongoc_find_and_modify_opts_ptr;
 typedef const mongoc_iovec_t * const_mongoc_iovec_ptr;
 typedef const mongoc_read_prefs_t * const_mongoc_read_prefs_ptr;
@@ -63,7 +63,6 @@ typedef enum {
    future_value_bool_type,
    future_value_char_ptr_type,
    future_value_char_ptr_ptr_type,
-   future_value_char_ptr_ptr_ptr_type,
    future_value_int_type,
    future_value_int64_t_type,
    future_value_size_t_type,
@@ -99,6 +98,7 @@ typedef enum {
    future_value_mongoc_write_concern_ptr_type,
    future_value_mongoc_change_stream_ptr_type,
    future_value_mongoc_remove_flags_t_type,
+   future_value_mongoc_string_list_ptr_type,
    future_value_const_mongoc_find_and_modify_opts_ptr_type,
    future_value_const_mongoc_iovec_ptr_type,
    future_value_const_mongoc_read_prefs_ptr_type,
@@ -120,7 +120,6 @@ typedef struct _future_value_t
       bool bool_value;
       char_ptr char_ptr_value;
       char_ptr_ptr char_ptr_ptr_value;
-      char_ptr_ptr_ptr char_ptr_ptr_ptr_value;
       int int_value;
       int64_t int64_t_value;
       size_t size_t_value;
@@ -156,6 +155,7 @@ typedef struct _future_value_t
       mongoc_write_concern_ptr mongoc_write_concern_ptr_value;
       mongoc_change_stream_ptr mongoc_change_stream_ptr_value;
       mongoc_remove_flags_t mongoc_remove_flags_t_value;
+      mongoc_string_list_ptr mongoc_string_list_ptr_value;
       const_mongoc_find_and_modify_opts_ptr const_mongoc_find_and_modify_opts_ptr_value;
       const_mongoc_iovec_ptr const_mongoc_iovec_ptr_value;
       const_mongoc_read_prefs_ptr const_mongoc_read_prefs_ptr_value;
@@ -207,15 +207,6 @@ future_value_set_char_ptr_ptr(
 
 char_ptr_ptr
 future_value_get_char_ptr_ptr (
-   future_value_t *future_value);
-
-void
-future_value_set_char_ptr_ptr_ptr(
-   future_value_t *future_value,
-   char_ptr_ptr_ptr value);
-
-char_ptr_ptr_ptr
-future_value_get_char_ptr_ptr_ptr (
    future_value_t *future_value);
 
 void
@@ -531,6 +522,15 @@ future_value_set_mongoc_remove_flags_t(
 
 mongoc_remove_flags_t
 future_value_get_mongoc_remove_flags_t (
+   future_value_t *future_value);
+
+void
+future_value_set_mongoc_string_list_ptr(
+   future_value_t *future_value,
+   mongoc_string_list_ptr value);
+
+mongoc_string_list_ptr
+future_value_get_mongoc_string_list_ptr (
    future_value_t *future_value);
 
 void

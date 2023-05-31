@@ -387,6 +387,20 @@ mongoc_collection_create_search_index (
    bson_error_t *error,
    char **outname);
 
+typedef struct _mongoc_string_list_t mongoc_string_list_t;
+
+BSON_EXPORT (mongoc_string_list_t *)
+mongoc_string_list_new (void);
+
+BSON_EXPORT (const char *)
+mongoc_string_list_get (const mongoc_string_list_t *sl, size_t i);
+
+BSON_EXPORT (size_t)
+mongoc_string_list_size (const mongoc_string_list_t *sl);
+
+BSON_EXPORT (void)
+mongoc_string_list_destroy (mongoc_string_list_t *sl);
+
 BSON_EXPORT (bool)
 mongoc_collection_create_search_indexes (
    mongoc_collection_t *coll,
@@ -395,8 +409,7 @@ mongoc_collection_create_search_indexes (
    const mongoc_create_search_index_options_t *opts,
    bson_t *server_reply,
    bson_error_t *error,
-   char ***outnames,
-   size_t *n_outnames);
+   mongoc_string_list_t *outnames);
 
 typedef struct _mongoc_update_search_index_options
    mongoc_update_search_index_options_t;

@@ -6454,17 +6454,9 @@ test_collection_create_search_indexes (void)
       const size_t n_sims = 2;
       bson_t reply;
       bson_error_t error;
-      char **outnames;
-      size_t n_outnames;
-      future_t *future =
-         future_collection_create_search_indexes (coll,
-                                                  sims,
-                                                  n_sims,
-                                                  NULL /* opts */,
-                                                  &reply,
-                                                  &error,
-                                                  &outnames,
-                                                  &n_outnames);
+      mongoc_string_list_t *outnames = mongoc_string_list_new ();
+      future_t *future = future_collection_create_search_indexes (
+         coll, sims, n_sims, NULL /* opts */, &reply, &error, outnames);
       request_t *request = mock_server_receives_msg (
          mock_server,
          MONGOC_MSG_NONE,
@@ -6477,15 +6469,12 @@ test_collection_create_search_indexes (void)
                                     ]
                                  })));
       ASSERT_OR_PRINT (future_get_bool (future), error);
-      ASSERT_CMPSIZE_T (n_outnames, ==, 2);
-      ASSERT_CMPSTR (outnames[0], "name1");
-      ASSERT_CMPSTR (outnames[1], "name2");
+      ASSERT_CMPSIZE_T (mongoc_string_list_size (outnames), ==, 2);
+      ASSERT_CMPSTR (mongoc_string_list_get (outnames, 0), "name1");
+      ASSERT_CMPSTR (mongoc_string_list_get (outnames, 1), "name2");
       request_destroy (request);
       future_destroy (future);
-      for (size_t i = 0; i < n_outnames; i++) {
-         bson_free (outnames[i]);
-      }
-      bson_free (outnames);
+      mongoc_string_list_destroy (outnames);
       bson_destroy (&reply);
       for (size_t i = 0; i < n_sims; i++) {
          mongoc_search_index_model_destroy (sims[i]);

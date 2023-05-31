@@ -51,9 +51,6 @@ future_get_char_ptr (future_t *future);
 char_ptr_ptr
 future_get_char_ptr_ptr (future_t *future);
 
-char_ptr_ptr_ptr
-future_get_char_ptr_ptr_ptr (future_t *future);
-
 int
 future_get_int (future_t *future);
 
@@ -158,6 +155,9 @@ future_get_mongoc_change_stream_ptr (future_t *future);
 
 mongoc_remove_flags_t
 future_get_mongoc_remove_flags_t (future_t *future);
+
+mongoc_string_list_ptr
+future_get_mongoc_string_list_ptr (future_t *future);
 
 const_mongoc_find_and_modify_opts_ptr
 future_get_const_mongoc_find_and_modify_opts_ptr (future_t *future);

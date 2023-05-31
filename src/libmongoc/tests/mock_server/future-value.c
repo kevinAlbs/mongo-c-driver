@@ -71,20 +71,6 @@ future_value_get_char_ptr_ptr (future_value_t *future_value)
 }
 
 void
-future_value_set_char_ptr_ptr_ptr (future_value_t *future_value, char_ptr_ptr_ptr value)
-{
-   future_value->type = future_value_char_ptr_ptr_ptr_type;
-   future_value->value.char_ptr_ptr_ptr_value = value;
-}
-
-char_ptr_ptr_ptr
-future_value_get_char_ptr_ptr_ptr (future_value_t *future_value)
-{
-   BSON_ASSERT (future_value->type == future_value_char_ptr_ptr_ptr_type);
-   return future_value->value.char_ptr_ptr_ptr_value;
-}
-
-void
 future_value_set_int (future_value_t *future_value, int value)
 {
    future_value->type = future_value_int_type;
@@ -572,6 +558,20 @@ future_value_get_mongoc_remove_flags_t (future_value_t *future_value)
 {
    BSON_ASSERT (future_value->type == future_value_mongoc_remove_flags_t_type);
    return future_value->value.mongoc_remove_flags_t_value;
+}
+
+void
+future_value_set_mongoc_string_list_ptr (future_value_t *future_value, mongoc_string_list_ptr value)
+{
+   future_value->type = future_value_mongoc_string_list_ptr_type;
+   future_value->value.mongoc_string_list_ptr_value = value;
+}
+
+mongoc_string_list_ptr
+future_value_get_mongoc_string_list_ptr (future_value_t *future_value)
+{
+   BSON_ASSERT (future_value->type == future_value_mongoc_string_list_ptr_type);
+   return future_value->value.mongoc_string_list_ptr_value;
 }
 
 void

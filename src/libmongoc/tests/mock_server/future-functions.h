@@ -642,8 +642,7 @@ future_collection_create_search_indexes (
    const_mongoc_create_search_index_options_ptr opts,
    bson_ptr server_reply,
    bson_error_ptr error,
-   char_ptr_ptr_ptr outnames,
-   size_t_ptr n_outnames
+   mongoc_string_list_ptr outnames
 );
 
 

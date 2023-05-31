@@ -1351,8 +1351,7 @@ BSON_THREAD_FUN (background_mongoc_collection_create_search_indexes, data)
          future_value_get_const_mongoc_create_search_index_options_ptr (future_get_param (future, 3)),
          future_value_get_bson_ptr (future_get_param (future, 4)),
          future_value_get_bson_error_ptr (future_get_param (future, 5)),
-         future_value_get_char_ptr_ptr_ptr (future_get_param (future, 6)),
-         future_value_get_size_t_ptr (future_get_param (future, 7))
+         future_value_get_mongoc_string_list_ptr (future_get_param (future, 6))
       ));
 
    future_resolve (future, return_value);
@@ -3085,11 +3084,10 @@ future_collection_create_search_indexes (
    const_mongoc_create_search_index_options_ptr opts,
    bson_ptr server_reply,
    bson_error_ptr error,
-   char_ptr_ptr_ptr outnames,
-   size_t_ptr n_outnames)
+   mongoc_string_list_ptr outnames)
 {
    future_t *future = future_new (future_value_bool_type,
-                                  8);
+                                  7);
    
    future_value_set_mongoc_collection_ptr (
       future_get_param (future, 0), coll);
@@ -3109,11 +3107,8 @@ future_collection_create_search_indexes (
    future_value_set_bson_error_ptr (
       future_get_param (future, 5), error);
    
-   future_value_set_char_ptr_ptr_ptr (
+   future_value_set_mongoc_string_list_ptr (
       future_get_param (future, 6), outnames);
-   
-   future_value_set_size_t_ptr (
-      future_get_param (future, 7), n_outnames);
    
    future_start (future, background_mongoc_collection_create_search_indexes);
    return future;

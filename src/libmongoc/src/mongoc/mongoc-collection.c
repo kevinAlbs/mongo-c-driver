@@ -3789,6 +3789,48 @@ mongoc_search_index_model_destroy (mongoc_search_index_model_t *sim)
    bson_free (sim);
 }
 
+struct _mongoc_string_list_t {
+   mongoc_array_t list;
+};
+
+mongoc_string_list_t *
+mongoc_string_list_new (void)
+{
+   mongoc_string_list_t *sl = bson_malloc (sizeof (mongoc_string_list_t));
+   _mongoc_array_init (&sl->list, sizeof (char *));
+   return sl;
+}
+
+BSON_EXPORT (const char *)
+mongoc_string_list_get (const mongoc_string_list_t *sl, size_t i)
+{
+   BSON_ASSERT_PARAM (sl);
+   BSON_ASSERT (i < sl->list.len);
+   return _mongoc_array_index (&sl->list, char *, i);
+}
+
+BSON_EXPORT (size_t)
+mongoc_string_list_size (const mongoc_string_list_t *sl)
+{
+   BSON_ASSERT_PARAM (sl);
+   return sl->list.len;
+}
+
+BSON_EXPORT (void)
+mongoc_string_list_destroy (mongoc_string_list_t *sl)
+{
+   if (!sl) {
+      return;
+   }
+   size_t i;
+   for (i = 0; i < sl->list.len; i++) {
+      char *got = _mongoc_array_index (&sl->list, char *, i);
+      bson_free (got);
+   }
+   _mongoc_array_destroy (&sl->list);
+   bson_free (sl);
+}
+
 bool
 mongoc_collection_create_search_index (
    mongoc_collection_t *coll,
@@ -3806,8 +3848,7 @@ mongoc_collection_create_search_index (
    // `outname` is optional.
 
    bool ok = false;
-   char **outnames = NULL;
-   size_t n_outnames = 0;
+   mongoc_string_list_t *outnames = mongoc_string_list_new ();
    if (!mongoc_collection_create_search_indexes (
           coll,
           (mongoc_search_index_model_t **) &sim,
@@ -3815,8 +3856,7 @@ mongoc_collection_create_search_index (
           opts,
           server_reply,
           error,
-          &outnames,
-          &n_outnames)) {
+          outnames)) {
       goto done;
    }
 
@@ -3824,28 +3864,25 @@ mongoc_collection_create_search_index (
       // Set `outname` to NULL so it is always safe to free from caller.
       *outname = NULL;
 
-      // `n_outnames` may be 0 on error.
-      if (n_outnames == 0) {
+      // There may be no returned outnames on error.
+      if (mongoc_string_list_size (outnames) == 0) {
          goto done;
       }
-      if (n_outnames > 1) {
+      if (mongoc_string_list_size (outnames) > 1) {
          bson_set_error (
             error,
             MONGOC_ERROR_BSON,
             MONGOC_ERROR_BSON_INVALID,
             "'createSearchIndexes' reply included %zu `name`. Expected 1",
-            n_outnames);
+            mongoc_string_list_size (outnames));
          goto done;
       }
-      *outname = bson_strdup (outnames[0]);
+      *outname = bson_strdup (mongoc_string_list_get (outnames, 0));
    }
 
    ok = true;
 done:
-   for (size_t i = 0; i < n_outnames; i++) {
-      bson_free (outnames[i]);
-   }
-   bson_free (outnames);
+   mongoc_string_list_destroy (outnames);
    return ok;
 }
 
@@ -3857,8 +3894,7 @@ mongoc_collection_create_search_indexes (
    const mongoc_create_search_index_options_t *opts,
    bson_t *server_reply,
    bson_error_t *error,
-   char ***outnames,
-   size_t *n_outnames)
+   mongoc_string_list_t *outnames)
 {
    BSON_ASSERT_PARAM (coll);
    BSON_ASSERT_PARAM (sims);
@@ -3880,13 +3916,6 @@ mongoc_collection_create_search_indexes (
    }
    // Caller expects `server_reply` to always be initialized.
    bson_init (reply);
-
-   // Caller expects `outnames` to always be safe to free.
-   if (outnames) {
-      *outnames = NULL;
-      BSON_ASSERT_PARAM (n_outnames);
-      *n_outnames = 0;
-   }
 
    // Build command.
    BSON_ASSERT (
@@ -3933,32 +3962,14 @@ mongoc_collection_create_search_indexes (
       //     }
       //   ]
       // }
-
-      // Count the number of `name`.
-      size_t count = 0;
-      bsonParse (*reply,
-                 require (keyWithType ("indexesCreated", array),
-                          visitEach (do (count++))));
-      if (bsonParseError != NULL) {
-         bson_set_error (error,
-                         MONGOC_ERROR_BSON,
-                         MONGOC_ERROR_BSON_INVALID,
-                         "Error parsing 'createSearchIndexes' reply: %s",
-                         bsonParseError);
-      }
-
-      // Allocate `outnames` and zero initialize. Zero initialize so it is safe
-      // for callers to call `bson_free` on all entries.
-      *outnames = bson_malloc0 (sizeof (char *) * count);
-      *n_outnames = count;
-      size_t tail_idx = 0;
       bsonParse (*reply,
                  require (keyWithType ("indexesCreated", array),
                           visitEach (parse (require (
-                             keyWithType ("name", utf8),
-                             do ((*outnames)[tail_idx] = bson_strdup (
-                                    bson_iter_utf8 (&bsonVisitIter, NULL));
-                                 tail_idx++))))));
+                             keyWithType ("name", utf8), do ({
+                                char *got = bson_strdup (
+                                   bson_iter_utf8 (&bsonVisitIter, NULL));
+                                _mongoc_array_append_val (&outnames->list, got);
+                             }))))));
       if (bsonParseError != NULL) {
          bson_set_error (error,
                          MONGOC_ERROR_BSON,
