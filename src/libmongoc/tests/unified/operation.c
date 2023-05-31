@@ -3559,7 +3559,7 @@ operation_createSearchIndex (test_t *test,
    bson_t *cmd = bson_new ();
 
    // Parse arguments.
-   bson_parser_doc (bp, "definition", &model);
+   bson_parser_doc (bp, "model", &model);
    if (!bson_parser_parse (bp, op->arguments, error)) {
       goto done;
    }
@@ -3610,7 +3610,7 @@ operation_createSearchIndexes (test_t *test,
    bson_t *cmd = bson_new ();
 
    // Parse arguments.
-   bson_parser_array (bp, "indexDefinitions", &models);
+   bson_parser_array (bp, "models", &models);
    if (!bson_parser_parse (bp, op->arguments, error)) {
       goto done;
    }
@@ -3652,7 +3652,7 @@ operation_dropSearchIndex (test_t *test,
    bson_t *cmd = bson_new ();
 
    // Parse arguments.
-   bson_parser_utf8 (bp, "indexName", &name);
+   bson_parser_utf8 (bp, "name", &name);
    if (!bson_parser_parse (bp, op->arguments, error)) {
       goto done;
    }
@@ -3695,8 +3695,8 @@ operation_listSearchIndexes (test_t *test,
 
    // Parse arguments.
    if (op->arguments) {
-      bson_parser_utf8 (bp, "indexName", &name);
-      bson_parser_doc_optional (bp, "options", &aggregateOptions);
+      bson_parser_utf8 (bp, "name", &name);
+      bson_parser_doc_optional (bp, "aggregationOptions", &aggregateOptions);
       if (!bson_parser_parse (bp, op->arguments, error)) {
          goto done;
       }
@@ -3749,7 +3749,7 @@ operation_updateSearchIndex (test_t *test,
 
    // Parse arguments.
    bson_parser_doc (bp, "definition", &definition);
-   bson_parser_utf8_optional (bp, "indexName", &name);
+   bson_parser_utf8_optional (bp, "name", &name);
    if (!bson_parser_parse (bp, op->arguments, error)) {
       goto done;
    }
