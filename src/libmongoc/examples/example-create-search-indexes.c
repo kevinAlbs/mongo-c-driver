@@ -68,6 +68,7 @@ main (int argc, char *argv[])
       ASSERT (bson_init_from_json (&cmd, cmd_str, -1, &error));
       if (!mongoc_collection_command_simple (
              coll, &cmd, NULL /* read_prefs */, NULL /* reply */, &error)) {
+         bson_destroy (&cmd);
          FAILNOW ("Failed to run createSearchIndexes: %s", error.message);
       }
       printf ("Created index: \"test index\"\n");
@@ -87,7 +88,6 @@ main (int argc, char *argv[])
                                       &pipeline,
                                       NULL /* opts */,
                                       NULL /* read_prefs */);
-      bson_destroy (&pipeline);
       printf ("Listing indexes:\n");
       const bson_t *got;
       while (mongoc_cursor_next (cursor, &got)) {
@@ -96,9 +96,11 @@ main (int argc, char *argv[])
          bson_free (got_str);
       }
       if (mongoc_cursor_error (cursor, &error)) {
+         bson_destroy (&pipeline);
          mongoc_cursor_destroy (cursor);
          FAILNOW ("Failed to run $listSearchIndexes: %s", error.message);
       }
+      bson_destroy (&pipeline);
       mongoc_cursor_destroy (cursor);
       // List Atlas Search Indexes ... end
    }
@@ -114,6 +116,7 @@ main (int argc, char *argv[])
       ASSERT (bson_init_from_json (&cmd, cmd_str, -1, &error));
       if (!mongoc_collection_command_simple (
              coll, &cmd, NULL /* read_prefs */, NULL /* reply */, &error)) {
+         bson_destroy (&cmd);
          FAILNOW ("Failed to run updateSearchIndex: %s", error.message);
       }
       printf ("Updated index: \"test index\"\n");
@@ -129,6 +132,7 @@ main (int argc, char *argv[])
       ASSERT (bson_init_from_json (&cmd, cmd_str, -1, &error));
       if (!mongoc_collection_command_simple (
              coll, &cmd, NULL /* read_prefs */, NULL /* reply */, &error)) {
+         bson_destroy (&cmd);
          FAILNOW ("Failed to run dropSearchIndex: %s", error.message);
       }
       printf ("Dropped index: \"test index\"\n");
