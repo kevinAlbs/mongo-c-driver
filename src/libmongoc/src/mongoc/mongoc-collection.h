@@ -367,6 +367,17 @@ mongoc_search_index_model_destroy (mongoc_search_index_model_t *sim);
 typedef struct _mongoc_create_search_index_options
    mongoc_create_search_index_options_t;
 
+BSON_EXPORT (mongoc_create_search_index_options_t *)
+mongoc_create_search_index_options_new (void);
+
+BSON_EXPORT (void)
+mongoc_create_search_index_options_append (
+   mongoc_create_search_index_options_t *opts, const bson_t *extra);
+
+BSON_EXPORT (void)
+mongoc_create_search_index_options_destroy (
+   mongoc_create_search_index_options_t *opts);
+
 BSON_EXPORT (bool)
 mongoc_collection_create_search_index (
    mongoc_collection_t *coll,
@@ -390,6 +401,17 @@ mongoc_collection_create_search_indexes (
 typedef struct _mongoc_update_search_index_options
    mongoc_update_search_index_options_t;
 
+BSON_EXPORT (mongoc_update_search_index_options_t *)
+mongoc_update_search_index_options_new (void);
+
+BSON_EXPORT (void)
+mongoc_update_search_index_options_append (
+   mongoc_update_search_index_options_t *opts, const bson_t *extra);
+
+BSON_EXPORT (void)
+mongoc_update_search_index_options_destroy (
+   mongoc_update_search_index_options_t *opts);
+
 BSON_EXPORT (bool)
 mongoc_collection_update_search_index (
    mongoc_collection_t *coll,
@@ -402,6 +424,17 @@ mongoc_collection_update_search_index (
 typedef struct _mongoc_drop_search_index_options
    mongoc_drop_search_index_options_t;
 
+BSON_EXPORT (mongoc_drop_search_index_options_t *)
+mongoc_drop_search_index_options_new (void);
+
+BSON_EXPORT (void)
+mongoc_drop_search_index_options_append (
+   mongoc_drop_search_index_options_t *opts, const bson_t *extra);
+
+BSON_EXPORT (void)
+mongoc_drop_search_index_options_destroy (
+   mongoc_drop_search_index_options_t *opts);
+
 BSON_EXPORT (bool)
 mongoc_collection_drop_search_index (
    mongoc_collection_t *coll,
@@ -412,6 +445,17 @@ mongoc_collection_drop_search_index (
 
 typedef struct _mongoc_drop_search_index_options
    mongoc_list_search_index_options_t;
+
+BSON_EXPORT (mongoc_list_search_index_options_t *)
+mongoc_list_search_index_options_new (void);
+
+BSON_EXPORT (void)
+mongoc_list_search_index_options_append (
+   mongoc_list_search_index_options_t *opts, const bson_t *extra);
+
+BSON_EXPORT (void)
+mongoc_list_search_index_options_destroy (
+   mongoc_list_search_index_options_t *opts);
 
 BSON_EXPORT (mongoc_cursor_t *)
 mongoc_collection_list_search_indexes (

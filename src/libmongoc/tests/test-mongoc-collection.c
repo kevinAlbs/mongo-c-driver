@@ -6370,6 +6370,67 @@ test_collection_create_search_index (void)
       mongoc_client_destroy (client);
       mock_server_destroy (mock_server);
    }
+   // Test creating with a session.
+   {
+      // Use `mock_mongos_new` so `hello` response includes
+      // `logicalSessionTimeoutMinutes`. `logicalSessionTimeoutMinutes` is used
+      // to determine session support in the driver.
+      mock_server_t *mock_server = mock_mongos_new (WIRE_VERSION_MAX);
+      // Auto respond to ignore the `endSessions` command sent in
+      // `mongoc_client_destroy`.
+      mock_server_auto_endsessions (mock_server);
+      mock_server_run (mock_server);
+      mongoc_client_t *client =
+         mongoc_client_new_from_uri (mock_server_get_uri (mock_server));
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      mongoc_search_index_model_t *sim =
+         mongoc_search_index_model_new ("myname", tmp_bson ("{'foo': 'bar'}"));
+      mongoc_create_search_index_options_t *csio =
+         mongoc_create_search_index_options_new ();
+      bson_t reply;
+      bson_error_t error;
+      char *outname;
+      mongoc_client_session_t *session;
+      // Start a session and append the session to options.
+      {
+         session =
+            mongoc_client_start_session (client, NULL /* opts */, &error);
+         ASSERT_OR_PRINT (session, error);
+         bson_t session_bson = BSON_INITIALIZER;
+         ASSERT_OR_PRINT (
+            mongoc_client_session_append (session, &session_bson, &error),
+            error);
+         mongoc_create_search_index_options_append (csio, &session_bson);
+         bson_destroy (&session_bson);
+      }
+      future_t *future = future_collection_create_search_index (
+         coll, sim, csio, &reply, &error, &outname);
+      // Expect 'lsid' field to be sent from session.
+      request_t *request = mock_server_receives_msg (
+         mock_server,
+         MONGOC_MSG_NONE,
+         tmp_bson (
+            "{'createSearchIndexes': 'coll', 'lsid': { '$exists': true }}"));
+      mock_server_replies_opmsg (
+         request, MONGOC_MSG_NONE, tmp_bson (BSON_STR ({
+            "ok" : 1,
+            "indexesCreated" : [ {"id" : "1", "name" : "myname"} ]
+         })));
+      ASSERT_OR_PRINT (future_get_bool (future), error);
+      ASSERT_CMPSTR (outname, "myname");
+      ASSERT_MATCH (&reply, "{'ok': 1 }");
+      request_destroy (request);
+      future_destroy (future);
+      bson_free (outname);
+      bson_destroy (&reply);
+      mongoc_client_session_destroy (session);
+      mongoc_create_search_index_options_destroy (csio);
+      mongoc_search_index_model_destroy (sim);
+      mongoc_collection_destroy (coll);
+      mongoc_client_destroy (client);
+      mock_server_destroy (mock_server);
+   }
 }
 
 static void

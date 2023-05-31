@@ -3733,10 +3733,37 @@ struct _mongoc_search_index_model {
 };
 
 struct _mongoc_create_search_index_options {
-   // placeholder is unused to bypass the warning:
-   // 'empty struct is a GNU extension`
-   char placeholder;
+   bson_t extra;
 };
+
+mongoc_create_search_index_options_t *
+mongoc_create_search_index_options_new (void)
+{
+   mongoc_create_search_index_options_t *opts =
+      bson_malloc (sizeof (mongoc_create_search_index_options_t));
+   bson_init (&opts->extra);
+   return opts;
+}
+
+void
+mongoc_create_search_index_options_append (
+   mongoc_create_search_index_options_t *opts, const bson_t *extra)
+{
+   BSON_ASSERT_PARAM (opts);
+   BSON_ASSERT_PARAM (extra);
+   BSON_ASSERT (bson_concat (&opts->extra, extra));
+}
+
+void
+mongoc_create_search_index_options_destroy (
+   mongoc_create_search_index_options_t *opts)
+{
+   if (!opts) {
+      return;
+   }
+   bson_destroy (&opts->extra);
+   bson_free (opts);
+}
 
 mongoc_search_index_model_t *
 mongoc_search_index_model_new (const char *name, const bson_t *definition)
@@ -3885,8 +3912,12 @@ mongoc_collection_create_search_indexes (
    }
    BSON_ASSERT (bson_append_array_end (&cmd, &indexes));
 
-   if (!mongoc_collection_command_simple (
-          coll, &cmd, NULL /* read_prefs */, reply, error)) {
+   if (!mongoc_collection_command_with_opts (coll,
+                                             &cmd,
+                                             NULL /* read_prefs */,
+                                             opts ? &opts->extra : NULL,
+                                             reply,
+                                             error)) {
       goto done;
    }
 
@@ -3944,6 +3975,40 @@ done:
    return ok;
 }
 
+struct _mongoc_update_search_index_options {
+   bson_t extra;
+};
+
+mongoc_update_search_index_options_t *
+mongoc_update_search_index_options_new (void)
+{
+   mongoc_update_search_index_options_t *opts =
+      bson_malloc (sizeof (mongoc_update_search_index_options_t));
+   bson_init (&opts->extra);
+   return opts;
+}
+
+void
+mongoc_update_search_index_options_append (
+   mongoc_update_search_index_options_t *opts, const bson_t *extra)
+{
+   BSON_ASSERT_PARAM (opts);
+   BSON_ASSERT_PARAM (extra);
+   BSON_ASSERT (bson_concat (&opts->extra, extra));
+}
+
+void
+mongoc_update_search_index_options_destroy (
+   mongoc_update_search_index_options_t *opts)
+{
+   if (!opts) {
+      return;
+   }
+   bson_destroy (&opts->extra);
+   bson_free (opts);
+}
+
+
 bool
 mongoc_collection_update_search_index (
    mongoc_collection_t *coll,
@@ -3978,8 +4043,12 @@ mongoc_collection_update_search_index (
    BSON_ASSERT (BSON_APPEND_UTF8 (&cmd, "name", name));
    BSON_ASSERT (BSON_APPEND_DOCUMENT (&cmd, "definition", definition));
 
-   if (!mongoc_collection_command_simple (
-          coll, &cmd, NULL /* read_prefs */, reply, error)) {
+   if (!mongoc_collection_command_with_opts (coll,
+                                             &cmd,
+                                             NULL /* read_prefs */,
+                                             opts ? &opts->extra : NULL,
+                                             reply,
+                                             error)) {
       goto done;
    }
 
@@ -3988,6 +4057,39 @@ done:
    bson_destroy (&local_reply);
    bson_destroy (&cmd);
    return ok;
+}
+
+struct _mongoc_drop_search_index_options {
+   bson_t extra;
+};
+
+mongoc_drop_search_index_options_t *
+mongoc_drop_search_index_options_new (void)
+{
+   mongoc_drop_search_index_options_t *opts =
+      bson_malloc (sizeof (mongoc_drop_search_index_options_t));
+   bson_init (&opts->extra);
+   return opts;
+}
+
+void
+mongoc_drop_search_index_options_append (
+   mongoc_drop_search_index_options_t *opts, const bson_t *extra)
+{
+   BSON_ASSERT_PARAM (opts);
+   BSON_ASSERT_PARAM (extra);
+   BSON_ASSERT (bson_concat (&opts->extra, extra));
+}
+
+void
+mongoc_drop_search_index_options_destroy (
+   mongoc_drop_search_index_options_t *opts)
+{
+   if (!opts) {
+      return;
+   }
+   bson_destroy (&opts->extra);
+   bson_free (opts);
 }
 
 bool
@@ -4021,8 +4123,12 @@ mongoc_collection_drop_search_index (
    BSON_ASSERT (BSON_APPEND_UTF8 (&cmd, "dropSearchIndex", coll->collection));
    BSON_ASSERT (BSON_APPEND_UTF8 (&cmd, "name", name));
 
-   if (!mongoc_collection_command_simple (
-          coll, &cmd, NULL /* read_prefs */, reply, error)) {
+   if (!mongoc_collection_command_with_opts (coll,
+                                             &cmd,
+                                             NULL /* read_prefs */,
+                                             opts ? &opts->extra : NULL,
+                                             reply,
+                                             error)) {
       goto done;
    }
 
@@ -4031,6 +4137,39 @@ done:
    bson_destroy (&local_reply);
    bson_destroy (&cmd);
    return ok;
+}
+
+struct _mongoc_list_search_index_options {
+   bson_t extra;
+};
+
+mongoc_list_search_index_options_t *
+mongoc_list_search_index_options_new (void)
+{
+   mongoc_list_search_index_options_t *opts =
+      bson_malloc (sizeof (mongoc_list_search_index_options_t));
+   bson_init (&opts->extra);
+   return opts;
+}
+
+void
+mongoc_list_search_index_options_append (
+   mongoc_list_search_index_options_t *opts, const bson_t *extra)
+{
+   BSON_ASSERT_PARAM (opts);
+   BSON_ASSERT_PARAM (extra);
+   BSON_ASSERT (bson_concat (&opts->extra, extra));
+}
+
+void
+mongoc_list_search_index_options_destroy (
+   mongoc_list_search_index_options_t *opts)
+{
+   if (!opts) {
+      return;
+   }
+   bson_destroy (&opts->extra);
+   bson_free (opts);
 }
 
 mongoc_cursor_t *
@@ -4058,9 +4197,18 @@ mongoc_collection_list_search_indexes (
    BSON_ASSERT (bson_append_document_end (&stage, &listSearchIndexes));
    BSON_ASSERT (bson_append_document_end (&pipeline, &stage));
 
-   mongoc_cursor_t *cursor = mongoc_collection_aggregate (
-      coll, MONGOC_QUERY_NONE, &pipeline, aggregate_opts, NULL /* read_prefs*/);
+   bson_t cmd_opts = BSON_INITIALIZER;
+   if (aggregate_opts) {
+      bson_concat (&cmd_opts, aggregate_opts);
+   }
+   if (opts) {
+      bson_concat (&cmd_opts, &opts->extra);
+   }
 
+   mongoc_cursor_t *cursor = mongoc_collection_aggregate (
+      coll, MONGOC_QUERY_NONE, &pipeline, &cmd_opts, NULL /* read_prefs*/);
+
+   bson_destroy (&cmd_opts);
    bson_destroy (&pipeline);
    return cursor;
 }
