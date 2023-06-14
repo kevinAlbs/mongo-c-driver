@@ -69,3 +69,20 @@ mcommon_thread_join (bson_thread_t thread)
    return 0;
 }
 #endif
+
+const char *mcommon_failpoint_caller_id = NULL;
+
+int
+mcommon_thread_create_with_failpoint (bson_thread_t *thread,
+                                      BSON_THREAD_FUN_TYPE (func),
+                                      void *arg,
+                                      const char *caller_id)
+{
+   if (mcommon_failpoint_caller_id &&
+       0 == strcmp (mcommon_failpoint_caller_id, caller_id)) {
+      printf ("failpoint activated for caller_id: %s. Returning 0\n",
+              caller_id);
+      return 0;
+   }
+   return mcommon_thread_create (thread, func, arg);
+}

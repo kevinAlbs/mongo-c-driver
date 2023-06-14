@@ -1291,8 +1291,10 @@ mongoc_server_monitor_run (mongoc_server_monitor_t *server_monitor)
    if (server_monitor->shared.state == MONGOC_THREAD_OFF) {
       server_monitor->is_rtt = false;
       server_monitor->shared.state = MONGOC_THREAD_RUNNING;
-      mcommon_thread_create (
-         &server_monitor->thread, _server_monitor_thread, server_monitor);
+      mcommon_thread_create_with_failpoint (&server_monitor->thread,
+                                            _server_monitor_thread,
+                                            server_monitor,
+                                            "server_monitor_thread");
    }
    bson_mutex_unlock (&server_monitor->shared.mutex);
 }
@@ -1304,8 +1306,10 @@ mongoc_server_monitor_run_as_rtt (mongoc_server_monitor_t *server_monitor)
    if (server_monitor->shared.state == MONGOC_THREAD_OFF) {
       server_monitor->is_rtt = true;
       server_monitor->shared.state = MONGOC_THREAD_RUNNING;
-      mcommon_thread_create (
-         &server_monitor->thread, _server_monitor_rtt_thread, server_monitor);
+      mcommon_thread_create_with_failpoint (&server_monitor->thread,
+                                            _server_monitor_rtt_thread,
+                                            server_monitor,
+                                            "server_monitor_rtt_thread");
    }
    bson_mutex_unlock (&server_monitor->shared.mutex);
 }

@@ -30,7 +30,10 @@
 BSON_BEGIN_DECLS
 
 #define mcommon_thread_create COMMON_NAME (thread_create)
+#define mcommon_thread_create_with_failpoint \
+   COMMON_NAME (thread_create_with_failpoint)
 #define mcommon_thread_join COMMON_NAME (thread_join)
+#define mcommon_failpoint_caller_id (failpoint_caller_id)
 
 #if defined(BSON_OS_UNIX)
 #include <pthread.h>
@@ -123,6 +126,15 @@ int
 mcommon_thread_create (bson_thread_t *thread,
                        BSON_THREAD_FUN_TYPE (func),
                        void *arg);
+
+// mcommon_thread_create_with_failpoint is a temporary testing wrapper to enable
+// testing errors creating threads. `caller_id` is a string `caller_id`.
+int
+mcommon_thread_create_with_failpoint (bson_thread_t *thread,
+                                      BSON_THREAD_FUN_TYPE (func),
+                                      void *arg,
+                                      const char *caller_id);
+extern const char *mcommon_failpoint_caller_id;
 
 #if defined(MONGOC_ENABLE_DEBUG_ASSERTIONS) && defined(BSON_OS_UNIX)
 #define mcommon_mutex_is_locked COMMON_NAME (mutex_is_locked)
