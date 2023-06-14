@@ -1128,6 +1128,36 @@ test_moretocome_cancel (void)
    tf_destroy (tf);
 }
 
+static void
+test_fails_to_create_thread (void)
+{
+   // Test failure to create server monitor thread.
+   mongoc_uri_t *uri = test_framework_get_uri ();
+   mongoc_uri_set_option_as_int32 (
+      uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 500);
+   mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
+   mcommon_failpoint_caller_id = "server_monitor_thread";
+   mongoc_client_t *client = mongoc_client_pool_pop (pool);
+   // Attempt to ping.
+   {
+      bson_error_t error;
+      bool ok = mongoc_client_command_simple (client,
+                                              "admin",
+                                              tmp_bson ("{'ping': 1}"),
+                                              NULL /* read_prefs */,
+                                              NULL /* reply */,
+                                              &error);
+      ASSERT (!ok);
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_SERVER_SELECTION,
+                             MONGOC_ERROR_SERVER_SELECTION_FAILURE,
+                             "No suitable servers");
+   }
+   mongoc_client_pool_push (pool, client);
+   mongoc_client_pool_destroy (pool);
+   mongoc_uri_destroy (uri);
+}
+
 void
 test_monitoring_install (TestSuite *suite)
 {
@@ -1197,4 +1227,8 @@ test_monitoring_install (TestSuite *suite)
 
    TestSuite_AddMockServerTest (
       suite, "/server_monitor_thread/sleep_after_scan", test_sleep_after_scan);
+
+   TestSuite_AddLive (suite,
+                      "/server_monitor_thread/fails_to_create_thread",
+                      test_fails_to_create_thread);
 }
