@@ -2113,8 +2113,10 @@ test_bson_json_double (void)
    BSON_ASSERT (BSON_ITER_HOLDS_DOUBLE (&iter));
    ASSERT_CMPDOUBLE (bson_iter_double (&iter), ==, 0.0);
 
-/* check that "x" is -0.0. signbit not available on Solaris, FreeBSD, or VS 2010 */
-#if !defined(__sun) && !defined(__FreeBSD__) && (!defined(_MSC_VER) || (_MSC_VER >= 1800))
+/* check that "x" is -0.0. signbit not available on Solaris, FreeBSD, or VS 2010
+ */
+#if !defined(__sun) && !defined(__FreeBSD__) && \
+   (!defined(_MSC_VER) || (_MSC_VER >= 1800))
    BSON_ASSERT (signbit (bson_iter_double (&iter)));
 #endif
 
@@ -3456,6 +3458,40 @@ test_bson_as_json_with_opts_all_types (void)
    bson_destroy (&scope);
 }
 
+static void
+test_CDRIVER_4533 (void)
+{
+   bson_error_t error;
+
+   {
+      bson_t *got_bson = bson_new_from_json (
+         (const uint8_t
+             *) "{\"a\" : 12, \"b\" : 34}, {\"c\" : 56}, {\"d\" : 78}",
+         -1,
+         &error);
+      ASSERT_OR_PRINT (got_bson, error);
+
+      char *got_str = bson_as_json (got_bson, NULL);
+      ASSERT_CMPSTR (got_str,
+                     "{ \"a\" : 12, \"b\" : 34, \"c\" : 56, \"d\" : 78 }");
+      bson_free (got_str);
+
+      bson_destroy (got_bson);
+   }
+
+   {
+      bson_t *got_bson = bson_new_from_json (
+         (const uint8_t *) "[1, 2, 3], {}, {\"a\" : 1}", -1, &error);
+      ASSERT_OR_PRINT (got_bson, error);
+
+      char *got_str = bson_as_json (got_bson, NULL);
+      ASSERT_CMPSTR (got_str, "{ \"0\" : 1, \"1\" : 2, \"2\" : 3, \"a\" : 1 }");
+      bson_free (got_str);
+
+      bson_destroy (got_bson);
+   }
+}
+
 void
 test_json_install (TestSuite *suite)
 {
@@ -3639,4 +3675,5 @@ test_json_install (TestSuite *suite)
    TestSuite_Add (suite,
                   "/bson/as_json_with_opts/all_types",
                   test_bson_as_json_with_opts_all_types);
+   TestSuite_Add (suite, "/CDRIVER-4533", test_CDRIVER_4533);
 }
