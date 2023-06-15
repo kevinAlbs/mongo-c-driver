@@ -1128,33 +1128,79 @@ test_moretocome_cancel (void)
    tf_destroy (tf);
 }
 
+extern size_t mcommon_num_join_calls;
+extern size_t mcommon_num_create_calls;
+
 static void
 test_fails_to_create_thread (void)
 {
-   // Test failure to create server monitor thread.
+   server_version_t server_version = test_framework_get_server_version ();
+   size_t server_count = test_framework_server_count ();
+   bool has_rtt_thread =
+      server_version >= test_framework_str_to_version ("4.4.0");
+
    mongoc_uri_t *uri = test_framework_get_uri ();
    mongoc_uri_set_option_as_int32 (
       uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 500);
-   mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
-   mcommon_failpoint_caller_id = "server_monitor_thread";
-   mongoc_client_t *client = mongoc_client_pool_pop (pool);
-   // Attempt to ping.
+
+   // Test successful creation of server monitor threads.
    {
-      bson_error_t error;
-      bool ok = mongoc_client_command_simple (client,
-                                              "admin",
-                                              tmp_bson ("{'ping': 1}"),
-                                              NULL /* read_prefs */,
-                                              NULL /* reply */,
-                                              &error);
-      ASSERT (!ok);
-      ASSERT_ERROR_CONTAINS (error,
-                             MONGOC_ERROR_SERVER_SELECTION,
-                             MONGOC_ERROR_SERVER_SELECTION_FAILURE,
-                             "No suitable servers");
+      mcommon_num_create_calls = 0;
+      mcommon_num_join_calls = 0;
+      mcommon_failpoint_caller_id = NULL;
+      mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      // Attempt to ping.
+      {
+         bson_error_t error;
+         bool ok = mongoc_client_command_simple (client,
+                                                 "admin",
+                                                 tmp_bson ("{'ping': 1}"),
+                                                 NULL /* read_prefs */,
+                                                 NULL /* reply */,
+                                                 &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+      mongoc_client_pool_push (pool, client);
+      mongoc_client_pool_destroy (pool);
+      // Expect two threads per server: monitoring thread and RTT monitor.
+      ASSERT_CMPSIZE_T (
+         mcommon_num_create_calls, ==, (has_rtt_thread ? 2 : 1) * server_count);
+      ASSERT_CMPSIZE_T (
+         mcommon_num_join_calls, ==, (has_rtt_thread ? 2 : 1) * server_count);
    }
-   mongoc_client_pool_push (pool, client);
-   mongoc_client_pool_destroy (pool);
+
+   // Test failure to create server monitor thread.
+   {
+      mcommon_num_create_calls = 0;
+      mcommon_num_join_calls = 0;
+      mcommon_failpoint_caller_id = "server_monitor_thread";
+      mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      // Attempt to ping.
+      {
+         bson_error_t error;
+         bool ok = mongoc_client_command_simple (client,
+                                                 "admin",
+                                                 tmp_bson ("{'ping': 1}"),
+                                                 NULL /* read_prefs */,
+                                                 NULL /* reply */,
+                                                 &error);
+         ASSERT (!ok);
+         ASSERT_ERROR_CONTAINS (error,
+                                MONGOC_ERROR_SERVER_SELECTION,
+                                MONGOC_ERROR_SERVER_SELECTION_FAILURE,
+                                "No suitable servers");
+      }
+      mongoc_client_pool_push (pool, client);
+      mongoc_client_pool_destroy (pool);
+      // Expect one attempted thread per server. The RTT monitor thread will not
+      // start if monitoring thread fails.
+      ASSERT_CMPSIZE_T (mcommon_num_create_calls, ==, 1 * server_count);
+      // Assert join is not called.
+      ASSERT_CMPSIZE_T (mcommon_num_join_calls, ==, 0);
+   }
+
    mongoc_uri_destroy (uri);
 }
 

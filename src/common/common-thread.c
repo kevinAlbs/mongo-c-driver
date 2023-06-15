@@ -16,17 +16,22 @@
 
 #include "common-thread-private.h"
 
+size_t mcommon_num_join_calls = 0;
+size_t mcommon_num_create_calls = 0;
+
 #if defined(BSON_OS_UNIX)
 int
 mcommon_thread_create (bson_thread_t *thread,
                        BSON_THREAD_FUN_TYPE (func),
                        void *arg)
 {
+   mcommon_num_create_calls++;
    return pthread_create (thread, NULL, func, arg);
 }
 int
 mcommon_thread_join (bson_thread_t thread)
 {
+   mcommon_num_join_calls++;
    return pthread_join (thread, NULL);
 }
 
@@ -45,6 +50,7 @@ mcommon_thread_create (bson_thread_t *thread,
                        BSON_THREAD_FUN_TYPE (func),
                        void *arg)
 {
+   mcommon_num_create_calls++;
    *thread = (HANDLE) _beginthreadex (NULL, 0, func, arg, 0, NULL);
    if (0 == *thread) {
       return 1;
@@ -55,6 +61,7 @@ int
 mcommon_thread_join (bson_thread_t thread)
 {
    int ret;
+   mcommon_num_join_calls++;
 
    /* zero indicates success for WaitForSingleObject. */
    ret = WaitForSingleObject (thread, INFINITE);
@@ -82,6 +89,7 @@ mcommon_thread_create_with_failpoint (bson_thread_t *thread,
        0 == strcmp (mcommon_failpoint_caller_id, caller_id)) {
       printf ("failpoint activated for caller_id: %s. Returning 0\n",
               caller_id);
+      mcommon_num_create_calls++;
       return 0;
    }
    return mcommon_thread_create (thread, func, arg);
