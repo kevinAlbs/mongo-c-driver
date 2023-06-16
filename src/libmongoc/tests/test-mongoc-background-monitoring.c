@@ -1176,6 +1176,7 @@ test_fails_to_create_thread (void)
       mcommon_num_join_calls = 0;
       mcommon_failpoint_caller_id = "server_monitor_thread";
       mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
+      capture_logs (true);
       mongoc_client_t *client = mongoc_client_pool_pop (pool);
       // Attempt to ping.
       {
@@ -1199,6 +1200,44 @@ test_fails_to_create_thread (void)
       ASSERT_CMPSIZE_T (mcommon_num_create_calls, ==, 1 * server_count);
       // Assert join is not called.
       ASSERT_CMPSIZE_T (mcommon_num_join_calls, ==, 0);
+      ASSERT_CAPTURED_LOG ("server_monitor",
+                           MONGOC_LOG_LEVEL_ERROR,
+                           "Failed to start monitoring thread");
+      capture_logs (false);
+   }
+
+   // Test failure to create server monitor RTT thread.
+   {
+      mcommon_num_create_calls = 0;
+      mcommon_num_join_calls = 0;
+      mcommon_failpoint_caller_id = "server_monitor_rtt_thread";
+      mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
+      capture_logs (true);
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      // Attempt to ping.
+      {
+         bson_error_t error;
+         bool ok = mongoc_client_command_simple (client,
+                                                 "admin",
+                                                 tmp_bson ("{'ping': 1}"),
+                                                 NULL /* read_prefs */,
+                                                 NULL /* reply */,
+                                                 &error);
+         // Expect success, since RTT monitoring thread is not required for
+         // successful server selection.
+         ASSERT_OR_PRINT (ok, error);
+      }
+      mongoc_client_pool_push (pool, client);
+      mongoc_client_pool_destroy (pool);
+      // Expect two threads per server: monitoring thread and RTT monitor.
+      ASSERT_CMPSIZE_T (mcommon_num_create_calls, ==, 2 * server_count);
+      // Assert join is not called on the RTT monitor threads.
+      ASSERT_CMPSIZE_T (mcommon_num_join_calls, ==, 1 * server_count);
+      ASSERT_CAPTURED_LOG (
+         "server_monitor",
+         MONGOC_LOG_LEVEL_ERROR,
+         "Failed to start Round-Trip Time monitoring thread.");
+      capture_logs (false);
    }
 
    mongoc_uri_destroy (uri);
