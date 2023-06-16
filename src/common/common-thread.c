@@ -87,10 +87,10 @@ mcommon_thread_create_with_failpoint (bson_thread_t *thread,
 {
    if (mcommon_failpoint_caller_id &&
        0 == strcmp (mcommon_failpoint_caller_id, caller_id)) {
-      printf ("failpoint activated for caller_id: %s. Returning 0\n",
+      printf ("failpoint activated for caller_id: %s. Returning 1\n",
               caller_id);
       mcommon_num_create_calls++;
-      return 0;
+      return 1;
    }
    return mcommon_thread_create (thread, func, arg);
 }
