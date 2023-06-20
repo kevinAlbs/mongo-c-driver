@@ -1290,11 +1290,18 @@ mongoc_server_monitor_run (mongoc_server_monitor_t *server_monitor)
    bson_mutex_lock (&server_monitor->shared.mutex);
    if (server_monitor->shared.state == MONGOC_THREAD_OFF) {
       server_monitor->is_rtt = false;
-      server_monitor->shared.state = MONGOC_THREAD_RUNNING;
-      mcommon_thread_create_with_failpoint (&server_monitor->thread,
-                                            _server_monitor_thread,
-                                            server_monitor,
-                                            "server_monitor_thread");
+      int ret = mcommon_thread_create_with_failpoint (&server_monitor->thread,
+                                                      _server_monitor_thread,
+                                                      server_monitor,
+                                                      "server_monitor_thread");
+      if (ret == 0) {
+         server_monitor->shared.state = MONGOC_THREAD_RUNNING;
+      } else {
+         _server_monitor_log (server_monitor,
+                              MONGOC_LOG_LEVEL_ERROR,
+                              "Failed to start monitoring thread. This server "
+                              "may not be selectable.");
+      }
    }
    bson_mutex_unlock (&server_monitor->shared.mutex);
 }
@@ -1305,11 +1312,19 @@ mongoc_server_monitor_run_as_rtt (mongoc_server_monitor_t *server_monitor)
    bson_mutex_lock (&server_monitor->shared.mutex);
    if (server_monitor->shared.state == MONGOC_THREAD_OFF) {
       server_monitor->is_rtt = true;
-      server_monitor->shared.state = MONGOC_THREAD_RUNNING;
-      mcommon_thread_create_with_failpoint (&server_monitor->thread,
-                                            _server_monitor_rtt_thread,
-                                            server_monitor,
-                                            "server_monitor_rtt_thread");
+      int ret =
+         mcommon_thread_create_with_failpoint (&server_monitor->thread,
+                                               _server_monitor_rtt_thread,
+                                               server_monitor,
+                                               "server_monitor_rtt_thread");
+      if (ret == 0) {
+         server_monitor->shared.state = MONGOC_THREAD_RUNNING;
+      } else {
+         _server_monitor_log (
+            server_monitor,
+            MONGOC_LOG_LEVEL_ERROR,
+            "Failed to start Round-Trip Time monitoring thread.");
+      }
    }
    bson_mutex_unlock (&server_monitor->shared.mutex);
 }
