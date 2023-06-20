@@ -836,9 +836,10 @@ static void
 TestSuite_PrintJsonHeader (TestSuite *suite, /* IN */
                            FILE *stream)     /* IN */
 {
-   char *hostname = test_framework_get_host ();
-   char *udspath = test_framework_get_unix_domain_socket_path_escaped ();
-   int port = test_framework_get_port ();
+   char *hostname = "placeholder"; // test_framework_get_host ();
+   char *udspath =
+      "placeholder"; // test_framework_get_unix_domain_socket_path_escaped ();
+   int port = 123;   // test_framework_get_port ();
    bool ssl = test_framework_get_ssl ();
 
    ASSERT (suite);
@@ -905,8 +906,8 @@ TestSuite_PrintJsonHeader (TestSuite *suite, /* IN */
             (suite->flags & TEST_TRACE) ? "true" : "false",
             getenv_or ("MONGODB_API_VERSION", "null"));
 
-   bson_free (hostname);
-   bson_free (udspath);
+   // bson_free (hostname);
+   // bson_free (udspath);
 
    fflush (stream);
 }
