@@ -166,7 +166,8 @@ _mongoc_topology_background_monitoring_start (mongoc_topology_t *topology)
             mcommon_thread_create_with_failpoint (&topology->srv_polling_thread,
                                                   srv_polling_run,
                                                   topology,
-                                                  "srv_polling_thread");
+                                                  "srv_polling_thread",
+                                                  NULL /* errno_out */);
          if (ret == 0) {
             topology->is_srv_polling = true;
          } else {

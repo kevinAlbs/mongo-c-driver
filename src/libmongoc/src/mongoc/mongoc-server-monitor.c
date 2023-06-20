@@ -1293,7 +1293,8 @@ mongoc_server_monitor_run (mongoc_server_monitor_t *server_monitor)
       int ret = mcommon_thread_create_with_failpoint (&server_monitor->thread,
                                                       _server_monitor_thread,
                                                       server_monitor,
-                                                      "server_monitor_thread");
+                                                      "server_monitor_thread",
+                                                      NULL /* errno_out */);
       if (ret == 0) {
          server_monitor->shared.state = MONGOC_THREAD_RUNNING;
       } else {
@@ -1316,7 +1317,8 @@ mongoc_server_monitor_run_as_rtt (mongoc_server_monitor_t *server_monitor)
          mcommon_thread_create_with_failpoint (&server_monitor->thread,
                                                _server_monitor_rtt_thread,
                                                server_monitor,
-                                               "server_monitor_rtt_thread");
+                                               "server_monitor_rtt_thread",
+                                               NULL /* errno_out */);
       if (ret == 0) {
          server_monitor->shared.state = MONGOC_THREAD_RUNNING;
       } else {

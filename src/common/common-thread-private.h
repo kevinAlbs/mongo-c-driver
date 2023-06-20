@@ -122,10 +122,13 @@ typedef struct {
  * libbson and libmongoc statically. */
 int
 mcommon_thread_join (bson_thread_t thread);
+// `errno_out` is set to an error code on error. Callers may use
+// `bson_strerror_r` to get an error message from `errno_out`.
 int
 mcommon_thread_create (bson_thread_t *thread,
                        BSON_THREAD_FUN_TYPE (func),
-                       void *arg);
+                       void *arg,
+                       int *errno_out);
 
 // mcommon_thread_create_with_failpoint is a temporary testing wrapper to enable
 // testing errors creating threads. `caller_id` is a string `caller_id`.
@@ -133,7 +136,8 @@ int
 mcommon_thread_create_with_failpoint (bson_thread_t *thread,
                                       BSON_THREAD_FUN_TYPE (func),
                                       void *arg,
-                                      const char *caller_id);
+                                      const char *caller_id,
+                                      int *errno_out);
 extern const char *mcommon_failpoint_caller_id;
 
 #if defined(MONGOC_ENABLE_DEBUG_ASSERTIONS) && defined(BSON_OS_UNIX)

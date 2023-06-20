@@ -16,6 +16,8 @@
 
 #include "common-thread-private.h"
 
+#include <errno.h>
+
 size_t mcommon_num_join_calls = 0;
 size_t mcommon_num_create_calls = 0;
 
@@ -23,10 +25,15 @@ size_t mcommon_num_create_calls = 0;
 int
 mcommon_thread_create (bson_thread_t *thread,
                        BSON_THREAD_FUN_TYPE (func),
-                       void *arg)
+                       void *arg,
+                       int *errno_out)
 {
    mcommon_num_create_calls++;
-   return pthread_create (thread, NULL, func, arg);
+   int ret = pthread_create (thread, NULL, func, arg);
+   if (ret != 0 && errno_out) {
+      *errno_out = ret;
+   }
+   return ret;
 }
 int
 mcommon_thread_join (bson_thread_t thread)
@@ -48,11 +55,15 @@ mcommon_mutex_is_locked (bson_mutex_t *mutex)
 int
 mcommon_thread_create (bson_thread_t *thread,
                        BSON_THREAD_FUN_TYPE (func),
-                       void *arg)
+                       void *arg,
+                       int *errno_out)
 {
    mcommon_num_create_calls++;
    *thread = (HANDLE) _beginthreadex (NULL, 0, func, arg, 0, NULL);
    if (0 == *thread) {
+      if (errno_out) {
+         *errno_out = errno;
+      }
       return 1;
    }
    return 0;
@@ -83,7 +94,8 @@ int
 mcommon_thread_create_with_failpoint (bson_thread_t *thread,
                                       BSON_THREAD_FUN_TYPE (func),
                                       void *arg,
-                                      const char *caller_id)
+                                      const char *caller_id,
+                                      int *errno_out)
 {
    if (mcommon_failpoint_caller_id &&
        0 == strcmp (mcommon_failpoint_caller_id, caller_id)) {
@@ -92,5 +104,5 @@ mcommon_thread_create_with_failpoint (bson_thread_t *thread,
       mcommon_num_create_calls++;
       return 1;
    }
-   return mcommon_thread_create (thread, func, arg);
+   return mcommon_thread_create (thread, func, arg, errno_out);
 }

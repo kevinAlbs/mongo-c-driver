@@ -140,7 +140,8 @@ static void
 start_thread (json_test_worker_thread_t *wt)
 {
    wt->shutdown_requested = false;
-   mcommon_thread_create (&wt->thread, json_test_worker_thread_run, wt);
+   mcommon_thread_create (
+      &wt->thread, json_test_worker_thread_run, wt, NULL /* errno_out */);
 }
 
 static void

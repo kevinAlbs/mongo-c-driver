@@ -2480,10 +2480,12 @@ _test_multi_threaded (bool external_key_vault)
    client1 = mongoc_client_pool_pop (pool);
    client2 = mongoc_client_pool_pop (pool);
 
-   r = mcommon_thread_create (threads, _worker_thread, client1);
+   r = mcommon_thread_create (
+      threads, _worker_thread, client1, NULL /* errno_out */);
    BSON_ASSERT (r == 0);
 
-   r = mcommon_thread_create (threads + 1, _worker_thread, client2);
+   r = mcommon_thread_create (
+      threads + 1, _worker_thread, client2, NULL /* errno_out */);
    BSON_ASSERT (r == 0);
 
    for (i = 0; i < 2; i++) {
@@ -6809,7 +6811,7 @@ test_bypass_mongocryptd_shared_library (void *unused)
    listen_socket_args_t *args = bson_malloc0 (sizeof (listen_socket_args_t));
    bson_mutex_init (&args->mutex);
    mongoc_cond_init (&args->cond);
-   mcommon_thread_create (&socket_thread, listen_socket, args);
+   mcommon_thread_create (&socket_thread, listen_socket, args, NULL);
 
    // configure mongoclient with auto encryption
    char *env_cryptSharedLibPath =
