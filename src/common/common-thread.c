@@ -102,6 +102,7 @@ mcommon_thread_create_with_failpoint (bson_thread_t *thread,
       printf ("failpoint activated for caller_id: %s. Returning 1\n",
               caller_id);
       mcommon_num_create_calls++;
+      *errno_out = EAGAIN;
       return 1;
    }
    return mcommon_thread_create (thread, func, arg, errno_out);
