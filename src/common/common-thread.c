@@ -29,6 +29,10 @@ mcommon_thread_create (bson_thread_t *thread,
                        int *errno_out)
 {
    mcommon_num_create_calls++;
+   BSON_ASSERT_PARAM (thread);
+   BSON_ASSERT_PARAM (func);
+   BSON_ASSERT (arg || true);       // optional.
+   BSON_ASSERT (errno_out || true); // optional.
    int ret = pthread_create (thread, NULL, func, arg);
    if (ret != 0 && errno_out) {
       *errno_out = ret;
@@ -59,6 +63,10 @@ mcommon_thread_create (bson_thread_t *thread,
                        int *errno_out)
 {
    mcommon_num_create_calls++;
+   BSON_ASSERT_PARAM (thread);
+   BSON_ASSERT_PARAM (func);
+   BSON_ASSERT (arg || true);       // optional.
+   BSON_ASSERT (errno_out || true); // optional.
    *thread = (HANDLE) _beginthreadex (NULL, 0, func, arg, 0, NULL);
    if (0 == *thread) {
       if (errno_out) {
