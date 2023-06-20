@@ -1143,6 +1143,8 @@ test_fails_to_create_thread (void)
    mongoc_uri_set_option_as_int32 (
       uri, MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 500);
 
+   bool has_srv_monitoring_thread = mongoc_uri_get_srv_hostname (uri) != NULL;
+
    // Test successful creation of server monitor threads.
    {
       mcommon_num_create_calls = 0;
@@ -1164,10 +1166,14 @@ test_fails_to_create_thread (void)
       mongoc_client_pool_push (pool, client);
       mongoc_client_pool_destroy (pool);
       // Expect two threads per server: monitoring thread and RTT monitor.
-      ASSERT_CMPSIZE_T (
-         mcommon_num_create_calls, ==, (has_rtt_thread ? 2 : 1) * server_count);
-      ASSERT_CMPSIZE_T (
-         mcommon_num_join_calls, ==, (has_rtt_thread ? 2 : 1) * server_count);
+      ASSERT_CMPSIZE_T (mcommon_num_create_calls,
+                        ==,
+                        (has_srv_monitoring_thread ? 1 : 0) +
+                           (has_rtt_thread ? 2 : 1) * server_count);
+      ASSERT_CMPSIZE_T (mcommon_num_join_calls,
+                        ==,
+                        (has_srv_monitoring_thread ? 1 : 0) +
+                           (has_rtt_thread ? 2 : 1) * server_count);
    }
 
    // Test failure to create server monitor thread.
@@ -1197,9 +1203,12 @@ test_fails_to_create_thread (void)
       mongoc_client_pool_destroy (pool);
       // Expect one attempted thread per server. The RTT monitor thread will not
       // start if monitoring thread fails.
-      ASSERT_CMPSIZE_T (mcommon_num_create_calls, ==, 1 * server_count);
+      ASSERT_CMPSIZE_T (mcommon_num_create_calls,
+                        ==,
+                        (has_srv_monitoring_thread ? 1 : 0) + 1 * server_count);
       // Assert join is not called.
-      ASSERT_CMPSIZE_T (mcommon_num_join_calls, ==, 0);
+      ASSERT_CMPSIZE_T (
+         mcommon_num_join_calls, ==, (has_srv_monitoring_thread ? 1 : 0) + 0);
       ASSERT_CAPTURED_LOG ("server_monitor",
                            MONGOC_LOG_LEVEL_ERROR,
                            "Failed to start monitoring thread");
@@ -1230,14 +1239,54 @@ test_fails_to_create_thread (void)
       mongoc_client_pool_push (pool, client);
       mongoc_client_pool_destroy (pool);
       // Expect two threads per server: monitoring thread and RTT monitor.
-      ASSERT_CMPSIZE_T (mcommon_num_create_calls, ==, 2 * server_count);
+      ASSERT_CMPSIZE_T (mcommon_num_create_calls,
+                        ==,
+                        (has_srv_monitoring_thread ? 1 : 0) + 2 * server_count);
       // Assert join is not called on the RTT monitor threads.
-      ASSERT_CMPSIZE_T (mcommon_num_join_calls, ==, 1 * server_count);
+      ASSERT_CMPSIZE_T (mcommon_num_join_calls,
+                        ==,
+                        (has_srv_monitoring_thread ? 1 : 0) + 1 * server_count);
       ASSERT_CAPTURED_LOG (
          "server_monitor",
          MONGOC_LOG_LEVEL_ERROR,
          "Failed to start Round-Trip Time monitoring thread.");
       capture_logs (false);
+   }
+
+   // Test failure to create SRV polling thread.
+   if (has_srv_monitoring_thread) {
+      mcommon_num_create_calls = 0;
+      mcommon_num_join_calls = 0;
+      mcommon_failpoint_caller_id = "srv_polling_thread";
+      mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
+      capture_logs (true);
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      // Attempt to ping.
+      {
+         bson_error_t error;
+         bool ok = mongoc_client_command_simple (client,
+                                                 "admin",
+                                                 tmp_bson ("{'ping': 1}"),
+                                                 NULL /* read_prefs */,
+                                                 NULL /* reply */,
+                                                 &error);
+         // Expect success, since SRV polling thread is not required for
+         // successful server selection.
+         ASSERT_OR_PRINT (ok, error);
+      }
+      mongoc_client_pool_push (pool, client);
+      mongoc_client_pool_destroy (pool);
+      // Expect thread for SRV polling and two threads per server: monitoring
+      // thread and RTT monitor.
+      ASSERT_CMPSIZE_T (mcommon_num_create_calls, ==, 1 + 2 * server_count);
+      // Assert join is not called on the failed SRV polling thread.
+      ASSERT_CMPSIZE_T (mcommon_num_join_calls, ==, 0 + 2 * server_count);
+      ASSERT_CAPTURED_LOG ("server_monitor",
+                           MONGOC_LOG_LEVEL_ERROR,
+                           "Failed to start SRV polling thread.");
+      capture_logs (false);
+   } else {
+      printf ("Skipping SRV tests. Test URI is not configured for SRV\n");
    }
 
    mongoc_uri_destroy (uri);
