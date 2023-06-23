@@ -4225,6 +4225,55 @@ test_mongoc_client_resends_handshake_on_network_error (void)
    mock_server_destroy (server);
 }
 
+static void
+test_faas (void)
+{
+   mock_server_t *server;
+   mongoc_uri_t *uri;
+   mongoc_client_t *client;
+   future_t *future;
+
+   server = mock_server_new ();
+   mock_server_run (server);
+
+   uri = mongoc_uri_copy (mock_server_get_uri (server));
+   bson_error_t error;
+   client = mongoc_client_new_from_uri_with_error (uri, &error);
+   ASSERT_OR_PRINT (client, error);
+
+   future = future_client_command_simple (
+      client, "test", tmp_bson ("{'ping': 1}"), NULL, NULL, NULL);
+
+   // Expect legacy hello with handshake.
+   {
+      request_t *request = mock_server_receives_legacy_hello (
+         server, "{'client': {'foo': 'bar'}}");
+
+      char *reply = bson_strdup_printf ("{'ok': 1,"
+                                        " 'minWireVersion': %d,"
+                                        " 'maxWireVersion': %d }",
+                                        WIRE_VERSION_MIN,
+                                        WIRE_VERSION_MAX);
+
+      reply_to_request_simple (request, reply);
+      bson_free (reply);
+      request_destroy (request);
+   }
+
+   // Expect "ping" command.
+   {
+      request_t *request = mock_server_receives_msg (
+         server, MONGOC_MSG_NONE, tmp_bson ("{'ping': 1}"));
+      reply_to_request_with_ok_and_destroy (request);
+      ASSERT (future_get_bool (future));
+      future_destroy (future);
+   }
+
+   mongoc_client_destroy (client);
+   mongoc_uri_destroy (uri);
+   mock_server_destroy (server);
+}
+
 void
 test_client_install (TestSuite *suite)
 {
@@ -4538,4 +4587,5 @@ test_client_install (TestSuite *suite)
       suite,
       "/Client/resends_handshake_on_network_error",
       test_mongoc_client_resends_handshake_on_network_error);
+   TestSuite_AddMockServerTest (suite, "/faas", test_faas);
 }
