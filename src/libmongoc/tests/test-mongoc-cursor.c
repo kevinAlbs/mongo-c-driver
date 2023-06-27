@@ -2727,6 +2727,105 @@ test_open_cursor_from_reply (void)
    mongoc_client_destroy (client);
 }
 
+#include "mongoc-client-pool-private.h"
+
+static void
+test_unknown_server (void)
+{
+   // Testing with a single threaded client passes. The handshake server
+   // description is used in the `mongoc_server_stream_t`.
+   {
+      mongoc_client_t *client;
+      mongoc_collection_t *coll;
+      bson_error_t error;
+
+      client = test_framework_new_default_client ();
+      coll = get_test_collection (client, "test_open_cursor_from_reply");
+
+      // Drop collection to remove data from prior runs.
+      // Ignore errors. Dropping a non-existing collection may return an "ns not
+      // found" error.
+      mongoc_collection_drop (coll, &error);
+
+      // Create an aggregate cursor. A server is selected. The "aggregate"
+      // command is not sent until the first call to `mongoc_cursor_next`.
+      mongoc_cursor_t *cursor =
+         mongoc_collection_aggregate (coll,
+                                      MONGOC_QUERY_NONE,
+                                      tmp_bson ("{}"),
+                                      NULL /* opts */,
+                                      NULL /* read_prefs */);
+      ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &error), error);
+
+      // Mark server as UNKNOWN in topology description.
+      _mongoc_topology_invalidate_server (client->topology, cursor->server_id);
+
+      // Send the "aggregate" command.
+      const bson_t *doc;
+      mongoc_cursor_next (cursor, &doc);
+      ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &error), error);
+
+      mongoc_cursor_destroy (cursor);
+      mongoc_collection_destroy (coll);
+      mongoc_client_destroy (client);
+   }
+
+   // Testing with a pooled client passes. The handshake server
+   // description is used in the `mongoc_server_stream_t`.
+   {
+      mongoc_client_pool_t *pool;
+      mongoc_client_t *client;
+      mongoc_collection_t *coll;
+      bson_error_t error;
+
+      pool = test_framework_new_default_client_pool ();
+
+      // Override the heartbeatFrequencyMS (default 10 seconds) and
+      // minHeartbeatFrequencyMS (default 500ms) to speed up the test.
+      // `_mongoc_topology_invalidate_server` does not cancel the in-progress
+      // hello check.
+      const int64_t overridden_heartbeat_ms = 1;
+      {
+         mongoc_topology_t *tp = _mongoc_client_pool_get_topology (pool);
+         mc_tpld_modification tdmod = mc_tpld_modify_begin (tp);
+         tdmod.new_td->heartbeat_msec = overridden_heartbeat_ms;
+         mc_tpld_modify_commit (tdmod);
+         tp->min_heartbeat_frequency_msec = overridden_heartbeat_ms;
+      }
+
+      client = mongoc_client_pool_pop (pool);
+      coll = get_test_collection (client, "test_open_cursor_from_reply");
+
+      // Drop collection to remove data from prior runs.
+      // Ignore errors. Dropping a non-existing collection may return an "ns not
+      // found" error.
+      mongoc_collection_drop (coll, &error);
+
+      // Create an aggregate cursor. A server is selected. The "aggregate"
+      // command is not sent until the first call to `mongoc_cursor_next`.
+      mongoc_cursor_t *cursor =
+         mongoc_collection_aggregate (coll,
+                                      MONGOC_QUERY_NONE,
+                                      tmp_bson ("{}"),
+                                      NULL /* opts */,
+                                      NULL /* read_prefs */);
+      ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &error), error);
+
+      // Mark server as UNKNOWN in topology description.
+      _mongoc_topology_invalidate_server (client->topology, cursor->server_id);
+
+      // Send the "aggregate" command.
+      const bson_t *doc;
+      mongoc_cursor_next (cursor, &doc);
+      ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &error), error);
+
+      mongoc_cursor_destroy (cursor);
+      mongoc_collection_destroy (coll);
+      mongoc_client_pool_push (pool, client);
+      mongoc_client_pool_destroy (pool);
+   }
+}
+
 void
 test_cursor_install (TestSuite *suite)
 {
@@ -2829,4 +2928,5 @@ test_cursor_install (TestSuite *suite)
                       test_cursor_batchsize_override_range_warning);
    TestSuite_AddLive (
       suite, "/Cursor/open_cursor_from_reply", test_open_cursor_from_reply);
+   TestSuite_AddLive (suite, "/CDRIVER-3563", test_unknown_server);
 }
