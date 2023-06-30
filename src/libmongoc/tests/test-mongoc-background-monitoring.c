@@ -1128,6 +1128,54 @@ test_moretocome_cancel (void)
    tf_destroy (tf);
 }
 
+typedef struct {
+   int polling_hello_count;
+   int awaitable_hello_count;
+} faas_test_context_t;
+
+static void
+faas_test_server_heartbeat_started (
+   const mongoc_apm_server_heartbeat_started_t *event)
+{
+   faas_test_context_t *ctx =
+      mongoc_apm_server_heartbeat_started_get_context (event);
+   if (mongoc_apm_server_heartbeat_started_get_awaited (event)) {
+      ctx->awaitable_hello_count += 1;
+   } else {
+      ctx->polling_hello_count += 1;
+   }
+}
+
+// Test that monitoring only uses the polling "hello" command in FaaS
+// environments.
+static void
+test_faas_polling (void)
+{
+   faas_test_context_t ctx = {0};
+   mongoc_client_pool_t *pool = test_framework_new_default_client_pool ();
+   // Subscribe to SDAM events.
+   mongoc_apm_callbacks_t *cbs = mongoc_apm_callbacks_new ();
+   mongoc_apm_set_server_heartbeat_started_cb (
+      cbs, faas_test_server_heartbeat_started);
+   mongoc_client_pool_set_apm_callbacks (pool, cbs, &ctx);
+   // Monitoring starts on the first call to pop.
+   mongoc_client_t *client = mongoc_client_pool_pop (pool);
+   bson_error_t error;
+   bool ok = mongoc_client_command_simple (client,
+                                           "db",
+                                           tmp_bson ("{'ping': 1}"),
+                                           NULL /* read prefs */,
+                                           NULL /* reply */,
+                                           &error);
+   ASSERT_OR_PRINT (ok, error);
+   // Expect no awaitable "hello" commands in faas (currently fails):
+   ASSERT_CMPINT (0, ==, ctx.awaitable_hello_count);
+   ASSERT_CMPINT (1, ==, ctx.polling_hello_count);
+   mongoc_client_pool_push (pool, client);
+   mongoc_apm_callbacks_destroy (cbs);
+   mongoc_client_pool_destroy (pool);
+}
+
 void
 test_monitoring_install (TestSuite *suite)
 {
@@ -1197,4 +1245,6 @@ test_monitoring_install (TestSuite *suite)
 
    TestSuite_AddMockServerTest (
       suite, "/server_monitor_thread/sleep_after_scan", test_sleep_after_scan);
+
+   TestSuite_AddLive (suite, "/faas/polling", test_faas_polling);
 }
