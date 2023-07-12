@@ -3511,6 +3511,79 @@ test_bson_as_json_with_opts_all_types (void)
    bson_destroy (&scope);
 }
 
+// `dump_bson` dumps BSON data as hex.
+// Consider using the `bsonview` tool in the specifications repository to parse
+// the resulting data.
+static void
+dump_bson (const bson_t *b)
+{
+   const uint8_t *data = bson_get_data (b);
+   for (size_t i = 0; i < b->len; i++) {
+      printf ("%02X", data[i]);
+   }
+   printf ("\n");
+}
+
+static void
+test_json_array_with_code (void)
+{
+   // Test parsing `[ 1 ]` and `{ "0": 1 }`. Results in the same BSON.
+   {
+      bson_t *b1;
+      {
+         const char *json = BSON_STR ([1]);
+         bson_error_t error;
+         b1 = bson_new_from_json ((const uint8_t *) json, -1, &error);
+         ASSERT_OR_PRINT (b1, error);
+         printf ("bson parsed from %s:\n", json);
+         dump_bson (b1);
+      }
+
+      bson_t *b2;
+      {
+         const char *json = BSON_STR ({"0" : 1});
+         bson_error_t error;
+         b2 = bson_new_from_json ((const uint8_t *) json, -1, &error);
+         ASSERT_OR_PRINT (b2, error);
+         printf ("bson parsed from %s:\n", json);
+         dump_bson (b2);
+      }
+
+      ASSERT (bson_equal (b1, b2));
+      bson_destroy (b2);
+      bson_destroy (b1);
+   }
+
+   // Test parsing `[ {"$code" : "A"} ]` and `{ "0": {"$code" : "A"} }`. Results
+   // in incorrect unequal BSON.
+   {
+      bson_t *b1;
+      {
+         // Parsing `[ {"$code" : "A"} ]` results in an invalid key.
+         const char *json = BSON_STR ([ {"$code" : "A"} ]);
+         bson_error_t error;
+         b1 = bson_new_from_json ((const uint8_t *) json, -1, &error);
+         ASSERT_OR_PRINT (b1, error);
+         printf ("bson parsed from %s:\n", json);
+         dump_bson (b1);
+      }
+
+      bson_t *b2;
+      {
+         const char *json = BSON_STR ({"0" : {"$code" : "A"}});
+         bson_error_t error;
+         b2 = bson_new_from_json ((const uint8_t *) json, -1, &error);
+         ASSERT_OR_PRINT (b2, error);
+         printf ("bson parsed from %s:\n", json);
+         dump_bson (b2);
+      }
+
+      ASSERT (bson_equal (b1, b2));
+      bson_destroy (b2);
+      bson_destroy (b1);
+   }
+}
+
 void
 test_json_install (TestSuite *suite)
 {
@@ -3700,4 +3773,6 @@ test_json_install (TestSuite *suite)
    TestSuite_Add (suite,
                   "/bson/as_json_with_opts/all_types",
                   test_bson_as_json_with_opts_all_types);
+   TestSuite_Add (
+      suite, "/bson/parse_array_with_code", test_json_array_with_code);
 }
