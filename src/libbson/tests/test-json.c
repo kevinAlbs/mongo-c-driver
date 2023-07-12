@@ -3525,7 +3525,7 @@ dump_bson (const bson_t *b)
 }
 
 static void
-test_json_array_with_code (void)
+test_parse_array (void)
 {
    // Test parsing `[ 1 ]` and `{ "0": 1 }`. Results in the same BSON.
    {
@@ -3578,7 +3578,47 @@ test_json_array_with_code (void)
          dump_bson (b2);
       }
 
-      ASSERT (bson_equal (b1, b2));
+      ASSERT (bson_equal (b1, b2)); // Fails. Comment out to test $dbPointer.
+      bson_destroy (b2);
+      bson_destroy (b1);
+   }
+
+   // Test parsing `[ {"$dbPointer" : ... } ]` and `{ "0": {"$dbPointer" : ... }
+   // }`. Results in incorrect unequal BSON.
+   {
+      bson_t *b1;
+      {
+         // Parsing `[ {"$dbPointer": ...  ]` results in an invalid key.
+         const char *json = BSON_STR ([ {
+            "$dbPointer" :
+               {"$ref" : "foo",
+                "$id" : {"$oid" : "01234567890abcdef0123456"}}
+         } ]);
+         bson_error_t error;
+         b1 = bson_new_from_json ((const uint8_t *) json, -1, &error);
+         ASSERT_OR_PRINT (b1, error);
+         printf ("bson parsed from %s:\n", json);
+         dump_bson (b1);
+      }
+
+      bson_t *b2;
+      {
+         const char *json = BSON_STR ({
+            "0" : {
+               "$dbPointer" : {
+                  "$ref" : "foo",
+                  "$id" : {"$oid" : "01234567890abcdef0123456"}
+               }
+            }
+         });
+         bson_error_t error;
+         b2 = bson_new_from_json ((const uint8_t *) json, -1, &error);
+         ASSERT_OR_PRINT (b2, error);
+         printf ("bson parsed from %s:\n", json);
+         dump_bson (b2);
+      }
+
+      ASSERT (bson_equal (b1, b2)); // Fails.
       bson_destroy (b2);
       bson_destroy (b1);
    }
@@ -3773,6 +3813,5 @@ test_json_install (TestSuite *suite)
    TestSuite_Add (suite,
                   "/bson/as_json_with_opts/all_types",
                   test_bson_as_json_with_opts_all_types);
-   TestSuite_Add (
-      suite, "/bson/parse_array_with_code", test_json_array_with_code);
+   TestSuite_Add (suite, "/bson/parse_array", test_parse_array);
 }
