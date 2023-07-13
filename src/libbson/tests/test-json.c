@@ -3555,6 +3555,88 @@ test_bson_as_json_with_opts_all_types (void)
    bson_destroy (&scope);
 }
 
+#define ASSERT_MEMEQUAL(a, a_len, b, b_len) \
+   if (1) {                                 \
+      char *a_hex = bin_to_hex (a, a_len);  \
+      char *b_hex = bin_to_hex (b, b_len);  \
+      ASSERT_CMPSTR (a_hex, b_hex);         \
+      bson_free (a_hex);                    \
+      bson_free (b_hex);                    \
+   } else                                   \
+      (void) 0
+
+static void
+test_CDRIVER4662 (void)
+{
+   {
+      bson_error_t error;
+      const char *degenerate_extjson =
+         "{\"d\" : {\"$numberDecimal\" : \"0E+2147483647\"}}";
+      uint32_t expected_len;
+      uint8_t *expected = hex_to_bin (
+         "180000001364000000000000000000000000000000FE5F00", &expected_len);
+
+      bson_t *as_bson =
+         bson_new_from_json ((const uint8_t *) degenerate_extjson, -1, &error);
+      ASSERT_OR_PRINT (as_bson, error);
+      ASSERT_MEMEQUAL (
+         expected, expected_len, bson_get_data (as_bson), as_bson->len);
+      bson_free (expected);
+      bson_destroy (as_bson);
+   }
+
+   {
+      bson_error_t error;
+      const char *degenerate_extjson =
+         "{\"d\" : {\"$numberDecimal\" : \"0E-2147483647\"}}";
+      uint32_t expected_len;
+      uint8_t *expected = hex_to_bin (
+         "180000001364000000000000000000000000000000000000", &expected_len);
+
+      bson_t *as_bson =
+         bson_new_from_json ((const uint8_t *) degenerate_extjson, -1, &error);
+      ASSERT_OR_PRINT (as_bson, error);
+      ASSERT_MEMEQUAL (
+         expected, expected_len, bson_get_data (as_bson), as_bson->len);
+      bson_free (expected);
+      bson_destroy (as_bson);
+   }
+
+   {
+      bson_error_t error;
+      const char *degenerate_extjson =
+         "{\"d\" : {\"$numberDecimal\" : \"-0E+2147483647\"}}";
+      uint32_t expected_len;
+      uint8_t *expected = hex_to_bin (
+         "180000001364000000000000000000000000000000FEDF00", &expected_len);
+
+      bson_t *as_bson =
+         bson_new_from_json ((const uint8_t *) degenerate_extjson, -1, &error);
+      ASSERT_OR_PRINT (as_bson, error);
+      ASSERT_MEMEQUAL (
+         expected, expected_len, bson_get_data (as_bson), as_bson->len);
+      bson_free (expected);
+      bson_destroy (as_bson);
+   }
+
+   {
+      bson_error_t error;
+      const char *degenerate_extjson =
+         "{\"d\" : {\"$numberDecimal\" : \"-0E-2147483647\"}}";
+      uint32_t expected_len;
+      uint8_t *expected = hex_to_bin (
+         "180000001364000000000000000000000000000000008000", &expected_len);
+
+      bson_t *as_bson =
+         bson_new_from_json ((const uint8_t *) degenerate_extjson, -1, &error);
+      ASSERT_OR_PRINT (as_bson, error);
+      ASSERT_MEMEQUAL (
+         expected, expected_len, bson_get_data (as_bson), as_bson->len);
+      bson_free (expected);
+      bson_destroy (as_bson);
+   }
+}
+
 void
 test_json_install (TestSuite *suite)
 {
@@ -3748,4 +3830,5 @@ test_json_install (TestSuite *suite)
    TestSuite_Add (suite,
                   "/bson/as_json_with_opts/all_types",
                   test_bson_as_json_with_opts_all_types);
+   TestSuite_Add (suite, "/bson/CDRIVER-4662", test_CDRIVER4662);
 }
