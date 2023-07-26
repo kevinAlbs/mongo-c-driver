@@ -1,5 +1,5 @@
 {
-  "description": "updateSearchIndex",
+  "description": "dropSearchIndex",
   "schemaVersion": "1.4",
   "createEntities": [
     {
@@ -42,11 +42,10 @@
       "description": "sends the correct command",
       "operations": [
         {
-          "name": "updateSearchIndex",
+          "name": "dropSearchIndex",
           "object": "collection0",
           "arguments": {
-            "name": "test index",
-            "definition": {}
+            "name": "test index"
           },
           "expectError": {
             "isError": true,
@@ -61,9 +60,8 @@
             {
               "commandStartedEvent": {
                 "command": {
-                  "updateSearchIndex": "collection0",
+                  "dropSearchIndex": "collection0",
                   "name": "test index",
-                  "definition": {},
                   "$db": "database0"
                 }
               }
