@@ -153,7 +153,7 @@ main (int argc, char *argv[])
    TEST_INSTALL (test_mcd_azure_imds_install);
    TEST_INSTALL (test_mcd_integer_install);
    TEST_INSTALL (test_service_gcp_install);
-
+   TEST_INSTALL (test_index_management_install);
    ret = TestSuite_Run (&suite);
 
    test_libmongoc_destroy (&suite);
