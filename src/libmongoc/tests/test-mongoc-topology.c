@@ -2545,8 +2545,8 @@ test_failure_to_setup_after_retry (void)
    server = mock_server_new ();
    mock_server_run (server);
    uri = mongoc_uri_copy (mock_server_get_uri (server));
-   client = mongoc_client_new_from_uri_with_error (uri, &error);
-   ASSERT_OR_PRINT (client, error);
+   client = mongoc_client_new_from_uri (uri);
+   ASSERT (client);
 
    // Override the heartbeatFrequencyMS (default 60 seconds) and
    // minHeartbeatFrequencyMS (default 500ms) to speed up the test.
@@ -2571,7 +2571,7 @@ test_failure_to_setup_after_retry (void)
                                         WIRE_VERSION_MIN,
                                         WIRE_VERSION_MAX);
 
-      reply_to_request_simple (request, reply);
+      mock_server_replies_simple (request, reply);
       bson_free (reply);
       request_destroy (request);
    }
@@ -2580,7 +2580,7 @@ test_failure_to_setup_after_retry (void)
    {
       request_t *request = mock_server_receives_msg (
          server, MONGOC_MSG_NONE, tmp_bson ("{'ping': 1}"));
-      reply_to_request_with_ok_and_destroy (request);
+      mock_server_replies_ok_and_destroys (request);
       ASSERT_OR_PRINT (future_get_bool (future), error);
       future_destroy (future);
    }
@@ -2598,7 +2598,7 @@ test_failure_to_setup_after_retry (void)
       // Set the initiator to fail.
       mongoc_client_set_stream_initiator (client, initiator_fail, NULL);
       // A network error on a previously known server triggers the retry.
-      reply_to_request_with_hang_up (request);
+      mock_server_hangs_up (request);
       request_destroy (request);
    }
 
