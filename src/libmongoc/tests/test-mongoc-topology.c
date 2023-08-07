@@ -2552,10 +2552,10 @@ test_failure_to_setup_after_retry (void)
    // minHeartbeatFrequencyMS (default 500ms) to speed up the test.
    const int64_t overridden_heartbeat_ms = 1;
    {
-      mc_tpld_modification tdmod = mc_tpld_modify_begin (client->topology);
-      tdmod.new_td->heartbeat_msec = overridden_heartbeat_ms;
-      mc_tpld_modify_commit (tdmod);
+      bson_mutex_lock (&client->topology->mutex);
+      client->topology->description.heartbeat_msec = overridden_heartbeat_ms;
       client->topology->min_heartbeat_frequency_msec = overridden_heartbeat_ms;
+      bson_mutex_unlock (&client->topology->mutex);
    }
 
    future = future_client_command_simple (
