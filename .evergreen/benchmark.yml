@@ -175,35 +175,35 @@ functions:
       name: perf
       file: mongo-c-driver/results.json
 
-  "backtrace":
-    - command: shell.exec
-      params:
-        working_dir: "mongo-c-driver"
-        script: |
-          echo "Debugging core files"
+  # "backtrace":
+  #   - command: shell.exec
+  #     params:
+  #       working_dir: "mongo-c-driver"
+  #       script: |
+  #         echo "Debugging core files"
 
-          shopt -s nullglob
-          for i in *core*; do
-             echo $i
-             echo "backtrace full" | gdb -q ./mongo-c-driver-performance/mongo-c-performance $i
-          done
+  #         shopt -s nullglob
+  #         for i in *core*; do
+  #            echo $i
+  #            echo "backtrace full" | gdb -q ./mongo-c-driver-performance/mongo-c-performance $i
+  #         done
 
-pre:
-  # Remove and recreate old directory
-  - command: shell.exec
-    params:
-      script: |
-        rm -rf mongo-c-driver
-        mkdir mongo-c-driver
+# pre:
+#   # Remove and recreate old directory
+#   - command: shell.exec
+#     params:
+#       script: |
+#         rm -rf mongo-c-driver
+#         mkdir mongo-c-driver
 
-post:
-  - func: "backtrace"
-  # Remove and recreate old directory
-  - command: shell.exec
-    params:
-      script: |
-        rm -rf mongo-c-driver
-        mkdir mongo-c-driver
+# post:
+#   - func: "backtrace"
+#   # Remove and recreate old directory
+#   - command: shell.exec
+#     params:
+#       script: |
+#         rm -rf mongo-c-driver
+#         mkdir mongo-c-driver
 
 #######################################
 #               Tasks                 #

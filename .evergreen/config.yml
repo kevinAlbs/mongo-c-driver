@@ -21,8 +21,8 @@ pre_error_fails_task: true
 post_error_fails_task: false
 
 # Unlikely, but document loudly when task failure is due to early termination.
-early_termination:
-  - func: early-termination
+# early_termination:
+#   - func: early-termination
 
 # TODO: move into timeout commands of appropriate task groups.
 timeout:
@@ -49,3 +49,4 @@ include:
   - filename: .evergreen/generated_configs/task_groups.yml
   - filename: .evergreen/generated_configs/tasks.yml
   - filename: .evergreen/generated_configs/variants.yml
+  - filename: .evergreen/benchmark.yml
