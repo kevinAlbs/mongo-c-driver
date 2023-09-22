@@ -79,6 +79,7 @@ functions:
       script: |
         set -o verbose
         set -o errexit
+        set -o xtrace
         rm -rf mongo-c-driver*
         curl --retry 5 http://s3.amazonaws.com/mciuploads/mongo-c-driver/${compile_variant}/${revision}/artifacts/${file}.tar.gz -o c-perf-binaries.tar.gz -sS --max-time 120
         ${decompress} c-perf-binaries.tar.gz
