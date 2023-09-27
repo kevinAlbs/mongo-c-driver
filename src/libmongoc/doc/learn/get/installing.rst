@@ -9,10 +9,11 @@ Installing Prebuilt MongoDB C Driver Libraries
 
 .. _EPEL: https://docs.fedoraproject.org/en-US/epel/
 .. _Homebrew: https://brew.sh/
+.. _vcpkg: https://vcpkg.io/
 
 The |libmongoc| and |libbson| libraries are often available in the package
-management repositories of `common Linux distributions <linux_>`_ and
-`macOS via Homebrew <macos_>`_.
+management repositories of `common Linux distributions <linux_>`_,
+`macOS via Homebrew <macos_>`_, and `vcpkg <installing_with_vcpkg_>`_.
 
 .. note::
 
@@ -129,7 +130,7 @@ with the following command::
 
 
 .. todo
-  Packages for Windows, via Conan, and via vcpkg
+  Packages for Windows, via Conan
 
 
 .. [#macos_brew]
@@ -137,3 +138,30 @@ with the following command::
   The Homebrew_ package manager is not installed by default on macOS. For
   information on installing Homebrew, refer to
   `the Homebrew installation documentation page <https://docs.brew.sh/Installation>`_.
+
+.. _installing_with_vcpkg:
+
+Installing with vcpkg
+*********************
+
+The C driver libraries (including both |libmongoc| and |libbson|) may be installed using the vcpkg_ package manager [#vcpkg_install]_
+
+Use the following command on macOS/Linux::
+
+  $ vcpkg install mongo-c-driver
+
+Use the following command on Windows:
+
+.. code-block:: powershell
+
+  PS C:\> .\vcpkg install mongo-c-driver
+
+.. note::
+
+  vcpkg does not provide separate packages for |libbson| and |libmongoc|.
+
+.. [#vcpkg_install]
+
+  For information on installing vcpkg, refer to
+  `the vcpkg installation documentation page <https://vcpkg.io/en/getting-started.html>`_.
+
