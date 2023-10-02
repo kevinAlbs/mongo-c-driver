@@ -94,123 +94,6 @@ test_mongoc_scram_iteration_count (void)
    test_iteration_count (10000, true);
 }
 
-enum {
-   // ensure there are more users than slots in cache to test cache invalidation
-   NUM_CACHE_TEST_USERS = 10 + MONGOC_SCRAM_CACHE_SIZE,
-
-   // ensure that there are several times that the cache needs to be invalidated
-   NUM_CACHE_TEST_THREADS = 3 * NUM_CACHE_TEST_USERS,
-};
-
-static int
-_test_skip_if_replica_set (void)
-{
-   char *replset_name = test_framework_replset_name ();
-   const bool is_replica_set = !replset_name;
-   bson_free (replset_name);
-   return is_replica_set;
-}
-
-static BSON_THREAD_FUN (_scram_cache_invalidation_thread, username_number_ptr)
-{
-   bson_error_t error;
-
-   int *pun_i_ptr = username_number_ptr;
-   int i = *pun_i_ptr;
-   bson_free (username_number_ptr);
-
-   const char *password = "mypass";
-   char *username = bson_strdup_printf ("cachetestuser%dX", i);
-
-   const char *uri_str = "mongodb://localhost:27017/";
-   char *cache_test_user_uri =
-      test_framework_add_user_password (uri_str, username, password);
-   BSON_ASSERT (cache_test_user_uri);
-
-   mongoc_uri_t *cache_test_uri = mongoc_uri_new (cache_test_user_uri);
-   BSON_ASSERT (cache_test_uri);
-
-   mongoc_client_pool_t *pool =
-      test_framework_client_pool_new_from_uri (cache_test_uri, NULL);
-   BSON_ASSERT (pool);
-
-   test_framework_set_pool_ssl_opts (pool);
-
-   mongoc_client_t *client = mongoc_client_pool_pop (pool);
-   BSON_ASSERT (client);
-
-   mongoc_collection_t *collection =
-      mongoc_client_get_collection (client, "admin", "testcache");
-   BSON_ASSERT (collection);
-
-   bson_t insert = BSON_INITIALIZER;
-   bool ok =
-      mongoc_collection_insert_one (collection, &insert, NULL, NULL, &error);
-   ASSERT_OR_PRINT (ok, error);
-
-   bson_free (username);
-   bson_free (cache_test_user_uri);
-   mongoc_collection_destroy (collection);
-   mongoc_uri_destroy (cache_test_uri);
-   mongoc_client_pool_push (pool, client);
-   mongoc_client_pool_destroy (pool);
-
-   BSON_THREAD_RETURN;
-}
-
-static void
-test_mongoc_scram_cache_invalidation (void *ctx)
-{
-   mongoc_client_pool_t *pool = NULL;
-   mongoc_client_t *client = NULL;
-   bson_error_t error;
-   mongoc_uri_t *const uri = test_framework_get_uri ();
-   BSON_ASSERT (uri);
-
-   pool = test_framework_client_pool_new_from_uri (uri, NULL);
-   BSON_ASSERT (pool);
-   test_framework_set_pool_ssl_opts (pool);
-   client = mongoc_client_pool_pop (pool);
-   BSON_ASSERT (client);
-
-   mongoc_database_t *const db = mongoc_client_get_database (client, "admin");
-   BSON_ASSERT (db);
-
-   bson_t *roles = tmp_bson ("[{'role': 'readWrite', 'db': 'admin'}]");
-
-   /* Remove cache test users if they already exist.
-    * Create more test users than could exist in cache. */
-   for (int i = 0; i < NUM_CACHE_TEST_USERS; i++) {
-      const char *password = "mypass";
-      char *username = bson_strdup_printf ("cachetestuser%dX", i);
-
-      mongoc_database_remove_user (db, username, &error);
-      bool ok =
-         mongoc_database_add_user (db, username, password, roles, NULL, &error);
-      ASSERT_OR_PRINT (ok, error);
-      bson_free (username);
-   }
-
-   bson_thread_t threads[NUM_CACHE_TEST_THREADS];
-   for (int i = 0; i < NUM_CACHE_TEST_THREADS; i++) {
-      int *username_number_ptr = bson_malloc (sizeof (*username_number_ptr));
-      *username_number_ptr = i % NUM_CACHE_TEST_USERS;
-      int rc = mcommon_thread_create (
-         &threads[i], _scram_cache_invalidation_thread, username_number_ptr);
-      BSON_ASSERT (rc == 0);
-   }
-
-   for (int i = 0; i < NUM_CACHE_TEST_THREADS; i++) {
-      int rc = mcommon_thread_join (threads[i]);
-      BSON_ASSERT (rc == 0);
-   }
-
-   mongoc_uri_destroy (uri);
-   mongoc_client_pool_push (pool, client);
-   mongoc_client_pool_destroy (pool);
-   mongoc_database_destroy (db);
-}
-
 static void
 test_mongoc_scram_sasl_prep (void)
 {
@@ -767,6 +650,115 @@ _test_mongoc_scram_saslprep_auth (bool pooled)
               MONGOC_TEST_NO_ERROR);
 }
 
+enum {
+   // ensure there are more users than slots in cache to test cache invalidation
+   NUM_CACHE_TEST_USERS = 10 + MONGOC_SCRAM_CACHE_SIZE,
+
+   // ensure that there are several times that the cache needs to be invalidated
+   NUM_CACHE_TEST_THREADS = 3 * NUM_CACHE_TEST_USERS,
+};
+
+static BSON_THREAD_FUN (_scram_cache_invalidation_thread, username_number_ptr)
+{
+   bson_error_t error;
+
+   int i = *((int *) username_number_ptr);
+   bson_free (username_number_ptr);
+
+   const char *password = "mypass";
+   char *username = bson_strdup_printf ("cachetestuser%dX", i);
+
+   char *uri_str = test_framework_get_uri_str_no_auth ("admin");
+   char *cache_test_user_uri =
+      test_framework_add_user_password (uri_str, username, password);
+   BSON_ASSERT (cache_test_user_uri);
+
+   mongoc_uri_t *cache_test_uri = mongoc_uri_new (cache_test_user_uri);
+   BSON_ASSERT (cache_test_uri);
+
+   // Set serverSelectionTryOnce=false so a single failed connection attempt
+   // does not result in an error.
+   mongoc_uri_set_option_as_bool (
+      cache_test_uri, MONGOC_URI_SERVERSELECTIONTRYONCE, false);
+
+   mongoc_client_t *client =
+      test_framework_client_new_from_uri (cache_test_uri, NULL /* api */);
+   BSON_ASSERT (client);
+
+   test_framework_set_ssl_opts (client);
+
+   mongoc_collection_t *collection =
+      mongoc_client_get_collection (client, "admin", "testcache");
+   BSON_ASSERT (collection);
+
+   bson_t insert = BSON_INITIALIZER;
+   bool ok =
+      mongoc_collection_insert_one (collection, &insert, NULL, NULL, &error);
+   ASSERT_OR_PRINT (ok, error);
+
+   bson_free (uri_str);
+   bson_free (username);
+   bson_free (cache_test_user_uri);
+   mongoc_collection_destroy (collection);
+   mongoc_uri_destroy (cache_test_uri);
+   mongoc_client_destroy (client);
+
+   BSON_THREAD_RETURN;
+}
+
+static void
+test_mongoc_scram_cache_invalidation (void *ctx)
+{
+   mongoc_client_pool_t *pool = NULL;
+   mongoc_client_t *client = NULL;
+   bson_error_t error;
+   mongoc_uri_t *const uri = test_framework_get_uri ();
+   BSON_ASSERT (uri);
+
+   pool = test_framework_client_pool_new_from_uri (uri, NULL);
+   BSON_ASSERT (pool);
+   test_framework_set_pool_ssl_opts (pool);
+   client = mongoc_client_pool_pop (pool);
+   BSON_ASSERT (client);
+
+   mongoc_database_t *const db = mongoc_client_get_database (client, "admin");
+   BSON_ASSERT (db);
+
+   bson_t *roles = tmp_bson ("[{'role': 'readWrite', 'db': 'admin'}]");
+
+   /* Remove cache test users if they already exist.
+    * Create more test users than could exist in cache. */
+   for (int i = 0; i < NUM_CACHE_TEST_USERS; i++) {
+      const char *password = "mypass";
+      char *username = bson_strdup_printf ("cachetestuser%dX", i);
+
+      mongoc_database_remove_user (db, username, &error);
+      bool ok =
+         mongoc_database_add_user (db, username, password, roles, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+      bson_free (username);
+   }
+
+   bson_thread_t threads[NUM_CACHE_TEST_THREADS];
+   for (int i = 0; i < NUM_CACHE_TEST_THREADS; i++) {
+      int *username_number_ptr = bson_malloc (sizeof (*username_number_ptr));
+      *username_number_ptr = i % NUM_CACHE_TEST_USERS;
+      int rc = mcommon_thread_create (
+         &threads[i], _scram_cache_invalidation_thread, username_number_ptr);
+      BSON_ASSERT (rc == 0);
+   }
+
+   for (int i = 0; i < NUM_CACHE_TEST_THREADS; i++) {
+      int rc = mcommon_thread_join (threads[i]);
+      BSON_ASSERT (rc == 0);
+   }
+
+   mongoc_uri_destroy (uri);
+   mongoc_client_pool_push (pool, client);
+   mongoc_client_pool_destroy (pool);
+   mongoc_database_destroy (db);
+}
+
 
 static void
 test_mongoc_saslprep_auth (void *ctx)
@@ -795,15 +787,13 @@ test_scram_install (TestSuite *suite)
    TestSuite_Add (
       suite, "/scram/utf8_string_length", test_mongoc_utf8_string_length);
    TestSuite_Add (suite, "/scram/utf8_to_unicode", test_mongoc_utf8_to_unicode);
-   TestSuite_AddFull (
-      suite,
-      "/scram/cache_invalidation",
-      test_mongoc_scram_cache_invalidation,
-      NULL,
-      NULL,
-      _test_skip_if_replica_set); /* this is testing scram cache invalidation,
-                                     no need to test on a replica set */
 #endif
+   TestSuite_AddFull (suite,
+                      "/scram/cache_invalidation",
+                      test_mongoc_scram_cache_invalidation,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_auth);
    TestSuite_AddFull (suite,
                       "/scram/auth_tests",
                       test_mongoc_scram_auth,
