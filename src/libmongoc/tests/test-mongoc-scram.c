@@ -760,6 +760,122 @@ test_mongoc_scram_cache_invalidation (void *ctx)
 }
 
 
+extern mongoc_scram_cache_t g_scram_cache[MONGOC_SCRAM_CACHE_SIZE];
+extern void
+_mongoc_scram_cache_clear (void);
+
+static void
+test_mongoc_scram_cache (void *ctx)
+{
+   bson_error_t error;
+   char *usernames[NUM_CACHE_TEST_USERS];
+   char *passwords[NUM_CACHE_TEST_USERS];
+
+   // Create test users.
+   {
+      mongoc_client_t *client = test_framework_new_default_client ();
+      mongoc_database_t *const db =
+         mongoc_client_get_database (client, "admin");
+      bson_t *roles = tmp_bson ("[{'role': 'readWrite', 'db': 'admin'}]");
+
+      /* Remove cache test users if they already exist.
+       * Create more test users than could exist in cache. */
+      for (int i = 0; i < NUM_CACHE_TEST_USERS; i++) {
+         passwords[i] = bson_strdup_printf ("mypass");
+         usernames[i] = bson_strdup_printf ("cachetestuser%dX", i);
+
+         mongoc_database_remove_user (db, usernames[i], &error);
+         bool ok = mongoc_database_add_user (
+            db, usernames[i], passwords[i], roles, NULL, &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+      mongoc_database_destroy (db);
+      mongoc_client_destroy (client);
+   }
+
+   // Test cache can be invalidated.
+   {
+      // Clear the cache.
+      _mongoc_scram_cache_clear ();
+
+      bson_t *ping_cmd = tmp_bson ("{'ping': 1}");
+
+      // Fill the cache.
+      for (int i = 0; i < MONGOC_SCRAM_CACHE_SIZE - 1; i++) {
+         mongoc_uri_t *uri = test_framework_get_uri ();
+
+         mongoc_uri_set_username (uri, usernames[i]);
+         mongoc_uri_set_password (uri, passwords[i]);
+
+         mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+         test_framework_set_ssl_opts (client);
+         bool ok = mongoc_client_command_simple (client,
+                                                 "db",
+                                                 ping_cmd,
+                                                 NULL /* read_prefs */,
+                                                 NULL /* reply */,
+                                                 &error);
+         ASSERT_OR_PRINT (ok, error);
+         mongoc_client_destroy (client);
+         mongoc_uri_destroy (uri);
+      }
+
+      // Expect cache to be filled.
+      for (int i = 0; i < MONGOC_SCRAM_CACHE_SIZE; i++) {
+         if (!g_scram_cache[i].taken) {
+            test_error ("Expected cache to be filled, found available entry "
+                        "at index %d",
+                        i);
+         }
+      }
+
+      // Authenticate with one more user.
+      {
+         mongoc_uri_t *uri = test_framework_get_uri ();
+
+         mongoc_uri_set_username (uri, usernames[MONGOC_SCRAM_CACHE_SIZE]);
+         mongoc_uri_set_password (uri, passwords[MONGOC_SCRAM_CACHE_SIZE]);
+
+         mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+         test_framework_set_ssl_opts (client);
+         bool ok = mongoc_client_command_simple (client,
+                                                 "db",
+                                                 ping_cmd,
+                                                 NULL /* read_prefs */,
+                                                 NULL /* reply */,
+                                                 &error);
+         ASSERT_OR_PRINT (ok, error);
+         mongoc_client_destroy (client);
+         mongoc_uri_destroy (uri);
+      }
+
+      // Expect cache to have been invalidated.
+      for (int i = 0; i < MONGOC_SCRAM_CACHE_SIZE; i++) {
+         if (i == 0) {
+            if (!g_scram_cache[i].taken) {
+               test_error (
+                  "Expected cache to have one entry, found available entry "
+                  "at index %d",
+                  i);
+            }
+         } else {
+            if (g_scram_cache[i].taken) {
+               test_error (
+                  "Expected cache to have one entry, found available entry "
+                  "at index %d",
+                  i);
+            }
+         }
+      }
+   }
+
+   // Free usernames and passwords
+   for (int i = 0; i < NUM_CACHE_TEST_USERS; i++) {
+      bson_free (passwords[i]);
+      bson_free (usernames[i]);
+   }
+}
+
 static void
 test_mongoc_saslprep_auth (void *ctx)
 {
@@ -791,6 +907,12 @@ test_scram_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/scram/cache_invalidation",
                       test_mongoc_scram_cache_invalidation,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_auth);
+   TestSuite_AddFull (suite,
+                      "/scram/cache",
+                      test_mongoc_scram_cache,
                       NULL,
                       NULL,
                       test_framework_skip_if_no_auth);

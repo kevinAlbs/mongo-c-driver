@@ -101,9 +101,9 @@ static BSON_ONCE_FUN (_unblock_after_first_cache_entry_populated)
  * in the future, but a linear lookup is currently fast enough and is much
  * simpler logic to reason about.
  */
-static mongoc_scram_cache_t g_scram_cache[MONGOC_SCRAM_CACHE_SIZE];
+mongoc_scram_cache_t g_scram_cache[MONGOC_SCRAM_CACHE_SIZE];
 
-static void
+void
 _mongoc_scram_cache_clear (void)
 {
    bson_mutex_lock (&clear_cache_lock);
