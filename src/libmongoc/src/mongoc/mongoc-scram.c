@@ -873,6 +873,9 @@ _mongoc_scram_step2 (mongoc_scram_t *scram,
 
    mongoc_scram_cache_entry_t cache;
    if (_mongoc_scram_cache_has_presecrets (&cache, scram)) {
+      static int32_t cache_hits = 0;
+      bson_atomic_int_add (&cache_hits, 1);
+      printf ("cache hit count: %" PRId32 "\n", cache_hits);
       _mongoc_scram_cache_apply_secrets (&cache, scram);
    } else {
       /*
