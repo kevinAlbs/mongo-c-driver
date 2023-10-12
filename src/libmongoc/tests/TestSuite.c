@@ -836,9 +836,20 @@ static void
 TestSuite_PrintJsonHeader (TestSuite *suite, /* IN */
                            FILE *stream)     /* IN */
 {
-   char *hostname = test_framework_get_host ();
-   char *udspath = test_framework_get_unix_domain_socket_path_escaped ();
-   int port = test_framework_get_port ();
+   char *hostname;
+   char *udspath;
+   int port;
+   mongoc_uri_t *uri = test_framework_get_uri ();
+   if (mongoc_uri_get_srv_hostname (uri) != NULL) {
+      hostname = bson_strdup (mongoc_uri_get_srv_hostname (uri));
+      udspath = bson_strdup ("Not applicable. Using `mongodb+srv`.");
+      port = 0;
+   } else {
+      hostname = test_framework_get_host ();
+      udspath = test_framework_get_unix_domain_socket_path_escaped ();
+      port = test_framework_get_port ();
+   }
+   mongoc_uri_destroy (uri);
    bool ssl = test_framework_get_ssl ();
 
    ASSERT (suite);
