@@ -737,7 +737,7 @@ _test_end_sessions (bool pooled)
    r = mongoc_client_session_append (cs1, &opts1, &error);
    ASSERT_OR_PRINT (r, error);
    r = mongoc_client_command_with_opts (
-      client, "admin", tmp_bson ("{'count': 'c'}"), NULL, &opts1, NULL, &error);
+      client, "db", tmp_bson ("{'count': 'c'}"), NULL, &opts1, NULL, &error);
    ASSERT_OR_PRINT (r, error);
 
    cs2 = mongoc_client_start_session (client, NULL, &error);
@@ -746,7 +746,7 @@ _test_end_sessions (bool pooled)
    r = mongoc_client_session_append (cs2, &opts2, &error);
    ASSERT_OR_PRINT (r, error);
    r = mongoc_client_command_with_opts (
-      client, "admin", tmp_bson ("{'count': 'c'}"), NULL, &opts2, NULL, &error);
+      client, "db", tmp_bson ("{'count': 'c'}"), NULL, &opts2, NULL, &error);
    ASSERT_OR_PRINT (r, error);
 
    /*
