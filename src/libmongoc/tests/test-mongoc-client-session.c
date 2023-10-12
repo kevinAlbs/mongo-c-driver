@@ -3037,7 +3037,7 @@ test_session_install (TestSuite *suite)
                       test_cmd_error,
                       NULL,
                       NULL,
-                      test_framework_skip_if_no_cluster_time,
+                      //  test_framework_skip_if_no_cluster_time,
                       test_framework_skip_if_no_crypto);
    TestSuite_AddFull (suite,
                       "/Session/read_concern",
