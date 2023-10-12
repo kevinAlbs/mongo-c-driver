@@ -680,6 +680,24 @@ test_framework_add_user_password (const char *uri_str,
                                   const char *user,
                                   const char *password)
 {
+   const char *const standard = "mongodb://";
+   const char *const srv = "mongodb+srv://";
+
+   const bool is_standard = strstr (uri_str, standard) == uri_str;
+   const bool is_srv = strstr (uri_str, srv) == uri_str;
+
+   ASSERT_WITH_MSG (is_standard || is_srv,
+                    "[%s] does not start with [%s] or [%s]",
+                    uri_str,
+                    standard,
+                    srv);
+
+   if (is_srv) {
+      return bson_strdup_printf ("mongodb+srv://%s:%s@%s",
+                                 user,
+                                 password,
+                                 uri_str + strlen ("mongodb+srv://"));
+   }
    return bson_strdup_printf (
       "mongodb://%s:%s@%s", user, password, uri_str + strlen ("mongodb://"));
 }
