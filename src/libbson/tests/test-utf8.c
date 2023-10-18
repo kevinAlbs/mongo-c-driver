@@ -83,6 +83,11 @@ test_bson_utf8_escape_for_json (void)
    str = bson_utf8_escape_for_json (unescaped, -1);
    ASSERT_MEMCMP (str, "\\u000e", 7);
    bson_free (str);
+
+   // Testing \xc6 results in "global-buffer-overflow" reported by ASAN:
+   str = bson_utf8_escape_for_json ("\xc6", 1);
+   ASSERT_MEMCMP (str, "\\u00c6", 2);
+   bson_free (str);
 }
 
 
@@ -262,6 +267,24 @@ test_bson_utf8_non_shortest (void)
    }
 }
 
+extern bool
+is_special_char (bson_unichar_t c);
+
+static void
+test_bson_is_special_char (void)
+{
+   for (bson_unichar_t u = 0; u < 257; u++) {
+      if (u < 128) {
+         printf ("char=0x%04x (%c). Is special=%d\n",
+                 u,
+                 (char) u,
+                 is_special_char (u));
+      } else {
+         printf ("char=0x%04x. Is special=%d\n", u, is_special_char (u));
+      }
+   }
+}
+
 
 void
 test_utf8_install (TestSuite *suite)
@@ -271,12 +294,15 @@ test_utf8_install (TestSuite *suite)
    TestSuite_Add (suite, "/bson/utf8/nil", test_bson_utf8_nil);
    TestSuite_Add (
       suite, "/bson/utf8/escape_for_json", test_bson_utf8_escape_for_json);
-   TestSuite_Add (
-      suite, "/bson/utf8/escape_for_json_performance", test_bson_utf8_escape_for_json_performance);
+   TestSuite_Add (suite,
+                  "/bson/utf8/escape_for_json_performance",
+                  test_bson_utf8_escape_for_json_performance);
    TestSuite_Add (
       suite, "/bson/utf8/get_char_next_char", test_bson_utf8_get_char);
    TestSuite_Add (
       suite, "/bson/utf8/from_unichar", test_bson_utf8_from_unichar);
    TestSuite_Add (
       suite, "/bson/utf8/non_shortest", test_bson_utf8_non_shortest);
+   TestSuite_Add (
+      suite, "/bson/utf8/is_special_char", test_bson_is_special_char);
 }
