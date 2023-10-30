@@ -249,6 +249,41 @@ test_bson_utf8_non_shortest (void)
       }
    }
 }
+static void
+test_bson_utf8_large_str (void)
+{
+   {
+      size_t large_size = ((size_t) UINT_MAX);
+      char *large_string = bson_malloc0 (large_size);
+      printf ("Testing valid string with size %zu ... begin\n", large_size);
+      BSON_ASSERT (
+         bson_utf8_validate (large_string, large_size, true /* allow NULL */));
+      printf ("Testing valid string with size %zu ... end\n", large_size);
+   }
+
+   {
+      size_t large_size = ((size_t) UINT_MAX) + 1;
+      char *large_string = bson_malloc0 (large_size);
+      printf ("Testing valid string with size %zu ... begin\n", large_size);
+      BSON_ASSERT (
+         bson_utf8_validate (large_string, large_size, true /* allow NULL */));
+      printf ("Testing valid string with size %zu ... end\n", large_size);
+   }
+
+   {
+      size_t large_size = ((size_t) UINT_MAX);
+      char *large_string = bson_malloc0 (large_size);
+      // Set last byte to the start of a 2-byte sequence: 0b11000000 = 0xC0
+      // Use a `uint8_t` pointer to avoid casting 0xC0 to signed char.
+      uint8_t *u8ptr = (uint8_t *) large_string;
+      u8ptr[large_size - 1] = 0xC0;
+      printf ("Testing invalid string with size %zu ... begin\n", large_size);
+      BSON_ASSERT (
+         !bson_utf8_validate (large_string, large_size, true /* allow NULL */));
+      printf ("Testing invalid string with size %zu ... end\n", large_size);
+   }
+   
+}
 
 
 void
@@ -265,4 +300,5 @@ test_utf8_install (TestSuite *suite)
       suite, "/bson/utf8/from_unichar", test_bson_utf8_from_unichar);
    TestSuite_Add (
       suite, "/bson/utf8/non_shortest", test_bson_utf8_non_shortest);
+   TestSuite_Add (suite, "/bson/utf8/large_str", test_bson_utf8_large_str);
 }
