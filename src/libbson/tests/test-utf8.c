@@ -249,9 +249,14 @@ test_bson_utf8_non_shortest (void)
       }
    }
 }
+
+// `bson_utf8_validate_verbose` is used to print progress of function call.
+extern bool bson_utf8_validate_verbose;
+
 static void
 test_bson_utf8_large_str (void)
 {
+   bson_utf8_validate_verbose = true;
    {
       size_t large_size = ((size_t) UINT_MAX);
       char *large_string = bson_malloc0 (large_size);
@@ -282,7 +287,7 @@ test_bson_utf8_large_str (void)
          !bson_utf8_validate (large_string, large_size, true /* allow NULL */));
       printf ("Testing invalid string with size %zu ... end\n", large_size);
    }
-   
+   bson_utf8_validate_verbose = false;
 }
 
 

@@ -110,6 +110,8 @@ _bson_utf8_get_sequence (const char *utf8,    /* IN */
  *--------------------------------------------------------------------------
  */
 
+bool bson_utf8_validate_verbose = false;
+
 bool
 bson_utf8_validate (const char *utf8, /* IN */
                     size_t utf8_len,  /* IN */
@@ -125,6 +127,11 @@ bson_utf8_validate (const char *utf8, /* IN */
 
    for (i = 0; i < utf8_len; i += seq_length) {
       _bson_utf8_get_sequence (&utf8[i], &seq_length, &first_mask);
+
+      if (bson_utf8_validate_verbose && i % (utf8_len / 10) == 0) {
+         printf(".");
+         fflush(stdout);
+      }
 
       /*
        * Ensure we have a valid multi-byte sequence length.
@@ -227,6 +234,10 @@ bson_utf8_validate (const char *utf8, /* IN */
       default:
          return false;
       }
+   }
+
+   if (bson_utf8_validate_verbose) {
+      printf ("\n");
    }
 
    return true;
