@@ -62,9 +62,12 @@ except ImportError:
         from distutils.version import LooseVersion as parse_version
 
 parser = optparse.OptionParser(description=__doc__)
-parser.add_option("--debug", "-d", action="store_true", help="Enable debug output")
-parser.add_option("--previous", "-p", action="store_true", help="Calculate the previous version instead of the current")
-parser.add_option("--next-minor", action="store_true", help="Calculate the next minor version instead of the current")
+parser.add_option("--debug", "-d", action="store_true",
+                  help="Enable debug output")
+parser.add_option("--previous", "-p", action="store_true",
+                  help="Calculate the previous version instead of the current")
+parser.add_option("--next-minor", action="store_true",
+                  help="Calculate the next minor version instead of the current")
 args, pos = parser.parse_args()
 assert not pos, "No positional arguments are expected"
 
