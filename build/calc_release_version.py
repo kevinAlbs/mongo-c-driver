@@ -47,7 +47,7 @@ import subprocess
 import optparse  # No 'argparse' on Python 2.6
 import sys
 from functools import total_ordering
-from pkg_resources import parse_version
+import pkg_resources
 
 
 @total_ordering
@@ -116,8 +116,8 @@ class Version:
         return self.as_dict()[item]
 
     def __lt__(self, other):
-        self_parsed = parse_version(str(self))
-        other_parsed = parse_version(str(other))
+        self_parsed = pkg_resources.parse_version(str(self))
+        other_parsed = pkg_resources.parse_version(str(other))
         return self_parsed < other_parsed
 
     def __eq__(self, other):
