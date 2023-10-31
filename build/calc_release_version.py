@@ -47,7 +47,6 @@ import subprocess
 import optparse  # No 'argparse' on Python 2.6
 import sys
 from functools import total_ordering
-import pkg_resources
 
 
 @total_ordering
@@ -116,9 +115,21 @@ class Version:
         return self.as_dict()[item]
 
     def __lt__(self, other):
-        self_parsed = pkg_resources.parse_version(str(self))
-        other_parsed = pkg_resources.parse_version(str(other))
-        return self_parsed < other_parsed
+        if self.major != other.major:
+            return self.major < other.major
+        if self.minor != other.minor:
+            return self.minor < other.minor
+        if self.micro != other.micro:
+            return self.micro < other.micro
+        if self.prerelease != other.prerelease:
+            if self.prerelease != '' and other.prerelease == '':
+                # Consider a prerelease less than non-prerelease.
+                return True
+            # For simplicity, compare prerelease versions lexicographically.
+            return self.prerelease < other.prerelease
+
+        # Versions are equal.
+        return False
 
     def __eq__(self, other):
         self_tuple = self.major, self.minor, self.micro, self.prerelease
