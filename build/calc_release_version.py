@@ -49,19 +49,17 @@ import sys
 
 
 class Version:
-    @classmethod
-    def from_string(cls, s):
-        v = cls()
+    def __init__(self, s):
         pat = r'(\d+)\.(\d+)\.(\d+)(\-\S+)?'
         match = re.match(pat, s)
         assert match, "Unrecognized version string %s" % s
-        v.major, v.minor, v.micro = (
+        self.major, self.minor, self.micro = (
             map(int, (match.group(1), match.group(2), match.group(3))))
 
         if match.group(4):
-            v.prerelease = match.group(4)[1:]
-
-        return v
+            self.prerelease = match.group(4)[1:]
+        else:
+            self.prerelease = ''
 
     def __lt__(self, other):
         if self.major != other.major:
@@ -87,7 +85,7 @@ class Version:
 
 
 def parse_version(ver):
-    return Version.from_string(ver)
+    return Version(ver)
 
 
 parser = optparse.OptionParser(description=__doc__)
