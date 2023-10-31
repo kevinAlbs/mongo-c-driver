@@ -46,20 +46,89 @@ import re
 import subprocess
 import optparse  # No 'argparse' on Python 2.6
 import sys
+from functools import total_ordering
+from pkg_resources import parse_version
 
-try:
-    # Prefer newer `packaging` over deprecated packages.
-    from packaging.version import Version as Version
-    from packaging.version import parse as parse_version
-except ImportError:
-    # Fallback to deprecated pkg_resources.
-    try:
-        from pkg_resources.extern.packaging.version import Version  # type: ignore
-        from pkg_resources import parse_version
-    except ImportError:
-        # Fallback to deprecated distutils.
-        from distutils.version import LooseVersion as Version
-        from distutils.version import LooseVersion as parse_version
+
+@total_ordering
+class Version:
+    def __init__(self):
+        self.major = ''
+        self.minor = ''
+        self.micro = ''
+        self.prerelease = ''
+
+    @property
+    def full_no_pre(self):
+        return '.'.join(map(str, (self.major, self.minor, self.micro)))
+
+    @property
+    def full_pre(self):
+        if self.prerelease:
+            return self.full_no_pre + '-' + self.prerelease
+        else:
+            return self.full_no_pre
+
+    @classmethod
+    def from_string(cls, s):
+        v = cls()
+        pat = r'(\d+)\.(\d+)\.(\d+)(\-\S+)?'
+        match = re.match(pat, s)
+        assert match, "Unrecognized version string %s" % s
+        v.major, v.minor, v.micro = (
+            map(int, (match.group(1), match.group(2), match.group(3))))
+
+        if match.group(4):
+            v.prerelease = match.group(4)[1:]
+
+        return v
+
+    @classmethod
+    def is_version_str(cls, s):
+        try:
+            cls.from_string(s)
+            return True
+        except Exception:
+            return False
+
+    def as_dict(self):
+        return {'major': self.major,
+                'minor': self.minor,
+                'micro': self.micro,
+                'prerelease': self.prerelease,
+                'full': str(self)}
+
+    def copy(self):
+        v = Version()
+        v.major = self.major
+        v.minor = self.minor
+        v.micro = self.micro
+        v.prerelease = self.prerelease
+        return v
+
+    def __str__(self):
+        s = '%s.%s.%s' % (self.major, self.minor, self.micro)
+        if self.prerelease:
+            s += '-' + self.prerelease
+        return s
+
+    def __getitem__(self, item):
+        return self.as_dict()[item]
+
+    def __lt__(self, other):
+        self_parsed = parse_version(str(self))
+        other_parsed = parse_version(str(other))
+        return self_parsed < other_parsed
+
+    def __eq__(self, other):
+        self_tuple = self.major, self.minor, self.micro, self.prerelease
+        other_tuple = other.major, other.minor, other.micro, other.prerelease
+        return self_tuple == other_tuple
+
+
+def parse_version(ver):
+    return Version.from_string(ver)
+
 
 parser = optparse.OptionParser(description=__doc__)
 parser.add_option("--debug", "-d", action="store_true",
