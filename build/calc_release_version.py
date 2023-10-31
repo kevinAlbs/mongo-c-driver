@@ -46,10 +46,8 @@ import re
 import subprocess
 import optparse  # No 'argparse' on Python 2.6
 import sys
-from functools import total_ordering
 
 
-@total_ordering
 class Version:
     def __init__(self):
         self.major = ''
