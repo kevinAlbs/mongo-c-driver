@@ -49,23 +49,6 @@ import sys
 
 
 class Version:
-    def __init__(self):
-        self.major = ''
-        self.minor = ''
-        self.micro = ''
-        self.prerelease = ''
-
-    @property
-    def full_no_pre(self):
-        return '.'.join(map(str, (self.major, self.minor, self.micro)))
-
-    @property
-    def full_pre(self):
-        if self.prerelease:
-            return self.full_no_pre + '-' + self.prerelease
-        else:
-            return self.full_no_pre
-
     @classmethod
     def from_string(cls, s):
         v = cls()
@@ -79,38 +62,6 @@ class Version:
             v.prerelease = match.group(4)[1:]
 
         return v
-
-    @classmethod
-    def is_version_str(cls, s):
-        try:
-            cls.from_string(s)
-            return True
-        except Exception:
-            return False
-
-    def as_dict(self):
-        return {'major': self.major,
-                'minor': self.minor,
-                'micro': self.micro,
-                'prerelease': self.prerelease,
-                'full': str(self)}
-
-    def copy(self):
-        v = Version()
-        v.major = self.major
-        v.minor = self.minor
-        v.micro = self.micro
-        v.prerelease = self.prerelease
-        return v
-
-    def __str__(self):
-        s = '%s.%s.%s' % (self.major, self.minor, self.micro)
-        if self.prerelease:
-            s += '-' + self.prerelease
-        return s
-
-    def __getitem__(self, item):
-        return self.as_dict()[item]
 
     def __lt__(self, other):
         if self.major != other.major:
