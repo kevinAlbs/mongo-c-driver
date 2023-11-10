@@ -4254,6 +4254,31 @@ test_failure_to_auth (void)
    mongoc_client_destroy (client);
    mongoc_uri_destroy (uri);
 }
+
+// Regression test for CDRIVER-4781.
+static void
+test_timeout_msec_exceeds (void)
+{
+   bson_error_t error;
+   mongoc_uri_t *uri = test_framework_get_uri ();
+   mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_SOCKETTIMEOUTMS, -1);
+   mongoc_client_t *client =
+      mongoc_client_new_from_uri_with_error (uri, &error);
+   ASSERT_OR_PRINT (client, error);
+   test_framework_set_ssl_opts (client);
+   bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
+   bool ok =
+      mongoc_client_command_simple (client, "db", ping, NULL, NULL, &error);
+   // On commit abb0bb7da8230d342dac5061623c1e4936ed46d9, results in error:
+   // "timeout_msec value 4294967295 exceeds supported 32-bit range"
+   // On prior commit 3e8a24311c21917420fd7fd2b00637deb4b168ce, results in
+   // success.
+   ASSERT_OR_PRINT (ok, error);
+   bson_destroy (ping);
+   mongoc_client_destroy (client);
+   mongoc_uri_destroy (uri);
+}
+
 void
 test_client_install (TestSuite *suite)
 {
@@ -4568,4 +4593,6 @@ test_client_install (TestSuite *suite)
       "/Client/resends_handshake_on_network_error",
       test_mongoc_client_resends_handshake_on_network_error);
    TestSuite_Add (suite, "/Client/failure_to_auth", test_failure_to_auth);
+   TestSuite_AddLive (
+      suite, "/timeout_msec_exceeds", test_timeout_msec_exceeds);
 }
