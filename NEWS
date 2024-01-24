@@ -1,3 +1,20 @@
+libmongoc 1.26.0
+================
+
+This is a test release done on a fork for CDRIVER-4809
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Kevin Albertson
+  * Jeremy Mikola
+  * Adrian Dole
+  * Kyle Kloberdanz
+  * Roberto C. Sánchez
+  * Ezra Chung
+  * itrofimow
+
+
+
 libmongoc 1.25.4
 ================
 
