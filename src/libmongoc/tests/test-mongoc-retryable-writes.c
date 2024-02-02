@@ -8,6 +8,7 @@
 #include "mock_server/future.h"
 #include "mock_server/future-functions.h"
 #include "json-test-operations.h"
+#include "test-mongoc-retryability-helpers.h"
 
 
 static bool
@@ -924,6 +925,449 @@ test_bulk_retry_tracks_new_server (void *unused)
    mongoc_client_destroy (client);
 }
 
+typedef struct _test_retry_writes_sharded_on_other_mongos_ctx {
+   int count;
+   uint16_t ports[2];
+} test_retry_writes_sharded_on_other_mongos_ctx;
+
+static void
+_test_retry_writes_sharded_on_other_mongos_cb (
+   const mongoc_apm_command_failed_t *event)
+{
+   BSON_ASSERT_PARAM (event);
+
+   test_retry_writes_sharded_on_other_mongos_ctx *const ctx =
+      (test_retry_writes_sharded_on_other_mongos_ctx *)
+         mongoc_apm_command_failed_get_context (event);
+   BSON_ASSERT (ctx);
+
+   ASSERT_WITH_MSG (ctx->count < 2,
+                    "expected at most two failpoints to trigger");
+
+   const mongoc_host_list_t *const host =
+      mongoc_apm_command_failed_get_host (event);
+   BSON_ASSERT (host);
+   BSON_ASSERT (!host->next);
+   ctx->ports[ctx->count++] = host->port;
+}
+
+// Test that in a sharded cluster writes are retried on a different mongos if
+// one available.
+static void
+retryable_writes_sharded_on_other_mongos (void *_ctx)
+{
+   BSON_UNUSED (_ctx);
+
+   bson_error_t error = {0};
+
+   // This test MUST be executed against a sharded cluster that has at least two
+   // mongos instances. Ensure that a test is run against a sharded cluster that
+   // has at least two mongoses. If there are more than two mongoses in the
+   // cluster, pick two to test against.
+   const test_get_two_mongos_clients_result_t clients =
+      _test_get_two_mongos_clients ();
+   mongoc_client_t *const s0 = clients.s0;
+   mongoc_client_t *const s1 = clients.s1;
+   BSON_ASSERT (s0 && s1);
+
+
+   // Deprioritization cannot be deterministically asserted by this test due to
+   // randomized selection from suitable servers. Repeat the test a few times to
+   // increase the likelihood of detecting incorrect deprioritization behavior.
+   for (int i = 0; i < 10; ++i) {
+      // Create a client per mongos using the direct connection, and configure
+      // the following fail point on each mongos: ...
+      //
+      // Note: `connectionClosed: false` is deliberately omitted to prevent SDAM
+      // error handling behavior from marking server as the Unknown due to a
+      // network error, which does not allow it to be a suitable server to be
+      // deprioritized during server selection.
+      {
+         bson_t *const command =
+            tmp_bson ("{"
+                      "  'configureFailPoint': 'failCommand',"
+                      "  'mode': { 'times': 1 },"
+                      "  'data': {"
+                      "    'failCommands': ['insert'],"
+                      "    'errorCode': 6,"
+                      "    'errorLabels': ['RetryableWriteError']"
+                      "  }"
+                      "}");
+
+         ASSERT_OR_PRINT (mongoc_client_command_simple (
+                             s0, "admin", command, NULL, NULL, &error),
+                          error);
+         ASSERT_OR_PRINT (mongoc_client_command_simple (
+                             s1, "admin", command, NULL, NULL, &error),
+                          error);
+      }
+
+      // Ensure consistent insert command behavior.
+      {
+         mongoc_database_t *const db = mongoc_client_get_database (s0, "db");
+         mongoc_collection_t *const coll =
+            mongoc_database_get_collection (db, "test");
+         bson_t opts = BSON_INITIALIZER;
+         {
+            // Ensure drop is observed later.
+            mongoc_write_concern_t *const wc = mongoc_write_concern_new ();
+            mongoc_write_concern_set_wmajority (wc, 0);
+            mongoc_write_concern_append (wc, &opts);
+            mongoc_write_concern_destroy (wc);
+         }
+         ASSERT_OR_PRINT (
+            mongoc_collection_drop_with_opts (coll, &opts, &error), error);
+         bson_destroy (&opts);
+         mongoc_collection_destroy (coll);
+         mongoc_database_destroy (db);
+      }
+
+      // Create a client with `retryWrites=true` that connects to the cluster,
+      // providing the two selected mongoses as seeds.
+      mongoc_client_t *client = NULL;
+      {
+         const char *const host_and_port =
+            "mongodb://localhost:27017,localhost:27018/?retryWrites=true";
+         char *const uri_str =
+            test_framework_add_user_password_from_env (host_and_port);
+         mongoc_uri_t *const uri = mongoc_uri_new (uri_str);
+
+         client = mongoc_client_new_from_uri_with_error (uri, &error);
+         ASSERT_OR_PRINT (client, error);
+
+         mongoc_uri_destroy (uri);
+         bson_free (uri_str);
+      }
+      BSON_ASSERT (client);
+
+      // Enable command monitoring, and execute a write command that is supposed
+      // to fail on both mongoses.
+      {
+         test_retry_writes_sharded_on_other_mongos_ctx ctx = {0};
+
+         {
+            mongoc_apm_callbacks_t *const callbacks =
+               mongoc_apm_callbacks_new ();
+            mongoc_apm_set_command_failed_cb (
+               callbacks, _test_retry_writes_sharded_on_other_mongos_cb);
+            mongoc_client_set_apm_callbacks (client, callbacks, &ctx);
+            mongoc_apm_callbacks_destroy (callbacks);
+         }
+
+         {
+            mongoc_database_t *const db =
+               mongoc_client_get_database (client, "db");
+            mongoc_collection_t *const coll =
+               mongoc_database_get_collection (db, "test");
+            bson_t opts = BSON_INITIALIZER;
+            {
+               // Ensure drop from earlier is observed.
+               mongoc_read_concern_t *const rc = mongoc_read_concern_new ();
+               mongoc_read_concern_set_level (
+                  rc, MONGOC_READ_CONCERN_LEVEL_MAJORITY);
+               mongoc_read_concern_append (rc, &opts);
+               mongoc_read_concern_destroy (rc);
+            }
+            ASSERT_WITH_MSG (
+               !mongoc_collection_insert_one (
+                  coll, tmp_bson ("{'x': 1}"), &opts, NULL, &error),
+               "expected insert command to fail");
+            bson_destroy (&opts);
+            mongoc_collection_destroy (coll);
+            mongoc_database_destroy (db);
+         }
+
+         // Assert that there were failed command events from each mongos.
+         ASSERT_WITH_MSG (
+            ctx.count == 2,
+            "expected exactly 2 failpoints to trigger, but observed %d",
+            ctx.count);
+
+         // Note: deprioritization cannot be deterministically asserted by this
+         // test due to randomized selection from suitable servers.
+         ASSERT_WITH_MSG ((ctx.ports[0] == 27017 || ctx.ports[0] == 27018) &&
+                             (ctx.ports[1] == 27017 || ctx.ports[1] == 27018) &&
+                             (ctx.ports[0] != ctx.ports[1]),
+                          "expected failpoints to trigger once on each mongos, "
+                          "but observed failures on %d and %d",
+                          ctx.ports[0],
+                          ctx.ports[1]);
+
+         mongoc_client_destroy (client);
+      }
+
+      // Disable the fail points.
+      {
+         bson_t *const command =
+            tmp_bson ("{"
+                      "  'configureFailPoint': 'failCommand',"
+                      "  'mode': 'off'"
+                      "}");
+
+         ASSERT_OR_PRINT (mongoc_client_command_simple (
+                             s0, "admin", command, NULL, NULL, &error),
+                          error);
+         ASSERT_OR_PRINT (mongoc_client_command_simple (
+                             s1, "admin", command, NULL, NULL, &error),
+                          error);
+      }
+   }
+
+   mongoc_client_destroy (s0);
+   mongoc_client_destroy (s1);
+}
+
+typedef struct _test_retry_writes_sharded_on_same_mongos_ctx {
+   int failed_count;
+   int succeeded_count;
+   uint16_t failed_port;
+   uint16_t succeeded_port;
+} test_retry_writes_sharded_on_same_mongos_ctx;
+
+static void
+_test_retry_writes_sharded_on_same_mongos_cb (
+   test_retry_writes_sharded_on_same_mongos_ctx *ctx,
+   const mongoc_apm_command_failed_t *failed,
+   const mongoc_apm_command_succeeded_t *succeeded)
+{
+   BSON_ASSERT_PARAM (ctx);
+   BSON_ASSERT (failed || true);
+   BSON_ASSERT (succeeded || true);
+
+   ASSERT_WITH_MSG (
+      ctx->failed_count < 2 && ctx->succeeded_count < 2,
+      "expected at most two events, but observed %d failed and %d succeeded",
+      ctx->failed_count,
+      ctx->succeeded_count);
+
+   if (failed) {
+      ctx->failed_count += 1;
+
+      const mongoc_host_list_t *const host =
+         mongoc_apm_command_failed_get_host (failed);
+      BSON_ASSERT (host);
+      BSON_ASSERT (!host->next);
+      ctx->failed_port = host->port;
+   }
+
+   if (succeeded) {
+      ctx->succeeded_count += 1;
+
+      const mongoc_host_list_t *const host =
+         mongoc_apm_command_succeeded_get_host (succeeded);
+      BSON_ASSERT (host);
+      BSON_ASSERT (!host->next);
+      ctx->succeeded_port = host->port;
+   }
+}
+
+static void
+_test_retry_writes_sharded_on_same_mongos_failed_cb (
+   const mongoc_apm_command_failed_t *event)
+{
+   _test_retry_writes_sharded_on_same_mongos_cb (
+      mongoc_apm_command_failed_get_context (event), event, NULL);
+}
+
+static void
+_test_retry_writes_sharded_on_same_mongos_succeeded_cb (
+   const mongoc_apm_command_succeeded_t *event)
+{
+   _test_retry_writes_sharded_on_same_mongos_cb (
+      mongoc_apm_command_succeeded_get_context (event), NULL, event);
+}
+
+// Test that in a sharded cluster on the same mongos if no other is available.
+static void
+retryable_writes_sharded_on_same_mongos (void *_ctx)
+{
+   BSON_UNUSED (_ctx);
+
+   bson_error_t error = {0};
+
+   // Ensure that a test is run against a sharded cluster. If there are multiple
+   // mongoses in the cluster, pick one to test against.
+   //
+   // Note: deliberately requiring *two* servers to ensure a Sharded topology,
+   // as only one server is considered a Single toplogy by libmongoc.
+   const test_get_two_mongos_clients_result_t clients =
+      _test_get_two_mongos_clients ();
+   mongoc_client_t *const s0 = clients.s0;
+   mongoc_client_t *const s1 = clients.s1;
+   BSON_ASSERT (s0 && s1);
+
+   // Deprioritization cannot be deterministically asserted by this test due to
+   // randomized selection from suitable servers. Repeat the test a few times to
+   // increase the likelihood of detecting incorrect deprioritization behavior.
+   for (int i = 0; i < 10; ++i) {
+      // Ensure consistent insert command results.
+      {
+         mongoc_database_t *const db = mongoc_client_get_database (s0, "db");
+         mongoc_collection_t *const coll =
+            mongoc_database_get_collection (db, "test");
+         bson_t opts = BSON_INITIALIZER;
+         {
+            // Ensure drop is observed later.
+            mongoc_write_concern_t *const wc = mongoc_write_concern_new ();
+            mongoc_write_concern_set_wmajority (wc, 0);
+            mongoc_write_concern_append (wc, &opts);
+            mongoc_write_concern_destroy (wc);
+         }
+         ASSERT_OR_PRINT (
+            mongoc_collection_drop_with_opts (coll, &opts, &error), error);
+         bson_destroy (&opts);
+         mongoc_collection_destroy (coll);
+         mongoc_database_destroy (db);
+      }
+
+      // Create a client that connects to the mongos using the direct
+      // connection, and configure the following fail point on the mongos: ...
+      //
+      // Note: `connectionClosed: false` is deliberately omitted to prevent SDAM
+      // error handling behavior from marking server as the Unknown due to a
+      // network error, which does not allow it to be a suitable server to be
+      // deprioritized during server selection.
+      ASSERT_OR_PRINT (mongoc_client_command_simple (
+                          s0,
+                          "admin",
+                          tmp_bson ("{"
+                                    "  'configureFailPoint': 'failCommand',"
+                                    "  'mode': { 'times': 1 },"
+                                    "  'data': {"
+                                    "    'failCommands': ['insert'],"
+                                    "    'errorCode': 6,"
+                                    "    'errorLabels': ['RetryableWriteError']"
+                                    "  }"
+                                    "}"),
+                          NULL,
+                          NULL,
+                          &error),
+                       error);
+
+      // Create a client with `retryWrites=true` that connects to the cluster,
+      // providing the selected mongos as the seed.
+      mongoc_client_t *client = NULL;
+      {
+         // Note: deliberately add `directConnection=false` to URI options to
+         // prevent initializing the topology as single.
+         const char *const host_and_port =
+            "mongodb://localhost:27017/"
+            "?retryWrites=true&directConnection=false";
+         char *const uri_str =
+            test_framework_add_user_password_from_env (host_and_port);
+         mongoc_uri_t *const uri = mongoc_uri_new (uri_str);
+
+         client = mongoc_client_new_from_uri_with_error (uri, &error);
+         ASSERT_OR_PRINT (client, error);
+
+         // Trigger a connection to update topology.
+         ASSERT_OR_PRINT (
+            mongoc_client_command_simple (
+               client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error),
+            error);
+
+         // Ensure the topology is actually sharded so that server
+         // deprioritization code paths are triggered.
+         {
+            mc_shared_tpld tpld = mc_tpld_take_ref (client->topology);
+            ASSERT_WITH_MSG (
+               tpld.ptr->type == MONGOC_TOPOLOGY_SHARDED,
+               "server deprioritization requires a sharded topology");
+            mc_tpld_drop_ref (&tpld);
+         }
+
+         mongoc_uri_destroy (uri);
+         bson_free (uri_str);
+      }
+      BSON_ASSERT (client);
+
+      // Enable command monitoring, and execute a write command that is supposed
+      // to fail.
+      {
+         test_retry_writes_sharded_on_same_mongos_ctx ctx = {
+            .failed_count = 0,
+            .succeeded_count = 0,
+         };
+
+         {
+            mongoc_apm_callbacks_t *const callbacks =
+               mongoc_apm_callbacks_new ();
+            mongoc_apm_set_command_failed_cb (
+               callbacks, _test_retry_writes_sharded_on_same_mongos_failed_cb);
+            mongoc_apm_set_command_succeeded_cb (
+               callbacks,
+               _test_retry_writes_sharded_on_same_mongos_succeeded_cb);
+            mongoc_client_set_apm_callbacks (client, callbacks, &ctx);
+            mongoc_apm_callbacks_destroy (callbacks);
+         }
+
+         {
+            mongoc_database_t *const db =
+               mongoc_client_get_database (client, "db");
+            mongoc_collection_t *const coll =
+               mongoc_database_get_collection (db, "test");
+            bson_t opts = BSON_INITIALIZER;
+            {
+               // Ensure drop from earlier is observed.
+               mongoc_write_concern_t *const wc = mongoc_write_concern_new ();
+               mongoc_write_concern_set_wmajority (wc, 0);
+               mongoc_write_concern_append (wc, &opts);
+               mongoc_write_concern_destroy (wc);
+            }
+            ASSERT_WITH_MSG (
+               mongoc_collection_insert_one (
+                  coll, tmp_bson ("{'x': 1}"), &opts, NULL, &error),
+               "expecting insert to succeed, but observed error: %s",
+               error.message);
+            bson_destroy (&opts);
+            mongoc_collection_destroy (coll);
+            mongoc_database_destroy (db);
+         }
+
+         // Asserts that there was a failed command and a successful command
+         // event.
+         ASSERT_WITH_MSG (ctx.failed_count == 1 && ctx.succeeded_count == 1,
+                          "expected exactly one failed event and one succeeded "
+                          "event, but observed %d failures and %d successes",
+                          ctx.failed_count,
+                          ctx.succeeded_count);
+
+         // Cannot distinguish "server deprioritization occurred and was
+         // reverted due to no other suitable servers" from "only a single
+         // suitable server (no deprioritization)" using only observable
+         // behavior. This is primarily a regression test. Inspect trace logs or
+         // use a debugger to verify correct code paths are triggered.
+         ASSERT_WITH_MSG (
+            ctx.failed_port == ctx.succeeded_port,
+            "expected failed and succeeded events on the same mongos, but "
+            "instead observed port %d (failed) and port %d (succeeded)",
+            ctx.failed_port,
+            ctx.succeeded_port);
+
+         mongoc_client_set_apm_callbacks (client, NULL, NULL);
+      }
+
+      mongoc_client_destroy (client);
+
+      // Disable the fail point.
+      ASSERT_OR_PRINT (mongoc_client_command_simple (
+                          s0,
+                          "admin",
+                          tmp_bson ("{"
+                                    "  'configureFailPoint': 'failCommand',"
+                                    "  'mode': 'off'"
+                                    "}"),
+                          NULL,
+                          NULL,
+                          &error),
+                       error);
+   }
+
+   mongoc_client_destroy (s0);
+   mongoc_client_destroy (s1);
+}
+
+
 void
 test_retryable_writes_install (TestSuite *suite)
 {
@@ -1000,5 +1444,25 @@ test_retryable_writes_install (TestSuite *suite)
                       NULL,
                       test_framework_skip_if_not_replset,
                       test_framework_skip_if_max_wire_version_less_than_17,
+                      test_framework_skip_if_no_crypto);
+   TestSuite_AddFull (suite,
+                      "/retryable_writes/prose_test_4",
+                      retryable_writes_sharded_on_other_mongos,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_not_mongos,
+                      test_framework_skip_if_no_failpoint,
+                      // `errorLabels` is a 4.3.1+ feature.
+                      test_framework_skip_if_max_wire_version_less_than_9,
+                      test_framework_skip_if_no_crypto);
+   TestSuite_AddFull (suite,
+                      "/retryable_writes/prose_test_5",
+                      retryable_writes_sharded_on_same_mongos,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_not_mongos,
+                      test_framework_skip_if_no_failpoint,
+                      // `errorLabels` is a 4.3.1+ feature.
+                      test_framework_skip_if_max_wire_version_less_than_9,
                       test_framework_skip_if_no_crypto);
 }
