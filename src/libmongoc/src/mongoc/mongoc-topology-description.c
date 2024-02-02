@@ -998,16 +998,16 @@ mongoc_topology_description_select (
    mongoc_ss_optype_t optype,
    const mongoc_read_prefs_t *read_pref,
    bool *must_use_primary,
+   const mongoc_deprioritized_servers_t *ds,
    int64_t local_threshold_ms)
 {
    mongoc_array_t suitable_servers;
-   mongoc_server_description_t const *sd = NULL;
-   int rand_n;
 
    ENTRY;
 
    if (topology->type == MONGOC_TOPOLOGY_SINGLE) {
-      sd = mongoc_set_get_item_const (mc_tpld_servers_const (topology), 0);
+      mongoc_server_description_t const *const sd =
+         mongoc_set_get_item_const (mc_tpld_servers_const (topology), 0);
 
       if (optype == MONGOC_SS_AGGREGATE_WITH_WRITE &&
           sd->max_wire_version < WIRE_VERSION_5_0) {
@@ -1036,11 +1036,57 @@ mongoc_topology_description_select (
                                                  read_pref,
                                                  must_use_primary,
                                                  local_threshold_ms);
+
+   // Server Selection Spec: If a list of deprioritized servers is provided, and
+   // the topology is a sharded cluster, these servers should be selected only
+   // if there are no other suitable servers. The server selection algorithm
+   // MUST ignore the deprioritized servers if the topology is not a sharded
+   // cluster.
+   if (ds && topology->type == MONGOC_TOPOLOGY_SHARDED) {
+      TRACE ("%s", "deprioritization: filtering list of candidates");
+
+      mongoc_array_t filtered_servers;
+      _mongoc_array_init (&filtered_servers,
+                          sizeof (mongoc_server_description_t *));
+
+      for (size_t idx = 0u; idx < suitable_servers.len; ++idx) {
+         mongoc_server_description_t const *const sd = _mongoc_array_index (
+            &suitable_servers, mongoc_server_description_t *, idx);
+
+         if (!mongoc_deprioritized_servers_contains (ds, sd)) {
+            TRACE ("deprioritization: - kept: %s (id: %" PRIu32 ")",
+                   sd->host.host_and_port,
+                   sd->id);
+            _mongoc_array_append_val (&filtered_servers, sd);
+         } else {
+            TRACE ("deprioritization: - removed: %s (id: %" PRIu32 ")",
+                   sd->host.host_and_port,
+                   sd->id);
+         }
+      }
+
+      if (filtered_servers.len == 0u) {
+         TRACE ("%s",
+                "deprioritization: reverted due to no other suitable servers");
+         _mongoc_array_destroy (&filtered_servers);
+      } else if (filtered_servers.len == suitable_servers.len) {
+         TRACE ("%s", "deprioritization: none found in list of candidates");
+         _mongoc_array_destroy (&filtered_servers);
+      } else {
+         TRACE ("%s", "deprioritization: using filtered list of candidates");
+         _mongoc_array_destroy (&suitable_servers);
+         suitable_servers = filtered_servers; // Ownership transfer.
+      }
+   }
+
+   mongoc_server_description_t const *sd = NULL;
+
    if (suitable_servers.len != 0) {
-      rand_n = _mongoc_rand_simple ((unsigned *) &topology->rand_seed);
+      const int rand_n =
+         _mongoc_rand_simple ((unsigned *) &topology->rand_seed);
       sd = _mongoc_array_index (&suitable_servers,
                                 mongoc_server_description_t *,
-                                rand_n % suitable_servers.len);
+                                (size_t) rand_n % suitable_servers.len);
    }
 
    _mongoc_array_destroy (&suitable_servers);
@@ -2328,7 +2374,7 @@ mongoc_topology_description_has_readable_server (
 
    /* local threshold argument doesn't matter */
    return mongoc_topology_description_select (
-             td, MONGOC_SS_READ, prefs, NULL, 0) != NULL;
+             td, MONGOC_SS_READ, prefs, NULL, NULL, 0) != NULL;
 }
 
 /*
@@ -2355,7 +2401,7 @@ mongoc_topology_description_has_writable_server (
    }
 
    return mongoc_topology_description_select (
-             td, MONGOC_SS_WRITE, NULL, NULL, 0) != NULL;
+             td, MONGOC_SS_WRITE, NULL, NULL, NULL, 0) != NULL;
 }
 
 /*
@@ -2601,4 +2647,22 @@ _mongoc_topology_description_clear_connection_pool (
    TRACE ("clearing pool for server: %s", sd->host.host_and_port);
 
    mc_tpl_sd_increment_generation (sd, service_id);
+}
+
+
+void
+mongoc_deprioritized_servers_add_if_sharded (
+   mongoc_deprioritized_servers_t *ds,
+   mongoc_topology_description_type_t topology_type,
+   const mongoc_server_description_t *sd)
+{
+   // In a sharded cluster, the server on which the operation failed MUST
+   // be provided to the server selection mechanism as a deprioritized
+   // server.
+   if (topology_type == MONGOC_TOPOLOGY_SHARDED) {
+      TRACE ("deprioritization: add to set: %s (id: %" PRIu32 ")",
+             sd->host.host_and_port,
+             sd->id);
+      mongoc_deprioritized_servers_add (ds, sd);
+   }
 }
