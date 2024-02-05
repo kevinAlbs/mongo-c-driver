@@ -260,6 +260,266 @@ test_bulkWrite_qe (void *unused)
 }
 
 static void
+test_bulkWrite_qe_bypassAutoEncryption (void *unused)
+{
+   BSON_UNUSED (unused);
+   bson_error_t error;
+   mongoc_client_t *unencryptedClient = test_framework_new_default_client ();
+
+   // Do test setup.
+   mongoc_client_t *encryptedClient;
+   mongoc_client_encryption_t *ce;
+   bson_value_t keyid;
+   {
+      bson_t *kms_providers = make_kms_providers ();
+
+      // Drop previous key vault collection (if exists).
+      {
+         mongoc_collection_t *key_vault_coll = mongoc_client_get_collection (
+            unencryptedClient, "keyvault", "datakeys");
+         mongoc_collection_drop (key_vault_coll, NULL); // Ignore error.
+         mongoc_collection_destroy (key_vault_coll);
+      }
+
+      // Create ClientEncryption object.
+      {
+         mongoc_client_encryption_opts_t *ceo =
+            mongoc_client_encryption_opts_new ();
+         mongoc_client_encryption_opts_set_keyvault_client (ceo,
+                                                            unencryptedClient);
+         mongoc_client_encryption_opts_set_kms_providers (ceo, kms_providers);
+         mongoc_client_encryption_opts_set_keyvault_namespace (
+            ceo, "keyvault", "datakeys");
+         ce = mongoc_client_encryption_new (ceo, &error);
+         ASSERT_OR_PRINT (ce, error);
+         mongoc_client_encryption_opts_destroy (ceo);
+      }
+
+      // Create Data Encryption Key (DEK).
+
+      {
+         mongoc_client_encryption_datakey_opts_t *dko =
+            mongoc_client_encryption_datakey_opts_new ();
+         bool ok = mongoc_client_encryption_create_datakey (
+            ce, "local", dko, &keyid, &error);
+         ASSERT_OR_PRINT (ok, error);
+         mongoc_client_encryption_datakey_opts_destroy (dko);
+      }
+
+
+      // Drop previous QE collection (if exists).
+      {
+         mongoc_collection_t *coll =
+            mongoc_client_get_collection (unencryptedClient, "db", "coll");
+         bson_t *ef = make_encrypted_fields (&keyid);
+         bson_t *dopts = BCON_NEW ("encryptedFields", BCON_DOCUMENT (ef));
+         bool ok = mongoc_collection_drop_with_opts (coll, dopts, &error);
+         ASSERT_OR_PRINT (ok, error);
+         bson_destroy (dopts);
+         mongoc_collection_destroy (coll);
+      }
+
+      // Create Queryable Encryption (QE) collection.
+      {
+         mongoc_database_t *db =
+            mongoc_client_get_database (unencryptedClient, "db");
+         bson_t *ef = make_encrypted_fields (&keyid);
+         bson_t *ccopts = BCON_NEW ("encryptedFields", BCON_DOCUMENT (ef));
+         mongoc_collection_t *coll =
+            mongoc_database_create_collection (db, "coll", ccopts, &error);
+         ASSERT_OR_PRINT (coll, error);
+         mongoc_collection_destroy (coll);
+         bson_destroy (ccopts);
+         mongoc_database_destroy (db);
+      }
+
+      // Create client with QE enabled, but bypassing query analysis.
+      {
+         mongoc_auto_encryption_opts_t *ao = mongoc_auto_encryption_opts_new ();
+         mongoc_auto_encryption_opts_set_kms_providers (ao, kms_providers);
+         mongoc_auto_encryption_opts_set_keyvault_namespace (
+            ao, "keyvault", "datakeys");
+         mongoc_auto_encryption_opts_set_bypass_query_analysis (ao, true);
+         encryptedClient = test_framework_new_default_client ();
+
+         bool ok =
+            mongoc_client_enable_auto_encryption (encryptedClient, ao, &error);
+         ASSERT_OR_PRINT (ok, error);
+         mongoc_auto_encryption_opts_destroy (ao);
+      }
+   }
+
+   // Explicitly encrypt values to insert.
+   bson_t to_insert1 = BSON_INITIALIZER;
+   bson_t to_insert2 = BSON_INITIALIZER;
+   {
+      mongoc_client_encryption_encrypt_opts_t *eo =
+         mongoc_client_encryption_encrypt_opts_new ();
+      mongoc_client_encryption_encrypt_opts_set_contention_factor (eo, 0);
+      mongoc_client_encryption_encrypt_opts_set_algorithm (eo, "Indexed");
+      mongoc_client_encryption_encrypt_opts_set_keyid (eo, &keyid);
+
+      {
+         bson_value_t plaintext = {
+            .value_type = BSON_TYPE_UTF8,
+            .value = {.v_utf8 = {.len = 3, .str = "foo"}}};
+         bson_value_t ciphertext;
+         bool ok = mongoc_client_encryption_encrypt (
+            ce, &plaintext, eo, &ciphertext, &error);
+         ASSERT_OR_PRINT (ok, error);
+         BSON_APPEND_VALUE (&to_insert1, "encryptedIndexed", &ciphertext);
+         bson_value_destroy (&ciphertext);
+      }
+
+      {
+         bson_value_t plaintext = {
+            .value_type = BSON_TYPE_UTF8,
+            .value = {.v_utf8 = {.len = 3, .str = "bar"}}};
+         bson_value_t ciphertext;
+         bool ok = mongoc_client_encryption_encrypt (
+            ce, &plaintext, eo, &ciphertext, &error);
+         ASSERT_OR_PRINT (ok, error);
+         BSON_APPEND_VALUE (&to_insert2, "encryptedIndexed", &ciphertext);
+         bson_value_destroy (&ciphertext);
+      }
+
+      mongoc_client_encryption_encrypt_opts_destroy (eo);
+   }
+
+   // Explicitly encrypt value to find.
+   bson_t to_find1 = BSON_INITIALIZER;
+   {
+      mongoc_client_encryption_encrypt_opts_t *eo =
+         mongoc_client_encryption_encrypt_opts_new ();
+      mongoc_client_encryption_encrypt_opts_set_contention_factor (eo, 0);
+      mongoc_client_encryption_encrypt_opts_set_algorithm (eo, "Indexed");
+      mongoc_client_encryption_encrypt_opts_set_query_type (eo, "equality");
+      mongoc_client_encryption_encrypt_opts_set_keyid (eo, &keyid);
+
+      {
+         bson_value_t plaintext = {
+            .value_type = BSON_TYPE_UTF8,
+            .value = {.v_utf8 = {.len = 3, .str = "foo"}}};
+         bson_value_t ciphertext;
+         bool ok = mongoc_client_encryption_encrypt (
+            ce, &plaintext, eo, &ciphertext, &error);
+         ASSERT_OR_PRINT (ok, error);
+         BSON_APPEND_VALUE (&to_find1, "encryptedIndexed", &ciphertext);
+         bson_value_destroy (&ciphertext);
+      }
+
+      mongoc_client_encryption_encrypt_opts_destroy (eo);
+   }
+
+   // Verify setup.
+   {
+      // Insert document with encrypted client.
+      {
+         mongoc_collection_t *coll =
+            mongoc_client_get_collection (encryptedClient, "db", "coll");
+         bson_t reply;
+         bool ok = mongoc_collection_insert_one (
+            coll, &to_insert1, NULL, &reply, &error);
+         ASSERT_OR_PRINT (ok, error);
+         mongoc_collection_destroy (coll);
+      }
+
+
+      // Find document with unencrypted client to verify it is encrypted.
+      {
+         mongoc_collection_t *coll =
+            mongoc_client_get_collection (unencryptedClient, "db", "coll");
+         const bson_t *doc;
+         mongoc_cursor_t *cursor = mongoc_collection_find_with_opts (
+            coll, tmp_bson ("{}"), NULL /* opts */, NULL /* read_prefs */);
+         bool has_doc = mongoc_cursor_next (cursor, &doc);
+         ASSERT (has_doc);
+         ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &error), error);
+         bson_iter_t iter;
+         ASSERT (bson_iter_init_find (&iter, doc, "encryptedIndexed"));
+         ASSERT_MATCH (doc, "{'encryptedIndexed': { '$$type': 'binData' }}");
+         mongoc_cursor_destroy (cursor);
+         mongoc_collection_destroy (coll);
+      }
+
+      // Delete document with encrypted client.
+      {
+         mongoc_collection_t *coll =
+            mongoc_client_get_collection (encryptedClient, "db", "coll");
+         bool ok =
+            mongoc_collection_delete_one (coll, &to_find1, NULL, NULL, &error);
+         ASSERT_OR_PRINT (ok, error);
+         mongoc_collection_destroy (coll);
+      }
+   }
+
+   // Run a `bulkWrite` command.
+   {
+      // clang-format off
+      bson_t *cmd = BCON_NEW (
+         "bulkWrite", BCON_INT32(1),
+         "ops", "[", "{", "insert", BCON_INT32(0), "document", BCON_DOCUMENT (&to_insert2), "}", "]",
+         "nsInfo", "[", "{", "ns", "db.coll", "}", "]"
+      );
+      // clang-format on
+      // Use `runCommand` since driver does not yet have a new `bulkWrite`
+      // helper.
+      bool ok = mongoc_client_command_with_opts (encryptedClient,
+                                                 "admin",
+                                                 cmd,
+                                                 NULL /* read prefs */,
+                                                 NULL /* opts */,
+                                                 NULL /* reply */,
+                                                 &error);
+      ASSERT_OR_PRINT (ok, error);
+      bson_destroy (cmd);
+   }
+
+   // Find document with encrypted client to verify it can decrypt.
+   {
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (encryptedClient, "db", "coll");
+      const bson_t *doc;
+      mongoc_cursor_t *cursor = mongoc_collection_find_with_opts (
+         coll, tmp_bson ("{}"), NULL /* opts */, NULL /* read_prefs */);
+      bool has_doc = mongoc_cursor_next (cursor, &doc);
+      ASSERT (has_doc);
+      ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &error), error);
+      bson_iter_t iter;
+      ASSERT (bson_iter_init_find (&iter, doc, "encryptedIndexed"));
+      ASSERT_MATCH (doc, "{'encryptedIndexed': 'bar' }");
+      mongoc_cursor_destroy (cursor);
+      mongoc_collection_destroy (coll);
+   }
+
+   // Find document with unencrypted client to verify it is encrypted.
+   {
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (unencryptedClient, "db", "coll");
+      const bson_t *doc;
+      mongoc_cursor_t *cursor = mongoc_collection_find_with_opts (
+         coll, tmp_bson ("{}"), NULL /* opts */, NULL /* read_prefs */);
+      bool has_doc = mongoc_cursor_next (cursor, &doc);
+      ASSERT (has_doc);
+      ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &error), error);
+      bson_iter_t iter;
+      ASSERT (bson_iter_init_find (&iter, doc, "encryptedIndexed"));
+      ASSERT_MATCH (doc, "{'encryptedIndexed': { '$$type': 'binData' }}");
+      mongoc_cursor_destroy (cursor);
+      mongoc_collection_destroy (coll);
+   }
+
+   bson_destroy (&to_find1);
+   bson_destroy (&to_insert2);
+   bson_destroy (&to_insert1);
+   bson_value_destroy (&keyid);
+   mongoc_client_encryption_destroy (ce);
+   mongoc_client_destroy (encryptedClient);
+   mongoc_client_destroy (unencryptedClient);
+}
+
+
+static void
 test_bulkWrite_csfle (void *unused)
 {
    // Create a schema map.
@@ -282,6 +542,14 @@ test_bulkWrite_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/bulkWrite/qe",
                       test_bulkWrite_qe,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_client_side_encryption
+                      /* TODO: require MongoDB 8.0 */
+   );
+   TestSuite_AddFull (suite,
+                      "/bulkWrite/qe/bypassAutoEncryption",
+                      test_bulkWrite_qe_bypassAutoEncryption,
                       NULL,
                       NULL,
                       test_framework_skip_if_no_client_side_encryption
