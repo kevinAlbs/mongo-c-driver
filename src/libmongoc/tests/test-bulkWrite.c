@@ -186,13 +186,27 @@ test_bulkWrite_qe (void *unused)
          mongoc_cursor_destroy (cursor);
          mongoc_collection_destroy (coll);
       }
+
+      // Delete document with encrypted client.
+      {
+         mongoc_collection_t *coll =
+            mongoc_client_get_collection (encryptedClient, "db", "coll");
+         bool ok = mongoc_collection_delete_one (
+            coll,
+            tmp_bson ("{'encryptedIndexed': 'foo' }"),
+            NULL,
+            NULL,
+            &error);
+         ASSERT_OR_PRINT (ok, error);
+         mongoc_collection_destroy (coll);
+      }
    }
 
    // Run a `bulkWrite` command.
    {
       bson_t *cmd = tmp_bson (BSON_STR ({
          "bulkWrite" : 1,
-         "ops" : [ {"insert" : 0, "document" : {"plainText" : "sample"}} ],
+         "ops" : [ {"insert" : 0, "document" : {"encryptedIndexed" : "bar"}} ],
          "nsInfo" : [ {"ns" : "db.coll"} ]
       }));
       // Use `runCommand` since driver does not yet have a new `bulkWrite`
@@ -205,6 +219,40 @@ test_bulkWrite_qe (void *unused)
                                                  NULL /* reply */,
                                                  &error);
       ASSERT_OR_PRINT (ok, error);
+   }
+
+   // Find document with encrypted client to verify it can decrypt.
+   {
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (encryptedClient, "db", "coll");
+      const bson_t *doc;
+      mongoc_cursor_t *cursor = mongoc_collection_find_with_opts (
+         coll, tmp_bson ("{}"), NULL /* opts */, NULL /* read_prefs */);
+      bool has_doc = mongoc_cursor_next (cursor, &doc);
+      ASSERT (has_doc);
+      ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &error), error);
+      bson_iter_t iter;
+      ASSERT (bson_iter_init_find (&iter, doc, "encryptedIndexed"));
+      ASSERT_MATCH (doc, "{'encryptedIndexed': 'bar' }");
+      mongoc_cursor_destroy (cursor);
+      mongoc_collection_destroy (coll);
+   }
+
+   // Find document with unencrypted client to verify it is encrypted.
+   {
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (unencryptedClient, "db", "coll");
+      const bson_t *doc;
+      mongoc_cursor_t *cursor = mongoc_collection_find_with_opts (
+         coll, tmp_bson ("{}"), NULL /* opts */, NULL /* read_prefs */);
+      bool has_doc = mongoc_cursor_next (cursor, &doc);
+      ASSERT (has_doc);
+      ASSERT_OR_PRINT (!mongoc_cursor_error (cursor, &error), error);
+      bson_iter_t iter;
+      ASSERT (bson_iter_init_find (&iter, doc, "encryptedIndexed"));
+      ASSERT_MATCH (doc, "{'encryptedIndexed': { '$$type': 'binData' }}");
+      mongoc_cursor_destroy (cursor);
+      mongoc_collection_destroy (coll);
    }
 
    mongoc_client_destroy (encryptedClient);
