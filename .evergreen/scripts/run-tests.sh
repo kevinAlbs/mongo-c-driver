@@ -235,6 +235,14 @@ if [[ "${LOADBALANCED}" != "noloadbalanced" ]]; then
   test_args+=("-l" "/command_monitoring/unified/*")
 fi
 
+# Test mongos deprioritization with retryable reads/writes.
+test_args+=(
+  "-l" "/retryable_reads/sharded/on_other_mongos"
+  "-l" "/retryable_reads/sharded/on_same_mongos"
+  "-l" "/retryable_writes/prose_test_4"
+  "-l" "/retryable_writes/prose_test_5"
+)
+
 if [[ ! "${test_args[*]}" =~ "-l" ]]; then
   # /http tests are only run if the set of tests to execute were not limited.
   echo "Waiting for simple HTTP server to start..."
