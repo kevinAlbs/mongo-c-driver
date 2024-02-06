@@ -1034,6 +1034,7 @@ retryable_writes_sharded_on_other_mongos (void *_ctx)
 
          client = mongoc_client_new_from_uri_with_error (uri, &error);
          ASSERT_OR_PRINT (client, error);
+         test_framework_set_ssl_opts (client);
 
          mongoc_uri_destroy (uri);
          bson_free (uri_str);
