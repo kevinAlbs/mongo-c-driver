@@ -266,8 +266,18 @@ _state_need_mongo_collinfo (_state_machine_t *state_machine,
    }
 
    bson_append_document (&opts, "filter", -1, &filter_bson);
-   db = mongoc_client_get_database (state_machine->collinfo_client,
-                                    state_machine->db_name);
+
+   if (mongocrypt_ctx_state (state_machine->ctx) ==
+       MONGOCRYPT_CTX_NEED_MONGO_COLLINFO_WITH_DB) {
+      // Target database may differ from command database.
+      db = mongoc_client_get_database (
+         state_machine->collinfo_client,
+         mongocrypt_ctx_mongo_db (state_machine->ctx));
+   } else {
+      // Use command database.
+      db = mongoc_client_get_database (state_machine->collinfo_client,
+                                       state_machine->db_name);
+   }
    cursor = mongoc_database_find_collections_with_opts (db, &opts);
    if (mongoc_cursor_error (cursor, error)) {
       goto fail;
@@ -1022,6 +1032,7 @@ _state_machine_run (_state_machine_t *state_machine,
          _ctx_check_error (state_machine->ctx, error, true);
          goto fail;
       case MONGOCRYPT_CTX_NEED_MONGO_COLLINFO:
+      case MONGOCRYPT_CTX_NEED_MONGO_COLLINFO_WITH_DB:
          if (!_state_need_mongo_collinfo (state_machine, error)) {
             goto fail;
          }
@@ -1390,6 +1401,9 @@ _mongoc_crypt_new (const bson_t *kms_providers,
 
    // Enable the NEEDS_CREDENTIALS state for on-demand credential loading
    mongocrypt_setopt_use_need_kms_credentials_state (crypt->handle);
+
+   // Enable the NEED_MONGO_COLLINFO_WITH_DB state to support `bulkWrite`
+   mongocrypt_setopt_use_need_mongo_collinfo_with_db_state (crypt->handle);
 
    if (!mongocrypt_init (crypt->handle)) {
       _crypt_check_error (crypt->handle, error, true);
