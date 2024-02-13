@@ -219,6 +219,8 @@ WIRE_VERSION_CHECK_DECLS (19)
 WIRE_VERSION_CHECK_DECLS (21)
 /* wire version 22 begins with the 7.1 release. */
 WIRE_VERSION_CHECK_DECLS (22)
+/* wire version 25 begins with the 8.0 release. */
+WIRE_VERSION_CHECK_DECLS (25)
 
 #undef WIRE_VERSION_CHECK_DECLS
 

@@ -2352,6 +2352,8 @@ WIRE_VERSION_CHECKS (19)
 WIRE_VERSION_CHECKS (21)
 /* wire version 22 begins with the 7.1 release. */
 WIRE_VERSION_CHECKS (22)
+/* wire version 25 begins with the 8.0 release. */
+WIRE_VERSION_CHECKS (25)
 
 int
 test_framework_skip_if_no_dual_ip_hostname (void)
@@ -2480,7 +2482,7 @@ test_framework_skip_if_no_aws (void)
 #ifdef MONGOC_ENABLE_MONGODB_AWS_AUTH
    return 1; /* proceed. */
 #else
-   return 0;    /* do not proceed. */
+   return 0; /* do not proceed. */
 #endif
 }
 
