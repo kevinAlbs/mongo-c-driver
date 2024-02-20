@@ -29,7 +29,7 @@ Parameters
 
 .. warning::
 
-  ``document`` may not contain fields with keys containing ``.`` or ``$``.
+   ``document`` is expected to be a replacmement document (not an update document). For exmample, ``{ "foo": "bar" }`` is a valid replacement document. ``{ "$set": { "foo" : "bar" } }`` is not, and using will result in an error.
 
 Errors
 ------

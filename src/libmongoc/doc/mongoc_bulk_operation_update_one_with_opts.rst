@@ -29,7 +29,7 @@ Parameters
 
 .. warning::
 
-  ``document`` *must only* contain fields whose key starts with ``$``. See the update document specification for more details.
+  ``document`` *must only* contain fields whose key starts with ``$`` (for example, ``{ "$set": { "foo": "bar" } }``). See the `update document specification <https://www.mongodb.com/docs/manual/reference/operator/update/>`_ for more details.
 
 Errors
 ------
