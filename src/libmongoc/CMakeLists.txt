@@ -1085,6 +1085,7 @@ set (test-libmongoc-sources
    ${PROJECT_SOURCE_DIR}/tests/unified/runner.c
    ${PROJECT_SOURCE_DIR}/tests/unified/test-diagnostics.c
    ${PROJECT_SOURCE_DIR}/tests/unified/util.c
+   ${PROJECT_SOURCE_DIR}/tests/test-bulkWrite.c
 )
 
 if (MONGOC_ENABLE_SSL)
