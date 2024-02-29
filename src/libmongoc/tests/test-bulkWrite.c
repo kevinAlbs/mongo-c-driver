@@ -600,15 +600,21 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                }
 
                // Parse optional `errInfo`.
+               bson_t errInfo = BSON_INITIALIZER;
                if (bson_iter_init_find (&result_iter, result, "errInfo")) {
-                  BSON_ASSERT (false &&
-                               "parsing errInfo is not yet implemented");
+                  bson_error_t error;
+                  if (!_mongoc_iter_document_as_bson (
+                         &result_iter, &errInfo, &error)) {
+                     ret.exc = mongoc_bulkwriteexception_new_from_error (
+                        &error, result);
+                  }
                }
 
                // Store a copy of the write error.
                mongoc_write_error_t *we = mongoc_write_error_new ();
                we->code = code;
                we->message = bson_strdup (errmsg);
+               we->details = bson_copy (&errInfo);
                _mongoc_array_append_val (&ret.exc->write_errors, we);
 
                // Mark in the insert so the insert IDs are not reported.
@@ -804,6 +810,67 @@ test_bulkWrite_insert_with_writeError (void *unused)
    mongoc_client_destroy (client);
 }
 
+static void
+test_bulkWrite_insert_with_writeError_with_details (void *unused)
+{
+   BSON_UNUSED (unused);
+   mongoc_client_t *client = test_framework_new_default_client ();
+
+   // Drop prior data.
+   {
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      mongoc_collection_drop (coll, NULL); // Ignore return.
+      mongoc_collection_destroy (coll);
+   }
+
+   // Create collection with a validator.
+   {
+      mongoc_database_t *db = mongoc_client_get_database (client, "db");
+      bson_error_t error;
+      mongoc_collection_t *coll = mongoc_database_create_collection (
+         db,
+         "coll",
+         tmp_bson (BSON_STR (
+            {"validator" : {"$jsonSchema" : {"required" : ["foo"]}}})),
+         &error);
+      ASSERT_OR_PRINT (coll, error);
+      mongoc_collection_destroy (coll);
+      mongoc_database_destroy (db);
+   }
+
+   // Create list of insert models.
+   mongoc_listof_bulkwritemodel_t *lb;
+   {
+      lb = mongoc_listof_bulkwritemodel_new ();
+      bson_error_t error;
+      ASSERT_OR_PRINT (
+         mongoc_listof_bulkwritemodel_append_insertone (
+            lb, "db.coll", -1, tmp_bson ("{'_id': 123 }"), &error),
+         error);
+   }
+
+   // Do the bulk write.
+   mongoc_bulkwritereturn_t br =
+      mongoc_client_bulkwrite (client, lb, NULL /* opts */);
+
+   // Expect an error due to document validation failure
+   {
+      ASSERT (br.exc);
+      const mongoc_write_error_t *we =
+         mongoc_bulkwriteexception_get_writeerror (br.exc, 0);
+      ASSERT (we);
+      ASSERT_CONTAINS (mongoc_write_error_get_message (we),
+                       "Document failed validation");
+      ASSERT_MATCH (mongoc_write_error_get_details (we),
+                    BSON_STR ({"failingDocumentId" : 123}));
+   }
+
+   mongoc_bulkwritereturn_cleanup (&br);
+   mongoc_listof_bulkwritemodel_destroy (lb);
+   mongoc_client_destroy (client);
+}
+
 
 void
 test_bulkWrite_install (TestSuite *suite)
@@ -821,6 +888,15 @@ test_bulkWrite_install (TestSuite *suite)
       suite,
       "/bulkWrite/insert/writeError",
       test_bulkWrite_insert_with_writeError,
+      NULL /* dtor */,
+      NULL /* ctx */,
+      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
+
+   TestSuite_AddFull (
+      suite,
+      "/bulkWrite/insert/writeError/details",
+      test_bulkWrite_insert_with_writeError_with_details,
       NULL /* dtor */,
       NULL /* ctx */,
       test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
