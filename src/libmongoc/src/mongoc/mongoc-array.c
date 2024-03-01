@@ -127,3 +127,30 @@ _mongoc_array_append_vals (mongoc_array_t *array,
 
    array->len += n_elements;
 }
+
+void
+_mongoc_array_resize (mongoc_array_t *array, size_t n_elements)
+{
+   size_t len;
+   size_t new_size;
+
+   BSON_ASSERT (array);
+
+   len = (size_t) n_elements * array->element_size;
+
+   new_size = bson_next_power_of_two (len);
+
+   if (array->element_alignment == 0) {
+      array->data = bson_realloc (array->data, new_size);
+      array->allocated = new_size;
+   } else {
+      void *const old_data = array->data;
+
+      array->data = bson_aligned_alloc (array->element_alignment, new_size);
+      memmove (array->data, old_data, array->allocated);
+      array->allocated = new_size;
+
+      bson_free (old_data);
+   }
+   array->len += n_elements;
+}
