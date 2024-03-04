@@ -1244,6 +1244,7 @@ if (ENABLE_EXAMPLES AND ENABLE_SHARED)
    # examples/tutorial
    mongoc_add_example (executing ${PROJECT_SOURCE_DIR}/examples/tutorial/executing.c)
    mongoc_add_example (appending ${PROJECT_SOURCE_DIR}/examples/tutorial/appending.c)
+   mongoc_add_example (benchmark-bulkWrite ${PROJECT_SOURCE_DIR}/tests/benchmark-bulkWrite.c)
 endif ()
 
 file (COPY ${PROJECT_SOURCE_DIR}/tests/binary DESTINATION ${PROJECT_BINARY_DIR}/tests)
