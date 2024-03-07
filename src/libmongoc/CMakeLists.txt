@@ -657,6 +657,7 @@ set (SOURCES ${SOURCES}
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-stream-tls-openssl-bio.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-openssl.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-ocsp-cache.c
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-bulkwrite.c
 )
 
 set (HEADERS
@@ -712,6 +713,7 @@ set (HEADERS
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-rand.h
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-stream-tls.h
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-ssl.h
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-bulkwrite.h
 )
 
 set (HEADERS_FORWARDING
@@ -1085,7 +1087,8 @@ set (test-libmongoc-sources
    ${PROJECT_SOURCE_DIR}/tests/unified/runner.c
    ${PROJECT_SOURCE_DIR}/tests/unified/test-diagnostics.c
    ${PROJECT_SOURCE_DIR}/tests/unified/util.c
-   ${PROJECT_SOURCE_DIR}/tests/test-bulkWrite.c
+   # ${PROJECT_SOURCE_DIR}/tests/test-bulkWrite.c
+   ${PROJECT_SOURCE_DIR}/tests/test-clientbulkwrite.c
 )
 
 if (MONGOC_ENABLE_SSL)

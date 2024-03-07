@@ -153,7 +153,8 @@ main (int argc, char *argv[])
    TEST_INSTALL (test_mcd_integer_install);
    TEST_INSTALL (test_mcd_rpc_install);
    TEST_INSTALL (test_service_gcp_install);
-   TEST_INSTALL (test_bulkWrite_install);
+   // TEST_INSTALL (test_bulkWrite_install);
+   TEST_INSTALL (test_clientbulkwrite_install);
 
    ret = TestSuite_Run (&suite);
 
