@@ -1,447 +1,311 @@
-"""
-Sends and receives an OP_MSG to a MongoDB server.
-"""
-
+import miniclient
+from miniclient import maxBsonObjectSize, maxMessageSizeBytes, allowance
 import bson
-import socket
-import struct
+import unittest
 
 """
-Specified format of OP_MSG:
+Observations:
 
-struct Section {
-    uint8 payloadType;
-    union payload {
-        document  document; // payloadType == 0
-        struct sequence {   // payloadType == 1
-            int32      size;
-            cstring    identifier;
-            document*  documents;
-        };
-    };
-};
-
-struct OP_MSG {
-    struct MsgHeader {
-        int32  messageLength;
-        int32  requestID;
-        int32  responseTo;
-        int32  opCode = 2013;
-    };
-    uint32      flagBits;
-    Section+    sections;
-    [uint32     checksum;]
-};
+Max BSON document size to insert is maxBsonObjectSize.
+Max BSON document size to send is maxBsonObjectSize + allowance. The allowance is 16 * 1024 bytes described in SERVER-10643. The server appears to add overhead internally in some cases (e.g. speaking to mongos), resulting in a reduced actual maximum to the client.
+Max size of an OP_MSG is maxMessageSizeBytes. Exceeding results in a connection error.
 """
-request_id = 0
-def opmsg_build (payload0_document : bytes, payload1_identifier: str | None = None, payload1_documents: list[bytes] | None = None) -> bytes:
-    """
-    Builds an OP_MSG to send.
-    """
 
-    global request_id
 
-    out = bytearray()
+class TestOpMsg(unittest.TestCase):
+    def setUp(self) -> None:
+        self.conn = miniclient.connect()
+        # Drop collection to clean-up data from prior test runs.
+        reply = miniclient.send_opmsg(
+            self.conn, bson.encode({"drop": "coll", "$db": "db"})
+        )
+        self.assertEqual(reply["ok"], 1)
 
-    # Serialize header.
-    out += struct.pack("<i", 0) # Placeholder for `messageLength`
-    request_id += 1
-    out += struct.pack("<i", request_id) # requestID
-    out += struct.pack("<i", 0) # responseTo
-    out += struct.pack("<i", 2013) # opCode
-    out += struct.pack("<I", 0) # flagBits
-    # Serialize payload 0 section
-    out += struct.pack("<B", 0)
-    out += payload0_document
+        # Check if speaking to mongos.
+        reply = miniclient.send_opmsg(
+            self.conn, bson.encode({"hello": 1, "$db": "admin"})
+        )
+        self.assertEqual(reply["ok"], 1)
+        self.ismongos = "msg" in reply and reply["msg"] == "isdbgrid"
 
-    # Maybe serialize payload 1 section
-    if payload1_identifier is not None:
-        assert payload1_documents is not None
-        out += struct.pack("<B", 1)
-        size = 4 # length of size itself.
-        size += len(payload1_identifier) + 1 # Include 1 for trailing null.
-        size += sum([len(doc) for doc in payload1_documents])
-        out += struct.pack("<i", size) # size
-        out += payload1_identifier.encode("utf8") + b"\0" # identifier
-        for doc in payload1_documents:
-            out += doc # documents
+        return super().setUp()
 
-    out[0:4] = struct.pack("<i", len(out)) # Overwrite `messageLength`
-    return out
+    def test_payload0_max_insert(self):
+        # Test payload 0
+        # ... with insert document size == maxBsonObjSize
+        overhead = 22  # Data from rest of document.
+        to_insert = {"_id": 0, "x": "a" * (maxBsonObjectSize - overhead)}
+        self.assertEqual(len(bson.encode(to_insert)), maxBsonObjectSize)
+        payload0_document = bson.encode(
+            {"insert": "coll", "$db": "db", "documents": [to_insert]}
+        )
+        reply = miniclient.send_opmsg(self.conn, payload0_document)
+        self.assertEqual(reply["ok"], 1)
+        self.assertEqual(reply["n"], 1)
 
-def opmsg_parse (msg : bytes) -> bytes:
-    """
-    Parses an OP_MSG reply. Returns the payload 0 document.
-    """
-    _messageLength = struct.unpack("<i", msg[0:4])
-    msg = msg[4:]
-    _requestId = struct.unpack("<i", msg[0:4])
-    msg = msg[4:]
-    _responseTo = struct.unpack("<i", msg[0:4])
-    msg = msg[4:]
-    opCode = struct.unpack("<i", msg[0:4])[0]
-    if opCode != 2013:
-        raise Exception ("Expected to parse opCode 2013, got: {}".format(opCode))
-    msg = msg[4:]
-    _flagBits = struct.unpack("<I", msg[0:4])
-    msg = msg[4:]
-    # Only expect one payload 0 section.
-    payloadType = msg[0]
-    if payloadType != 0:
-        raise Exception ("Expected to parse payloadType 0, got: {}".format(payloadType))
-    msg = msg[1:]
-    return msg
+        # ... with insert document size == maxBsonObjSize + 1
+        overhead = 22  # Data from rest of document.
+        to_insert = {"_id": 0, "x": "a" * (maxBsonObjectSize - overhead + 1)}
+        self.assertEqual(len(bson.encode(to_insert)), maxBsonObjectSize + 1)
+        payload0_document = bson.encode(
+            {"insert": "coll", "$db": "db", "documents": [to_insert]}
+        )
+        reply = miniclient.send_opmsg(self.conn, payload0_document)
+        self.assertEqual(reply["ok"], 1)
+        self.assertEqual(reply["n"], 0)
+        self.assertIn("object to insert too large", reply["writeErrors"][0]["errmsg"])
 
-    
-def socket_recvall (conn: socket.socket, want: int):
-    """
-    Receives exaclty `want` bytes on a socket or raises an exception.
-    """
-    out = bytearray()
-    while len(out) < want:
-        got = conn.recv(want)
-        if len(got) == 0:
-            raise Exception ("Received empty message on socket. Peer closed socket_connection?")
-        out += got
-    return bytes(out)
+    def test_payload1_max_insert(self):
+        # Test payload 1
+        # ... with insert document size == maxBsonObjSize
+        payload0_document = bson.encode(
+            {
+                "insert": "coll",
+                "$db": "db",
+            }
+        )
+        payload1_document = bson.encode({"_id": 0, "x": "a" * (maxBsonObjectSize - 22)})
+        self.assertEqual(len(payload1_document), maxBsonObjectSize)
+        reply = miniclient.send_opmsg(
+            self.conn, payload0_document, "documents", [payload1_document]
+        )
+        self.assertEqual(reply["ok"], 1)
+        self.assertEqual(reply["n"], 1)
+        # Drop collection to clean-up.
+        reply = miniclient.send_opmsg(
+            self.conn, bson.encode({"drop": "coll", "$db": "db"})
+        )
+        self.assertEqual(reply["ok"], 1)
+        # Test payload 1
+        # ... with insert document size , maxBsonObjSize + 1
+        payload0_document = bson.encode(
+            {
+                "insert": "coll",
+                "$db": "db",
+            }
+        )
+        payload1_document = bson.encode(
+            {"_id": 0, "x": "a" * (maxBsonObjectSize + 1 - 22)}
+        )
+        self.assertEqual(len(payload1_document), maxBsonObjectSize + 1)
+        reply = miniclient.send_opmsg(
+            self.conn, payload0_document, "documents", [payload1_document]
+        )
+        self.assertEqual(reply["ok"], 1)
+        self.assertEqual(reply["n"], 0)
+        self.assertIn("object to insert too large", reply["writeErrors"][0]["errmsg"])
+        # Drop collection to clean-up.
+        reply = miniclient.send_opmsg(
+            self.conn, bson.encode({"drop": "coll", "$db": "db"})
+        )
+        self.assertEqual(reply["ok"], 1)
 
-def socket_send_and_recv_opmsg (conn: socket.socket, payload0_document : bytes, payload1_identifier: str | None = None, payload1_documents: list[bytes] | None = None) -> dict:
-    # Send a hello.
-    opmsg = opmsg_build(payload0_document, payload1_identifier, payload1_documents)
-    conn.sendall (opmsg)
+    def test_payload0_max_update(self):
+        # Insert a document to receive update
+        reply = miniclient.send_opmsg(
+            self.conn,
+            bson.encode({"insert": "coll", "$db": "db", "documents": [{"_id": 0}]}),
+        )
+        self.assertEqual(reply["ok"], 1)
+        self.assertEqual(reply["n"], 1)
 
-    # Receive reply.
-    msg_size_le = socket_recvall(conn, 4)
-    (msg_size,) = struct.unpack("<i", msg_size_le)
-    remaining = socket_recvall(conn, msg_size - 4)
-    msg = msg_size_le + remaining
-    reply_bytes : bytes = opmsg_parse (msg)
-    reply = bson.decode(reply_bytes)    
-    return reply
+        # Test payload 0
+        # ... with update statement size > maxBsonObjSize, such that the payload document size == maxBsonObjSize + allowance
+        update_statement = {
+            "q": {
+                # Put large payload in query to avoid storing a large document. This may avoid the "object to large to insert error"
+                "x": {"$ne": "b" * (maxBsonObjectSize + allowance - 110)}
+            },
+            "u": {"$set": {"x": "a"}},
+        }
+        payload0_document = bson.encode(
+            {"update": "coll", "$db": "db", "updates": [update_statement]}
+        )
+        self.assertEqual(len(payload0_document), maxBsonObjectSize + allowance)
+        reply = miniclient.send_opmsg(self.conn, payload0_document)
+        if self.ismongos:
+            # mongos appears to add size to update statement, resulting in an error.
+            self.assertEqual(reply["ok"], 0)
+            self.assertIn(
+                "BSONObj size: 16793922 (0x1004142) is invalid. Size must be between 0 and 16793600(16MB)",
+                reply["errmsg"],
+            )
+        else:
+            self.assertEqual(reply["ok"], 1)
+            self.assertEqual(reply["n"], 1)
 
-def socket_connect () -> socket.socket:
-    """
-    Connects and does a MongoDB handshake. Returns a socket.
-    """
-    conn = socket.create_connection(("localhost", 27017), timeout=1.0)
-    # Send handshake
-    reply = socket_send_and_recv_opmsg (conn, bson.encode({ "hello": 1, "$db": "admin" }))
-    if reply["ok"] != 1:
-        raise Exception ("Did not get ok:1 in reply: {}".format(reply))
-    return conn
+        # Drop collection to clean-up.
+        reply = miniclient.send_opmsg(
+            self.conn, bson.encode({"drop": "coll", "$db": "db"})
+        )
+        self.assertEqual(reply["ok"], 1)
 
-conn = socket_connect ()
-maxBsonObjectSize = 16777216
-maxMessageSizeBytes = 48000000
-maxWriteBatchSize = 100000
-allowance = 16 * 1024 # Refer: SERVER-10643
+        # Insert a document to receive update
+        reply = miniclient.send_opmsg(
+            self.conn,
+            bson.encode({"insert": "coll", "$db": "db", "documents": [{"_id": 0}]}),
+        )
+        self.assertEqual(reply["ok"], 1)
+        self.assertEqual(reply["n"], 1)
 
-# Drop collection to clean-up.
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
-assert (reply["ok"] == 1)
+        # Test payload 0
+        # ... with update statement size > maxBsonObjSize, such that the payload document size == maxBsonObjSize + allowance + 1
+        update_statement = {
+            "q": {
+                # Put large payload in query to avoid storing a large document. This may avoid the "object to large to insert error"
+                "x": {"$ne": "b" * (maxBsonObjectSize + allowance + 1 - 110)}
+            },
+            "u": {"$set": {"x": "a"}},
+        }
+        payload0_document = bson.encode(
+            {"update": "coll", "$db": "db", "updates": [update_statement]}
+        )
+        self.assertEqual(len(payload0_document), maxBsonObjectSize + allowance + 1)
+        reply = miniclient.send_opmsg(self.conn, payload0_document)
+        self.assertEqual(reply["ok"], 0)
+        self.assertIn(
+            "BSONObj size: 16793601 (0x1004001) is invalid. Size must be between 0 and 16793600(16MB)",
+            reply["errmsg"],
+        )
 
-# Test payload 0
-# ... with insert document size == maxBsonObjSize
-to_insert = {
-    "_id": 0,
-    "x": "a" * (maxBsonObjectSize - 22)
-}
-assert(len(bson.encode(to_insert)) == maxBsonObjectSize)
-payload0_document = bson.encode({
-    "insert": "coll",
-    "$db" : "db",
-    "documents": [
-        to_insert
-    ]
-})
-assert (len(payload0_document) == maxBsonObjectSize + 53)
-reply = socket_send_and_recv_opmsg (conn, payload0_document)
-assert (reply["ok"] == 1)
-assert (reply["n"] == 1)
+    def test_payload1_max_update(self):
+        # Test payload 1
+        # ... with update statement size == maxBsonObjSize + allowance.
 
-# Drop collection to clean-up.
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
-assert (reply["ok"] == 1)
+        # Insert a document to receive update
+        reply = miniclient.send_opmsg(
+            self.conn,
+            bson.encode({"insert": "coll", "$db": "db", "documents": [{"_id": 0}]}),
+        )
+        self.assertEqual(reply["ok"], 1)
+        self.assertEqual(reply["n"], 1)
 
-# Test payload 0
-# ... with insert document size == maxBsonObjSize + 1
-to_insert = {
-    "_id": 0,
-    "x": "a" * (maxBsonObjectSize + 1 - 22)
-}
-assert(len(bson.encode(to_insert)) == maxBsonObjectSize + 1)
-payload0_document = bson.encode({
-    "insert": "coll",
-    "$db" : "db",
-    "documents": [
-        to_insert
-    ]
-})
-assert (len(payload0_document) == maxBsonObjectSize + 53 + 1)
-reply = socket_send_and_recv_opmsg (conn, payload0_document)
-assert (reply["ok"] == 1)
-assert (reply["n"] == 0)
-assert ("object to insert too large" in reply["writeErrors"][0]["errmsg"])
+        overhead = 59
+        update_statement = bson.encode(
+            {
+                "q": {
+                    # Put large payload in query to avoid storing a large document. This may avoid the "object to large to insert error"
+                    "x": {"$ne": "b" * (maxBsonObjectSize + allowance - overhead)}
+                },
+                "u": {"$set": {"x": "a"}},
+            }
+        )
+        self.assertEqual(len(update_statement), maxBsonObjectSize + allowance)
 
-# Drop collection to clean-up.
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
-assert (reply["ok"] == 1)
+        payload0_document = bson.encode({"update": "coll", "$db": "db"})
+        reply = miniclient.send_opmsg(
+            self.conn, payload0_document, "updates", [update_statement]
+        )
 
-# Test payload 0
-# ... with payload document size == maxBsonObjSize + allowance
-to_insert = {
-    "_id": 0,
-    "x": "a" * (maxBsonObjectSize - 22)
-}
-assert(len(bson.encode(to_insert)) == maxBsonObjectSize)
-to_insert_extra = {
-    "_id": 1,
-    "x": "a" * 16306
-}
-assert(len(bson.encode(to_insert_extra)) <= maxBsonObjectSize)
-payload0_document = bson.encode({
-    "insert": "coll",
-    "$db" : "db",
-    "documents": [
-        to_insert,
-        to_insert_extra
-    ]
-})
-assert (len(payload0_document) == maxBsonObjectSize + allowance)
-reply = socket_send_and_recv_opmsg (conn, payload0_document)
-assert (reply["ok"] == 1)
-assert (reply["n"] == 2)
+        # Both mongos and mongod appear to interally add size to update statement, resulting in an error.
+        if self.ismongos:
+            # mongos reports command error.
+            self.assertEqual(reply["ok"], 0)
+            self.assertIn(
+                "BSONObj size: 16793973 (0x1004175) is invalid. Size must be between 0 and 16793600(16MB)",
+                reply["errmsg"],
+            )
+        else:
+            self.assertEqual(reply["ok"], 1)
+            self.assertEqual(reply["n"], 0)
+            self.assertIn(
+                "BSONObj size: 16793617 (0x1004011) is invalid. Size must be between 0 and 16793600(16MB)",
+                reply["writeErrors"][0]["errmsg"],
+            )
 
-# Test payload 0
-# ... with payload document size == maxBsonObjSize + allowance + 1
-to_insert = {
-    "_id": 0,
-    "x": "a" * (maxBsonObjectSize - 22)
-}
-assert(len(bson.encode(to_insert)) == maxBsonObjectSize)
-to_insert_extra = {
-    "_id": 1,
-    "x": "a" * (16306 + 1)
-}
-assert(len(bson.encode(to_insert_extra)) <= maxBsonObjectSize)
-payload0_document = bson.encode({
-    "insert": "coll",
-    "$db" : "db",
-    "documents": [
-        to_insert,
-        to_insert_extra
-    ]
-})
-assert (len(payload0_document) == maxBsonObjectSize + allowance + 1)
-reply = socket_send_and_recv_opmsg (conn, payload0_document)
-assert (reply["ok"] == 0)
-assert ("BSONObj size: 16793601 (0x1004001) is invalid. Size must be between 0 and 16793600(16MB)" in reply["errmsg"])
+    def test_payload0_max_opmsg(self):
+        # Test payload 0
+        # ... with payload document size == maxBsonObjSize + allowance
+        overhead = 22  # Data from rest of document.
+        to_insert = {"_id": 0, "x": "a" * (maxBsonObjectSize - overhead)}
+        self.assertLessEqual(len(bson.encode(to_insert)), maxBsonObjectSize)
+        to_insert_extra = {"_id": 1, "x": "a" * 16306}
+        self.assertLessEqual(len(bson.encode(to_insert_extra)), maxBsonObjectSize)
+        payload0_document = bson.encode(
+            {"insert": "coll", "$db": "db", "documents": [to_insert, to_insert_extra]}
+        )
+        self.assertEqual(len(payload0_document), maxBsonObjectSize + allowance)
+        reply = miniclient.send_opmsg(self.conn, payload0_document)
+        self.assertEqual(reply["ok"], 1)
+        self.assertEqual(reply["n"], 2)
 
-# Drop collection to clean-up.
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
-assert (reply["ok"] == 1)
+        # Test payload 0
+        # ... with payload document size == maxBsonObjSize + allowance + 1
+        overhead = 22  # Data from rest of document.
+        to_insert = {"_id": 0, "x": "a" * (maxBsonObjectSize - overhead)}
+        self.assertLessEqual(len(bson.encode(to_insert)), maxBsonObjectSize)
+        to_insert_extra = {"_id": 1, "x": "a" * (16306 + 1)}
+        self.assertLessEqual(len(bson.encode(to_insert_extra)), maxBsonObjectSize)
+        payload0_document = bson.encode(
+            {"insert": "coll", "$db": "db", "documents": [to_insert, to_insert_extra]}
+        )
+        self.assertEqual(len(payload0_document), maxBsonObjectSize + allowance + 1)
+        reply = miniclient.send_opmsg(self.conn, payload0_document)
+        self.assertEqual(reply["ok"], 0)
+        self.assertIn(
+            "BSONObj size: 16793601 (0x1004001) is invalid. Size must be between 0 and 16793600(16MB)",
+            reply["errmsg"],
+        )
 
-# Test payload 1
-# ... with insert document size == maxBsonObjSize
-payload0_document = bson.encode({
-    "insert": "coll",
-    "$db" : "db",
-})
-payload1_document = bson.encode({
-    "_id": 0,
-    "x": "a" * (maxBsonObjectSize - 22)
-})
-assert (len(payload1_document) == maxBsonObjectSize)
-reply = socket_send_and_recv_opmsg (conn, payload0_document, "documents", [payload1_document])
-assert (reply["ok"] == 1)
-assert (reply["n"] == 1)
+    def test_payload1_max_opmsg(self):
+        # Test payload 1
+        # ... with message size == maxMessageSizeBytes
+        payload0_document = bson.encode(
+            {
+                "insert": "coll",
+                "$db": "db",
+            }
+        )
+        payload1_documents = []
+        id = 0
+        longstr = "a" * 1024
+        for _ in range(45889):
+            payload1_documents.append(bson.encode({"_id": id, "x": longstr}))
+            id += 1
+        # Add one more to get exact length.
+        payload1_documents.append(bson.encode({"_id": id, "x": "a" * 14}))
+        opmsg = miniclient.build_opmsg(
+            payload0_document, "documents", payload1_documents
+        )
+        self.assertEqual(len(opmsg), maxMessageSizeBytes)
 
-# Drop collection to clean-up.
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
-assert (reply["ok"] == 1)
+        reply = miniclient.send_opmsg(
+            self.conn, payload0_document, "documents", payload1_documents
+        )
+        self.assertEqual(reply["ok"], 1)
+        self.assertEqual(reply["n"], 45890)
 
-# Test payload 1
-# ... with insert document size == maxBsonObjSize + 1
-payload0_document = bson.encode({
-    "insert": "coll",
-    "$db" : "db",
-})
-payload1_document = bson.encode({
-    "_id": 0,
-    "x": "a" * (maxBsonObjectSize + 1 - 22)
-})
-assert (len(payload1_document) == maxBsonObjectSize + 1)
-reply = socket_send_and_recv_opmsg (conn, payload0_document, "documents", [payload1_document])
-assert (reply["ok"] == 1)
-assert (reply["n"] == 0)
-assert ("object to insert too large" in reply["writeErrors"][0]["errmsg"])
+        # Test payload 1
+        # ... with message size == maxMessageSizeBytes + 1
+        payload0_document = bson.encode(
+            {
+                "insert": "coll",
+                "$db": "db",
+            }
+        )
 
-# Drop collection to clean-up.
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
-assert (reply["ok"] == 1)
+        payload1_documents = []
+        id = 0
+        longstr = "a" * 1024
+        for _ in range(45889):
+            payload1_documents.append(bson.encode({"_id": id, "x": longstr}))
+            id += 1
+        # Add one more to get exact length.
+        payload1_documents.append(bson.encode({"_id": id, "x": "a" * (14 + 1)}))
+        opmsg = miniclient.build_opmsg(
+            payload0_document, "documents", payload1_documents
+        )
+        assert len(opmsg) == maxMessageSizeBytes + 1
+        # Expect network error.
+        with self.assertRaises(ConnectionError):
+            reply = miniclient.send_opmsg(
+                self.conn, payload0_document, "documents", payload1_documents
+            )
 
-# Test payload 1
-# ... with message size == maxMessageSizeBytes
-payload0_document = bson.encode({
-    "insert": "coll",
-    "$db" : "db",
-})
+    def tearDown(self) -> None:
+        self.conn.close()
+        return super().tearDown()
 
-payload1_documents = []
-id = 0
-longstr = "a" * 1024
-for _ in range(45889):
-    payload1_documents.append(bson.encode({
-        "_id": id,
-        "x": longstr
-    }))
-    id += 1
-# Add one more to get exact length.
-payload1_documents.append(bson.encode({
-    "_id": id,
-    "x": "a" * 14
-}))
-opmsg = opmsg_build (payload0_document, "documents", payload1_documents)
-assert(len(opmsg) == maxMessageSizeBytes)
 
-reply = socket_send_and_recv_opmsg(conn, payload0_document, "documents", payload1_documents)
-assert (reply["ok"] == 1)
-assert (reply["n"] == 45890)
-
-# Test payload 1
-# ... with message size == maxMessageSizeBytes + 1
-payload0_document = bson.encode({
-    "insert": "coll",
-    "$db" : "db",
-})
-
-payload1_documents = []
-id = 0
-longstr = "a" * 1024
-for _ in range(45889):
-    payload1_documents.append(bson.encode({
-        "_id": id,
-        "x": longstr
-    }))
-    id += 1
-# Add one more to get exact length.
-payload1_documents.append(bson.encode({
-    "_id": id,
-    "x": "a" * (14 + 1)
-}))
-opmsg = opmsg_build (payload0_document, "documents", payload1_documents)
-assert(len(opmsg) == maxMessageSizeBytes + 1)
-
-got_socketerror = False
-try:
-    reply = socket_send_and_recv_opmsg(conn, payload0_document, "documents", payload1_documents)
-except ConnectionResetError as err:
-    got_socketerror = True
-except BrokenPipeError as err:    
-    got_socketerror = True
-assert (got_socketerror)
-
-# Reconnect.
-conn = socket_connect ()
-
-# Drop collection to clean-up.
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
-assert (reply["ok"] == 1)
-
-# Test payload 0
-# ... with update statement size > maxBsonObjSize, such that the payload document size == maxBsonObjSize + allowance
-
-# Insert a document to receive update
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"insert": "coll", "$db": "db", "documents": [{"_id": 0}]}))
-assert (reply["ok"] == 1)
-assert (reply["n"] == 1)
-
-update_statement = {
-    "q": {
-        # Put large payload in query to avoid storing a large document. This may avoid the "object to large to insert error"
-        "x": { "$ne": "b" * (maxBsonObjectSize + allowance - 110) }
-    },
-    "u": {
-        "$set": {"x": "a"}
-    }
-}
-payload0_document = bson.encode({
-    "update": "coll",
-    "$db" : "db",
-    "updates": [
-        update_statement
-    ]
-})
-assert (len(payload0_document) == maxBsonObjectSize + allowance)
-reply = socket_send_and_recv_opmsg (conn, payload0_document)
-assert (reply["ok"] == 1)
-assert (reply["n"] == 1)
-
-# Drop collection to clean-up.
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
-assert (reply["ok"] == 1)
-
-# Test payload 0
-# ... with update statement size > maxBsonObjSize, such that the payload document size == maxBsonObjSize + allowance + 1
-
-# Insert a document to receive update
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"insert": "coll", "$db": "db", "documents": [{"_id": 0}]}))
-assert (reply["ok"] == 1)
-assert (reply["n"] == 1)
-
-update_statement = {
-    "q": {
-        # Put large payload in query to avoid storing a large document. This may avoid the "object to large to insert error"
-        "x": { "$ne": "b" * (maxBsonObjectSize + allowance + 1 - 110) }
-    },
-    "u": {
-        "$set": {"x": "a"}
-    }
-}
-payload0_document = bson.encode({
-    "update": "coll",
-    "$db" : "db",
-    "updates": [
-        update_statement
-    ]
-})
-assert (len(payload0_document) == maxBsonObjectSize + allowance + 1)
-reply = socket_send_and_recv_opmsg (conn, payload0_document)
-assert (reply["ok"] == 0)
-assert ("BSONObj size: 16793601 (0x1004001) is invalid. Size must be between 0 and 16793600(16MB)" in reply["errmsg"])
-
-# Drop collection to clean-up.
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
-assert (reply["ok"] == 1)
-
-# Test payload 1
-# ... with update statement size == maxBsonObjSize + allowance.
-
-# Insert a document to receive update
-reply = socket_send_and_recv_opmsg (conn, bson.encode({"insert": "coll", "$db": "db", "documents": [{"_id": 0}]}))
-assert (reply["ok"] == 1)
-assert (reply["n"] == 1)
-
-update_statement = bson.encode({
-    "q": {
-        # Put large payload in query to avoid storing a large document. This may avoid the "object to large to insert error"
-        "x": { "$ne": "b" * (maxBsonObjectSize + allowance - 59) }
-    },
-    "u": {
-        "$set": {"x": "a"}
-    }
-})
-assert (len(update_statement) == maxBsonObjectSize + allowance)
-
-payload0_document = bson.encode({
-    "update": "coll",
-    "$db" : "db"
-})
-reply = socket_send_and_recv_opmsg (conn, payload0_document, "updates", [update_statement])
-assert (reply["ok"] == 1)
-assert (reply["n"] == 0)
-# Q: Does mongod add elements to update statement? A:
-assert ("BSONObj size: 16793617 (0x1004011) is invalid. Size must be between 0 and 16793600(16MB)" in reply["writeErrors"][0]["errmsg"])
-
-conn.close()
-
+if __name__ == "__main__":
+    unittest.main()
