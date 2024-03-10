@@ -332,8 +332,116 @@ payload1_documents.append(bson.encode({
 opmsg = opmsg_build (payload0_document, "documents", payload1_documents)
 assert(len(opmsg) == maxMessageSizeBytes + 1)
 
+got_socketerror = False
 try:
     reply = socket_send_and_recv_opmsg(conn, payload0_document, "documents", payload1_documents)
 except ConnectionResetError as err:
-    got_ConnectionResetError = True
-assert (got_ConnectionResetError)
+    got_socketerror = True
+except BrokenPipeError as err:    
+    got_socketerror = True
+assert (got_socketerror)
+
+# Reconnect.
+conn = socket_connect ()
+
+# Drop collection to clean-up.
+reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
+assert (reply["ok"] == 1)
+
+# Test payload 0
+# ... with update statement size > maxBsonObjSize, such that the payload document size == maxBsonObjSize + allowance
+
+# Insert a document to receive update
+reply = socket_send_and_recv_opmsg (conn, bson.encode({"insert": "coll", "$db": "db", "documents": [{"_id": 0}]}))
+assert (reply["ok"] == 1)
+assert (reply["n"] == 1)
+
+update_statement = {
+    "q": {
+        # Put large payload in query to avoid storing a large document. This may avoid the "object to large to insert error"
+        "x": { "$ne": "b" * (maxBsonObjectSize + allowance - 110) }
+    },
+    "u": {
+        "$set": {"x": "a"}
+    }
+}
+payload0_document = bson.encode({
+    "update": "coll",
+    "$db" : "db",
+    "updates": [
+        update_statement
+    ]
+})
+assert (len(payload0_document) == maxBsonObjectSize + allowance)
+reply = socket_send_and_recv_opmsg (conn, payload0_document)
+assert (reply["ok"] == 1)
+assert (reply["n"] == 1)
+
+# Drop collection to clean-up.
+reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
+assert (reply["ok"] == 1)
+
+# Test payload 0
+# ... with update statement size > maxBsonObjSize, such that the payload document size == maxBsonObjSize + allowance + 1
+
+# Insert a document to receive update
+reply = socket_send_and_recv_opmsg (conn, bson.encode({"insert": "coll", "$db": "db", "documents": [{"_id": 0}]}))
+assert (reply["ok"] == 1)
+assert (reply["n"] == 1)
+
+update_statement = {
+    "q": {
+        # Put large payload in query to avoid storing a large document. This may avoid the "object to large to insert error"
+        "x": { "$ne": "b" * (maxBsonObjectSize + allowance + 1 - 110) }
+    },
+    "u": {
+        "$set": {"x": "a"}
+    }
+}
+payload0_document = bson.encode({
+    "update": "coll",
+    "$db" : "db",
+    "updates": [
+        update_statement
+    ]
+})
+assert (len(payload0_document) == maxBsonObjectSize + allowance + 1)
+reply = socket_send_and_recv_opmsg (conn, payload0_document)
+assert (reply["ok"] == 0)
+assert ("BSONObj size: 16793601 (0x1004001) is invalid. Size must be between 0 and 16793600(16MB)" in reply["errmsg"])
+
+# Drop collection to clean-up.
+reply = socket_send_and_recv_opmsg (conn, bson.encode({"drop": "coll", "$db": "db"}))
+assert (reply["ok"] == 1)
+
+# Test payload 1
+# ... with update statement size == maxBsonObjSize + allowance.
+
+# Insert a document to receive update
+reply = socket_send_and_recv_opmsg (conn, bson.encode({"insert": "coll", "$db": "db", "documents": [{"_id": 0}]}))
+assert (reply["ok"] == 1)
+assert (reply["n"] == 1)
+
+update_statement = bson.encode({
+    "q": {
+        # Put large payload in query to avoid storing a large document. This may avoid the "object to large to insert error"
+        "x": { "$ne": "b" * (maxBsonObjectSize + allowance - 59) }
+    },
+    "u": {
+        "$set": {"x": "a"}
+    }
+})
+assert (len(update_statement) == maxBsonObjectSize + allowance)
+
+payload0_document = bson.encode({
+    "update": "coll",
+    "$db" : "db"
+})
+reply = socket_send_and_recv_opmsg (conn, payload0_document, "updates", [update_statement])
+assert (reply["ok"] == 1)
+assert (reply["n"] == 0)
+# Q: Does mongod add elements to update statement? A:
+assert ("BSONObj size: 16793617 (0x1004011) is invalid. Size must be between 0 and 16793600(16MB)" in reply["writeErrors"][0]["errmsg"])
+
+conn.close()
+
