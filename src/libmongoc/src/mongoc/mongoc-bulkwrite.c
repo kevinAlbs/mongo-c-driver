@@ -2,21 +2,118 @@
 #include <mongoc-buffer-private.h>
 #include <mongoc-array-private.h>
 #include <mongoc-error.h>
+#include <mongoc-server-stream-private.h>
+#include <mongoc-cmd-private.h>
+#include <mongoc-client-private.h>
+
+int32_t _mock_maxWriteBatchSize = 0;
+int32_t _mock_maxMessageSizeBytes = 0;
+
+struct _mongoc_mapof_insertoneresult_t {
+   mongoc_array_t inserted_ids;
+};
+
+struct _mongoc_bulkwriteexception_t {
+   struct {
+      bson_error_t error;
+      bson_t document;
+      bool isset;
+   } optional_error;
+   // `write_errors` is an array of `mongoc_write_error_t*`.
+   // The array is sized to the number of operations.
+   mongoc_array_t write_errors;
+   // If `has_any_error` is false, the bulk write exception is not returned.
+   bool has_any_error;
+};
+
+static mongoc_bulkwriteexception_t *
+mongoc_bulkwriteexception_new_from_error (bson_error_t *error,
+                                          const bson_t *error_document)
+{
+   BSON_ASSERT_PARAM (error);
+
+   mongoc_bulkwriteexception_t *self = bson_malloc0 (sizeof (*self));
+   memcpy (&self->optional_error.error, error, sizeof (*error));
+   if (error_document) {
+      bson_copy_to (error_document, &self->optional_error.document);
+   } else {
+      // Initialize an empty document.
+      bson_init (&self->optional_error.document);
+   }
+   self->optional_error.isset = true;
+   return self;
+}
 
 mongoc_bulkwritereturn_t
-mongoc_client_bulkwrite (mongoc_client_t *client,
+mongoc_client_bulkwrite (mongoc_client_t *self,
                          mongoc_listof_bulkwritemodel_t *models,
                          mongoc_bulkwriteoptions_t *options // may be NULL
 )
 {
-   return (mongoc_bulkwritereturn_t){0};
+   BSON_ASSERT_PARAM (self);
+   BSON_ASSERT_PARAM (models);
+
+   mongoc_bulkwritereturn_t ret = {0};
+   mongoc_server_stream_t *ss = NULL;
+   // bson_t cmd = BSON_INITIALIZER;
+   // mongoc_cmd_parts_t parts = {0};
+
+   // Select a stream.
+   {
+      bson_t reply;
+      bson_error_t error;
+      ss = mongoc_cluster_stream_for_writes (&self->cluster,
+                                             NULL /* session */,
+                                             NULL /* deprioritized servers */,
+                                             &reply,
+                                             &error);
+      if (!ss) {
+         ret.exc = mongoc_bulkwriteexception_new_from_error (&error, &reply);
+         bson_destroy (&reply);
+         goto fail;
+      }
+   }
+
+fail:
+   return ret;
 }
 
-const mongoc_insertoneresult_t *
+mongoc_insertoneresult_t *
 mongoc_mapof_insertoneresult_lookup (mongoc_mapof_insertoneresult_t *self,
                                      size_t idx)
 {
+   BSON_ASSERT_PARAM (self);
    return NULL;
+}
+
+const bson_value_t *
+mongoc_insertoneresult_inserted_id (mongoc_insertoneresult_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return NULL;
+}
+
+mongoc_mapof_insertoneresult_t *
+mongoc_bulkwriteresult_insertResults (mongoc_bulkwriteresult_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return NULL;
+}
+
+int64_t
+mongoc_bulkwriteresult_insertedCount (mongoc_bulkwriteresult_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return 0;
+}
+
+bool
+mongoc_bulkwriteexception_error (mongoc_bulkwriteexception_t *self,
+                                 bson_error_t *error,
+                                 const bson_t **error_document)
+{
+   BSON_ASSERT_PARAM (self);
+   return false;
 }
 
 void

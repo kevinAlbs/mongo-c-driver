@@ -57,10 +57,13 @@ test_clientbulkwrite_insert (void *unused)
    // Ensure no error.
    {
       if (br.exc) {
-         if (br.exc->error.isset) {
+         bson_error_t error;
+         const bson_t *error_document;
+         if (mongoc_bulkwriteexception_error (
+                br.exc, &error, &error_document)) {
             test_error ("Expected no exception, got: %s\n%s\n",
-                        br.exc->error.value.message,
-                        tmp_json (&br.exc->error.document));
+                        error.message,
+                        tmp_json (error_document));
          }
          test_error ("Expected no exception, got one with no top-level error");
       }
@@ -69,30 +72,34 @@ test_clientbulkwrite_insert (void *unused)
    // Ensure results report IDs inserted.
    {
       ASSERT (br.res);
-      ASSERT_CMPINT64 (br.res->insertedCount, ==, 2);
+      ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedCount (br.res), ==, 2);
+      mongoc_mapof_insertoneresult_t *mir =
+         mongoc_bulkwriteresult_insertResults (br.res);
 
       // Check index 0.
       {
-         const mongoc_insertoneresult_t *ir =
-            mongoc_mapof_insertoneresult_lookup (br.res->insertResults, 0);
+         mongoc_insertoneresult_t *ir =
+            mongoc_mapof_insertoneresult_lookup (mir, 0);
          ASSERT (ir);
          bson_value_t expected = {.value_type = BSON_TYPE_INT32,
                                   .value = {.v_int32 = 123}};
-         ASSERT_BSONVALUE_EQ (&ir->inserted_id, &expected);
+         ASSERT_BSONVALUE_EQ (mongoc_insertoneresult_inserted_id (ir),
+                              &expected);
       }
 
       // Check index 1.
       {
-         const mongoc_insertoneresult_t *ir =
-            mongoc_mapof_insertoneresult_lookup (br.res->insertResults, 1);
+         mongoc_insertoneresult_t *ir =
+            mongoc_mapof_insertoneresult_lookup (mir, 1);
          ASSERT (ir);
          bson_value_t expected = {.value_type = BSON_TYPE_INT32,
                                   .value = {.v_int32 = 456}};
-         ASSERT_BSONVALUE_EQ (&ir->inserted_id, &expected);
+         ASSERT_BSONVALUE_EQ (mongoc_insertoneresult_inserted_id (ir),
+                              &expected);
       }
 
       // Check no index 2.
-      ASSERT (!mongoc_mapof_insertoneresult_lookup (br.res->insertResults, 2));
+      ASSERT (!mongoc_mapof_insertoneresult_lookup (mir, 2));
    }
 
    mongoc_bulkwritereturn_cleanup (&br);

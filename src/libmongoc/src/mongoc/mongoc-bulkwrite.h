@@ -303,145 +303,141 @@ struct _mongoc_bulkwriteoptions_t {
 
    // `extra` is appended to the bulkWrite command.
    // It is included to support future server options.
-   void *extra;
+   bson_t *extra;
 };
 
 typedef struct _mongoc_mapof_insertoneresult_t mongoc_mapof_insertoneresult_t;
 typedef struct _mongoc_insertoneresult_t mongoc_insertoneresult_t;
-BSON_EXPORT (const mongoc_insertoneresult_t *)
+BSON_EXPORT (mongoc_insertoneresult_t *)
 mongoc_mapof_insertoneresult_lookup (mongoc_mapof_insertoneresult_t *self,
                                      size_t idx);
 
 typedef struct _mongoc_mapof_updateresult_t mongoc_mapof_updateresult_t;
 typedef struct _mongoc_updateresult_t mongoc_updateresult_t;
-BSON_EXPORT (const mongoc_updateresult_t *)
+BSON_EXPORT (mongoc_updateresult_t *)
 mongoc_mapof_updateresult_lookup (mongoc_mapof_updateresult_t *self,
                                   size_t idx);
 
 typedef struct _mongoc_mapof_deleteresult_t mongoc_mapof_deleteresult_t;
 typedef struct _mongoc_deleteresult_t mongoc_deleteresult_t;
-BSON_EXPORT (const mongoc_deleteresult_t *)
+BSON_EXPORT (mongoc_deleteresult_t *)
 mongoc_mapof_deleteresult_lookup (mongoc_mapof_deleteresult_t *self,
                                   size_t idx);
 
 
-struct _mongoc_bulkwriteresult_t {
-   /**
-    * Indicates whether this write result was acknowledged. If not, then all
-    * other members of this result will be undefined.
-    *
-    * NOT REQUIRED TO IMPLEMENT. See the CRUD specification for more guidance on
-    * modeling unacknowledged results.
-    */
-   bool acknowledged;
+/**
+ * Indicates whether this write result was acknowledged. If not, then all
+ * other members of this result will be undefined.
+ *
+ * NOT REQUIRED TO IMPLEMENT. See the CRUD specification for more guidance on
+ * modeling unacknowledged results.
+ */
+bool
+mongoc_bulkwriteresult_acknowledged (mongoc_bulkwriteresult_t *self);
 
-   /**
-    * Indicates whether the results are verbose. If false, the insertResults,
-    * updateResults, and deleteResults fields in this result will be undefined.
-    *
-    * NOT REQUIRED TO IMPLEMENT. See below for other ways to differentiate
-    * summary results from verbose results.
-    */
-   bool hasVerboseResults;
+/**
+ * Indicates whether the results are verbose. If false, the insertResults,
+ * updateResults, and deleteResults fields in this result will be undefined.
+ *
+ * NOT REQUIRED TO IMPLEMENT. See below for other ways to differentiate
+ * summary results from verbose results.
+ */
+bool
+mongoc_bulkwriteresult_hasVerboseResults (mongoc_bulkwriteresult_t *self);
 
-   /**
-    * The total number of documents inserted across all insert operations.
-    */
-   int64_t insertedCount;
+/**
+ * The total number of documents inserted across all insert operations.
+ */
+int64_t
+mongoc_bulkwriteresult_insertedCount (mongoc_bulkwriteresult_t *self);
 
-   /**
-    * The total number of documents upserted across all update operations.
-    */
-   int64_t upsertedCount;
+/**
+ * The total number of documents upserted across all update operations.
+ */
+int64_t
+mongoc_bulkwriteresult_upsertedCount (mongoc_bulkwriteresult_t *self);
 
-   /**
-    * The total number of documents matched across all update operations.
-    */
-   int64_t matchedCount;
+/**
+ * The total number of documents matched across all update operations.
+ */
+int64_t
+mongoc_bulkwriteresult_matchedCount (mongoc_bulkwriteresult_t *self);
 
-   /**
-    * The total number of documents modified across all update operations.
-    */
-   int64_t modifiedCount;
+/**
+ * The total number of documents modified across all update operations.
+ */
+int64_t
+mongoc_bulkwriteresult_modifiedCount (mongoc_bulkwriteresult_t *self);
 
-   /**
-    * The total number of documents deleted across all delete operations.
-    */
-   int64_t deletedCount;
+/**
+ * The total number of documents deleted across all delete operations.
+ */
+int64_t
+mongoc_bulkwriteresult_deletedCount (mongoc_bulkwriteresult_t *self);
 
-   /**
-    * The results of each individual insert operation that was successfully
-    * performed.
-    */
-   // May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
-   mongoc_mapof_insertoneresult_t *insertResults;
+/**
+ * The results of each individual insert operation that was successfully
+ * performed.
+ */
+// May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
+mongoc_mapof_insertoneresult_t *
+mongoc_bulkwriteresult_insertResults (mongoc_bulkwriteresult_t *self);
 
-   /**
-    * The results of each individual update operation that was successfully
-    * performed.
-    */
-   // May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
-   mongoc_mapof_updateresult_t *updateResult;
+/**
+ * The results of each individual update operation that was successfully
+ * performed.
+ */
+// May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
+mongoc_mapof_updateresult_t *
+mongoc_bulkwriteresult_updateResult (mongoc_bulkwriteresult_t *self);
 
-   /**
-    * The results of each individual delete operation that was successfully
-    * performed.
-    */
-   // May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
-   mongoc_mapof_deleteresult_t *deleteResults;
+/**
+ * The results of each individual delete operation that was successfully
+ * performed.
+ */
+// May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
+mongoc_mapof_deleteresult_t *
+mongoc_bulkwriteresult_deleteResults (mongoc_bulkwriteresult_t *self);
 
-   // `internal` is reserved.
-   void *internal;
-};
+/**
+ * The _id of the inserted document.
+ */
+const bson_value_t *
+mongoc_insertoneresult_inserted_id (mongoc_insertoneresult_t *self);
 
-struct _mongoc_insertoneresult_t {
-   /**
-    * The _id of the inserted document.
-    */
-   bson_value_t inserted_id;
+/**
+ * The number of documents that matched the filter.
+ */
+int64_t
+mongoc_updateresult_matchedCount (mongoc_insertoneresult_t *self);
 
-   // `internal` is reserved.
-   void *internal;
-};
+/**
+ * The number of documents that were modified.
+ */
+int64_t
+mongoc_updateresult_modifiedCount (mongoc_insertoneresult_t *self);
 
-struct _mongoc_updateresult_t {
-   /**
-    * The number of documents that matched the filter.
-    */
-   int64_t matchedCount;
+/**
+ * The number of documents that were upserted.
+ *
+ * NOT REQUIRED TO IMPLEMENT. Drivers may choose not to provide this property
+ * so long as it is always possible to discern whether an upsert took place.
+ */
+int64_t
+mongoc_updateresult_upsertedCount (mongoc_insertoneresult_t *self);
 
-   /**
-    * The number of documents that were modified.
-    */
-   int64_t modifiedCount;
+/**
+ * The _id field of the upserted document if an upsert occurred.
+ */
+// May be NULL.
+const bson_value_t *
+mongoc_updateresult_upsertedId (mongoc_insertoneresult_t *self);
 
-   /**
-    * The number of documents that were upserted.
-    *
-    * NOT REQUIRED TO IMPLEMENT. Drivers may choose not to provide this property
-    * so long as it is always possible to discern whether an upsert took place.
-    */
-   int64_t upsertedCount;
-
-   /**
-    * The _id field of the upserted document if an upsert occurred.
-    */
-   // May be NULL.
-   const bson_value_t *upsertedId;
-
-   // `internal` is reserved.
-   void *internal;
-};
-
-struct _mongoc_deleteresult_t {
-   /**
-    * The number of documents that were deleted.
-    */
-   int64_t deletedCount;
-
-   // `internal` is reserved.
-   void *internal;
-};
+/**
+ * The number of documents that were deleted.
+ */
+int64_t
+mongoc_deleteresult_deletedCount (mongoc_deleteresult_t *self);
 
 typedef struct _mongoc_listof_writeconcernerror_t
    mongoc_listof_writeconcernerror_t;
@@ -460,100 +456,96 @@ typedef struct _mongoc_writeerror_t mongoc_writeerror_t;
 BSON_EXPORT (const mongoc_writeerror_t *)
 mongoc_mapof_writeerror_lookup (mongoc_mapof_writeerror_t *self, size_t idx);
 
-struct _mongoc_bulkwriteexception_t {
-   /**
-    * A top-level error that occurred when attempting to communicate with the
-    * server or execute the bulk write. This value may not be populated if the
-    * exception was thrown due to errors occurring on individual writes.
-    */
-   // May be unset.
-   struct {
-      bool isset;
-      bson_error_t value;
-      bson_t document;
-   } error;
+/**
+ * A top-level error that occurred when attempting to communicate with the
+ * server or execute the bulk write. This value may not be populated if the
+ * exception was thrown due to errors occurring on individual writes.
+ */
+// Returns false if no error is set.
+bool
+mongoc_bulkwriteexception_error (mongoc_bulkwriteexception_t *self,
+                                 bson_error_t *error,
+                                 const bson_t **error_document);
 
-   /**
-    * Write concern errors that occurred while executing the bulk write. This
-    * list may have multiple items if more than one server command was required
-    * to execute the bulk write.
-    */
-   mongoc_listof_writeconcernerror_t *writeConcernErrors;
+/**
+ * Write concern errors that occurred while executing the bulk write. This
+ * list may have multiple items if more than one server command was required
+ * to execute the bulk write.
+ */
+mongoc_listof_writeconcernerror_t *
+mongoc_bulkwriteexception_writeConcernErrors (
+   mongoc_bulkwriteexception_t *self);
 
-   /**
-    * Errors that occurred during the execution of individual write operations.
-    * This map will contain at most one entry if the bulk write was ordered.
-    */
-   mongoc_mapof_writeerror_t *writeErrors;
+/**
+ * Errors that occurred during the execution of individual write operations.
+ * This map will contain at most one entry if the bulk write was ordered.
+ */
+mongoc_mapof_writeerror_t *
+mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self);
 
-   /**
-    * The results of any successful operations that were performed before the
-    * error was encountered.
-    */
-   // May be NULL.
-   mongoc_bulkwriteresult_t *partialResult;
-};
+/**
+ * The results of any successful operations that were performed before the
+ * error was encountered.
+ */
+// May be NULL.
+mongoc_bulkwriteresult_t *
+mongoc_bulkwriteexception_partialResult (mongoc_bulkwriteexception_t *self);
 
-struct _mongoc_writeconcernerror_t {
-   /**
-    * An integer value identifying the write concern error. Corresponds to the
-    * "writeConcernError.code" field in the command response.
-    *
-    * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
-    */
-   int32_t code;
+/**
+ * An integer value identifying the write concern error. Corresponds to
+ * the "writeConcernError.code" field in the command response.
+ *
+ * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
+ */
+int32_t
+mongoc_writeconcernerror_code (mongoc_writeconcernerror_t *self);
 
-   /**
-    * A document identifying the write concern setting related to the error.
-    * Corresponds to the "writeConcernError.errInfo" field in the command
-    * response.
-    *
-    * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
-    */
-   // May be NULL.
-   bson_t *details;
+/**
+ * A document identifying the write concern setting related to the error.
+ * Corresponds to the "writeConcernError.errInfo" field in the command
+ * response.
+ *
+ * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
+ */
+// May be NULL.
+bson_t *
+mongoc_writeconcernerror_details (mongoc_writeconcernerror_t *self);
 
-   /**
-    * A description of the error. Corresponds to the
-    * "writeConcernError.errmsg" field in the command response.
-    *
-    * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
-    */
-   char *message;
+/**
+ * A description of the error. Corresponds to the
+ * "writeConcernError.errmsg" field in the command response.
+ *
+ * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
+ */
+char *
+mongoc_writeconcernerror_message (mongoc_writeconcernerror_t *self);
 
-   // `internal` is reserved.
-   void *internal;
-};
+/**
+ * An integer value identifying the write error. Corresponds to the
+ * "writeErrors[].code" field in the command response.
+ *
+ * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
+ */
+int32_t
+mongoc_writeerror_code (mongoc_writeerror_t *self);
 
+/**
+ * A document providing more information about the write error (e.g.
+ * details pertaining to document validation). Corresponds to the
+ * "writeErrors[].errInfo" field in the command response.
+ *
+ * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
+ */
+bson_t *
+mongoc_writeerror_details (mongoc_writeerror_t *self);
 
-struct _mongoc_writeerror_t {
-   /**
-    * An integer value identifying the write error. Corresponds to the
-    * "writeErrors[].code" field in the command response.
-    *
-    * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
-    */
-   int32_t code;
-
-   /**
-    * A document providing more information about the write error (e.g. details
-    * pertaining to document validation). Corresponds to the
-    * "writeErrors[].errInfo" field in the command response.
-    *
-    * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
-    */
-   bson_t *details;
-
-   /**
-    * A description of the error. Corresponds to the "writeErrors[].errmsg"
-    * field in the command response.
-    *
-    * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
-    */
-   char *message;
-
-   // `internal` is reserved.
-   void *internal;
-};
+/**
+ * A description of the error. Corresponds to the "writeErrors[].errmsg"
+ * field in the command response.
+ *
+ * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
+ */
+char *
+mongoc_writeerror_message (mongoc_writeerror_t *self);
 
 BSON_END_DECLS
