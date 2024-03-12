@@ -128,34 +128,23 @@ _mongoc_array_append_vals (mongoc_array_t *array,
    array->len += n_elements;
 }
 
+
 // `_mongoc_array_init_with_zerofill` initializes `array`, appends `n_elements`
 // entries, and zero initializes entries.
 void
-_mongoc_array_init_with_zerofill (mongoc_array_t *array, size_t n_elements)
+_mongoc_array_init_with_zerofill (mongoc_array_t *array,
+                                  size_t element_size,
+                                  size_t n_elements)
 {
-   size_t len;
-   size_t new_size;
+   BSON_ASSERT_PARAM (array);
+   BSON_ASSERT (element_size > 0);
+   BSON_ASSERT (n_elements > 0);
 
-   BSON_ASSERT (array);
+   size_t new_size = bson_next_power_of_two (n_elements * element_size);
 
-   len = (size_t) n_elements * array->element_size;
-
-   new_size = bson_next_power_of_two (len);
-
-   if (array->element_alignment == 0) {
-      array->data = bson_realloc (array->data, new_size);
-      array->allocated = new_size;
-   } else {
-      void *const old_data = array->data;
-
-      array->data = bson_aligned_alloc (array->element_alignment, new_size);
-      memmove (array->data, old_data, array->allocated);
-      array->allocated = new_size;
-
-      bson_free (old_data);
-   }
-
-   // Zero out the new entries.
-   memset (array->data, 0, array->allocated);
    array->len = n_elements;
+   array->element_alignment = 0;
+   array->element_size = element_size;
+   array->allocated = new_size;
+   array->data = (void *) bson_malloc0 (array->allocated);
 }
