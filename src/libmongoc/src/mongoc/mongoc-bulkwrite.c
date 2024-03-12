@@ -90,26 +90,6 @@ mongoc_bulkwriteexception_new (size_t nmodels)
    return self;
 }
 
-static mongoc_bulkwriteexception_t *
-mongoc_bulkwriteexception_new_from_error (size_t nmodels,
-                                          bson_error_t *error,
-                                          const bson_t *error_document)
-{
-   BSON_ASSERT_PARAM (error);
-
-   mongoc_bulkwriteexception_t *self = mongoc_bulkwriteexception_new (nmodels);
-   memcpy (&self->optional_error.error, error, sizeof (*error));
-   if (error_document) {
-      bson_copy_to (error_document, &self->optional_error.document);
-   } else {
-      // Initialize an empty document.
-      bson_init (&self->optional_error.document);
-   }
-   self->optional_error.isset = true;
-   self->has_any_error = true;
-   return self;
-}
-
 static void
 mongoc_bulkwriteexception_set_error (mongoc_bulkwriteexception_t *self,
                                      bson_error_t *error,
@@ -194,6 +174,12 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
    bson_t cmd = BSON_INITIALIZER;
    mongoc_cmd_parts_t parts = {0};
 
+   // Create empty result and exception to collect results/errors from batches.
+   ret.res = mongoc_bulkwriteresult_new ();
+   // Copy `inserted_ids` to the result.
+   _mongoc_array_copy (&ret.res->mapof_ior.inserted_ids, &models->inserted_ids);
+   ret.exc = mongoc_bulkwriteexception_new (models->n_ops);
+
    // Select a stream.
    {
       bson_t reply;
@@ -204,8 +190,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                                              &reply,
                                              &error);
       if (!ss) {
-         ret.exc = mongoc_bulkwriteexception_new_from_error (
-            models->n_ops, &error, &reply);
+         mongoc_bulkwriteexception_set_error (ret.exc, &error, &reply);
          bson_destroy (&reply);
          goto fail;
       }
@@ -252,12 +237,6 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
    if (_mock_maxMessageSizeBytes > 0) {
       maxMessageSizeBytes = _mock_maxMessageSizeBytes;
    }
-
-   // Create empty result and exception to collect results/errors from batches.
-   ret.res = mongoc_bulkwriteresult_new ();
-   // Copy `inserted_ids` to the result.
-   _mongoc_array_copy (&ret.res->mapof_ior.inserted_ids, &models->inserted_ids);
-   ret.exc = mongoc_bulkwriteexception_new (models->n_ops);
 
    size_t writeBatchSize_offset = 0;
    size_t payload_offset = 0;
