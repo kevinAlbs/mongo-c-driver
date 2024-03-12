@@ -23,16 +23,16 @@ struct _mongoc_listof_bulkwritemodel_t {
    size_t n_ops;
    // `ns_to_index` maps a namespace to an index.
    bson_t ns_to_index;
-   // `inserted_ids` is an array sized to the number of operations.
-   // If the operation was an insert, the `id` is stored.
-   mongoc_array_t inserted_ids;
+   // `entries` is an array of `mongoc_insertoneresult_t` sized to the number of
+   // operations. If the operation was an insert, the `id` is stored.
+   mongoc_array_t entries;
 };
 
 struct _mongoc_mapof_insertoneresult_t {
-   // `inserted_ids` is an array of `mongoc_insertoneresult_t`.
+   // `entries` is an array of `mongoc_insertoneresult_t`.
    // The array is sized to the number of operations.
    // If the operation was an insert, the `id` is stored.
-   mongoc_array_t inserted_ids;
+   mongoc_array_t entries;
 };
 
 struct _mongoc_bulkwriteresult_t {
@@ -155,7 +155,7 @@ mongoc_bulkwriteresult_destroy (mongoc_bulkwriteresult_t *self)
    if (!self) {
       return;
    }
-   _mongoc_array_destroy (&self->mapof_ior.inserted_ids);
+   _mongoc_array_destroy (&self->mapof_ior.entries);
    bson_free (self);
 }
 
@@ -176,8 +176,8 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 
    // Create empty result and exception to collect results/errors from batches.
    ret.res = mongoc_bulkwriteresult_new ();
-   // Copy `inserted_ids` to the result.
-   _mongoc_array_copy (&ret.res->mapof_ior.inserted_ids, &models->inserted_ids);
+   // Copy `entries` to the result.
+   _mongoc_array_copy (&ret.res->mapof_ior.entries, &models->entries);
    ret.exc = mongoc_bulkwriteexception_new (models->n_ops);
 
    // Select a stream.
@@ -276,8 +276,8 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
           * + 1 byte payload type = 1
           * + 4 byte size of payload
           * == 26 bytes opcode overhead
-          * + X Full command document {insert: "test", writeConcern: {...}}
-          * + Y command identifier ("documents", "deletes", "updates") ( + \0)
+          * + X Payload 0 document: {bulkWrite: 1, writeConcern: {...}}
+          * + Y Payload 1 identifier: "ops" + \0
           */
          size_t overhead =
             26 + parts.assembled.command->len + strlen ("ops") + 1;
@@ -488,7 +488,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 
                      // Mark in the insert so the insert IDs are not reported.
                      mongoc_insertoneresult_t *ior =
-                        &_mongoc_array_index (&ret.res->mapof_ior.inserted_ids,
+                        &_mongoc_array_index (&ret.res->mapof_ior.entries,
                                               mongoc_insertoneresult_t,
                                               models_idx);
                      ior->has_write_error = true;
@@ -536,11 +536,11 @@ mongoc_mapof_insertoneresult_lookup (mongoc_mapof_insertoneresult_t *self,
                                      size_t idx)
 {
    BSON_ASSERT_PARAM (self);
-   if (idx >= self->inserted_ids.len) {
+   if (idx >= self->entries.len) {
       return NULL;
    }
    mongoc_insertoneresult_t *ior =
-      &_mongoc_array_index (&self->inserted_ids, mongoc_insertoneresult_t, idx);
+      &_mongoc_array_index (&self->entries, mongoc_insertoneresult_t, idx);
    if (!ior->is_insert) {
       return NULL;
    }
@@ -599,7 +599,7 @@ mongoc_listof_bulkwritemodel_new (void)
       bson_malloc0 (sizeof (mongoc_listof_bulkwritemodel_t));
    _mongoc_buffer_init (&self->ops, NULL, 0, NULL, NULL);
    bson_init (&self->ns_to_index);
-   _mongoc_array_init (&self->inserted_ids, sizeof (mongoc_insertoneresult_t));
+   _mongoc_array_init (&self->entries, sizeof (mongoc_insertoneresult_t));
    return self;
 }
 
@@ -609,7 +609,7 @@ mongoc_listof_bulkwritemodel_destroy (mongoc_listof_bulkwritemodel_t *self)
    if (!self) {
       return;
    }
-   _mongoc_array_destroy (&self->inserted_ids);
+   _mongoc_array_destroy (&self->entries);
    bson_destroy (&self->ns_to_index);
    _mongoc_buffer_destroy (&self->ops);
    bson_free (self);
@@ -688,6 +688,6 @@ mongoc_listof_bulkwritemodel_append_insertone (
 
    self->n_ops++;
    mongoc_insertoneresult_t ior = {.is_insert = true, .id_iter = id_iter};
-   _mongoc_array_append_val (&self->inserted_ids, ior);
+   _mongoc_array_append_val (&self->entries, ior);
    return true;
 }
