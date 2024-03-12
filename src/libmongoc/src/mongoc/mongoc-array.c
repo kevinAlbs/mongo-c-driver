@@ -128,8 +128,10 @@ _mongoc_array_append_vals (mongoc_array_t *array,
    array->len += n_elements;
 }
 
+// `_mongoc_array_init_with_zerofill` initializes `array`, appends `n_elements`
+// entries, and zero initializes entries.
 void
-_mongoc_array_resize (mongoc_array_t *array, size_t n_elements)
+_mongoc_array_init_with_zerofill (mongoc_array_t *array, size_t n_elements)
 {
    size_t len;
    size_t new_size;
@@ -152,5 +154,8 @@ _mongoc_array_resize (mongoc_array_t *array, size_t n_elements)
 
       bson_free (old_data);
    }
-   array->len += n_elements;
+
+   // Zero out the new entries.
+   memset (array->data, 0, array->allocated);
+   array->len = n_elements;
 }

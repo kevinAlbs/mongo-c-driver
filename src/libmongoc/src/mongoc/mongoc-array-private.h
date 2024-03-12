@@ -51,7 +51,7 @@ _mongoc_array_aligned_init (mongoc_array_t *array,
 void
 _mongoc_array_init (mongoc_array_t *array, size_t element_size);
 void
-_mongoc_array_resize (mongoc_array_t *array, size_t n_elements);
+_mongoc_array_init_with_zerofill (mongoc_array_t *array, size_t n_elements);
 void
 _mongoc_array_copy (mongoc_array_t *dst, const mongoc_array_t *src);
 void
