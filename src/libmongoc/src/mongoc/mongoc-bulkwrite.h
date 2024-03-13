@@ -258,7 +258,7 @@ struct _mongoc_bulkwriteoptions_t {
     *
     * Defaults to false.
     */
-   bool ordered;
+   mongoc_opt_bool_t ordered;
 
    /**
     * If true, allows the writes to opt out of document-level validation.

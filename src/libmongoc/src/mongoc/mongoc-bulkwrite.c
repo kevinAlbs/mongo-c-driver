@@ -173,6 +173,10 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
    mongoc_server_stream_t *ss = NULL;
    bson_t cmd = BSON_INITIALIZER;
    mongoc_cmd_parts_t parts = {0};
+   mongoc_bulkwriteoptions_t defaults = {0};
+   if (!options) {
+      options = &defaults;
+   }
 
    // Create empty result and exception to collect results/errors from batches.
    ret.res = mongoc_bulkwriteresult_new ();
@@ -199,6 +203,18 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
    // Create the payload 0.
    {
       BSON_ASSERT (bson_append_int32 (&cmd, "bulkWrite", 9, 1));
+      // errorsOnly is default true. Set to false if verboseResults requested.
+      BSON_ASSERT (bson_append_bool (
+         &cmd,
+         "errorsOnly",
+         10,
+         (options && options->verboseResults) ? false : true));
+      // ordered is default true.
+      BSON_ASSERT (bson_append_bool (
+         &cmd,
+         "ordered",
+         7,
+         (options && options->ordered.isset) ? options->ordered.value : true));
       // Append 'nsInfo' array.
       bson_array_builder_t *nsInfo;
       BSON_ASSERT (
