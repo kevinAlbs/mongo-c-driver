@@ -385,10 +385,11 @@ result_check (result_t *result,
                              result->value,
                              result->array_of_root_docs,
                              error)) {
-         test_diagnostics_error_info (
-            "expectResult mismatch:\nExpected: %s\nActual: %s\n",
-            bson_val_to_json (expect_result),
-            bson_val_to_json (result->value));
+         test_diagnostics_error_info ("Result mismatch:\n"
+                                      "Expected: %s\n"
+                                      "Actual:   %s\n",
+                                      bson_val_to_json (expect_result),
+                                      bson_val_to_json (result->value));
          goto done;
       }
    }
