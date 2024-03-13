@@ -236,6 +236,179 @@ done:
    return ret;
 }
 
+#include <mongoc-bulkwrite.h>
+
+static bool
+append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
+                              bson_t *model_wrapper,
+                              bson_error_t *error)
+{
+   bool ok = false;
+   // Example `model_wrapper`:
+   // { "insertOne": { "namespace": "db.coll", "document": { "_id": 1 } }}
+   char *namespace = NULL;
+   bson_t *document = NULL;
+   bson_parser_t *parser = bson_parser_new ();
+
+   // Expect exactly one root key to identify the model (e.g. "insertOne"):
+   if (bson_count_keys (model_wrapper) != 1) {
+      test_set_error (error,
+                      "expected exactly one key in model, got %d : %s",
+                      bson_count_keys (model_wrapper),
+                      tmp_json (model_wrapper));
+      goto done;
+   }
+   bson_iter_t model_wrapper_iter;
+   BSON_ASSERT (bson_iter_init (&model_wrapper_iter, model_wrapper));
+   BSON_ASSERT (bson_iter_next (&model_wrapper_iter));
+   const char *model_name = bson_iter_key (&model_wrapper_iter);
+   bson_t model_bson;
+   bson_iter_bson (&model_wrapper_iter, &model_bson);
+
+   if (0 == strcmp ("insertOne", model_name)) {
+      // Parse an "insertOne".
+      bson_parser_utf8 (parser, "namespace", &namespace);
+      bson_parser_doc (parser, "document", &document);
+      if (!bson_parser_parse (parser, &model_bson, error)) {
+         goto done;
+      }
+
+      if (!mongoc_listof_bulkwritemodel_append_insertone (
+             models,
+             namespace,
+             -1,
+             (mongoc_insertone_model_t){.document = document},
+             error)) {
+         goto done;
+      }
+   } else {
+      test_set_error (error, "unsupported model: %s", model_name);
+      goto done;
+   }
+
+   ok = true;
+done:
+   bson_parser_destroy_with_parsed_fields (parser);
+   return ok;
+}
+
+static bool
+operation_client_bulkwrite (test_t *test,
+                            operation_t *op,
+                            result_t *result,
+                            bson_error_t *error)
+{
+   bool ret = false;
+   mongoc_client_t *client = NULL;
+
+   mongoc_listof_bulkwritemodel_t *models = NULL;
+
+   client = entity_map_get_client (test->entity_map, op->object, error);
+   if (!client) {
+      goto done;
+   }
+
+   mongoc_bulkwriteoptions_t opts = {0};
+   int64_t nmodels = 0;
+
+   // Parse arguments.
+   {
+      bool parse_ok = false;
+      bson_t *args_models = NULL;
+      bool *args_verboseResults = NULL;
+      bool *args_ordered = NULL;
+      bson_parser_t *parser = bson_parser_new ();
+
+      bson_parser_array (parser, "models", &args_models);
+      bson_parser_bool_optional (
+         parser, "verboseResults", &args_verboseResults);
+      bson_parser_bool_optional (parser, "ordered", &args_ordered);
+      if (!bson_parser_parse (parser, op->arguments, error)) {
+         goto parse_done;
+      }
+      if (args_verboseResults && *args_verboseResults) {
+         opts.verboseResults = true;
+      }
+      if (args_ordered) {
+         opts.ordered =
+            *args_ordered ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE;
+      }
+
+      // Parse models.
+      bson_iter_t args_models_iter;
+      BSON_ASSERT (bson_iter_init (&args_models_iter, args_models));
+      models = mongoc_listof_bulkwritemodel_new ();
+      while (bson_iter_next (&args_models_iter)) {
+         nmodels++;
+         bson_t model_wrapper;
+         bson_iter_bson (&args_models_iter, &model_wrapper);
+         if (!append_client_bulkwritemodel (models, &model_wrapper, error)) {
+            goto parse_done;
+         }
+      }
+
+      parse_ok = true;
+   parse_done:
+      bson_parser_destroy_with_parsed_fields (parser);
+      if (!parse_ok) {
+         goto done;
+      }
+   }
+
+   // Do client bulk write.
+   mongoc_bulkwritereturn_t bwr =
+      mongoc_client_bulkwrite (client, models, &opts);
+
+   // Build up the result value as a BSON document.
+   bson_t bwr_bson = BSON_INITIALIZER;
+   if (bwr.res) {
+      BSON_APPEND_INT32 (&bwr_bson,
+                         "insertedCount",
+                         mongoc_bulkwriteresult_insertedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson, "upsertedCount", 0);
+      BSON_APPEND_INT32 (&bwr_bson, "matchedCount", 0);
+      BSON_APPEND_INT32 (&bwr_bson, "modifiedCount", 0);
+      BSON_APPEND_INT32 (&bwr_bson, "deletedCount", 0);
+      mongoc_mapof_insertoneresult_t *mapof_ior =
+         mongoc_bulkwriteresult_insertResults (bwr.res);
+      if (mapof_ior) {
+         bson_t insertResults_bson;
+         BSON_APPEND_DOCUMENT_BEGIN (
+            &bwr_bson, "insertResults", &insertResults_bson);
+         // For simplicity: iterate over all indices.
+         for (int64_t idx = 0; idx < nmodels; idx++) {
+            mongoc_insertoneresult_t *ior =
+               mongoc_mapof_insertoneresult_lookup (mapof_ior, idx);
+            if (ior) {
+               bson_t ior_bson;
+               char *idx_str = bson_strdup_printf ("%" PRId64, idx);
+               BSON_APPEND_DOCUMENT_BEGIN (
+                  &insertResults_bson, idx_str, &ior_bson);
+               BSON_APPEND_VALUE (&ior_bson,
+                                  "insertedId",
+                                  mongoc_insertoneresult_inserted_id (ior));
+               bson_append_document_end (&insertResults_bson, &ior_bson);
+               bson_free (idx_str);
+            }
+         }
+         bson_append_document_end (&bwr_bson, &insertResults_bson);
+      }
+      bson_t empty_doc = BSON_INITIALIZER;
+      BSON_APPEND_DOCUMENT (&bwr_bson, "updateResults", &empty_doc);
+      BSON_APPEND_DOCUMENT (&bwr_bson, "deleteResults", &empty_doc);
+   }
+   mongoc_bulkwritereturn_cleanup (&bwr);
+   bson_error_t empty_error = {0};
+   bson_val_t *bwr_val = bson_val_from_bson (&bwr_bson);
+   result_from_val_and_reply (result, bwr_val, NULL /* reply */, &empty_error);
+   bson_destroy (&bwr_bson);
+   bson_val_destroy (bwr_val);
+   ret = true;
+done:
+   mongoc_listof_bulkwritemodel_destroy (models);
+   return ret;
+}
+
 static bool
 operation_create_datakey (test_t *test,
                           operation_t *op,
@@ -3911,6 +4084,7 @@ operation_run (test_t *test, bson_t *op_bson, bson_error_t *error)
       {"createChangeStream", operation_create_change_stream},
       {"listDatabases", operation_list_databases},
       {"listDatabaseNames", operation_list_database_names},
+      {"clientBulkWrite", operation_client_bulkwrite},
 
       /* ClientEncryption operations */
       {"createDataKey", operation_create_datakey},
