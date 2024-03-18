@@ -248,6 +248,8 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
    // { "insertOne": { "namespace": "db.coll", "document": { "_id": 1 } }}
    char *namespace = NULL;
    bson_t *document = NULL;
+   bson_t *filter = NULL;
+   bson_t *update = NULL;
    bson_parser_t *parser = bson_parser_new ();
 
    // Expect exactly one root key to identify the model (e.g. "insertOne"):
@@ -281,6 +283,39 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              error)) {
          goto done;
       }
+   } else if (0 == strcmp ("updateOne", model_name)) {
+      // Parse an "updateOne".
+      bson_parser_utf8 (parser, "namespace", &namespace);
+      bson_parser_doc (parser, "filter", &filter);
+      bson_parser_doc (parser, "update", &update);
+      if (!bson_parser_parse (parser, &model_bson, error)) {
+         goto done;
+      }
+
+      if (!mongoc_listof_bulkwritemodel_append_updateone (
+             models,
+             namespace,
+             -1,
+             (mongoc_updateone_model_t){.filter = filter, .update = update},
+             error)) {
+         goto done;
+      }
+   } else if (0 == strcmp ("deleteOne", model_name)) {
+      // Parse an "updateOne".
+      bson_parser_utf8 (parser, "namespace", &namespace);
+      bson_parser_doc (parser, "filter", &filter);
+      if (!bson_parser_parse (parser, &model_bson, error)) {
+         goto done;
+      }
+
+      if (!mongoc_listof_bulkwritemodel_append_deleteone (
+             models,
+             namespace,
+             -1,
+             (mongoc_deleteone_model_t){.filter = filter},
+             error)) {
+         goto done;
+      }
    } else {
       test_set_error (error, "unsupported model: %s", model_name);
       goto done;
@@ -300,6 +335,8 @@ operation_client_bulkwrite (test_t *test,
 {
    bool ret = false;
    mongoc_client_t *client = NULL;
+   bson_t *comment = NULL;
+   bson_t *let = NULL;
 
    mongoc_listof_bulkwritemodel_t *models = NULL;
 
@@ -317,12 +354,19 @@ operation_client_bulkwrite (test_t *test,
       bson_t *args_models = NULL;
       bool *args_verboseResults = NULL;
       bool *args_ordered = NULL;
+      bson_t *args_comment = NULL;
+      bool *args_bypassDocumentValidation = NULL;
+      bson_t *args_let = NULL;
       bson_parser_t *parser = bson_parser_new ();
 
       bson_parser_array (parser, "models", &args_models);
       bson_parser_bool_optional (
          parser, "verboseResults", &args_verboseResults);
       bson_parser_bool_optional (parser, "ordered", &args_ordered);
+      bson_parser_doc_optional (parser, "comment", &args_comment);
+      bson_parser_bool_optional (
+         parser, "bypassDocumentValidation", &args_bypassDocumentValidation);
+      bson_parser_doc_optional (parser, "let", &args_let);
       if (!bson_parser_parse (parser, op->arguments, error)) {
          goto parse_done;
       }
@@ -332,6 +376,21 @@ operation_client_bulkwrite (test_t *test,
       if (args_ordered) {
          opts.ordered =
             *args_ordered ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE;
+      }
+      if (args_comment) {
+         // Copy `args_comment` to extend lifetime beyond `parser`.
+         comment = bson_copy (args_comment);
+         opts.comment = comment;
+      }
+      if (args_bypassDocumentValidation) {
+         opts.bypassDocumentValidation = *args_bypassDocumentValidation
+                                            ? MONGOC_OPT_BOOL_TRUE
+                                            : MONGOC_OPT_BOOL_FALSE;
+      }
+      if (args_let) {
+         // Copy `args_let` to extend lifetime beyond `parser`.
+         let = bson_copy (args_let);
+         opts.let = let;
       }
 
       // Parse models.
@@ -366,9 +425,15 @@ operation_client_bulkwrite (test_t *test,
                          "insertedCount",
                          mongoc_bulkwriteresult_insertedCount (bwr.res));
       BSON_APPEND_INT32 (&bwr_bson, "upsertedCount", 0);
-      BSON_APPEND_INT32 (&bwr_bson, "matchedCount", 0);
-      BSON_APPEND_INT32 (&bwr_bson, "modifiedCount", 0);
-      BSON_APPEND_INT32 (&bwr_bson, "deletedCount", 0);
+      BSON_APPEND_INT32 (&bwr_bson,
+                         "matchedCount",
+                         mongoc_bulkwriteresult_matchedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson,
+                         "modifiedCount",
+                         mongoc_bulkwriteresult_modifiedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson,
+                         "deletedCount",
+                         mongoc_bulkwriteresult_deletedCount (bwr.res));
       mongoc_mapof_insertoneresult_t *mapof_ior =
          mongoc_bulkwriteresult_insertResults (bwr.res);
       if (mapof_ior) {
@@ -393,9 +458,59 @@ operation_client_bulkwrite (test_t *test,
          }
          bson_append_document_end (&bwr_bson, &insertResults_bson);
       }
-      bson_t empty_doc = BSON_INITIALIZER;
-      BSON_APPEND_DOCUMENT (&bwr_bson, "updateResults", &empty_doc);
-      BSON_APPEND_DOCUMENT (&bwr_bson, "deleteResults", &empty_doc);
+
+      mongoc_mapof_updateresult_t *mapof_ur =
+         mongoc_bulkwriteresult_updateResult (bwr.res);
+      if (mapof_ur) {
+         bson_t updateResults_bson;
+         BSON_APPEND_DOCUMENT_BEGIN (
+            &bwr_bson, "updateResults", &updateResults_bson);
+         // For simplicity: iterate over all indices.
+         for (int64_t idx = 0; idx < nmodels; idx++) {
+            mongoc_updateresult_t *ur =
+               mongoc_mapof_updateresult_lookup (mapof_ur, idx);
+            if (ur) {
+               bson_t ur_bson;
+               char *idx_str = bson_strdup_printf ("%" PRId64, idx);
+               BSON_APPEND_DOCUMENT_BEGIN (
+                  &updateResults_bson, idx_str, &ur_bson);
+               BSON_APPEND_INT32 (&ur_bson,
+                                  "matchedCount",
+                                  mongoc_updateresult_matchedCount (ur));
+               BSON_APPEND_INT32 (&ur_bson,
+                                  "modifiedCount",
+                                  mongoc_updateresult_modifiedCount (ur));
+               bson_append_document_end (&updateResults_bson, &ur_bson);
+               bson_free (idx_str);
+            }
+         }
+         bson_append_document_end (&bwr_bson, &updateResults_bson);
+      }
+
+      mongoc_mapof_deleteresult_t *mapof_dr =
+         mongoc_bulkwriteresult_deleteResults (bwr.res);
+      if (mapof_dr) {
+         bson_t deleteResults_bson;
+         BSON_APPEND_DOCUMENT_BEGIN (
+            &bwr_bson, "deleteResults", &deleteResults_bson);
+         // For simplicity: iterate over all indices.
+         for (int64_t idx = 0; idx < nmodels; idx++) {
+            mongoc_deleteresult_t *dr =
+               mongoc_mapof_deleteresult_lookup (mapof_dr, idx);
+            if (dr) {
+               bson_t dr_bson;
+               char *idx_str = bson_strdup_printf ("%" PRId64, idx);
+               BSON_APPEND_DOCUMENT_BEGIN (
+                  &deleteResults_bson, idx_str, &dr_bson);
+               BSON_APPEND_INT32 (&dr_bson,
+                                  "deletedCount",
+                                  mongoc_deleteresult_deletedCount (dr));
+               bson_append_document_end (&deleteResults_bson, &dr_bson);
+               bson_free (idx_str);
+            }
+         }
+         bson_append_document_end (&bwr_bson, &deleteResults_bson);
+      }
    }
    mongoc_bulkwritereturn_cleanup (&bwr);
    bson_error_t empty_error = {0};
@@ -405,6 +520,8 @@ operation_client_bulkwrite (test_t *test,
    bson_val_destroy (bwr_val);
    ret = true;
 done:
+   bson_destroy (let);
+   bson_destroy (comment);
    mongoc_listof_bulkwritemodel_destroy (models);
    return ret;
 }

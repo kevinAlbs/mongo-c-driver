@@ -146,6 +146,14 @@ typedef struct {
    bson_t *extra; // may be NULL.
 } mongoc_updateone_model_t;
 
+bool
+mongoc_listof_bulkwritemodel_append_updateone (
+   mongoc_listof_bulkwritemodel_t *self,
+   const char *namespace,
+   int namespace_len,
+   mongoc_updateone_model_t model,
+   bson_error_t *error);
+
 typedef struct {
    /**
     * The filter to apply.
@@ -221,6 +229,14 @@ typedef struct {
    // It is included to support future server options.
    bson_t *extra; // may be NULL.
 } mongoc_deleteone_model_t;
+
+bool
+mongoc_listof_bulkwritemodel_append_deleteone (
+   mongoc_listof_bulkwritemodel_t *self,
+   const char *namespace,
+   int namespace_len,
+   mongoc_deleteone_model_t model,
+   bson_error_t *error);
 
 typedef struct {
    /**
@@ -300,6 +316,13 @@ struct _mongoc_bulkwriteoptions_t {
     * Defaults to false.
     */
    bool verboseResults;
+
+   /**
+    * Enables users to specify an arbitrary comment to help trace the operation
+    * through the database profiler, currentOp and logs. The default is to not
+    * send a value.
+    */
+   bson_t *comment;
 
    // `extra` is appended to the bulkWrite command.
    // It is included to support future server options.
@@ -409,13 +432,13 @@ mongoc_insertoneresult_inserted_id (mongoc_insertoneresult_t *self);
  * The number of documents that matched the filter.
  */
 int64_t
-mongoc_updateresult_matchedCount (mongoc_insertoneresult_t *self);
+mongoc_updateresult_matchedCount (mongoc_updateresult_t *self);
 
 /**
  * The number of documents that were modified.
  */
 int64_t
-mongoc_updateresult_modifiedCount (mongoc_insertoneresult_t *self);
+mongoc_updateresult_modifiedCount (mongoc_updateresult_t *self);
 
 /**
  * The number of documents that were upserted.
@@ -424,14 +447,14 @@ mongoc_updateresult_modifiedCount (mongoc_insertoneresult_t *self);
  * so long as it is always possible to discern whether an upsert took place.
  */
 int64_t
-mongoc_updateresult_upsertedCount (mongoc_insertoneresult_t *self);
+mongoc_updateresult_upsertedCount (mongoc_updateresult_t *self);
 
 /**
  * The _id field of the upserted document if an upsert occurred.
  */
 // May be NULL.
 const bson_value_t *
-mongoc_updateresult_upsertedId (mongoc_insertoneresult_t *self);
+mongoc_updateresult_upsertedId (mongoc_updateresult_t *self);
 
 /**
  * The number of documents that were deleted.
