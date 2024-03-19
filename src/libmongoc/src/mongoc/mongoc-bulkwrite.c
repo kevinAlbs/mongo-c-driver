@@ -910,6 +910,16 @@ mongoc_bulkwriteexception_error (mongoc_bulkwriteexception_t *self,
                                  const bson_t **error_document)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT_PARAM (error);
+   // `error_document` is optional.
+
+   if (self->optional_error.isset) {
+      memcpy (error, &self->optional_error.error, sizeof (bson_error_t));
+      if (error_document) {
+         *error_document = &self->optional_error.document;
+      }
+      return true;
+   }
    return false;
 }
 
@@ -1079,6 +1089,70 @@ mongoc_listof_bulkwritemodel_append_updateone (
 
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
    BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
+   BSON_ASSERT (bson_append_bool (&op, "multi", 5, false));
+
+   BSON_ASSERT (
+      _mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
+
+   self->n_ops++;
+   // Add a slot in `entries` to keep the 1:1 mapping with the models.
+   mongoc_insertoneresult_t ior = {.is_insert = false};
+   _mongoc_array_append_val (&self->entries, ior);
+   bool is_update = true;
+   _mongoc_array_append_val (&self->updates, is_update);
+   bool is_delete = false;
+   _mongoc_array_append_val (&self->deletes, is_delete);
+   return true;
+}
+
+bool
+mongoc_listof_bulkwritemodel_append_replaceone (
+   mongoc_listof_bulkwritemodel_t *self,
+   const char *namespace,
+   int namespace_len,
+   mongoc_replaceone_model_t model,
+   bson_error_t *error)
+{
+   BSON_ASSERT_PARAM (self);
+   BSON_ASSERT_PARAM (namespace);
+   bson_t *filter = model.filter;
+   bson_t *replacement = model.replacement;
+   BSON_ASSERT_PARAM (filter);
+   BSON_ASSERT (filter->len >= 5);
+   BSON_ASSERT_PARAM (replacement);
+   BSON_ASSERT (replacement->len >= 5);
+
+   bson_t op = BSON_INITIALIZER;
+
+   // Find or create the namespace index.
+   {
+      bson_iter_t iter;
+      int32_t ns_index;
+      if (bson_iter_init_find (&iter, &self->ns_to_index, namespace)) {
+         ns_index = bson_iter_int32 (&iter);
+      } else {
+         uint32_t key_count = bson_count_keys (&self->ns_to_index);
+         if (!bson_in_range_int32_t_unsigned (key_count)) {
+            bson_set_error (
+               error,
+               MONGOC_ERROR_COMMAND,
+               MONGOC_ERROR_COMMAND_INVALID_ARG,
+               "Only %" PRId32
+               " distinct collections may be inserted into. Got %" PRIu32,
+               INT32_MAX,
+               key_count);
+            return false;
+         }
+         ns_index = (int32_t) key_count;
+         bson_append_int32 (
+            &self->ns_to_index, namespace, namespace_len, ns_index);
+      }
+      BSON_ASSERT (bson_append_int32 (&op, "update", 6, ns_index));
+   }
+
+
+   BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
+   BSON_ASSERT (bson_append_document (&op, "updateMods", 10, replacement));
    BSON_ASSERT (bson_append_bool (&op, "multi", 5, false));
 
    BSON_ASSERT (

@@ -208,6 +208,60 @@ typedef struct {
     * The filter to apply.
     */
    bson_t *filter;
+   /**
+    * The replacement document.
+    */
+   bson_t *replacement;
+
+   /**
+    * A set of filters specifying to which array elements an update should
+    * apply.
+    *
+    * This option is sent only if the caller explicitly provides a value.
+    */
+   bson_t *arrayFilters; // may be NULL
+
+   /**
+    * Specifies a collation.
+    *
+    * This option is sent only if the caller explicitly provides a value.
+    */
+   bson_t *collation; // may be NULL
+
+   /**
+    * The index to use. Specify either the index name as a string or the index
+    * key pattern. If specified, then the query system will only consider plans
+    * using the hinted index.
+    *
+    * This option is only sent if the caller explicitly provides a value.
+    */
+   bson_value_t *hint; // may be NULL
+
+   /**
+    * When true, creates a new document if no document matches the query.
+    * Defaults to false.
+    *
+    * This options is sent only if the caller explicitly provides a value.
+    */
+   mongoc_opt_bool_t upsert;
+   // `extra` is appended to the update operation.
+   // It is included to support future server options.
+   bson_t *extra; // may be NULL.
+} mongoc_replaceone_model_t;
+
+bool
+mongoc_listof_bulkwritemodel_append_replaceone (
+   mongoc_listof_bulkwritemodel_t *self,
+   const char *namespace,
+   int namespace_len,
+   mongoc_replaceone_model_t model,
+   bson_error_t *error);
+
+typedef struct {
+   /**
+    * The filter to apply.
+    */
+   bson_t *filter;
 
    /**
     * Specifies a collation.

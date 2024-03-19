@@ -250,6 +250,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
    bson_t *document = NULL;
    bson_t *filter = NULL;
    bson_t *update = NULL;
+   bson_t *replacement = NULL;
    bson_parser_t *parser = bson_parser_new ();
 
    // Expect exactly one root key to identify the model (e.g. "insertOne"):
@@ -301,7 +302,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
          goto done;
       }
    } else if (0 == strcmp ("deleteOne", model_name)) {
-      // Parse an "updateOne".
+      // Parse a "deleteOne".
       bson_parser_utf8 (parser, "namespace", &namespace);
       bson_parser_doc (parser, "filter", &filter);
       if (!bson_parser_parse (parser, &model_bson, error)) {
@@ -313,6 +314,24 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              namespace,
              -1,
              (mongoc_deleteone_model_t){.filter = filter},
+             error)) {
+         goto done;
+      }
+   } else if (0 == strcmp ("replaceOne", model_name)) {
+      // Parse a "replaceOne".
+      bson_parser_utf8 (parser, "namespace", &namespace);
+      bson_parser_doc (parser, "filter", &filter);
+      bson_parser_doc (parser, "replacement", &replacement);
+      if (!bson_parser_parse (parser, &model_bson, error)) {
+         goto done;
+      }
+
+      if (!mongoc_listof_bulkwritemodel_append_replaceone (
+             models,
+             namespace,
+             -1,
+             (mongoc_replaceone_model_t){.filter = filter,
+                                         .replacement = replacement},
              error)) {
          goto done;
       }
@@ -512,6 +531,11 @@ operation_client_bulkwrite (test_t *test,
          bson_append_document_end (&bwr_bson, &deleteResults_bson);
       }
    }
+
+   if (bwr.exc && mongoc_bulkwriteexception_error (bwr.exc, error, NULL)) {
+      test_error ("Error reporting not-yet-implemented: %s\n", error->message);
+   }
+
    mongoc_bulkwritereturn_cleanup (&bwr);
    bson_error_t empty_error = {0};
    bson_val_t *bwr_val = bson_val_from_bson (&bwr_bson);
