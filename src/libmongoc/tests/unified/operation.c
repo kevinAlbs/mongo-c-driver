@@ -251,6 +251,8 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
    bson_t *filter = NULL;
    bson_t *update = NULL;
    bson_t *replacement = NULL;
+   bson_t *collation = NULL;
+   bson_val_t *hint = NULL;
    bson_parser_t *parser = bson_parser_new ();
 
    // Expect exactly one root key to identify the model (e.g. "insertOne"):
@@ -305,6 +307,8 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
       // Parse a "deleteOne".
       bson_parser_utf8 (parser, "namespace", &namespace);
       bson_parser_doc (parser, "filter", &filter);
+      bson_parser_doc_optional (parser, "collation", &collation);
+      bson_parser_any_optional (parser, "hint", &hint);
       if (!bson_parser_parse (parser, &model_bson, error)) {
          goto done;
       }
@@ -313,7 +317,31 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              models,
              namespace,
              -1,
-             (mongoc_deleteone_model_t){.filter = filter},
+             (mongoc_deleteone_model_t){.filter = filter,
+                                        .collation = collation,
+                                        .hint = hint ? bson_val_to_value (hint)
+                                                     : NULL},
+             error)) {
+         goto done;
+      }
+   } else if (0 == strcmp ("deleteMany", model_name)) {
+      // Parse a "deleteMany".
+      bson_parser_utf8 (parser, "namespace", &namespace);
+      bson_parser_doc (parser, "filter", &filter);
+      bson_parser_doc_optional (parser, "collation", &collation);
+      bson_parser_any_optional (parser, "hint", &hint);
+      if (!bson_parser_parse (parser, &model_bson, error)) {
+         goto done;
+      }
+
+      if (!mongoc_listof_bulkwritemodel_append_deletemany (
+             models,
+             namespace,
+             -1,
+             (mongoc_deletemany_model_t){.filter = filter,
+                                         .collation = collation,
+                                         .hint = hint ? bson_val_to_value (hint)
+                                                      : NULL},
              error)) {
          goto done;
       }

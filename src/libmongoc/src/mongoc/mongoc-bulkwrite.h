@@ -277,7 +277,7 @@ typedef struct {
     *
     * This option is only sent if the caller explicitly provides a value.
     */
-   bson_value_t *hint; // may be NULL
+   const bson_value_t *hint; // may be NULL
 
    // `extra` is appended to the delete operation.
    // It is included to support future server options.
@@ -312,12 +312,20 @@ typedef struct {
     *
     * This option is only sent if the caller explicitly provides a value.
     */
-   bson_value_t *hint; // may be NULL
+   const bson_value_t *hint; // may be NULL
 
    // `extra` is appended to the delete operation.
    // It is included to support future server options.
    bson_t *extra; // may be NULL.
 } mongoc_deletemany_model_t;
+
+bool
+mongoc_listof_bulkwritemodel_append_deletemany (
+   mongoc_listof_bulkwritemodel_t *self,
+   const char *namespace,
+   int namespace_len,
+   mongoc_deletemany_model_t model,
+   bson_error_t *error);
 
 struct _mongoc_bulkwriteoptions_t {
    /**
