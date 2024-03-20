@@ -622,7 +622,10 @@ check_schema_version (test_file_t *test_file)
    const char *supported_version_strs[] = {
       "1.8",  /* fully supported through this version */
       "1.12", /* partially supported (expectedError.errorResponse assertions) */
-      "1.18" /* partially supported (additional properties in kmsProviders) */};
+      "1.18"  /* partially supported (additional properties in kmsProviders) */
+      "1.20"  /* partially supported (expectedError.writeErrors and
+                 expectedError.writeConcernErrors) */
+   };
    int i;
 
    for (i = 0; i < sizeof (supported_version_strs) /

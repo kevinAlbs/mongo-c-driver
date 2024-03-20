@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#ifndef MONGOC_BULKWRITE_H
+#define MONGOC_BULKWRITE_H
+
 #include <bson/bson.h>
 #include <mongoc-client.h>
 #include <mongoc-write-concern.h>
@@ -573,6 +576,8 @@ mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self);
  * error was encountered.
  */
 // May be NULL.
+// TODO: consider removing. May not be needed since
+// `mongoc_bulkwritereturn_t` contains a `mongoc_bulkwriteresult_t`.
 mongoc_bulkwriteresult_t *
 mongoc_bulkwriteexception_partialResult (mongoc_bulkwriteexception_t *self);
 
@@ -634,3 +639,5 @@ char *
 mongoc_writeerror_message (mongoc_writeerror_t *self);
 
 BSON_END_DECLS
+
+#endif // MONGOC_BULKWRITE_H

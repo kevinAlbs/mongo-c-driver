@@ -30,7 +30,7 @@ struct _mongoc_listof_bulkwritemodel_t {
    // operation was an update, the value is true.
    mongoc_array_t updates;
    // `deletes` is an array of bools sized to the number of operations. If the
-   // operation was an update, the value is true.
+   // operation was a delete, the value is true.
    mongoc_array_t deletes;
    // TODO: Consider combining `entries`, `updates`, and `deletes` into a
    // `verbose_results` array to contain:
@@ -96,6 +96,8 @@ struct _mongoc_deleteresult_t {
     * The number of documents that were deleted.
     */
    int64_t deletedCount;
+
+   bool succeeded;
 };
 
 struct _mongoc_bulkwriteexception_t {
@@ -734,6 +736,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                            }
 
                            dr->deletedCount = n;
+                           dr->succeeded = true;
                         }
                      }
                   }
@@ -789,6 +792,9 @@ mongoc_mapof_insertoneresult_lookup (mongoc_mapof_insertoneresult_t *self,
       return NULL;
    }
    if (ior->has_write_error) {
+      // TODO: do not return if operation did not return success.
+      // If operation was not run (due to earlier error), `has_write_error` may
+      // be false.
       return NULL;
    }
    return ior;
@@ -822,6 +828,7 @@ mongoc_mapof_updateresult_lookup (mongoc_mapof_updateresult_t *self, size_t idx)
    if (!ur->is_update) {
       return NULL;
    }
+   // TODO: do not return if operation did not return success.
    return ur;
 }
 
@@ -853,12 +860,15 @@ mongoc_mapof_deleteresult_lookup (mongoc_mapof_deleteresult_t *self, size_t idx)
    if (idx >= self->entries.len) {
       return NULL;
    }
-   mongoc_deleteresult_t *ur =
+   mongoc_deleteresult_t *dr =
       &_mongoc_array_index (&self->entries, mongoc_deleteresult_t, idx);
-   if (!ur->is_delete) {
+   if (!dr->is_delete) {
       return NULL;
    }
-   return ur;
+   if (!dr->succeeded) {
+      return NULL;
+   }
+   return dr;
 }
 
 int64_t
@@ -1300,4 +1310,24 @@ mongoc_listof_bulkwritemodel_append_deletemany (
    bool is_delete = true;
    _mongoc_array_append_val (&self->deletes, is_delete);
    return true;
+}
+
+struct _mongoc_listof_writeconcernerror_t {
+   int placeholder;
+};
+
+mongoc_listof_writeconcernerror_t *
+mongoc_bulkwriteexception_writeConcernErrors (mongoc_bulkwriteexception_t *self)
+{
+   return NULL;
+}
+
+struct _mongoc_mapof_writeerror_t {
+   int placeholder;
+};
+
+mongoc_mapof_writeerror_t *
+mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self)
+{
+   return NULL;
 }

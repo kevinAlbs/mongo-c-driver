@@ -34,6 +34,10 @@ struct _result_t {
    bson_t *reply;
    char *str;
    bool array_of_root_docs;
+   // For a mongoc_client_bulkwrite operation, `write_errors` and
+   // `write_concern_errors` are optionally set.
+   bson_t *write_errors;
+   bson_t *write_concern_errors;
 };
 
 result_t *
@@ -80,6 +84,8 @@ result_destroy (result_t *result)
    bson_val_destroy (result->value);
    bson_destroy (result->reply);
    bson_free (result->str);
+   bson_destroy (result->write_errors);
+   bson_destroy (result->write_concern_errors);
    bson_free (result);
 }
 
@@ -361,6 +367,8 @@ result_check (result_t *result,
    bson_t *error_labels_omit;
    bson_val_t *error_expect_result;
    bson_val_t *error_response;
+   bson_t *write_errors = NULL;
+   bson_t *write_concern_errors = NULL;
 
    if (!expect_result && !expect_error) {
       if (!result->ok) {
@@ -407,6 +415,9 @@ result_check (result_t *result,
          parser, "errorLabelsOmit", &error_labels_omit);
       bson_parser_any_optional (parser, "expectResult", &error_expect_result);
       bson_parser_any_optional (parser, "errorResponse", &error_response);
+      bson_parser_doc_optional (parser, "writeErrors", &write_errors);
+      bson_parser_array_optional (
+         parser, "writeConcernErrors", &write_concern_errors);
       if (!bson_parser_parse (parser, expect_error, error)) {
          goto done;
       }
@@ -622,12 +633,142 @@ result_check (result_t *result,
          bson_val_destroy (val_to_match);
          bson_destroy (&doc_to_match);
       }
+
+      if (write_errors) {
+         test_error ("TODO: writeErrors assertions not yet implemented");
+      }
+
+      if (write_concern_errors) {
+         test_error ("TODO: writeConcernErrors assertions not yet implemented");
+      }
    }
 
    ret = true;
 done:
    bson_parser_destroy_with_parsed_fields (parser);
    return ret;
+}
+
+void
+result_from_bulkwritereturn (result_t *result,
+                             mongoc_bulkwritereturn_t bwr,
+                             size_t nmodels)
+{
+   // Build up the result value as a BSON document.
+   bson_t bwr_bson = BSON_INITIALIZER;
+   if (bwr.res) {
+      BSON_APPEND_INT32 (&bwr_bson,
+                         "insertedCount",
+                         mongoc_bulkwriteresult_insertedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson, "upsertedCount", 0);
+      BSON_APPEND_INT32 (&bwr_bson,
+                         "matchedCount",
+                         mongoc_bulkwriteresult_matchedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson,
+                         "modifiedCount",
+                         mongoc_bulkwriteresult_modifiedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson,
+                         "deletedCount",
+                         mongoc_bulkwriteresult_deletedCount (bwr.res));
+      mongoc_mapof_insertoneresult_t *mapof_ior =
+         mongoc_bulkwriteresult_insertResults (bwr.res);
+      if (mapof_ior) {
+         bson_t insertResults_bson;
+         BSON_APPEND_DOCUMENT_BEGIN (
+            &bwr_bson, "insertResults", &insertResults_bson);
+         // For simplicity: iterate over all indices.
+         for (int64_t idx = 0; idx < nmodels; idx++) {
+            mongoc_insertoneresult_t *ior =
+               mongoc_mapof_insertoneresult_lookup (mapof_ior, idx);
+            if (ior) {
+               bson_t ior_bson;
+               char *idx_str = bson_strdup_printf ("%" PRId64, idx);
+               BSON_APPEND_DOCUMENT_BEGIN (
+                  &insertResults_bson, idx_str, &ior_bson);
+               BSON_APPEND_VALUE (&ior_bson,
+                                  "insertedId",
+                                  mongoc_insertoneresult_inserted_id (ior));
+               bson_append_document_end (&insertResults_bson, &ior_bson);
+               bson_free (idx_str);
+            }
+         }
+         bson_append_document_end (&bwr_bson, &insertResults_bson);
+      }
+
+      mongoc_mapof_updateresult_t *mapof_ur =
+         mongoc_bulkwriteresult_updateResult (bwr.res);
+      if (mapof_ur) {
+         bson_t updateResults_bson;
+         BSON_APPEND_DOCUMENT_BEGIN (
+            &bwr_bson, "updateResults", &updateResults_bson);
+         // For simplicity: iterate over all indices.
+         for (int64_t idx = 0; idx < nmodels; idx++) {
+            mongoc_updateresult_t *ur =
+               mongoc_mapof_updateresult_lookup (mapof_ur, idx);
+            if (ur) {
+               bson_t ur_bson;
+               char *idx_str = bson_strdup_printf ("%" PRId64, idx);
+               BSON_APPEND_DOCUMENT_BEGIN (
+                  &updateResults_bson, idx_str, &ur_bson);
+               BSON_APPEND_INT32 (&ur_bson,
+                                  "matchedCount",
+                                  mongoc_updateresult_matchedCount (ur));
+               BSON_APPEND_INT32 (&ur_bson,
+                                  "modifiedCount",
+                                  mongoc_updateresult_modifiedCount (ur));
+               bson_append_document_end (&updateResults_bson, &ur_bson);
+               bson_free (idx_str);
+            }
+         }
+         bson_append_document_end (&bwr_bson, &updateResults_bson);
+      }
+
+      mongoc_mapof_deleteresult_t *mapof_dr =
+         mongoc_bulkwriteresult_deleteResults (bwr.res);
+      if (mapof_dr) {
+         bson_t deleteResults_bson;
+         BSON_APPEND_DOCUMENT_BEGIN (
+            &bwr_bson, "deleteResults", &deleteResults_bson);
+         // For simplicity: iterate over all indices.
+         for (int64_t idx = 0; idx < nmodels; idx++) {
+            mongoc_deleteresult_t *dr =
+               mongoc_mapof_deleteresult_lookup (mapof_dr, idx);
+            if (dr) {
+               bson_t dr_bson;
+               char *idx_str = bson_strdup_printf ("%" PRId64, idx);
+               BSON_APPEND_DOCUMENT_BEGIN (
+                  &deleteResults_bson, idx_str, &dr_bson);
+               BSON_APPEND_INT32 (&dr_bson,
+                                  "deletedCount",
+                                  mongoc_deleteresult_deletedCount (dr));
+               bson_append_document_end (&deleteResults_bson, &dr_bson);
+               bson_free (idx_str);
+            }
+         }
+         bson_append_document_end (&bwr_bson, &deleteResults_bson);
+      }
+   }
+
+
+   bson_error_t empty_error = {0};
+   bson_val_t *bwr_val = bson_val_from_bson (&bwr_bson);
+   result_from_val_and_reply (result, bwr_val, NULL /* reply */, &empty_error);
+
+   if (bwr.exc) {
+      result->ok = false; // An error occurred.
+   }
+
+   if (mongoc_bulkwriteexception_writeErrors (bwr.exc)) {
+      test_error ("reporting writeErrors in test results not-yet-implemented");
+   }
+
+   if (mongoc_bulkwriteexception_writeConcernErrors (bwr.exc)) {
+      test_error (
+         "reporting writeConcernErrors in test results not-yet-implemented");
+   }
+
+   bson_destroy (&bwr_bson);
+   bson_val_destroy (bwr_val);
 }
 
 static void
