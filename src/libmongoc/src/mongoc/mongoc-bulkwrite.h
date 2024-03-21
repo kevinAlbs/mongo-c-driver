@@ -531,7 +531,7 @@ typedef struct _mongoc_listof_writeconcernerror_t
    mongoc_listof_writeconcernerror_t;
 typedef struct _mongoc_writeconcernerror_t mongoc_writeconcernerror_t;
 
-BSON_EXPORT (const mongoc_writeconcernerror_t *)
+BSON_EXPORT (mongoc_writeconcernerror_t *)
 mongoc_listof_writeconcernerror_at (mongoc_listof_writeconcernerror_t *self,
                                     size_t idx);
 

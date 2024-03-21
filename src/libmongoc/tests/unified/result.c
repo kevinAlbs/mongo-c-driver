@@ -74,6 +74,7 @@ _result_init (result_t *result,
    result->ok = (error->code == 0);
    result->str = bson_string_free (str, false);
    result->write_errors = bson_new ();
+   result->write_concern_errors = bson_new ();
 }
 
 void
@@ -658,7 +659,7 @@ result_check (result_t *result,
                   test_set_error (error,
                                   "error.writeErrors[%s] not found.\n"
                                   "Expected: %s\n"
-                                  "Actual: (not found)\n",
+                                  "Actual:   (not found)\n",
                                   key,
                                   bson_val_to_json (expected_val));
                   bson_val_destroy (actual_val);
@@ -671,7 +672,7 @@ result_check (result_t *result,
                   test_diagnostics_error_info (
                      "error.writeErrors[%s] mismatch:\n"
                      "Expected: %s\n"
-                     "Actual: %s\n",
+                     "Actual:   %s\n",
                      key,
                      bson_val_to_json (expected_val),
                      bson_val_to_json (actual_val));
@@ -693,7 +694,7 @@ result_check (result_t *result,
                   test_set_error (error,
                                   "error.writeErrors[%s] mismatch:\n"
                                   "Expected: (not found)\n"
-                                  "Actual: %s\n",
+                                  "Actual:   %s\n",
                                   key,
                                   bson_val_to_json (actual_val));
                   bson_val_destroy (actual_val);
@@ -705,7 +706,24 @@ result_check (result_t *result,
       }
 
       if (write_concern_errors) {
-         test_error ("TODO: writeConcernErrors assertions not yet implemented");
+         bson_val_t *expected_val = bson_val_from_array (write_concern_errors);
+         bson_val_t *actual_val =
+            bson_val_from_array (result->write_concern_errors);
+         if (!bson_match (expected_val,
+                          actual_val,
+                          true /* array of root documents */,
+                          error)) {
+            test_diagnostics_error_info ("error.writeConcernErrors mismatch:\n"
+                                         "Expected: %s\n"
+                                         "Actual:   %s\n",
+                                         bson_val_to_json (expected_val),
+                                         bson_val_to_json (actual_val));
+            bson_val_destroy (actual_val);
+            bson_val_destroy (expected_val);
+            goto done;
+         }
+         bson_val_destroy (actual_val);
+         bson_val_destroy (expected_val);
       }
    }
 
@@ -843,17 +861,40 @@ result_from_bulkwritereturn (result_t *result,
                   &we_bson, "code", mongoc_writeerror_code (we));
                BSON_APPEND_UTF8 (
                   &we_bson, "message", mongoc_writeerror_message (we));
-               BSON_APPEND_DOCUMENT (
-                  &we_bson, "details", mongoc_writeerror_details (we));
+               bson_t *details = mongoc_writeerror_details (we);
+               if (details) {
+                  BSON_APPEND_DOCUMENT (&we_bson, "details", details);
+               }
                bson_append_document_end (result->write_errors, &we_bson);
                bson_free (idx_str);
             }
          }
       }
 
-      if (mongoc_bulkwriteexception_writeConcernErrors (bwr.exc)) {
-         test_error (
-            "reporting writeConcernErrors in test results not-yet-implemented");
+      mongoc_listof_writeconcernerror_t *listof_wce =
+         mongoc_bulkwriteexception_writeConcernErrors (bwr.exc);
+      {
+         for (size_t idx = 0;
+              idx < mongoc_listof_writeconcernerror_len (listof_wce);
+              idx++) {
+            mongoc_writeconcernerror_t *wce =
+               mongoc_listof_writeconcernerror_at (listof_wce, idx);
+            ASSERT (wce);
+            bson_t wce_bson;
+            char *idx_str = bson_strdup_printf ("%zu", idx);
+            BSON_APPEND_DOCUMENT_BEGIN (
+               result->write_concern_errors, idx_str, &wce_bson);
+            BSON_APPEND_INT32 (
+               &wce_bson, "code", mongoc_writeconcernerror_code (wce));
+            BSON_APPEND_UTF8 (
+               &wce_bson, "message", mongoc_writeconcernerror_message (wce));
+            bson_t *details = mongoc_writeconcernerror_details (wce);
+            if (details) {
+               BSON_APPEND_DOCUMENT (&wce_bson, "details", details);
+            }
+            bson_append_document_end (result->write_concern_errors, &wce_bson);
+            bson_free (idx_str);
+         }
       }
    }
 

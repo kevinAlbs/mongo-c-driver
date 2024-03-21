@@ -106,6 +106,11 @@ struct _mongoc_mapof_writeerror_t {
    mongoc_array_t entries;
 };
 
+struct _mongoc_listof_writeconcernerror_t {
+   // `entries` is an array of `mongoc_writeconcernerror_t`.
+   mongoc_array_t entries;
+};
+
 struct _mongoc_bulkwriteexception_t {
    struct {
       bson_error_t error;
@@ -114,6 +119,7 @@ struct _mongoc_bulkwriteexception_t {
    } optional_error;
 
    mongoc_mapof_writeerror_t mapof_we;
+   mongoc_listof_writeconcernerror_t listof_wce;
 
    // If `has_any_error` is false, the bulk write exception is not returned.
    bool has_any_error;
@@ -145,6 +151,29 @@ mongoc_writeerror_destroy (mongoc_writeerror_t *self)
    bson_free (self);
 }
 
+struct _mongoc_writeconcernerror_t {
+   int32_t code;
+   bson_t *details;
+   char *message;
+};
+
+static mongoc_writeconcernerror_t *
+mongoc_writeconcernerror_new (void)
+{
+   return bson_malloc0 (sizeof (mongoc_writeconcernerror_t));
+}
+
+static void
+mongoc_writeconcernerror_destroy (mongoc_writeconcernerror_t *self)
+{
+   if (!self) {
+      return;
+   }
+   bson_destroy (self->details);
+   bson_free (self->message);
+   bson_free (self);
+}
+
 static mongoc_bulkwriteexception_t *
 mongoc_bulkwriteexception_new (size_t nmodels)
 {
@@ -152,6 +181,8 @@ mongoc_bulkwriteexception_new (size_t nmodels)
    bson_init (&self->optional_error.document);
    _mongoc_array_init_with_zerofill (
       &self->mapof_we.entries, sizeof (mongoc_writeerror_t *), nmodels);
+   _mongoc_array_init (&self->listof_wce.entries,
+                       sizeof (mongoc_writeconcernerror_t *));
    self->has_any_error = false;
    return self;
 }
@@ -205,6 +236,15 @@ mongoc_bulkwriteexception_destroy (mongoc_bulkwriteexception_t *self)
       mongoc_writeerror_destroy (entry);
    }
    _mongoc_array_destroy (&self->mapof_we.entries);
+
+   // Destroy all write concern errors entries.
+   for (size_t i = 0; i < self->listof_wce.entries.len; i++) {
+      mongoc_writeconcernerror_t *entry = _mongoc_array_index (
+         &self->listof_wce.entries, mongoc_writeconcernerror_t *, i);
+      mongoc_writeconcernerror_destroy (entry);
+   }
+   _mongoc_array_destroy (&self->listof_wce.entries);
+
    bson_free (self);
 }
 
@@ -514,6 +554,78 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                mongoc_bulkwriteexception_set_error (
                   ret.exc, &error, &cmd_reply);
                goto batch_fail;
+            }
+
+            if (bson_iter_init_find (&iter, &cmd_reply, "writeConcernError")) {
+               bson_iter_t wce_iter;
+               bson_t wce_bson;
+
+               {
+                  bson_error_t error;
+                  if (!_mongoc_iter_document_as_bson (
+                         &iter, &wce_bson, &error)) {
+                     mongoc_bulkwriteexception_set_error (
+                        ret.exc, &error, &cmd_reply);
+                     goto batch_fail;
+                  }
+               }
+
+               // Parse `code`.
+               int32_t code;
+               {
+                  if (!bson_iter_init_find (&wce_iter, &wce_bson, "code") ||
+                      !BSON_ITER_HOLDS_INT32 (&wce_iter)) {
+                     bson_error_t error;
+                     bson_set_error (&error,
+                                     MONGOC_ERROR_COMMAND,
+                                     MONGOC_ERROR_COMMAND_INVALID_ARG,
+                                     "expected to find int32 `code` in "
+                                     "writeConcernError, but did not");
+                     mongoc_bulkwriteexception_set_error (
+                        ret.exc, &error, &wce_bson);
+                     goto batch_fail;
+                  }
+                  code = bson_iter_int32 (&wce_iter);
+               }
+
+               // Parse `errmsg`.
+               const char *errmsg;
+               {
+                  if (!bson_iter_init_find (&wce_iter, &wce_bson, "errmsg") ||
+                      !BSON_ITER_HOLDS_UTF8 (&wce_iter)) {
+                     bson_error_t error;
+                     bson_set_error (&error,
+                                     MONGOC_ERROR_COMMAND,
+                                     MONGOC_ERROR_COMMAND_INVALID_ARG,
+                                     "expected to find utf8 `errmsg` in "
+                                     "writeConcernError, but did not");
+                     mongoc_bulkwriteexception_set_error (
+                        ret.exc, &error, &wce_bson);
+                     goto batch_fail;
+                  }
+                  errmsg = bson_iter_utf8 (&wce_iter, NULL);
+               }
+
+               // Parse optional `errInfo`.
+               bson_t errInfo = BSON_INITIALIZER;
+               if (bson_iter_init_find (&wce_iter, &wce_bson, "errInfo")) {
+                  bson_error_t error;
+                  if (!_mongoc_iter_document_as_bson (
+                         &wce_iter, &errInfo, &error)) {
+                     mongoc_bulkwriteexception_set_error (
+                        ret.exc, &error, &wce_bson);
+                  }
+               }
+
+               // Store a copy of the write concern error.
+               mongoc_writeconcernerror_t *wce =
+                  mongoc_writeconcernerror_new ();
+               wce->code = code;
+               wce->message = bson_strdup (errmsg);
+               wce->details = bson_copy (&errInfo);
+
+               _mongoc_array_append_val (&ret.exc->listof_wce.entries, wce);
+               ret.exc->has_any_error = true;
             }
 
             {
@@ -1323,15 +1435,54 @@ mongoc_listof_bulkwritemodel_append_deletemany (
    return true;
 }
 
-struct _mongoc_listof_writeconcernerror_t {
-   int placeholder;
-};
-
 mongoc_listof_writeconcernerror_t *
 mongoc_bulkwriteexception_writeConcernErrors (mongoc_bulkwriteexception_t *self)
 {
-   return NULL;
+   BSON_ASSERT_PARAM (self);
+   return &self->listof_wce;
 }
+
+mongoc_writeconcernerror_t *
+mongoc_listof_writeconcernerror_at (mongoc_listof_writeconcernerror_t *self,
+                                    size_t idx)
+{
+   BSON_ASSERT_PARAM (self);
+   if (idx > self->entries.len) {
+      return NULL;
+   }
+
+   return _mongoc_array_index (
+      &self->entries, mongoc_writeconcernerror_t *, idx);
+}
+
+size_t
+mongoc_listof_writeconcernerror_len (mongoc_listof_writeconcernerror_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->entries.len;
+}
+
+int32_t
+mongoc_writeconcernerror_code (mongoc_writeconcernerror_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->code;
+}
+
+bson_t *
+mongoc_writeconcernerror_details (mongoc_writeconcernerror_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->details;
+}
+
+char *
+mongoc_writeconcernerror_message (mongoc_writeconcernerror_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->message;
+}
+
 
 mongoc_mapof_writeerror_t *
 mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self)
@@ -1348,12 +1499,12 @@ mongoc_mapof_writeerror_lookup (mongoc_mapof_writeerror_t *self, size_t idx)
    if (idx > self->entries.len) {
       return NULL;
    }
-   mongoc_writeerror_t **we_loc =
-      &_mongoc_array_index (&self->entries, mongoc_writeerror_t *, idx);
-   if (*we_loc == NULL) {
+   mongoc_writeerror_t *we =
+      _mongoc_array_index (&self->entries, mongoc_writeerror_t *, idx);
+   if (we == NULL) {
       return NULL;
    }
-   return *we_loc;
+   return we;
 }
 
 int32_t
