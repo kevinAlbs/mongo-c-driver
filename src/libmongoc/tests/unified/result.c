@@ -73,6 +73,7 @@ _result_init (result_t *result,
    memcpy (&result->error, error, sizeof (bson_error_t));
    result->ok = (error->code == 0);
    result->str = bson_string_free (str, false);
+   result->write_errors = bson_new ();
 }
 
 void
@@ -635,7 +636,72 @@ result_check (result_t *result,
       }
 
       if (write_errors) {
-         test_error ("TODO: writeErrors assertions not yet implemented");
+         if (write_errors && !result->write_errors) {
+            test_set_error (error, "Expected writeErrors but got none");
+            goto done;
+         }
+
+         // Ensure the numeric keys of the expected `writeErrors` exactly match
+         // the actual `writeErrors`.
+         {
+            bson_t *expected = write_errors;
+            bson_t *actual = result->write_errors;
+
+            bson_iter_t expected_iter;
+            bson_iter_init (&expected_iter, expected);
+            while (bson_iter_next (&expected_iter)) {
+               bson_val_t *expected_val = bson_val_from_iter (&expected_iter);
+               bson_val_t *actual_val = NULL;
+               const char *key = bson_iter_key (&expected_iter);
+               bson_iter_t actual_iter;
+               if (!bson_iter_init_find (&actual_iter, actual, key)) {
+                  test_set_error (error,
+                                  "error.writeErrors[%s] not found.\n"
+                                  "Expected: %s\n"
+                                  "Actual: (not found)\n",
+                                  key,
+                                  bson_val_to_json (expected_val));
+                  bson_val_destroy (actual_val);
+                  bson_val_destroy (expected_val);
+                  goto done;
+               }
+               actual_val = bson_val_from_iter (&actual_iter);
+
+               if (!bson_match (expected_val, actual_val, false, error)) {
+                  test_diagnostics_error_info (
+                     "error.writeErrors[%s] mismatch:\n"
+                     "Expected: %s\n"
+                     "Actual: %s\n",
+                     key,
+                     bson_val_to_json (expected_val),
+                     bson_val_to_json (actual_val));
+                  bson_val_destroy (actual_val);
+                  bson_val_destroy (expected_val);
+                  goto done;
+               }
+               bson_val_destroy (actual_val);
+               bson_val_destroy (expected_val);
+            }
+
+            // Ensure no extra reported errors.
+            bson_iter_t actual_iter;
+            bson_iter_init (&actual_iter, actual);
+            if (bson_iter_next (&actual_iter)) {
+               bson_val_t *actual_val = bson_val_from_iter (&actual_iter);
+               const char *key = bson_iter_key (&actual_iter);
+               if (!bson_has_field (expected, key)) {
+                  test_set_error (error,
+                                  "error.writeErrors[%s] mismatch:\n"
+                                  "Expected: (not found)\n"
+                                  "Actual: %s\n",
+                                  key,
+                                  bson_val_to_json (actual_val));
+                  bson_val_destroy (actual_val);
+                  goto done;
+               }
+               bson_val_destroy (actual_val);
+            }
+         }
       }
 
       if (write_concern_errors) {
@@ -749,22 +815,46 @@ result_from_bulkwritereturn (result_t *result,
       }
    }
 
+   bson_error_t error = {0};
+   const bson_t *error_document = NULL;
+   if (bwr.exc) {
+      mongoc_bulkwriteexception_error (bwr.exc, &error, &error_document);
+   }
 
-   bson_error_t empty_error = {0};
    bson_val_t *bwr_val = bson_val_from_bson (&bwr_bson);
-   result_from_val_and_reply (result, bwr_val, NULL /* reply */, &empty_error);
+   result_from_val_and_reply (result, bwr_val, error_document, &error);
 
    if (bwr.exc) {
       result->ok = false; // An error occurred.
-   }
+      mongoc_mapof_writeerror_t *mapof_we =
+         mongoc_bulkwriteexception_writeErrors (bwr.exc);
+      BSON_ASSERT (mapof_we);
+      {
+         // For simplicity: iterate over all indices.
+         for (int64_t idx = 0; idx < nmodels; idx++) {
+            mongoc_writeerror_t *we =
+               mongoc_mapof_writeerror_lookup (mapof_we, idx);
+            if (we) {
+               bson_t we_bson;
+               char *idx_str = bson_strdup_printf ("%" PRId64, idx);
+               BSON_APPEND_DOCUMENT_BEGIN (
+                  result->write_errors, idx_str, &we_bson);
+               BSON_APPEND_INT32 (
+                  &we_bson, "code", mongoc_writeerror_code (we));
+               BSON_APPEND_UTF8 (
+                  &we_bson, "message", mongoc_writeerror_message (we));
+               BSON_APPEND_DOCUMENT (
+                  &we_bson, "details", mongoc_writeerror_details (we));
+               bson_append_document_end (result->write_errors, &we_bson);
+               bson_free (idx_str);
+            }
+         }
+      }
 
-   if (mongoc_bulkwriteexception_writeErrors (bwr.exc)) {
-      test_error ("reporting writeErrors in test results not-yet-implemented");
-   }
-
-   if (mongoc_bulkwriteexception_writeConcernErrors (bwr.exc)) {
-      test_error (
-         "reporting writeConcernErrors in test results not-yet-implemented");
+      if (mongoc_bulkwriteexception_writeConcernErrors (bwr.exc)) {
+         test_error (
+            "reporting writeConcernErrors in test results not-yet-implemented");
+      }
    }
 
    bson_destroy (&bwr_bson);

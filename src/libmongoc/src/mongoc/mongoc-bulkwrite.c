@@ -100,15 +100,21 @@ struct _mongoc_deleteresult_t {
    bool succeeded;
 };
 
+struct _mongoc_mapof_writeerror_t {
+   // `entries` is an array of `mongoc_write_error_t*`.
+   // The array is sized to the number of operations.
+   mongoc_array_t entries;
+};
+
 struct _mongoc_bulkwriteexception_t {
    struct {
       bson_error_t error;
       bson_t document;
       bool isset;
    } optional_error;
-   // `write_errors` is an array of `mongoc_write_error_t*`.
-   // The array is sized to the number of operations.
-   mongoc_array_t write_errors;
+
+   mongoc_mapof_writeerror_t mapof_we;
+
    // If `has_any_error` is false, the bulk write exception is not returned.
    bool has_any_error;
 };
@@ -145,7 +151,7 @@ mongoc_bulkwriteexception_new (size_t nmodels)
    mongoc_bulkwriteexception_t *self = bson_malloc0 (sizeof (*self));
    bson_init (&self->optional_error.document);
    _mongoc_array_init_with_zerofill (
-      &self->write_errors, sizeof (mongoc_writeerror_t *), nmodels);
+      &self->mapof_we.entries, sizeof (mongoc_writeerror_t *), nmodels);
    self->has_any_error = false;
    return self;
 }
@@ -177,8 +183,8 @@ mongoc_bulkwriteexception_set_writeerror (mongoc_bulkwriteexception_t *self,
                                           mongoc_writeerror_t *we,
                                           size_t idx)
 {
-   mongoc_writeerror_t **we_loc =
-      &_mongoc_array_index (&self->write_errors, mongoc_writeerror_t *, idx);
+   mongoc_writeerror_t **we_loc = &_mongoc_array_index (
+      &self->mapof_we.entries, mongoc_writeerror_t *, idx);
    *we_loc = we;
    self->has_any_error = true;
 }
@@ -193,12 +199,12 @@ mongoc_bulkwriteexception_destroy (mongoc_bulkwriteexception_t *self)
    bson_destroy (&self->optional_error.document);
 
    // Destroy all write errors entries.
-   for (size_t i = 0; i < self->write_errors.len; i++) {
-      mongoc_writeerror_t *entry =
-         _mongoc_array_index (&self->write_errors, mongoc_writeerror_t *, i);
+   for (size_t i = 0; i < self->mapof_we.entries.len; i++) {
+      mongoc_writeerror_t *entry = _mongoc_array_index (
+         &self->mapof_we.entries, mongoc_writeerror_t *, i);
       mongoc_writeerror_destroy (entry);
    }
-   _mongoc_array_destroy (&self->write_errors);
+   _mongoc_array_destroy (&self->mapof_we.entries);
    bson_free (self);
 }
 
@@ -930,6 +936,11 @@ mongoc_bulkwriteexception_error (mongoc_bulkwriteexception_t *self,
       }
       return true;
    }
+
+   memset (error, 0, sizeof (*error));
+   if (error_document) {
+      *error_document = 0;
+   }
    return false;
 }
 
@@ -1322,12 +1333,46 @@ mongoc_bulkwriteexception_writeConcernErrors (mongoc_bulkwriteexception_t *self)
    return NULL;
 }
 
-struct _mongoc_mapof_writeerror_t {
-   int placeholder;
-};
-
 mongoc_mapof_writeerror_t *
 mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self)
 {
-   return NULL;
+   BSON_ASSERT_PARAM (self);
+   return &self->mapof_we;
+}
+
+mongoc_writeerror_t *
+mongoc_mapof_writeerror_lookup (mongoc_mapof_writeerror_t *self, size_t idx)
+{
+   BSON_ASSERT_PARAM (self);
+
+   if (idx > self->entries.len) {
+      return NULL;
+   }
+   mongoc_writeerror_t **we_loc =
+      &_mongoc_array_index (&self->entries, mongoc_writeerror_t *, idx);
+   if (*we_loc == NULL) {
+      return NULL;
+   }
+   return *we_loc;
+}
+
+int32_t
+mongoc_writeerror_code (mongoc_writeerror_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->code;
+}
+
+bson_t *
+mongoc_writeerror_details (mongoc_writeerror_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->details;
+}
+
+char *
+mongoc_writeerror_message (mongoc_writeerror_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->message;
 }

@@ -541,7 +541,7 @@ mongoc_listof_writeconcernerror_len (mongoc_listof_writeconcernerror_t *self);
 typedef struct _mongoc_mapof_writeerror_t mongoc_mapof_writeerror_t;
 typedef struct _mongoc_writeerror_t mongoc_writeerror_t;
 
-BSON_EXPORT (const mongoc_writeerror_t *)
+BSON_EXPORT (mongoc_writeerror_t *)
 mongoc_mapof_writeerror_lookup (mongoc_mapof_writeerror_t *self, size_t idx);
 
 /**
