@@ -135,7 +135,7 @@ typedef struct {
     *
     * This option is only sent if the caller explicitly provides a value.
     */
-   bson_value_t *hint; // may be NULL
+   const bson_value_t *hint; // may be NULL
 
    /**
     * When true, creates a new document if no document matches the query.
@@ -192,7 +192,7 @@ typedef struct {
     *
     * This option is only sent if the caller explicitly provides a value.
     */
-   bson_value_t *hint; // may be NULL
+   const bson_value_t *hint; // may be NULL
 
    /**
     * When true, creates a new document if no document matches the query.
@@ -246,7 +246,7 @@ typedef struct {
     *
     * This option is only sent if the caller explicitly provides a value.
     */
-   bson_value_t *hint; // may be NULL
+   const bson_value_t *hint; // may be NULL
 
    /**
     * When true, creates a new document if no document matches the query.

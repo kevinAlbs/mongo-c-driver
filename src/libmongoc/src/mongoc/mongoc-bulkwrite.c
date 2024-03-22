@@ -1283,6 +1283,19 @@ mongoc_listof_bulkwritemodel_append_updateone (
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
    BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
    BSON_ASSERT (bson_append_bool (&op, "multi", 5, false));
+   if (model.arrayFilters) {
+      BSON_ASSERT (
+         bson_append_array (&op, "arrayFilters", 12, model.arrayFilters));
+   }
+   if (model.collation) {
+      BSON_ASSERT (bson_append_document (&op, "collation", 9, model.collation));
+   }
+   if (model.hint) {
+      BSON_ASSERT (bson_append_value (&op, "hint", 4, model.hint));
+   }
+   if (model.upsert.isset) {
+      BSON_ASSERT (bson_append_bool (&op, "upsert", 6, model.upsert.value));
+   }
 
    BSON_ASSERT (
       _mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
@@ -1348,6 +1361,19 @@ mongoc_listof_bulkwritemodel_append_updatemany (
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
    BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
    BSON_ASSERT (bson_append_bool (&op, "multi", 5, true));
+   if (model.arrayFilters) {
+      BSON_ASSERT (
+         bson_append_array (&op, "arrayFilters", 12, model.arrayFilters));
+   }
+   if (model.collation) {
+      BSON_ASSERT (bson_append_document (&op, "collation", 9, model.collation));
+   }
+   if (model.hint) {
+      BSON_ASSERT (bson_append_value (&op, "hint", 4, model.hint));
+   }
+   if (model.upsert.isset) {
+      BSON_ASSERT (bson_append_bool (&op, "upsert", 6, model.upsert.value));
+   }
 
    BSON_ASSERT (
       _mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
@@ -1417,6 +1443,12 @@ mongoc_listof_bulkwritemodel_append_replaceone (
    BSON_ASSERT (bson_append_bool (&op, "multi", 5, false));
    if (model.upsert.isset) {
       BSON_ASSERT (bson_append_bool (&op, "upsert", 6, model.upsert.value));
+   }
+   if (model.collation) {
+      BSON_ASSERT (bson_append_document (&op, "collation", 9, model.collation));
+   }
+   if (model.hint) {
+      BSON_ASSERT (bson_append_value (&op, "hint", 4, model.hint));
    }
 
    BSON_ASSERT (

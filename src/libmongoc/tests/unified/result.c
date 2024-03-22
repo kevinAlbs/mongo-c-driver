@@ -386,6 +386,18 @@ result_check (result_t *result,
    /* check result. */
    if (expect_result) {
       if (!result->ok) {
+         if (!bson_empty (result->write_errors)) {
+            char *as_json =
+               bson_as_canonical_extended_json (result->write_errors, NULL);
+            test_diagnostics_error_info ("Write errors: %s", as_json);
+            bson_free (as_json);
+         }
+         if (!bson_empty (result->write_concern_errors)) {
+            char *as_json = bson_as_canonical_extended_json (
+               result->write_concern_errors, NULL);
+            test_diagnostics_error_info ("Write concern errors: %s", as_json);
+            bson_free (as_json);
+         }
          test_set_error (
             error, "expected result, but got error: %s", result->error.message);
          goto done;

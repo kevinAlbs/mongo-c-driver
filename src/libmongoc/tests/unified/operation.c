@@ -254,6 +254,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
    bson_t *collation = NULL;
    bson_val_t *hint = NULL;
    bool *upsert = NULL;
+   bson_t *arrayFilters = NULL;
    bson_parser_t *parser = bson_parser_new ();
 
    // Expect exactly one root key to identify the model (e.g. "insertOne"):
@@ -292,6 +293,10 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
       bson_parser_utf8 (parser, "namespace", &namespace);
       bson_parser_doc (parser, "filter", &filter);
       bson_parser_doc (parser, "update", &update);
+      bson_parser_array_optional (parser, "arrayFilters", &arrayFilters);
+      bson_parser_doc_optional (parser, "collation", &collation);
+      bson_parser_any_optional (parser, "hint", &hint);
+      bson_parser_bool_optional (parser, "upsert", &upsert);
       if (!bson_parser_parse (parser, &model_bson, error)) {
          goto done;
       }
@@ -300,7 +305,16 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              models,
              namespace,
              -1,
-             (mongoc_updateone_model_t){.filter = filter, .update = update},
+             (mongoc_updateone_model_t){
+                .filter = filter,
+                .update = update,
+                .arrayFilters = arrayFilters,
+                .collation = collation,
+                .hint = hint ? bson_val_to_value (hint) : NULL,
+                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE
+                                            : MONGOC_OPT_BOOL_FALSE)
+                                 : MONGOC_OPT_BOOL_UNSET,
+             },
              error)) {
          goto done;
       }
@@ -309,6 +323,10 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
       bson_parser_utf8 (parser, "namespace", &namespace);
       bson_parser_doc (parser, "filter", &filter);
       bson_parser_doc (parser, "update", &update);
+      bson_parser_array_optional (parser, "arrayFilters", &arrayFilters);
+      bson_parser_doc_optional (parser, "collation", &collation);
+      bson_parser_any_optional (parser, "hint", &hint);
+      bson_parser_bool_optional (parser, "upsert", &upsert);
       if (!bson_parser_parse (parser, &model_bson, error)) {
          goto done;
       }
@@ -317,7 +335,17 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              models,
              namespace,
              -1,
-             (mongoc_updatemany_model_t){.filter = filter, .update = update},
+             (mongoc_updatemany_model_t){
+                .filter = filter,
+                .update = update,
+                .arrayFilters = arrayFilters,
+                .collation = collation,
+                .hint = hint ? bson_val_to_value (hint) : NULL,
+                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE
+                                            : MONGOC_OPT_BOOL_FALSE)
+                                 : MONGOC_OPT_BOOL_UNSET,
+
+             },
              error)) {
          goto done;
       }
@@ -368,7 +396,9 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
       bson_parser_utf8 (parser, "namespace", &namespace);
       bson_parser_doc (parser, "filter", &filter);
       bson_parser_doc (parser, "replacement", &replacement);
+      bson_parser_doc_optional (parser, "collation", &collation);
       bson_parser_bool_optional (parser, "upsert", &upsert);
+      bson_parser_any_optional (parser, "hint", &hint);
       if (!bson_parser_parse (parser, &model_bson, error)) {
          goto done;
       }
@@ -382,7 +412,12 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
                 .replacement = replacement,
                 .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE
                                             : MONGOC_OPT_BOOL_FALSE)
-                                 : MONGOC_OPT_BOOL_UNSET},
+                                 : MONGOC_OPT_BOOL_UNSET,
+                .collation = collation,
+                .hint = hint ? bson_val_to_value (hint) : NULL
+
+             },
+
              error)) {
          goto done;
       }
