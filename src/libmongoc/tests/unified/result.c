@@ -744,7 +744,9 @@ result_from_bulkwritereturn (result_t *result,
       BSON_APPEND_INT32 (&bwr_bson,
                          "insertedCount",
                          mongoc_bulkwriteresult_insertedCount (bwr.res));
-      BSON_APPEND_INT32 (&bwr_bson, "upsertedCount", 0);
+      BSON_APPEND_INT32 (&bwr_bson,
+                         "upsertedCount",
+                         mongoc_bulkwriteresult_upsertedCount (bwr.res));
       BSON_APPEND_INT32 (&bwr_bson,
                          "matchedCount",
                          mongoc_bulkwriteresult_matchedCount (bwr.res));
@@ -800,6 +802,13 @@ result_from_bulkwritereturn (result_t *result,
                BSON_APPEND_INT32 (&ur_bson,
                                   "modifiedCount",
                                   mongoc_updateresult_modifiedCount (ur));
+               const bson_value_t *upsert_id =
+                  mongoc_updateresult_upsertedId (ur);
+               if (upsert_id) {
+                  BSON_APPEND_VALUE (&ur_bson,
+                                     "upsertedId",
+                                     mongoc_updateresult_upsertedId (ur));
+               }
                bson_append_document_end (&updateResults_bson, &ur_bson);
                bson_free (idx_str);
             }

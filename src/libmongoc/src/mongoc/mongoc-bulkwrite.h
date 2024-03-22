@@ -206,6 +206,14 @@ typedef struct {
    bson_t *extra; // may be NULL.
 } mongoc_updatemany_model_t;
 
+bool
+mongoc_listof_bulkwritemodel_append_updatemany (
+   mongoc_listof_bulkwritemodel_t *self,
+   const char *namespace,
+   int namespace_len,
+   mongoc_updatemany_model_t model,
+   bson_error_t *error);
+
 typedef struct {
    /**
     * The filter to apply.

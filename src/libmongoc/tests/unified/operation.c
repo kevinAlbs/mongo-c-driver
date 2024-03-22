@@ -253,6 +253,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
    bson_t *replacement = NULL;
    bson_t *collation = NULL;
    bson_val_t *hint = NULL;
+   bool *upsert = NULL;
    bson_parser_t *parser = bson_parser_new ();
 
    // Expect exactly one root key to identify the model (e.g. "insertOne"):
@@ -303,6 +304,23 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              error)) {
          goto done;
       }
+   } else if (0 == strcmp ("updateMany", model_name)) {
+      // Parse an "updateOne".
+      bson_parser_utf8 (parser, "namespace", &namespace);
+      bson_parser_doc (parser, "filter", &filter);
+      bson_parser_doc (parser, "update", &update);
+      if (!bson_parser_parse (parser, &model_bson, error)) {
+         goto done;
+      }
+
+      if (!mongoc_listof_bulkwritemodel_append_updatemany (
+             models,
+             namespace,
+             -1,
+             (mongoc_updatemany_model_t){.filter = filter, .update = update},
+             error)) {
+         goto done;
+      }
    } else if (0 == strcmp ("deleteOne", model_name)) {
       // Parse a "deleteOne".
       bson_parser_utf8 (parser, "namespace", &namespace);
@@ -350,6 +368,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
       bson_parser_utf8 (parser, "namespace", &namespace);
       bson_parser_doc (parser, "filter", &filter);
       bson_parser_doc (parser, "replacement", &replacement);
+      bson_parser_bool_optional (parser, "upsert", &upsert);
       if (!bson_parser_parse (parser, &model_bson, error)) {
          goto done;
       }
@@ -358,8 +377,12 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              models,
              namespace,
              -1,
-             (mongoc_replaceone_model_t){.filter = filter,
-                                         .replacement = replacement},
+             (mongoc_replaceone_model_t){
+                .filter = filter,
+                .replacement = replacement,
+                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE
+                                            : MONGOC_OPT_BOOL_FALSE)
+                                 : MONGOC_OPT_BOOL_UNSET},
              error)) {
          goto done;
       }

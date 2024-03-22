@@ -62,6 +62,7 @@ struct _mongoc_bulkwriteresult_t {
    int64_t matchedcount;
    int64_t modifiedcount;
    int64_t deletedcount;
+   int64_t upsertedcount;
    mongoc_mapof_insertoneresult_t mapof_ior;
    mongoc_mapof_updateresult_t mapof_ur;
    mongoc_mapof_deleteresult_t mapof_dr;
@@ -556,6 +557,21 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                goto batch_fail;
             }
 
+            if (bson_iter_init_find (&iter, &cmd_reply, "nUpserted") &&
+                BSON_ITER_HOLDS_INT32 (&iter)) {
+               ret.res->upsertedcount += (int64_t) bson_iter_int32 (&iter);
+            } else {
+               bson_error_t error;
+               bson_set_error (
+                  &error,
+                  MONGOC_ERROR_COMMAND,
+                  MONGOC_ERROR_COMMAND_INVALID_ARG,
+                  "expected to find int32 `nUpserted`, but did not");
+               mongoc_bulkwriteexception_set_error (
+                  ret.exc, &error, &cmd_reply);
+               goto batch_fail;
+            }
+
             if (bson_iter_init_find (&iter, &cmd_reply, "writeConcernError")) {
                bson_iter_t wce_iter;
                bson_t wce_bson;
@@ -820,6 +836,32 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                               nModified = bson_iter_int32 (&result_iter);
                            }
 
+                           // Check for an optional `upsertId`.
+                           if (bson_iter_init_find (
+                                  &result_iter, result, "upserted")) {
+                              bson_iter_t id_iter;
+                              BSON_ASSERT (
+                                 bson_iter_init (&result_iter, result));
+                              if (!bson_iter_find_descendant (
+                                     &result_iter, "upserted._id", &id_iter)) {
+                                 bson_error_t error;
+                                 bson_set_error (
+                                    &error,
+                                    MONGOC_ERROR_COMMAND,
+                                    MONGOC_ERROR_COMMAND_INVALID_ARG,
+                                    "expected `upserted` to be a document "
+                                    "containing `_id`, but did not find `_id`");
+                                 mongoc_bulkwriteexception_set_error (
+                                    ret.exc, &error, result);
+                                 goto batch_fail;
+                              }
+                              ur->didUpsert = true;
+                              const bson_value_t *id_value =
+                                 bson_iter_value (&id_iter);
+                              bson_value_copy (id_value, &ur->upsertedId);
+                           }
+
+
                            ur->matchedCount = n;
                            ur->modifiedCount = nModified;
                         }
@@ -964,6 +1006,16 @@ mongoc_updateresult_modifiedCount (mongoc_updateresult_t *self)
    return self->modifiedCount;
 }
 
+const bson_value_t *
+mongoc_updateresult_upsertedId (mongoc_updateresult_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   if (self->didUpsert) {
+      return &self->upsertedId;
+   }
+   return NULL;
+}
+
 mongoc_mapof_updateresult_t *
 mongoc_bulkwriteresult_updateResult (mongoc_bulkwriteresult_t *self)
 {
@@ -1009,6 +1061,13 @@ mongoc_bulkwriteresult_insertedCount (mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->insertedcount;
+}
+
+int64_t
+mongoc_bulkwriteresult_upsertedCount (mongoc_bulkwriteresult_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->upsertedcount;
 }
 
 int64_t
@@ -1171,6 +1230,7 @@ mongoc_listof_bulkwritemodel_append_insertone (
    _mongoc_array_append_val (&self->updates, is_update);
    bool is_delete = false;
    _mongoc_array_append_val (&self->deletes, is_delete);
+   bson_destroy (&op);
    return true;
 }
 
@@ -1235,8 +1295,76 @@ mongoc_listof_bulkwritemodel_append_updateone (
    _mongoc_array_append_val (&self->updates, is_update);
    bool is_delete = false;
    _mongoc_array_append_val (&self->deletes, is_delete);
+   bson_destroy (&op);
    return true;
 }
+
+bool
+mongoc_listof_bulkwritemodel_append_updatemany (
+   mongoc_listof_bulkwritemodel_t *self,
+   const char *namespace,
+   int namespace_len,
+   mongoc_updatemany_model_t model,
+   bson_error_t *error)
+{
+   BSON_ASSERT_PARAM (self);
+   BSON_ASSERT_PARAM (namespace);
+   bson_t *filter = model.filter;
+   bson_t *update = model.update;
+   BSON_ASSERT_PARAM (filter);
+   BSON_ASSERT (filter->len >= 5);
+   BSON_ASSERT_PARAM (update);
+   BSON_ASSERT (update->len >= 5);
+
+   bson_t op = BSON_INITIALIZER;
+
+   // Find or create the namespace index.
+   {
+      bson_iter_t iter;
+      int32_t ns_index;
+      if (bson_iter_init_find (&iter, &self->ns_to_index, namespace)) {
+         ns_index = bson_iter_int32 (&iter);
+      } else {
+         uint32_t key_count = bson_count_keys (&self->ns_to_index);
+         if (!bson_in_range_int32_t_unsigned (key_count)) {
+            bson_set_error (
+               error,
+               MONGOC_ERROR_COMMAND,
+               MONGOC_ERROR_COMMAND_INVALID_ARG,
+               "Only %" PRId32
+               " distinct collections may be inserted into. Got %" PRIu32,
+               INT32_MAX,
+               key_count);
+            return false;
+         }
+         ns_index = (int32_t) key_count;
+         bson_append_int32 (
+            &self->ns_to_index, namespace, namespace_len, ns_index);
+      }
+      BSON_ASSERT (bson_append_int32 (&op, "update", 6, ns_index));
+   }
+
+
+   BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
+   BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
+   BSON_ASSERT (bson_append_bool (&op, "multi", 5, true));
+
+   BSON_ASSERT (
+      _mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
+
+   self->n_ops++;
+   // Add a slot in `entries` to keep the 1:1 mapping with the models.
+   mongoc_insertoneresult_t ior = {.is_insert = false};
+   _mongoc_array_append_val (&self->entries, ior);
+   bool is_update = true;
+   _mongoc_array_append_val (&self->updates, is_update);
+   bool is_delete = false;
+   _mongoc_array_append_val (&self->deletes, is_delete);
+
+   bson_destroy (&op);
+   return true;
+}
+
 
 bool
 mongoc_listof_bulkwritemodel_append_replaceone (
@@ -1287,6 +1415,9 @@ mongoc_listof_bulkwritemodel_append_replaceone (
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
    BSON_ASSERT (bson_append_document (&op, "updateMods", 10, replacement));
    BSON_ASSERT (bson_append_bool (&op, "multi", 5, false));
+   if (model.upsert.isset) {
+      BSON_ASSERT (bson_append_bool (&op, "upsert", 6, model.upsert.value));
+   }
 
    BSON_ASSERT (
       _mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
@@ -1299,6 +1430,8 @@ mongoc_listof_bulkwritemodel_append_replaceone (
    _mongoc_array_append_val (&self->updates, is_update);
    bool is_delete = false;
    _mongoc_array_append_val (&self->deletes, is_delete);
+
+   bson_destroy (&op);
    return true;
 }
 
@@ -1365,6 +1498,8 @@ mongoc_listof_bulkwritemodel_append_deleteone (
    _mongoc_array_append_val (&self->updates, is_update);
    bool is_delete = true;
    _mongoc_array_append_val (&self->deletes, is_delete);
+
+   bson_destroy (&op);
    return true;
 }
 
@@ -1432,6 +1567,8 @@ mongoc_listof_bulkwritemodel_append_deletemany (
    _mongoc_array_append_val (&self->updates, is_update);
    bool is_delete = true;
    _mongoc_array_append_val (&self->deletes, is_delete);
+
+   bson_destroy (&op);
    return true;
 }
 
