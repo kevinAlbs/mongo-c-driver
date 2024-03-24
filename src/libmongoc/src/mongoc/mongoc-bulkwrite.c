@@ -36,6 +36,7 @@ struct _mongoc_listof_bulkwritemodel_t {
    // `verbose_results` array to contain:
    // - Iterators to the `_id` for inserts
    // - Identifier of the operation (to construct results)
+   bool has_multi_write;
 };
 
 struct _mongoc_mapof_insertoneresult_t {
@@ -313,6 +314,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
    bson_t cmd = BSON_INITIALIZER;
    mongoc_cmd_parts_t parts = {0};
    mongoc_bulkwriteoptions_t defaults = {0};
+   mongoc_server_stream_t *retry_ss = NULL;
    if (!options) {
       options = &defaults;
    }
@@ -394,6 +396,16 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 
       mongoc_cmd_parts_init (&parts, self, "admin", MONGOC_QUERY_NONE, &cmd);
       bson_error_t error;
+
+      parts.allow_txn_number =
+         MONGOC_CMD_PARTS_ALLOW_TXN_NUMBER_YES; // To append `lsid`.
+      if (models->has_multi_write) {
+         // Write commands that include multi-document operations are not
+         // retryable.
+         parts.allow_txn_number = MONGOC_CMD_PARTS_ALLOW_TXN_NUMBER_NO;
+      }
+      parts.is_write_command = true; // To append `txnNumber`.
+
       if (!mongoc_cmd_parts_assemble (&parts, ss, &error)) {
          mongoc_bulkwriteexception_set_error (ret.exc, &error, NULL);
          goto fail;
@@ -485,12 +497,42 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
             BSON_ASSERT (bson_in_range_int32_t_unsigned (payload_len));
             parts.assembled.payload_size = (int32_t) payload_len;
 
+            bool is_retryable = parts.is_retryable_write;
+            // Send in possible retry.
+         retry: {
             bool ok = mongoc_cluster_run_command_monitored (
                &self->cluster, &parts.assembled, &cmd_reply, &error);
+
+            mongoc_write_err_type_t error_type =
+               _mongoc_write_error_get_type (&cmd_reply);
+            // Check for a retryable write error.
+            if (error_type == MONGOC_WRITE_ERR_RETRY && is_retryable) {
+               is_retryable = false; // Only retry once.
+               bson_error_t ignored_error;
+
+               // Select a server and create a stream again.
+               retry_ss = mongoc_cluster_stream_for_writes (
+                  &self->cluster,
+                  NULL /* session */,
+                  NULL /* deprioritized servers */,
+                  NULL /* reply */,
+                  &ignored_error);
+
+               if (retry_ss) {
+                  parts.assembled.server_stream = retry_ss;
+                  bson_destroy (&cmd_reply);
+                  bson_init (&cmd_reply);
+                  goto retry;
+               }
+            }
+
+            // Check for a command ('ok': 0) error.
             if (!ok) {
-               mongoc_bulkwriteexception_set_error (ret.exc, &error, NULL);
+               mongoc_bulkwriteexception_set_error (
+                  ret.exc, &error, &cmd_reply);
                goto batch_fail;
             }
+         }
          }
 
          // Add to result and/or exception.
@@ -928,6 +970,9 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
    }
 
 fail:
+   if (retry_ss) {
+      mongoc_server_stream_cleanup (retry_ss);
+   }
    mongoc_cmd_parts_cleanup (&parts);
    bson_destroy (&cmd);
    mongoc_server_stream_cleanup (ss);
@@ -1387,6 +1432,8 @@ mongoc_listof_bulkwritemodel_append_updatemany (
    bool is_delete = false;
    _mongoc_array_append_val (&self->deletes, is_delete);
 
+   self->has_multi_write = true;
+
    bson_destroy (&op);
    return true;
 }
@@ -1599,6 +1646,8 @@ mongoc_listof_bulkwritemodel_append_deletemany (
    _mongoc_array_append_val (&self->updates, is_update);
    bool is_delete = true;
    _mongoc_array_append_val (&self->deletes, is_delete);
+
+   self->has_multi_write = true;
 
    bson_destroy (&op);
    return true;
