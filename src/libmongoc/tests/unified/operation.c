@@ -519,6 +519,10 @@ operation_client_bulkwrite (test_t *test,
       }
    }
 
+   if (op->session) {
+      opts.session = op->session;
+   }
+
    // Do client bulk write.
    mongoc_bulkwritereturn_t bwr =
       mongoc_client_bulkwrite (client, models, &opts);

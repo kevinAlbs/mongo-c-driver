@@ -397,6 +397,9 @@ struct _mongoc_bulkwriteoptions_t {
     */
    bson_t *comment;
 
+   // An optional session. May be NULL.
+   mongoc_client_session_t *session;
+
    // `extra` is appended to the bulkWrite command.
    // It is included to support future server options.
    bson_t *extra;
