@@ -33,7 +33,8 @@ struct _bson_matcher_t {
 };
 
 #define MATCH_ERR(format, ...) \
-   test_set_error (error, "match error at '%s': " format, path, __VA_ARGS__)
+   test_set_error (            \
+      error, "match error at path: '%s': " format, path, __VA_ARGS__)
 
 static char *
 get_first_key (const bson_t *bson)
@@ -449,7 +450,7 @@ bson_matcher_match (bson_matcher_t *matcher,
          }
 
          if (NULL == actual_val) {
-            MATCH_ERR ("key %s is not present", key);
+            MATCH_ERR ("key '%s' is not present", key);
             bson_val_destroy (expected_val);
             bson_val_destroy (actual_val);
             goto done;
