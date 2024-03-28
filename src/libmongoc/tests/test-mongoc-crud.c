@@ -244,43 +244,84 @@ prose_test_3 (void *ctx)
       bson_destroy (&reply);
    }
 
-   mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
    bson_t *doc = tmp_bson ("{'a': 'b'}");
 
-   for (int32_t i = 0; i < maxWriteBatchSize + 1; i++) {
-      ok = mongoc_listof_bulkwritemodel_append_insertone (
-         models,
-         "db.coll",
-         -1,
-         (mongoc_insertone_model_t){.document = doc},
-         &error);
-      ASSERT_OR_PRINT (ok, error);
+   // Test maximum in one batch
+   {
+      mongoc_listof_bulkwritemodel_t *models =
+         mongoc_listof_bulkwritemodel_new ();
+      for (int32_t i = 0; i < maxWriteBatchSize; i++) {
+         ok = mongoc_listof_bulkwritemodel_append_insertone (
+            models,
+            "db.coll",
+            -1,
+            (mongoc_insertone_model_t){.document = doc},
+            &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+
+      mongoc_bulkwritereturn_t ret =
+         mongoc_client_bulkwrite (client, models, NULL /* options */);
+      ASSERT (ret.res);
+      ASSERT_CMPINT64 (
+         mongoc_bulkwriteresult_insertedCount (ret.res), ==, maxWriteBatchSize);
+      mongoc_bulkwritereturn_cleanup (&ret);
+
+      // Assert first `bulkWrite` sends `maxWriteBatchSize` ops.
+      bson_t expect = BSON_INITIALIZER;
+      BSON_APPEND_INT64 (&expect, "0", maxWriteBatchSize);
+      ASSERT_EQUAL_BSON (&expect, &cb_ctx.ops_counts);
+      bson_destroy (&expect);
+
+      mongoc_listof_bulkwritemodel_destroy (models);
    }
 
-   mongoc_bulkwritereturn_t ret =
-      mongoc_client_bulkwrite (client, models, NULL /* options */);
-   ASSERT (ret.res);
-   ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedCount (ret.res),
-                    ==,
-                    maxWriteBatchSize + 1);
-   mongoc_bulkwritereturn_cleanup (&ret);
+   // Reset.
+   bson_destroy (&cb_ctx.operation_ids);
+   bson_init (&cb_ctx.operation_ids);
+   bson_destroy (&cb_ctx.ops_counts);
+   bson_init (&cb_ctx.ops_counts);
 
-   // Assert first `bulkWrite` sends `maxWriteBatchSize` ops.
-   // Assert second `bulkWrite` sends 1 op.
-   bson_t expect = BSON_INITIALIZER;
-   BSON_APPEND_INT64 (&expect, "0", maxWriteBatchSize);
-   BSON_APPEND_INT64 (&expect, "1", 1);
-   ASSERT_EQUAL_BSON (&expect, &cb_ctx.ops_counts);
-   bson_destroy (&expect);
+   // Test two batches
+   {
+      mongoc_listof_bulkwritemodel_t *models =
+         mongoc_listof_bulkwritemodel_new ();
+      for (int32_t i = 0; i < maxWriteBatchSize + 1; i++) {
+         ok = mongoc_listof_bulkwritemodel_append_insertone (
+            models,
+            "db.coll",
+            -1,
+            (mongoc_insertone_model_t){.document = doc},
+            &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
 
-   // Assert both have the same `operation_id`.
-   int64_t operation_id_0 = bson_lookup_int64 (&cb_ctx.operation_ids, "0");
-   int64_t operation_id_1 = bson_lookup_int64 (&cb_ctx.operation_ids, "1");
-   ASSERT_CMPINT64 (operation_id_0, ==, operation_id_1);
+      mongoc_bulkwritereturn_t ret =
+         mongoc_client_bulkwrite (client, models, NULL /* options */);
+      ASSERT (ret.res);
+      ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedCount (ret.res),
+                       ==,
+                       maxWriteBatchSize + 1);
+      mongoc_bulkwritereturn_cleanup (&ret);
+
+      // Assert first `bulkWrite` sends `maxWriteBatchSize` ops.
+      // Assert second `bulkWrite` sends 1 op.
+      bson_t expect = BSON_INITIALIZER;
+      BSON_APPEND_INT64 (&expect, "0", maxWriteBatchSize);
+      BSON_APPEND_INT64 (&expect, "1", 1);
+      ASSERT_EQUAL_BSON (&expect, &cb_ctx.ops_counts);
+      bson_destroy (&expect);
+
+      // Assert both have the same `operation_id`.
+      int64_t operation_id_0 = bson_lookup_int64 (&cb_ctx.operation_ids, "0");
+      int64_t operation_id_1 = bson_lookup_int64 (&cb_ctx.operation_ids, "1");
+      ASSERT_CMPINT64 (operation_id_0, ==, operation_id_1);
+
+      mongoc_listof_bulkwritemodel_destroy (models);
+   }
 
    bson_destroy (&cb_ctx.operation_ids);
    bson_destroy (&cb_ctx.ops_counts);
-   mongoc_listof_bulkwritemodel_destroy (models);
    mongoc_client_destroy (client);
 }
 
@@ -325,7 +366,6 @@ prose_test_4 (void *ctx)
       bson_destroy (&reply);
    }
 
-   mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
 
    bson_t doc = BSON_INITIALIZER;
    {
@@ -337,10 +377,145 @@ prose_test_4 (void *ctx)
       bson_free (large_str);
    }
 
-   int32_t numModels = (maxMessageSizeBytes / maxBsonObjectSize) + 1;
+   // Test maximum in one batch
+   {
+      mongoc_listof_bulkwritemodel_t *models =
+         mongoc_listof_bulkwritemodel_new ();
+      int32_t numModels = (maxMessageSizeBytes / maxBsonObjectSize);
 
+      for (int32_t i = 0; i < numModels; i++) {
+         ok = mongoc_listof_bulkwritemodel_append_insertone (
+            models,
+            "db.coll",
+            -1,
+            (mongoc_insertone_model_t){.document = &doc},
+            &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
 
-   for (int32_t i = 0; i < numModels; i++) {
+      mongoc_bulkwritereturn_t ret =
+         mongoc_client_bulkwrite (client, models, NULL /* options */);
+      if (ret.exc) {
+         ASSERT_OR_PRINT (
+            !mongoc_bulkwriteexception_error (ret.exc, &error, NULL), error);
+      }
+      ASSERT (ret.res);
+      ASSERT_CMPINT64 (
+         mongoc_bulkwriteresult_insertedCount (ret.res), ==, numModels);
+      mongoc_bulkwritereturn_cleanup (&ret);
+
+      // Assert one `bulkWrite` was sent:
+      ASSERT_CMPUINT32 (1, ==, bson_count_keys (&cb_ctx.ops_counts));
+
+      // Assert the count of total models sent:
+      int64_t ops_count_0 = bson_lookup_int64 (&cb_ctx.ops_counts, "0");
+      ASSERT_CMPINT64 (ops_count_0, ==, numModels);
+
+      mongoc_listof_bulkwritemodel_destroy (models);
+   }
+
+   // Reset.
+   bson_destroy (&cb_ctx.operation_ids);
+   bson_init (&cb_ctx.operation_ids);
+   bson_destroy (&cb_ctx.ops_counts);
+   bson_init (&cb_ctx.ops_counts);
+
+   // Test two batches
+   {
+      mongoc_listof_bulkwritemodel_t *models =
+         mongoc_listof_bulkwritemodel_new ();
+      int32_t numModels = (maxMessageSizeBytes / maxBsonObjectSize) + 1;
+
+      for (int32_t i = 0; i < numModels; i++) {
+         ok = mongoc_listof_bulkwritemodel_append_insertone (
+            models,
+            "db.coll",
+            -1,
+            (mongoc_insertone_model_t){.document = &doc},
+            &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+
+      mongoc_bulkwritereturn_t ret =
+         mongoc_client_bulkwrite (client, models, NULL /* options */);
+      if (ret.exc) {
+         ASSERT_OR_PRINT (
+            !mongoc_bulkwriteexception_error (ret.exc, &error, NULL), error);
+      }
+      ASSERT (ret.res);
+      ASSERT_CMPINT64 (
+         mongoc_bulkwriteresult_insertedCount (ret.res), ==, numModels);
+      mongoc_bulkwritereturn_cleanup (&ret);
+
+      // Assert two `bulkWrite`s were sent:
+      ASSERT_CMPUINT32 (2, ==, bson_count_keys (&cb_ctx.ops_counts));
+
+      // Assert the sum of the total models sent:
+      int64_t ops_count_0 = bson_lookup_int64 (&cb_ctx.ops_counts, "0");
+      int64_t ops_count_1 = bson_lookup_int64 (&cb_ctx.ops_counts, "1");
+      ASSERT_CMPINT64 (ops_count_0 + ops_count_1, ==, numModels);
+
+      // Assert both have the same `operation_id`.
+      int64_t operation_id_0 = bson_lookup_int64 (&cb_ctx.operation_ids, "0");
+      int64_t operation_id_1 = bson_lookup_int64 (&cb_ctx.operation_ids, "1");
+      ASSERT_CMPINT64 (operation_id_0, ==, operation_id_1);
+
+      mongoc_listof_bulkwritemodel_destroy (models);
+   }
+
+   bson_destroy (&cb_ctx.operation_ids);
+   bson_destroy (&cb_ctx.ops_counts);
+   bson_destroy (&doc);
+   mongoc_client_destroy (client);
+}
+
+static void
+prose_test_5 (void *ctx)
+{
+   /*
+   Test a client-side error is returned if a Clientinsert is attempted for an
+   unacknowledged
+   */
+   mongoc_client_t *client;
+   BSON_UNUSED (ctx);
+   bool ok;
+   bson_error_t error;
+
+   client = test_framework_new_default_client ();
+   // Get `maxBsonObjectSize` from the server.
+   int32_t maxBsonObjectSize;
+   {
+      bson_t reply;
+
+      ok = mongoc_client_command_simple (
+         client, "admin", tmp_bson ("{'hello': 1}"), NULL, &reply, &error);
+      ASSERT_OR_PRINT (ok, error);
+
+      maxBsonObjectSize = bson_lookup_int32 (&reply, "maxBsonObjectSize");
+      bson_destroy (&reply);
+   }
+
+   bson_t doc = BSON_INITIALIZER;
+   {
+      size_t len = maxBsonObjectSize;
+      char *large_str = bson_malloc (len + 1);
+      memset (large_str, 'b', len);
+      large_str[len] = '\0';
+      BSON_APPEND_UTF8 (&doc, "a", large_str);
+      bson_free (large_str);
+   }
+
+   mongoc_bulkwriteoptions_t opts = {.writeConcern =
+                                        mongoc_write_concern_new ()};
+
+   mongoc_write_concern_set_w (opts.writeConcern,
+                               MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
+
+   // Test a large insert.
+   {
+      mongoc_listof_bulkwritemodel_t *models =
+         mongoc_listof_bulkwritemodel_new ();
+
       ok = mongoc_listof_bulkwritemodel_append_insertone (
          models,
          "db.coll",
@@ -348,36 +523,49 @@ prose_test_4 (void *ctx)
          (mongoc_insertone_model_t){.document = &doc},
          &error);
       ASSERT_OR_PRINT (ok, error);
+
+      mongoc_bulkwritereturn_t ret =
+         mongoc_client_bulkwrite (client, models, &opts);
+      ASSERT (ret.exc);
+      ASSERT (mongoc_bulkwriteexception_error (ret.exc, &error, NULL));
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_COMMAND,
+                             MONGOC_ERROR_COMMAND_INVALID_ARG,
+                             "of size");
+
+      mongoc_bulkwritereturn_cleanup (&ret);
+      mongoc_listof_bulkwritemodel_destroy (models);
    }
 
-   mongoc_bulkwritereturn_t ret =
-      mongoc_client_bulkwrite (client, models, NULL /* options */);
-   if (ret.exc) {
-      ASSERT_OR_PRINT (!mongoc_bulkwriteexception_error (ret.exc, &error, NULL),
-                       error);
+   // Test a large replace.
+   {
+      mongoc_listof_bulkwritemodel_t *models =
+         mongoc_listof_bulkwritemodel_new ();
+
+      ok = mongoc_listof_bulkwritemodel_append_replaceone (
+         models,
+         "db.coll",
+         -1,
+         (mongoc_replaceone_model_t){.filter = tmp_bson ("{}"),
+                                     .replacement = &doc},
+         &error);
+      ASSERT_OR_PRINT (ok, error);
+
+      mongoc_bulkwritereturn_t ret =
+         mongoc_client_bulkwrite (client, models, &opts);
+      ASSERT (ret.exc);
+      ASSERT (mongoc_bulkwriteexception_error (ret.exc, &error, NULL));
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_COMMAND,
+                             MONGOC_ERROR_COMMAND_INVALID_ARG,
+                             "of size");
+
+      mongoc_bulkwritereturn_cleanup (&ret);
+      mongoc_listof_bulkwritemodel_destroy (models);
    }
-   ASSERT (ret.res);
-   ASSERT_CMPINT64 (
-      mongoc_bulkwriteresult_insertedCount (ret.res), ==, numModels);
-   mongoc_bulkwritereturn_cleanup (&ret);
 
-   // Assert two `bulkWrite`s were sent:
-   ASSERT_CMPUINT32 (2, ==, bson_count_keys (&cb_ctx.ops_counts));
-
-   // Assert the sum of the total models sent:
-   int64_t ops_count_0 = bson_lookup_int64 (&cb_ctx.ops_counts, "0");
-   int64_t ops_count_1 = bson_lookup_int64 (&cb_ctx.ops_counts, "1");
-   ASSERT_CMPINT64 (ops_count_0 + ops_count_1, ==, numModels);
-
-   // Assert both have the same `operation_id`.
-   int64_t operation_id_0 = bson_lookup_int64 (&cb_ctx.operation_ids, "0");
-   int64_t operation_id_1 = bson_lookup_int64 (&cb_ctx.operation_ids, "1");
-   ASSERT_CMPINT64 (operation_id_0, ==, operation_id_1);
-
-   bson_destroy (&cb_ctx.operation_ids);
-   bson_destroy (&cb_ctx.ops_counts);
    bson_destroy (&doc);
-   mongoc_listof_bulkwritemodel_destroy (models);
+   mongoc_write_concern_destroy (opts.writeConcern);
    mongoc_client_destroy (client);
 }
 
@@ -412,6 +600,13 @@ test_crud_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/crud/prose_test_4",
                       prose_test_4,
+                      NULL, /* dtor */
+                      NULL, /* ctx */
+                      test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */);
+
+   TestSuite_AddFull (suite,
+                      "/crud/prose_test_5",
+                      prose_test_5,
                       NULL, /* dtor */
                       NULL, /* ctx */
                       test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */);
