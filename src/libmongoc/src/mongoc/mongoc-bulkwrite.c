@@ -38,6 +38,8 @@ struct _mongoc_listof_bulkwritemodel_t {
    // - Iterators to the `_id` for inserts
    // - Identifier of the operation (to construct results)
    bool has_multi_write;
+   // `max_insert_len` tracks the maximum length of any document to-be inserted.
+   uint32_t max_insert_len;
 };
 
 struct _mongoc_mapof_insertoneresult_t {
@@ -361,6 +363,8 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
          goto fail;
       }
    }
+
+   int32_t maxBsonObjectSize = mongoc_server_stream_max_bson_obj_size (ss);
 
    // Create the payload 0.
    {
@@ -1308,9 +1312,11 @@ mongoc_listof_bulkwritemodel_append_insertone (
       BSON_ASSERT (BSON_APPEND_OID (&tmp, "_id", &oid));
       BSON_ASSERT (bson_concat (&tmp, document));
       BSON_ASSERT (bson_append_document (&op, "document", 8, &tmp));
+      self->max_insert_len = BSON_MAX (self->max_insert_len, tmp.len);
       bson_destroy (&tmp);
    } else {
       BSON_ASSERT (bson_append_document (&op, "document", 8, document));
+      self->max_insert_len = BSON_MAX (self->max_insert_len, document->len);
    }
 
    BSON_ASSERT (
@@ -1547,6 +1553,9 @@ mongoc_listof_bulkwritemodel_append_replaceone (
 
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
    BSON_ASSERT (bson_append_document (&op, "updateMods", 10, replacement));
+
+   self->max_insert_len = BSON_MAX (self->max_insert_len, replacement->len);
+
    BSON_ASSERT (bson_append_bool (&op, "multi", 5, false));
    if (model.upsert.isset) {
       BSON_ASSERT (bson_append_bool (&op, "upsert", 6, model.upsert.value));
