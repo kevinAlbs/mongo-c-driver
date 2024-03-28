@@ -5,7 +5,8 @@
 #include <mongoc-server-stream-private.h>
 #include <mongoc-cmd-private.h>
 #include <mongoc-client-private.h>
-#include <mongoc-util-private.h> // _mongoc_iter_document_as_bson
+#include <mongoc-util-private.h>  // _mongoc_iter_document_as_bson
+#include <mongoc-error-private.h> // _mongoc_write_error_handle_labels
 
 int32_t _mock_maxWriteBatchSize = 0;
 int32_t _mock_maxMessageSizeBytes = 0;
@@ -553,6 +554,11 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
          retry: {
             bool ok = mongoc_cluster_run_command_monitored (
                &self->cluster, &parts.assembled, &cmd_reply, &error);
+
+            if (parts.is_retryable_write) {
+               _mongoc_write_error_handle_labels (
+                  ok, &error, &cmd_reply, parts.assembled.server_stream->sd);
+            }
 
             mongoc_write_err_type_t error_type =
                _mongoc_write_error_get_type (&cmd_reply);
