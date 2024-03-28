@@ -181,8 +181,13 @@ mongoc_bulkwriteexception_new (size_t nmodels)
 {
    mongoc_bulkwriteexception_t *self = bson_malloc0 (sizeof (*self));
    bson_init (&self->optional_error.document);
+   size_t nentries = nmodels;
+   if (nentries == 0) {
+      // Initialize with 1 to avoid assert.
+      nentries = 1;
+   }
    _mongoc_array_init_with_zerofill (
-      &self->mapof_we.entries, sizeof (mongoc_writeerror_t *), nmodels);
+      &self->mapof_we.entries, sizeof (mongoc_writeerror_t *), nentries);
    _mongoc_array_init (&self->listof_wce.entries,
                        sizeof (mongoc_writeconcernerror_t *));
    self->has_any_error = false;
@@ -254,9 +259,14 @@ static mongoc_bulkwriteresult_t *
 mongoc_bulkwriteresult_new (mongoc_listof_bulkwritemodel_t *models)
 {
    mongoc_bulkwriteresult_t *self = bson_malloc0 (sizeof (*self));
+   size_t nentries = models->n_ops;
+   if (nentries == 0) {
+      // Initialize with 1 to avoid assert.
+      nentries = 1;
+   }
 
    _mongoc_array_init_with_zerofill (
-      &self->mapof_ur.entries, sizeof (mongoc_updateresult_t), models->n_ops);
+      &self->mapof_ur.entries, sizeof (mongoc_updateresult_t), nentries);
 
    for (size_t i = 0; i < models->updates.len; i++) {
       mongoc_updateresult_t *ur = &_mongoc_array_index (
@@ -266,7 +276,7 @@ mongoc_bulkwriteresult_new (mongoc_listof_bulkwritemodel_t *models)
    }
 
    _mongoc_array_init_with_zerofill (
-      &self->mapof_dr.entries, sizeof (mongoc_deleteresult_t), models->n_ops);
+      &self->mapof_dr.entries, sizeof (mongoc_deleteresult_t), nentries);
 
    for (size_t i = 0; i < models->deletes.len; i++) {
       mongoc_deleteresult_t *dr = &_mongoc_array_index (
@@ -324,6 +334,16 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
    // Copy `entries` to the result.
    _mongoc_array_copy (&ret.res->mapof_ior.entries, &models->entries);
    ret.exc = mongoc_bulkwriteexception_new (models->n_ops);
+
+   if (models->n_ops == 0) {
+      bson_error_t error;
+      bson_set_error (&error,
+                      MONGOC_ERROR_COMMAND,
+                      MONGOC_ERROR_COMMAND_INVALID_ARG,
+                      "cannot do `bulkWrite` with no models");
+      mongoc_bulkwriteexception_set_error (ret.exc, &error, NULL);
+      goto fail;
+   }
 
    // Select a stream.
    {
@@ -979,7 +999,10 @@ fail:
    if (retry_ss) {
       mongoc_server_stream_cleanup (retry_ss);
    }
-   mongoc_cmd_parts_cleanup (&parts);
+   if (parts.body) {
+      // Only clean-up if initialized.
+      mongoc_cmd_parts_cleanup (&parts);
+   }
    bson_destroy (&cmd);
    mongoc_server_stream_cleanup (ss);
    if (ret.exc && !ret.exc->has_any_error) {
