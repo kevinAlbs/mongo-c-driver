@@ -432,6 +432,31 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
          mongoc_cmd_parts_set_session (&parts, options->session);
       }
 
+      // Apply write concern:
+      {
+         mongoc_write_concern_t *wc = self->write_concern; // Default to client.
+         if (options && options->writeConcern) {
+            wc = options->writeConcern;
+         }
+         if (!mongoc_cmd_parts_set_write_concern (&parts, wc, &error)) {
+            mongoc_bulkwriteexception_set_error (ret.exc, &error, NULL);
+            goto fail;
+         }
+         if (!mongoc_write_concern_is_acknowledged (wc) &&
+             bson_cmp_greater_us (models->max_insert_len, maxBsonObjectSize)) {
+            bson_set_error (
+               &error,
+               MONGOC_ERROR_COMMAND,
+               MONGOC_ERROR_COMMAND_INVALID_ARG,
+               "Unacknowledged `bulkWrite` includes insert of size: %" PRIu32
+               ", exceeding maxBsonObjectSize: %" PRId32,
+               models->max_insert_len,
+               maxBsonObjectSize);
+            mongoc_bulkwriteexception_set_error (ret.exc, &error, NULL);
+            goto fail;
+         }
+      }
+
       if (!mongoc_cmd_parts_assemble (&parts, ss, &error)) {
          mongoc_bulkwriteexception_set_error (ret.exc, &error, NULL);
          goto fail;
