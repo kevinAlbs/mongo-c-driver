@@ -15,8 +15,7 @@
         ],
         "uriOptions": {
           "retryWrites": false
-        },
-        "useMultipleMongoses": false
+        }
       }
     },
     {
@@ -436,6 +435,44 @@
                 "message": "Replication is being shut down"
               }
             ]
+          }
+        }
+      ]
+    },
+    {
+      "description": "an empty bulkWrite is a client-side error",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "client0",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "bulkWrite"
+                ],
+                "writeConcernError": {
+                  "code": 91,
+                  "errmsg": "Replication is being shut down"
+                }
+              }
+            }
+          }
+        },
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [],
+            "verboseResults": true
+          },
+          "expectError": {
+            "isClientError": true
           }
         }
       ]
