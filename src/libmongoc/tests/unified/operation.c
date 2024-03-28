@@ -462,6 +462,7 @@ operation_client_bulkwrite (test_t *test,
       bson_t *args_comment = NULL;
       bool *args_bypassDocumentValidation = NULL;
       bson_t *args_let = NULL;
+      mongoc_write_concern_t *args_wc = NULL;
       bson_parser_t *parser = bson_parser_new ();
 
       bson_parser_array (parser, "models", &args_models);
@@ -472,6 +473,7 @@ operation_client_bulkwrite (test_t *test,
       bson_parser_bool_optional (
          parser, "bypassDocumentValidation", &args_bypassDocumentValidation);
       bson_parser_doc_optional (parser, "let", &args_let);
+      bson_parser_write_concern_optional (parser, &args_wc);
       if (!bson_parser_parse (parser, op->arguments, error)) {
          goto parse_done;
       }
@@ -496,6 +498,9 @@ operation_client_bulkwrite (test_t *test,
          // Copy `args_let` to extend lifetime beyond `parser`.
          let = bson_copy (args_let);
          opts.let = let;
+      }
+      if (args_wc) {
+         opts.writeConcern = mongoc_write_concern_copy (args_wc);
       }
 
       // Parse models.
@@ -531,6 +536,7 @@ operation_client_bulkwrite (test_t *test,
    mongoc_bulkwritereturn_cleanup (&bwr);
    ret = true;
 done:
+   mongoc_write_concern_destroy (opts.writeConcern);
    bson_destroy (let);
    bson_destroy (comment);
    mongoc_listof_bulkwritemodel_destroy (models);
