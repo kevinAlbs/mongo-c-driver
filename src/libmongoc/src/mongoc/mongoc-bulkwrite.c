@@ -554,6 +554,18 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
             parts.assembled.payload_size = (int32_t) payload_len;
 
             bool is_retryable = parts.is_retryable_write;
+
+            /* increment the transaction number for the first attempt of each
+             * retryable write command */
+            if (is_retryable) {
+               bson_iter_t txn_number_iter;
+               BSON_ASSERT (bson_iter_init_find (
+                  &txn_number_iter, parts.assembled.command, "txnNumber"));
+               bson_iter_overwrite_int64 (
+                  &txn_number_iter,
+                  ++parts.assembled.session->server_session->txn_number);
+            }
+
             // Send in possible retry.
          retry: {
             bool ok = mongoc_cluster_run_command_monitored (
