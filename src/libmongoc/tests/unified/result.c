@@ -855,13 +855,28 @@ result_from_bulkwritereturn (result_t *result,
    }
 
    bson_error_t error = {0};
-   const bson_t *error_document = NULL;
+   bson_t error_labels_document = BSON_INITIALIZER;
    if (bwr.exc) {
-      mongoc_bulkwriteexception_error (bwr.exc, &error, &error_document);
+      mongoc_bulkwriteexception_error (bwr.exc, &error, NULL);
+      // Construct an error document from the collected error labels.
+      {
+         mongoc_listof_errorlabel_t *listof_el =
+            mongoc_bulkwriteexception_errorLabels (bwr.exc);
+         bson_array_builder_t *bab;
+         BSON_APPEND_ARRAY_BUILDER_BEGIN (
+            &error_labels_document, "errorLabels", &bab);
+         for (size_t i = 0; i < mongoc_listof_errorlabel_len (listof_el); i++) {
+            const char *el = mongoc_listof_errorlabel_at (listof_el, i);
+            ASSERT (el);
+            bson_array_builder_append_utf8 (bab, el, -1);
+         }
+         bson_append_array_builder_end (&error_labels_document, bab);
+      }
    }
 
    bson_val_t *bwr_val = bson_val_from_bson (&bwr_bson);
-   result_from_val_and_reply (result, bwr_val, error_document, &error);
+   result_from_val_and_reply (result, bwr_val, &error_labels_document, &error);
+   bson_destroy (&error_labels_document);
 
    if (bwr.exc) {
       result->ok = false; // An error occurred.

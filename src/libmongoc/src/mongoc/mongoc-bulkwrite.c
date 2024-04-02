@@ -116,6 +116,12 @@ struct _mongoc_listof_writeconcernerror_t {
    mongoc_array_t entries;
 };
 
+struct _mongoc_listof_errorlabel_t {
+   // `entries` is an array of `char*`.
+   mongoc_array_t entries;
+};
+
+
 struct _mongoc_bulkwriteexception_t {
    struct {
       bson_error_t error;
@@ -125,10 +131,71 @@ struct _mongoc_bulkwriteexception_t {
 
    mongoc_mapof_writeerror_t mapof_we;
    mongoc_listof_writeconcernerror_t listof_wce;
+   mongoc_listof_errorlabel_t listof_el;
 
    // If `has_any_error` is false, the bulk write exception is not returned.
    bool has_any_error;
 };
+
+
+mongoc_listof_errorlabel_t *
+mongoc_bulkwriteexception_errorLabels (mongoc_bulkwriteexception_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return &self->listof_el;
+}
+
+const char *
+mongoc_listof_errorlabel_at (mongoc_listof_errorlabel_t *self, size_t idx)
+{
+   BSON_ASSERT_PARAM (self);
+   if (idx > self->entries.len) {
+      return NULL;
+   }
+   return _mongoc_array_index (&self->entries, char *, idx);
+}
+
+size_t
+mongoc_listof_errorlabel_len (mongoc_listof_errorlabel_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->entries.len;
+}
+
+// `mongoc_listof_errorlabel_upsert` checks `reply` for the `errorLabels`
+// fields, and upserts into the list.
+static void
+mongoc_listof_errorlabel_upsert (mongoc_listof_errorlabel_t *self,
+                                 const bson_t *reply)
+{
+   BSON_ASSERT_PARAM (self);
+   BSON_ASSERT_PARAM (reply);
+
+   bson_iter_t iter, error_labels;
+   if (bson_iter_init_find (&iter, reply, "errorLabels") &&
+       bson_iter_recurse (&iter, &error_labels)) {
+      while (bson_iter_next (&error_labels)) {
+         const char *to_upsert = bson_iter_utf8 (&error_labels, NULL);
+         if (!to_upsert) {
+            MONGOC_ERROR ("Skipping unexpected non-UTF8 error label.");
+            continue;
+         }
+         // Check if label already present.
+         for (size_t i = 0; i < self->entries.len; i++) {
+            const char *existing =
+               _mongoc_array_index (&self->entries, char *, i);
+            if (0 == strcmp (existing, to_upsert)) {
+               // Already present, ignore it.
+               continue;
+            }
+         }
+         // Not present. Insert a copy.
+         char *to_upsert_copy = bson_strdup (to_upsert);
+         _mongoc_array_append_val (&self->entries, to_upsert_copy);
+      }
+   }
+}
+
 
 struct _mongoc_writeerror_t {
    int32_t code;
@@ -193,6 +260,7 @@ mongoc_bulkwriteexception_new (size_t nmodels)
       &self->mapof_we.entries, sizeof (mongoc_writeerror_t *), nentries);
    _mongoc_array_init (&self->listof_wce.entries,
                        sizeof (mongoc_writeconcernerror_t *));
+   _mongoc_array_init (&self->listof_el.entries, sizeof (char *));
    self->has_any_error = false;
    return self;
 }
@@ -217,6 +285,9 @@ mongoc_bulkwriteexception_set_error (mongoc_bulkwriteexception_t *self,
    }
    self->optional_error.isset = true;
    self->has_any_error = true;
+   if (error_document) {
+      mongoc_listof_errorlabel_upsert (&self->listof_el, error_document);
+   }
 }
 
 static void
@@ -254,6 +325,13 @@ mongoc_bulkwriteexception_destroy (mongoc_bulkwriteexception_t *self)
       mongoc_writeconcernerror_destroy (entry);
    }
    _mongoc_array_destroy (&self->listof_wce.entries);
+
+   // Destroy all error labels.
+   for (size_t i = 0; i < self->listof_el.entries.len; i++) {
+      char *entry = _mongoc_array_index (&self->listof_el.entries, char *, i);
+      bson_free (entry);
+   }
+   _mongoc_array_destroy (&self->listof_el.entries);
 
    bson_free (self);
 }
@@ -760,9 +838,26 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
             }
 
             {
+               bson_t cursor_opts = BSON_INITIALIZER;
+               {
+                  bson_error_t error;
+                  BSON_ASSERT (
+                     bson_append_int32 (&cursor_opts,
+                                        "serverId",
+                                        8,
+                                        parts.assembled.server_stream->sd->id));
+                  // Use same session.
+                  if (!mongoc_client_session_append (
+                         parts.assembled.session, &cursor_opts, &error)) {
+                     mongoc_bulkwriteexception_set_error (
+                        ret.exc, &error, NULL);
+                     goto batch_fail;
+                  }
+               }
                // Construct the reply cursor.
                reply_cursor = mongoc_cursor_new_from_command_reply_with_opts (
-                  self, &cmd_reply, NULL);
+                  self, &cmd_reply, &cursor_opts);
+               bson_destroy (&cursor_opts);
                // `cmd_reply` is stolen. Clear it.
                bson_init (&cmd_reply);
 

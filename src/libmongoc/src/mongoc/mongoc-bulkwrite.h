@@ -566,6 +566,18 @@ mongoc_bulkwriteexception_error (mongoc_bulkwriteexception_t *self,
                                  bson_error_t *error,
                                  const bson_t **error_document);
 
+typedef struct _mongoc_listof_errorlabel_t mongoc_listof_errorlabel_t;
+
+mongoc_listof_errorlabel_t *
+mongoc_bulkwriteexception_errorLabels (mongoc_bulkwriteexception_t *self);
+
+BSON_EXPORT (const char *)
+mongoc_listof_errorlabel_at (mongoc_listof_errorlabel_t *self, size_t idx);
+
+BSON_EXPORT (size_t)
+mongoc_listof_errorlabel_len (mongoc_listof_errorlabel_t *self);
+
+
 /**
  * Write concern errors that occurred while executing the bulk write. This
  * list may have multiple items if more than one server command was required
