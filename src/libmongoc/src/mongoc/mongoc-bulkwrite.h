@@ -27,7 +27,7 @@ BSON_BEGIN_DECLS
 // API patterns:
 // Opaque types are pointers (e.g. `mongoc_listof_bulkwritemodel_t`)
 // Optional struct values are pointers (e.g. `mongoc_bulkwriteoptions_t`)
-// Return types (e.g. `mongoc_bulkwriteresult_t`) have cleanup functions.
+// Return types (e.g. `mongoc_bulkwritereturn_t`) have cleanup functions.
 // Non-opaque argument types do not own their fields (e.g.
 // `mongoc_bulkwriteoptions_t` has no `cleanup` function).
 
@@ -407,20 +407,20 @@ struct _mongoc_bulkwriteoptions_t {
 
 typedef struct _mongoc_mapof_insertoneresult_t mongoc_mapof_insertoneresult_t;
 typedef struct _mongoc_insertoneresult_t mongoc_insertoneresult_t;
-BSON_EXPORT (mongoc_insertoneresult_t *)
-mongoc_mapof_insertoneresult_lookup (mongoc_mapof_insertoneresult_t *self,
+BSON_EXPORT (const mongoc_insertoneresult_t *)
+mongoc_mapof_insertoneresult_lookup (const mongoc_mapof_insertoneresult_t *self,
                                      size_t idx);
 
 typedef struct _mongoc_mapof_updateresult_t mongoc_mapof_updateresult_t;
 typedef struct _mongoc_updateresult_t mongoc_updateresult_t;
-BSON_EXPORT (mongoc_updateresult_t *)
-mongoc_mapof_updateresult_lookup (mongoc_mapof_updateresult_t *self,
+BSON_EXPORT (const mongoc_updateresult_t *)
+mongoc_mapof_updateresult_lookup (const mongoc_mapof_updateresult_t *self,
                                   size_t idx);
 
 typedef struct _mongoc_mapof_deleteresult_t mongoc_mapof_deleteresult_t;
 typedef struct _mongoc_deleteresult_t mongoc_deleteresult_t;
-BSON_EXPORT (mongoc_deleteresult_t *)
-mongoc_mapof_deleteresult_lookup (mongoc_mapof_deleteresult_t *self,
+BSON_EXPORT (const mongoc_deleteresult_t *)
+mongoc_mapof_deleteresult_lookup (const mongoc_mapof_deleteresult_t *self,
                                   size_t idx);
 
 
@@ -432,7 +432,7 @@ mongoc_mapof_deleteresult_lookup (mongoc_mapof_deleteresult_t *self,
  * modeling unacknowledged results.
  */
 BSON_EXPORT (bool)
-mongoc_bulkwriteresult_acknowledged (mongoc_bulkwriteresult_t *self);
+mongoc_bulkwriteresult_acknowledged (const mongoc_bulkwriteresult_t *self);
 
 /**
  * Indicates whether the results are verbose. If false, the insertResults,
@@ -442,79 +442,79 @@ mongoc_bulkwriteresult_acknowledged (mongoc_bulkwriteresult_t *self);
  * summary results from verbose results.
  */
 BSON_EXPORT (bool)
-mongoc_bulkwriteresult_hasVerboseResults (mongoc_bulkwriteresult_t *self);
+mongoc_bulkwriteresult_hasVerboseResults (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents inserted across all insert operations.
  */
 BSON_EXPORT (int64_t)
-mongoc_bulkwriteresult_insertedCount (mongoc_bulkwriteresult_t *self);
+mongoc_bulkwriteresult_insertedCount (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents upserted across all update operations.
  */
 BSON_EXPORT (int64_t)
-mongoc_bulkwriteresult_upsertedCount (mongoc_bulkwriteresult_t *self);
+mongoc_bulkwriteresult_upsertedCount (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents matched across all update operations.
  */
 BSON_EXPORT (int64_t)
-mongoc_bulkwriteresult_matchedCount (mongoc_bulkwriteresult_t *self);
+mongoc_bulkwriteresult_matchedCount (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents modified across all update operations.
  */
 BSON_EXPORT (int64_t)
-mongoc_bulkwriteresult_modifiedCount (mongoc_bulkwriteresult_t *self);
+mongoc_bulkwriteresult_modifiedCount (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents deleted across all delete operations.
  */
 BSON_EXPORT (int64_t)
-mongoc_bulkwriteresult_deletedCount (mongoc_bulkwriteresult_t *self);
+mongoc_bulkwriteresult_deletedCount (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The results of each individual insert operation that was successfully
  * performed.
  */
 // May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
-BSON_EXPORT (mongoc_mapof_insertoneresult_t *)
-mongoc_bulkwriteresult_insertResults (mongoc_bulkwriteresult_t *self);
+BSON_EXPORT (const mongoc_mapof_insertoneresult_t *)
+mongoc_bulkwriteresult_insertResults (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The results of each individual update operation that was successfully
  * performed.
  */
 // May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
-BSON_EXPORT (mongoc_mapof_updateresult_t *)
-mongoc_bulkwriteresult_updateResult (mongoc_bulkwriteresult_t *self);
+BSON_EXPORT (const mongoc_mapof_updateresult_t *)
+mongoc_bulkwriteresult_updateResult (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The results of each individual delete operation that was successfully
  * performed.
  */
 // May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
-BSON_EXPORT (mongoc_mapof_deleteresult_t *)
-mongoc_bulkwriteresult_deleteResults (mongoc_bulkwriteresult_t *self);
+BSON_EXPORT (const mongoc_mapof_deleteresult_t *)
+mongoc_bulkwriteresult_deleteResults (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The _id of the inserted document.
  */
 BSON_EXPORT (const bson_value_t *)
-mongoc_insertoneresult_inserted_id (mongoc_insertoneresult_t *self);
+mongoc_insertoneresult_inserted_id (const mongoc_insertoneresult_t *self);
 
 /**
  * The number of documents that matched the filter.
  */
 BSON_EXPORT (int64_t)
-mongoc_updateresult_matchedCount (mongoc_updateresult_t *self);
+mongoc_updateresult_matchedCount (const mongoc_updateresult_t *self);
 
 /**
  * The number of documents that were modified.
  */
 BSON_EXPORT (int64_t)
-mongoc_updateresult_modifiedCount (mongoc_updateresult_t *self);
+mongoc_updateresult_modifiedCount (const mongoc_updateresult_t *self);
 
 /**
  * The number of documents that were upserted.
@@ -523,20 +523,20 @@ mongoc_updateresult_modifiedCount (mongoc_updateresult_t *self);
  * so long as it is always possible to discern whether an upsert took place.
  */
 BSON_EXPORT (int64_t)
-mongoc_updateresult_upsertedCount (mongoc_updateresult_t *self);
+mongoc_updateresult_upsertedCount (const mongoc_updateresult_t *self);
 
 /**
  * The _id field of the upserted document if an upsert occurred.
  */
 // May be NULL.
 BSON_EXPORT (const bson_value_t *)
-mongoc_updateresult_upsertedId (mongoc_updateresult_t *self);
+mongoc_updateresult_upsertedId (const mongoc_updateresult_t *self);
 
 /**
  * The number of documents that were deleted.
  */
 BSON_EXPORT (int64_t)
-mongoc_deleteresult_deletedCount (mongoc_deleteresult_t *self);
+mongoc_deleteresult_deletedCount (const mongoc_deleteresult_t *self);
 
 typedef struct _mongoc_listof_writeconcernerror_t
    mongoc_listof_writeconcernerror_t;

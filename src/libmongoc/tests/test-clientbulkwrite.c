@@ -73,12 +73,12 @@ test_clientbulkwrite_insert (void *unused)
    {
       ASSERT (br.res);
       ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedCount (br.res), ==, 2);
-      mongoc_mapof_insertoneresult_t *mir =
+      const mongoc_mapof_insertoneresult_t *mir =
          mongoc_bulkwriteresult_insertResults (br.res);
 
       // Check index 0.
       {
-         mongoc_insertoneresult_t *ir =
+         const mongoc_insertoneresult_t *ir =
             mongoc_mapof_insertoneresult_lookup (mir, 0);
          ASSERT (ir);
          bson_value_t expected = {.value_type = BSON_TYPE_INT32,
@@ -89,7 +89,7 @@ test_clientbulkwrite_insert (void *unused)
 
       // Check index 1.
       {
-         mongoc_insertoneresult_t *ir =
+         const mongoc_insertoneresult_t *ir =
             mongoc_mapof_insertoneresult_lookup (mir, 1);
          ASSERT (ir);
          bson_value_t expected = {.value_type = BSON_TYPE_INT32,

@@ -1152,8 +1152,8 @@ fail:
    return ret;
 }
 
-mongoc_insertoneresult_t *
-mongoc_mapof_insertoneresult_lookup (mongoc_mapof_insertoneresult_t *self,
+const mongoc_insertoneresult_t *
+mongoc_mapof_insertoneresult_lookup (const mongoc_mapof_insertoneresult_t *self,
                                      size_t idx)
 {
    BSON_ASSERT_PARAM (self);
@@ -1175,7 +1175,7 @@ mongoc_mapof_insertoneresult_lookup (mongoc_mapof_insertoneresult_t *self,
 }
 
 const bson_value_t *
-mongoc_insertoneresult_inserted_id (mongoc_insertoneresult_t *self)
+mongoc_insertoneresult_inserted_id (const mongoc_insertoneresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    // Remove the const. `bson_iter_value` does not modify the argument.
@@ -1183,15 +1183,16 @@ mongoc_insertoneresult_inserted_id (mongoc_insertoneresult_t *self)
    return bson_iter_value (id_iter);
 }
 
-mongoc_mapof_insertoneresult_t *
-mongoc_bulkwriteresult_insertResults (mongoc_bulkwriteresult_t *self)
+const mongoc_mapof_insertoneresult_t *
+mongoc_bulkwriteresult_insertResults (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return &self->mapof_ior;
 }
 
-mongoc_updateresult_t *
-mongoc_mapof_updateresult_lookup (mongoc_mapof_updateresult_t *self, size_t idx)
+const mongoc_updateresult_t *
+mongoc_mapof_updateresult_lookup (const mongoc_mapof_updateresult_t *self,
+                                  size_t idx)
 {
    BSON_ASSERT_PARAM (self);
    if (idx >= self->entries.len) {
@@ -1207,21 +1208,21 @@ mongoc_mapof_updateresult_lookup (mongoc_mapof_updateresult_t *self, size_t idx)
 }
 
 int64_t
-mongoc_updateresult_matchedCount (mongoc_updateresult_t *self)
+mongoc_updateresult_matchedCount (const mongoc_updateresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->matchedCount;
 }
 
 int64_t
-mongoc_updateresult_modifiedCount (mongoc_updateresult_t *self)
+mongoc_updateresult_modifiedCount (const mongoc_updateresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->modifiedCount;
 }
 
 const bson_value_t *
-mongoc_updateresult_upsertedId (mongoc_updateresult_t *self)
+mongoc_updateresult_upsertedId (const mongoc_updateresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    if (self->didUpsert) {
@@ -1230,15 +1231,16 @@ mongoc_updateresult_upsertedId (mongoc_updateresult_t *self)
    return NULL;
 }
 
-mongoc_mapof_updateresult_t *
-mongoc_bulkwriteresult_updateResult (mongoc_bulkwriteresult_t *self)
+const mongoc_mapof_updateresult_t *
+mongoc_bulkwriteresult_updateResult (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return &self->mapof_ur;
 }
 
-mongoc_deleteresult_t *
-mongoc_mapof_deleteresult_lookup (mongoc_mapof_deleteresult_t *self, size_t idx)
+const mongoc_deleteresult_t *
+mongoc_mapof_deleteresult_lookup (const mongoc_mapof_deleteresult_t *self,
+                                  size_t idx)
 {
    BSON_ASSERT_PARAM (self);
    if (idx >= self->entries.len) {
@@ -1256,14 +1258,14 @@ mongoc_mapof_deleteresult_lookup (mongoc_mapof_deleteresult_t *self, size_t idx)
 }
 
 int64_t
-mongoc_deleteresult_deletedCount (mongoc_deleteresult_t *self)
+mongoc_deleteresult_deletedCount (const mongoc_deleteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->deletedCount;
 }
 
-mongoc_mapof_deleteresult_t *
-mongoc_bulkwriteresult_deleteResults (mongoc_bulkwriteresult_t *self)
+const mongoc_mapof_deleteresult_t *
+mongoc_bulkwriteresult_deleteResults (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return &self->mapof_dr;
@@ -1271,35 +1273,35 @@ mongoc_bulkwriteresult_deleteResults (mongoc_bulkwriteresult_t *self)
 
 
 int64_t
-mongoc_bulkwriteresult_insertedCount (mongoc_bulkwriteresult_t *self)
+mongoc_bulkwriteresult_insertedCount (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->insertedcount;
 }
 
 int64_t
-mongoc_bulkwriteresult_upsertedCount (mongoc_bulkwriteresult_t *self)
+mongoc_bulkwriteresult_upsertedCount (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->upsertedcount;
 }
 
 int64_t
-mongoc_bulkwriteresult_matchedCount (mongoc_bulkwriteresult_t *self)
+mongoc_bulkwriteresult_matchedCount (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->matchedcount;
 }
 
 int64_t
-mongoc_bulkwriteresult_modifiedCount (mongoc_bulkwriteresult_t *self)
+mongoc_bulkwriteresult_modifiedCount (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->modifiedcount;
 }
 
 int64_t
-mongoc_bulkwriteresult_deletedCount (mongoc_bulkwriteresult_t *self)
+mongoc_bulkwriteresult_deletedCount (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->deletedcount;

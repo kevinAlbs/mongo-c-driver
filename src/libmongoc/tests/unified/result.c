@@ -768,7 +768,7 @@ result_from_bulkwritereturn (result_t *result,
       BSON_APPEND_INT32 (&bwr_bson,
                          "deletedCount",
                          mongoc_bulkwriteresult_deletedCount (bwr.res));
-      mongoc_mapof_insertoneresult_t *mapof_ior =
+      const mongoc_mapof_insertoneresult_t *mapof_ior =
          mongoc_bulkwriteresult_insertResults (bwr.res);
       if (mapof_ior) {
          bson_t insertResults_bson;
@@ -776,7 +776,7 @@ result_from_bulkwritereturn (result_t *result,
             &bwr_bson, "insertResults", &insertResults_bson);
          // For simplicity: iterate over all indices.
          for (int64_t idx = 0; idx < nmodels; idx++) {
-            mongoc_insertoneresult_t *ior =
+            const mongoc_insertoneresult_t *ior =
                mongoc_mapof_insertoneresult_lookup (mapof_ior, idx);
             if (ior) {
                bson_t ior_bson;
@@ -793,7 +793,7 @@ result_from_bulkwritereturn (result_t *result,
          bson_append_document_end (&bwr_bson, &insertResults_bson);
       }
 
-      mongoc_mapof_updateresult_t *mapof_ur =
+      const mongoc_mapof_updateresult_t *mapof_ur =
          mongoc_bulkwriteresult_updateResult (bwr.res);
       if (mapof_ur) {
          bson_t updateResults_bson;
@@ -801,7 +801,7 @@ result_from_bulkwritereturn (result_t *result,
             &bwr_bson, "updateResults", &updateResults_bson);
          // For simplicity: iterate over all indices.
          for (int64_t idx = 0; idx < nmodels; idx++) {
-            mongoc_updateresult_t *ur =
+            const mongoc_updateresult_t *ur =
                mongoc_mapof_updateresult_lookup (mapof_ur, idx);
             if (ur) {
                bson_t ur_bson;
@@ -828,7 +828,7 @@ result_from_bulkwritereturn (result_t *result,
          bson_append_document_end (&bwr_bson, &updateResults_bson);
       }
 
-      mongoc_mapof_deleteresult_t *mapof_dr =
+      const mongoc_mapof_deleteresult_t *mapof_dr =
          mongoc_bulkwriteresult_deleteResults (bwr.res);
       if (mapof_dr) {
          bson_t deleteResults_bson;
@@ -836,7 +836,7 @@ result_from_bulkwritereturn (result_t *result,
             &bwr_bson, "deleteResults", &deleteResults_bson);
          // For simplicity: iterate over all indices.
          for (int64_t idx = 0; idx < nmodels; idx++) {
-            mongoc_deleteresult_t *dr =
+            const mongoc_deleteresult_t *dr =
                mongoc_mapof_deleteresult_lookup (mapof_dr, idx);
             if (dr) {
                bson_t dr_bson;
