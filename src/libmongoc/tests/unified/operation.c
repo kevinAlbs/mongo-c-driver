@@ -442,6 +442,7 @@ operation_client_bulkwrite (test_t *test,
    mongoc_client_t *client = NULL;
    bson_t *comment = NULL;
    bson_t *let = NULL;
+   mongoc_write_concern_t *wc = NULL;
 
    mongoc_listof_bulkwritemodel_t *models = NULL;
 
@@ -500,7 +501,8 @@ operation_client_bulkwrite (test_t *test,
          opts.let = let;
       }
       if (args_wc) {
-         opts.writeConcern = mongoc_write_concern_copy (args_wc);
+         wc = mongoc_write_concern_copy (args_wc);
+         opts.writeConcern = wc;
       }
 
       // Parse models.
@@ -536,7 +538,7 @@ operation_client_bulkwrite (test_t *test,
    mongoc_bulkwritereturn_cleanup (&bwr);
    ret = true;
 done:
-   mongoc_write_concern_destroy (opts.writeConcern);
+   mongoc_write_concern_destroy (wc);
    bson_destroy (let);
    bson_destroy (comment);
    mongoc_listof_bulkwritemodel_destroy (models);

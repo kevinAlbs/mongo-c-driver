@@ -69,10 +69,10 @@ typedef struct {
    /**
     * The document to insert.
     */
-   bson_t *document;
+   const bson_t *document;
    // `extra` is appended to the update operation.
    // It is included to support future server options.
-   bson_t *extra; // may be NULL.
+   const bson_t *extra; // may be NULL.
 } mongoc_insertone_model_t;
 
 BSON_EXPORT (bool)
@@ -108,25 +108,25 @@ typedef struct {
    /**
     * The filter to apply.
     */
-   bson_t *filter;
+   const bson_t *filter;
    /**
     * The update document or pipeline to apply to the selected document.
     */
-   bson_t *update;
+   const bson_t *update;
    /**
     * A set of filters specifying to which array elements an update should
     * apply.
     *
     * This option is sent only if the caller explicitly provides a value.
     */
-   bson_t *arrayFilters; // may be NULL
+   const bson_t *arrayFilters; // may be NULL
 
    /**
     * Specifies a collation.
     *
     * This option is sent only if the caller explicitly provides a value.
     */
-   bson_t *collation; // may be NULL
+   const bson_t *collation; // may be NULL
 
    /**
     * The index to use. Specify either the index name as a string or the index
@@ -146,7 +146,7 @@ typedef struct {
    mongoc_opt_bool_t upsert;
    // `extra` is appended to the update operation.
    // It is included to support future server options.
-   bson_t *extra; // may be NULL.
+   const bson_t *extra; // may be NULL.
 } mongoc_updateone_model_t;
 
 BSON_EXPORT (bool)
@@ -161,12 +161,12 @@ typedef struct {
    /**
     * The filter to apply.
     */
-   bson_t *filter;
+   const bson_t *filter;
    /**
     * The update document or pipeline to apply to the selected document.
     */
 
-   bson_t *update;
+   const bson_t *update;
    // If `is_pipeline` is true, `update` is treated as a pipeline.
    bool is_pipeline;
 
@@ -176,14 +176,14 @@ typedef struct {
     *
     * This option is sent only if the caller explicitly provides a value.
     */
-   bson_t *arrayFilters; // may be NULL
+   const bson_t *arrayFilters; // may be NULL
 
    /**
     * Specifies a collation.
     *
     * This option is sent only if the caller explicitly provides a value.
     */
-   bson_t *collation; // may be NULL
+   const bson_t *collation; // may be NULL
 
    /**
     * The index to use. Specify either the index name as a string or the index
@@ -203,7 +203,7 @@ typedef struct {
    mongoc_opt_bool_t upsert;
    // `extra` is appended to the update operation.
    // It is included to support future server options.
-   bson_t *extra; // may be NULL.
+   const bson_t *extra; // may be NULL.
 } mongoc_updatemany_model_t;
 
 BSON_EXPORT (bool)
@@ -218,11 +218,11 @@ typedef struct {
    /**
     * The filter to apply.
     */
-   bson_t *filter;
+   const bson_t *filter;
    /**
     * The replacement document.
     */
-   bson_t *replacement;
+   const bson_t *replacement;
 
    /**
     * A set of filters specifying to which array elements an update should
@@ -230,14 +230,14 @@ typedef struct {
     *
     * This option is sent only if the caller explicitly provides a value.
     */
-   bson_t *arrayFilters; // may be NULL
+   const bson_t *arrayFilters; // may be NULL
 
    /**
     * Specifies a collation.
     *
     * This option is sent only if the caller explicitly provides a value.
     */
-   bson_t *collation; // may be NULL
+   const bson_t *collation; // may be NULL
 
    /**
     * The index to use. Specify either the index name as a string or the index
@@ -257,7 +257,7 @@ typedef struct {
    mongoc_opt_bool_t upsert;
    // `extra` is appended to the update operation.
    // It is included to support future server options.
-   bson_t *extra; // may be NULL.
+   const bson_t *extra; // may be NULL.
 } mongoc_replaceone_model_t;
 
 BSON_EXPORT (bool)
@@ -272,14 +272,14 @@ typedef struct {
    /**
     * The filter to apply.
     */
-   bson_t *filter;
+   const bson_t *filter;
 
    /**
     * Specifies a collation.
     *
     * This option is sent only if the caller explicitly provides a value.
     */
-   bson_t *collation; // may be NULL
+   const bson_t *collation; // may be NULL
 
    /**
     * The index to use. Specify either the index name as a string or the index
@@ -292,7 +292,7 @@ typedef struct {
 
    // `extra` is appended to the delete operation.
    // It is included to support future server options.
-   bson_t *extra; // may be NULL.
+   const bson_t *extra; // may be NULL.
 } mongoc_deleteone_model_t;
 
 BSON_EXPORT (bool)
@@ -307,14 +307,14 @@ typedef struct {
    /**
     * The filter to apply.
     */
-   bson_t *filter;
+   const bson_t *filter;
 
    /**
     * Specifies a collation.
     *
     * This option is sent only if the caller explicitly provides a value.
     */
-   bson_t *collation; // may be NULL
+   const bson_t *collation; // may be NULL
 
    /**
     * The index to use. Specify either the index name as a string or the index
@@ -327,7 +327,7 @@ typedef struct {
 
    // `extra` is appended to the delete operation.
    // It is included to support future server options.
-   bson_t *extra; // may be NULL.
+   const bson_t *extra; // may be NULL.
 } mongoc_deletemany_model_t;
 
 BSON_EXPORT (bool)
@@ -367,7 +367,7 @@ struct _mongoc_bulkwriteoptions_t {
     * This option is only sent if the caller explicitly provides a value.
     */
    // May be NULL.
-   bson_t *let;
+   const bson_t *let;
 
    /**
     * The write concern to use for this bulk write.
@@ -380,7 +380,7 @@ struct _mongoc_bulkwriteoptions_t {
     * MongoClient.withWriteConcern() method.
     */
    // May be NULL.
-   mongoc_write_concern_t *writeConcern;
+   const mongoc_write_concern_t *writeConcern;
 
    /**
     * Whether detailed results for each successful operation should be included
@@ -395,14 +395,14 @@ struct _mongoc_bulkwriteoptions_t {
     * through the database profiler, currentOp and logs. The default is to not
     * send a value.
     */
-   bson_t *comment;
+   const bson_t *comment;
 
    // An optional session. May be NULL.
    mongoc_client_session_t *session;
 
    // `extra` is appended to the bulkWrite command.
    // It is included to support future server options.
-   bson_t *extra;
+   const bson_t *extra;
 };
 
 typedef struct _mongoc_mapof_insertoneresult_t mongoc_mapof_insertoneresult_t;

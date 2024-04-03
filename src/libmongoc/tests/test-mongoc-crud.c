@@ -480,6 +480,7 @@ prose_test_5 (void *ctx)
    BSON_UNUSED (ctx);
    bool ok;
    bson_error_t error;
+   mongoc_write_concern_t *wc;
 
    client = test_framework_new_default_client ();
    // Get `maxBsonObjectSize` from the server.
@@ -505,11 +506,9 @@ prose_test_5 (void *ctx)
       bson_free (large_str);
    }
 
-   mongoc_bulkwriteoptions_t opts = {.writeConcern =
-                                        mongoc_write_concern_new ()};
-
-   mongoc_write_concern_set_w (opts.writeConcern,
-                               MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
+   wc = mongoc_write_concern_new ();
+   mongoc_write_concern_set_w (wc, MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
+   mongoc_bulkwriteoptions_t opts = {.writeConcern = wc};
 
    // Test a large insert.
    {
@@ -565,7 +564,7 @@ prose_test_5 (void *ctx)
    }
 
    bson_destroy (&doc);
-   mongoc_write_concern_destroy (opts.writeConcern);
+   mongoc_write_concern_destroy (wc);
    mongoc_client_destroy (client);
 }
 

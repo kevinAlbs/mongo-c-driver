@@ -514,7 +514,8 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 
       // Apply write concern:
       {
-         mongoc_write_concern_t *wc = self->write_concern; // Default to client.
+         const mongoc_write_concern_t *wc =
+            self->write_concern; // Default to client.
          if (options->writeConcern) {
             wc = options->writeConcern;
          }
@@ -1375,7 +1376,7 @@ mongoc_listof_bulkwritemodel_append_insertone (
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (namespace);
-   bson_t *document = model.document;
+   const bson_t *document = model.document;
    BSON_ASSERT_PARAM (document);
    BSON_ASSERT (document->len >= 5);
 
@@ -1459,8 +1460,8 @@ mongoc_listof_bulkwritemodel_append_updateone (
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (namespace);
-   bson_t *filter = model.filter;
-   bson_t *update = model.update;
+   const bson_t *filter = model.filter;
+   const bson_t *update = model.update;
    BSON_ASSERT_PARAM (filter);
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (update);
@@ -1537,8 +1538,8 @@ mongoc_listof_bulkwritemodel_append_updatemany (
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (namespace);
-   bson_t *filter = model.filter;
-   bson_t *update = model.update;
+   const bson_t *filter = model.filter;
+   const bson_t *update = model.update;
    BSON_ASSERT_PARAM (filter);
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (update);
@@ -1619,8 +1620,8 @@ mongoc_listof_bulkwritemodel_append_replaceone (
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (namespace);
-   bson_t *filter = model.filter;
-   bson_t *replacement = model.replacement;
+   const bson_t *filter = model.filter;
+   const bson_t *replacement = model.replacement;
    BSON_ASSERT_PARAM (filter);
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (replacement);
@@ -1697,7 +1698,7 @@ mongoc_listof_bulkwritemodel_append_deleteone (
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (namespace);
-   bson_t *filter = model.filter;
+   const bson_t *filter = model.filter;
    BSON_ASSERT_PARAM (filter);
    BSON_ASSERT (filter->len >= 5);
 
@@ -1766,7 +1767,7 @@ mongoc_listof_bulkwritemodel_append_deletemany (
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (namespace);
-   bson_t *filter = model.filter;
+   const bson_t *filter = model.filter;
    BSON_ASSERT_PARAM (filter);
    BSON_ASSERT (filter->len >= 5);
 
