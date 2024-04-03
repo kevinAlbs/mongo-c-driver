@@ -683,7 +683,7 @@ prose_test_6 (void *ctx)
 
    // Count write errors.
    {
-      mongoc_mapof_writeerror_t *mapof_we =
+      const mongoc_mapof_writeerror_t *mapof_we =
          mongoc_bulkwriteexception_writeErrors (ret.exc);
       size_t numWriteErrors = 0;
       for (size_t i = 0; i < numModels; i++) {
@@ -795,7 +795,7 @@ prose_test_7 (void *ctx)
 
    // Count write concern errors.
    {
-      mongoc_listof_writeconcernerror_t *listof_wce =
+      const mongoc_listof_writeconcernerror_t *listof_wce =
          mongoc_bulkwriteexception_writeConcernErrors (ret.exc);
       size_t numWriteConcernErrors =
          mongoc_listof_writeconcernerror_len (listof_wce);

@@ -860,7 +860,7 @@ result_from_bulkwritereturn (result_t *result,
       mongoc_bulkwriteexception_error (bwr.exc, &error, NULL);
       // Construct an error document from the collected error labels.
       {
-         mongoc_listof_errorlabel_t *listof_el =
+         const mongoc_listof_errorlabel_t *listof_el =
             mongoc_bulkwriteexception_errorLabels (bwr.exc);
          bson_array_builder_t *bab;
          BSON_APPEND_ARRAY_BUILDER_BEGIN (
@@ -880,13 +880,13 @@ result_from_bulkwritereturn (result_t *result,
 
    if (bwr.exc) {
       result->ok = false; // An error occurred.
-      mongoc_mapof_writeerror_t *mapof_we =
+      const mongoc_mapof_writeerror_t *mapof_we =
          mongoc_bulkwriteexception_writeErrors (bwr.exc);
       BSON_ASSERT (mapof_we);
       {
          // For simplicity: iterate over all indices.
          for (int64_t idx = 0; idx < nmodels; idx++) {
-            mongoc_writeerror_t *we =
+            const mongoc_writeerror_t *we =
                mongoc_mapof_writeerror_lookup (mapof_we, idx);
             if (we) {
                bson_t we_bson;
@@ -897,7 +897,7 @@ result_from_bulkwritereturn (result_t *result,
                   &we_bson, "code", mongoc_writeerror_code (we));
                BSON_APPEND_UTF8 (
                   &we_bson, "message", mongoc_writeerror_message (we));
-               bson_t *details = mongoc_writeerror_details (we);
+               const bson_t *details = mongoc_writeerror_details (we);
                if (details) {
                   BSON_APPEND_DOCUMENT (&we_bson, "details", details);
                }
@@ -907,13 +907,13 @@ result_from_bulkwritereturn (result_t *result,
          }
       }
 
-      mongoc_listof_writeconcernerror_t *listof_wce =
+      const mongoc_listof_writeconcernerror_t *listof_wce =
          mongoc_bulkwriteexception_writeConcernErrors (bwr.exc);
       {
          for (size_t idx = 0;
               idx < mongoc_listof_writeconcernerror_len (listof_wce);
               idx++) {
-            mongoc_writeconcernerror_t *wce =
+            const mongoc_writeconcernerror_t *wce =
                mongoc_listof_writeconcernerror_at (listof_wce, idx);
             ASSERT (wce);
             bson_t wce_bson;
@@ -924,7 +924,7 @@ result_from_bulkwritereturn (result_t *result,
                &wce_bson, "code", mongoc_writeconcernerror_code (wce));
             BSON_APPEND_UTF8 (
                &wce_bson, "message", mongoc_writeconcernerror_message (wce));
-            bson_t *details = mongoc_writeconcernerror_details (wce);
+            const bson_t *details = mongoc_writeconcernerror_details (wce);
             if (details) {
                BSON_APPEND_DOCUMENT (&wce_bson, "details", details);
             }

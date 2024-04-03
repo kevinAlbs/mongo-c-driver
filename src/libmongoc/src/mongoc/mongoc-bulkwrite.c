@@ -138,15 +138,15 @@ struct _mongoc_bulkwriteexception_t {
 };
 
 
-mongoc_listof_errorlabel_t *
-mongoc_bulkwriteexception_errorLabels (mongoc_bulkwriteexception_t *self)
+const mongoc_listof_errorlabel_t *
+mongoc_bulkwriteexception_errorLabels (const mongoc_bulkwriteexception_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return &self->listof_el;
 }
 
 const char *
-mongoc_listof_errorlabel_at (mongoc_listof_errorlabel_t *self, size_t idx)
+mongoc_listof_errorlabel_at (const mongoc_listof_errorlabel_t *self, size_t idx)
 {
    BSON_ASSERT_PARAM (self);
    if (idx > self->entries.len) {
@@ -156,7 +156,7 @@ mongoc_listof_errorlabel_at (mongoc_listof_errorlabel_t *self, size_t idx)
 }
 
 size_t
-mongoc_listof_errorlabel_len (mongoc_listof_errorlabel_t *self)
+mongoc_listof_errorlabel_len (const mongoc_listof_errorlabel_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->entries.len;
@@ -1308,7 +1308,7 @@ mongoc_bulkwriteresult_deletedCount (const mongoc_bulkwriteresult_t *self)
 }
 
 bool
-mongoc_bulkwriteexception_error (mongoc_bulkwriteexception_t *self,
+mongoc_bulkwriteexception_error (const mongoc_bulkwriteexception_t *self,
                                  bson_error_t *error,
                                  const bson_t **error_document)
 {
@@ -1829,16 +1829,17 @@ mongoc_listof_bulkwritemodel_append_deletemany (
    return true;
 }
 
-mongoc_listof_writeconcernerror_t *
-mongoc_bulkwriteexception_writeConcernErrors (mongoc_bulkwriteexception_t *self)
+const mongoc_listof_writeconcernerror_t *
+mongoc_bulkwriteexception_writeConcernErrors (
+   const mongoc_bulkwriteexception_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return &self->listof_wce;
 }
 
-mongoc_writeconcernerror_t *
-mongoc_listof_writeconcernerror_at (mongoc_listof_writeconcernerror_t *self,
-                                    size_t idx)
+const mongoc_writeconcernerror_t *
+mongoc_listof_writeconcernerror_at (
+   const mongoc_listof_writeconcernerror_t *self, size_t idx)
 {
    BSON_ASSERT_PARAM (self);
    if (idx > self->entries.len) {
@@ -1850,43 +1851,45 @@ mongoc_listof_writeconcernerror_at (mongoc_listof_writeconcernerror_t *self,
 }
 
 size_t
-mongoc_listof_writeconcernerror_len (mongoc_listof_writeconcernerror_t *self)
+mongoc_listof_writeconcernerror_len (
+   const mongoc_listof_writeconcernerror_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->entries.len;
 }
 
 int32_t
-mongoc_writeconcernerror_code (mongoc_writeconcernerror_t *self)
+mongoc_writeconcernerror_code (const mongoc_writeconcernerror_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->code;
 }
 
-bson_t *
-mongoc_writeconcernerror_details (mongoc_writeconcernerror_t *self)
+const bson_t *
+mongoc_writeconcernerror_details (const mongoc_writeconcernerror_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->details;
 }
 
-char *
-mongoc_writeconcernerror_message (mongoc_writeconcernerror_t *self)
+const char *
+mongoc_writeconcernerror_message (const mongoc_writeconcernerror_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->message;
 }
 
 
-mongoc_mapof_writeerror_t *
-mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self)
+const mongoc_mapof_writeerror_t *
+mongoc_bulkwriteexception_writeErrors (const mongoc_bulkwriteexception_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return &self->mapof_we;
 }
 
-mongoc_writeerror_t *
-mongoc_mapof_writeerror_lookup (mongoc_mapof_writeerror_t *self, size_t idx)
+const mongoc_writeerror_t *
+mongoc_mapof_writeerror_lookup (const mongoc_mapof_writeerror_t *self,
+                                size_t idx)
 {
    BSON_ASSERT_PARAM (self);
 
@@ -1902,21 +1905,21 @@ mongoc_mapof_writeerror_lookup (mongoc_mapof_writeerror_t *self, size_t idx)
 }
 
 int32_t
-mongoc_writeerror_code (mongoc_writeerror_t *self)
+mongoc_writeerror_code (const mongoc_writeerror_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->code;
 }
 
-bson_t *
-mongoc_writeerror_details (mongoc_writeerror_t *self)
+const bson_t *
+mongoc_writeerror_details (const mongoc_writeerror_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->details;
 }
 
-char *
-mongoc_writeerror_message (mongoc_writeerror_t *self)
+const char *
+mongoc_writeerror_message (const mongoc_writeerror_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->message;

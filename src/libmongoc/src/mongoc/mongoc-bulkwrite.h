@@ -542,18 +542,20 @@ typedef struct _mongoc_listof_writeconcernerror_t
    mongoc_listof_writeconcernerror_t;
 typedef struct _mongoc_writeconcernerror_t mongoc_writeconcernerror_t;
 
-BSON_EXPORT (mongoc_writeconcernerror_t *)
-mongoc_listof_writeconcernerror_at (mongoc_listof_writeconcernerror_t *self,
-                                    size_t idx);
+BSON_EXPORT (const mongoc_writeconcernerror_t *)
+mongoc_listof_writeconcernerror_at (
+   const mongoc_listof_writeconcernerror_t *self, size_t idx);
 
 BSON_EXPORT (size_t)
-mongoc_listof_writeconcernerror_len (mongoc_listof_writeconcernerror_t *self);
+mongoc_listof_writeconcernerror_len (
+   const mongoc_listof_writeconcernerror_t *self);
 
 typedef struct _mongoc_mapof_writeerror_t mongoc_mapof_writeerror_t;
 typedef struct _mongoc_writeerror_t mongoc_writeerror_t;
 
-BSON_EXPORT (mongoc_writeerror_t *)
-mongoc_mapof_writeerror_lookup (mongoc_mapof_writeerror_t *self, size_t idx);
+BSON_EXPORT (const mongoc_writeerror_t *)
+mongoc_mapof_writeerror_lookup (const mongoc_mapof_writeerror_t *self,
+                                size_t idx);
 
 /**
  * A top-level error that occurred when attempting to communicate with the
@@ -562,20 +564,21 @@ mongoc_mapof_writeerror_lookup (mongoc_mapof_writeerror_t *self, size_t idx);
  */
 // Returns false if no error is set.
 BSON_EXPORT (bool)
-mongoc_bulkwriteexception_error (mongoc_bulkwriteexception_t *self,
+mongoc_bulkwriteexception_error (const mongoc_bulkwriteexception_t *self,
                                  bson_error_t *error,
                                  const bson_t **error_document);
 
 typedef struct _mongoc_listof_errorlabel_t mongoc_listof_errorlabel_t;
 
-BSON_EXPORT (mongoc_listof_errorlabel_t *)
-mongoc_bulkwriteexception_errorLabels (mongoc_bulkwriteexception_t *self);
+BSON_EXPORT (const mongoc_listof_errorlabel_t *)
+mongoc_bulkwriteexception_errorLabels (const mongoc_bulkwriteexception_t *self);
 
 BSON_EXPORT (const char *)
-mongoc_listof_errorlabel_at (mongoc_listof_errorlabel_t *self, size_t idx);
+mongoc_listof_errorlabel_at (const mongoc_listof_errorlabel_t *self,
+                             size_t idx);
 
 BSON_EXPORT (size_t)
-mongoc_listof_errorlabel_len (mongoc_listof_errorlabel_t *self);
+mongoc_listof_errorlabel_len (const mongoc_listof_errorlabel_t *self);
 
 
 /**
@@ -583,16 +586,16 @@ mongoc_listof_errorlabel_len (mongoc_listof_errorlabel_t *self);
  * list may have multiple items if more than one server command was required
  * to execute the bulk write.
  */
-BSON_EXPORT (mongoc_listof_writeconcernerror_t *)
+BSON_EXPORT (const mongoc_listof_writeconcernerror_t *)
 mongoc_bulkwriteexception_writeConcernErrors (
-   mongoc_bulkwriteexception_t *self);
+   const mongoc_bulkwriteexception_t *self);
 
 /**
  * Errors that occurred during the execution of individual write operations.
  * This map will contain at most one entry if the bulk write was ordered.
  */
-BSON_EXPORT (mongoc_mapof_writeerror_t *)
-mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self);
+BSON_EXPORT (const mongoc_mapof_writeerror_t *)
+mongoc_bulkwriteexception_writeErrors (const mongoc_bulkwriteexception_t *self);
 
 /**
  * The results of any successful operations that were performed before the
@@ -601,8 +604,9 @@ mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self);
 // May be NULL.
 // TODO: consider removing. May not be needed since
 // `mongoc_bulkwritereturn_t` contains a `mongoc_bulkwriteresult_t`.
-BSON_EXPORT (mongoc_bulkwriteresult_t *)
-mongoc_bulkwriteexception_partialResult (mongoc_bulkwriteexception_t *self);
+BSON_EXPORT (const mongoc_bulkwriteresult_t *)
+mongoc_bulkwriteexception_partialResult (
+   const mongoc_bulkwriteexception_t *self);
 
 /**
  * An integer value identifying the write concern error. Corresponds to
@@ -611,7 +615,7 @@ mongoc_bulkwriteexception_partialResult (mongoc_bulkwriteexception_t *self);
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
 BSON_EXPORT (int32_t)
-mongoc_writeconcernerror_code (mongoc_writeconcernerror_t *self);
+mongoc_writeconcernerror_code (const mongoc_writeconcernerror_t *self);
 
 /**
  * A document identifying the write concern setting related to the error.
@@ -621,8 +625,8 @@ mongoc_writeconcernerror_code (mongoc_writeconcernerror_t *self);
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
 // May be NULL.
-BSON_EXPORT (bson_t *)
-mongoc_writeconcernerror_details (mongoc_writeconcernerror_t *self);
+BSON_EXPORT (const bson_t *)
+mongoc_writeconcernerror_details (const mongoc_writeconcernerror_t *self);
 
 /**
  * A description of the error. Corresponds to the
@@ -630,8 +634,8 @@ mongoc_writeconcernerror_details (mongoc_writeconcernerror_t *self);
  *
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
-BSON_EXPORT (char *)
-mongoc_writeconcernerror_message (mongoc_writeconcernerror_t *self);
+BSON_EXPORT (const char *)
+mongoc_writeconcernerror_message (const mongoc_writeconcernerror_t *self);
 
 /**
  * An integer value identifying the write error. Corresponds to the
@@ -640,7 +644,7 @@ mongoc_writeconcernerror_message (mongoc_writeconcernerror_t *self);
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
 BSON_EXPORT (int32_t)
-mongoc_writeerror_code (mongoc_writeerror_t *self);
+mongoc_writeerror_code (const mongoc_writeerror_t *self);
 
 /**
  * A document providing more information about the write error (e.g.
@@ -649,8 +653,8 @@ mongoc_writeerror_code (mongoc_writeerror_t *self);
  *
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
-BSON_EXPORT (bson_t *)
-mongoc_writeerror_details (mongoc_writeerror_t *self);
+BSON_EXPORT (const bson_t *)
+mongoc_writeerror_details (const mongoc_writeerror_t *self);
 
 /**
  * A description of the error. Corresponds to the "writeErrors[].errmsg"
@@ -658,8 +662,8 @@ mongoc_writeerror_details (mongoc_writeerror_t *self);
  *
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
-BSON_EXPORT (char *)
-mongoc_writeerror_message (mongoc_writeerror_t *self);
+BSON_EXPORT (const char *)
+mongoc_writeerror_message (const mongoc_writeerror_t *self);
 
 BSON_END_DECLS
 
