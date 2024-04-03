@@ -149,7 +149,7 @@ typedef struct {
    bson_t *extra; // may be NULL.
 } mongoc_updateone_model_t;
 
-bool
+BSON_EXPORT (bool)
 mongoc_listof_bulkwritemodel_append_updateone (
    mongoc_listof_bulkwritemodel_t *self,
    const char *namespace,
@@ -206,7 +206,7 @@ typedef struct {
    bson_t *extra; // may be NULL.
 } mongoc_updatemany_model_t;
 
-bool
+BSON_EXPORT (bool)
 mongoc_listof_bulkwritemodel_append_updatemany (
    mongoc_listof_bulkwritemodel_t *self,
    const char *namespace,
@@ -260,7 +260,7 @@ typedef struct {
    bson_t *extra; // may be NULL.
 } mongoc_replaceone_model_t;
 
-bool
+BSON_EXPORT (bool)
 mongoc_listof_bulkwritemodel_append_replaceone (
    mongoc_listof_bulkwritemodel_t *self,
    const char *namespace,
@@ -295,7 +295,7 @@ typedef struct {
    bson_t *extra; // may be NULL.
 } mongoc_deleteone_model_t;
 
-bool
+BSON_EXPORT (bool)
 mongoc_listof_bulkwritemodel_append_deleteone (
    mongoc_listof_bulkwritemodel_t *self,
    const char *namespace,
@@ -330,7 +330,7 @@ typedef struct {
    bson_t *extra; // may be NULL.
 } mongoc_deletemany_model_t;
 
-bool
+BSON_EXPORT (bool)
 mongoc_listof_bulkwritemodel_append_deletemany (
    mongoc_listof_bulkwritemodel_t *self,
    const char *namespace,
@@ -431,7 +431,7 @@ mongoc_mapof_deleteresult_lookup (mongoc_mapof_deleteresult_t *self,
  * NOT REQUIRED TO IMPLEMENT. See the CRUD specification for more guidance on
  * modeling unacknowledged results.
  */
-bool
+BSON_EXPORT (bool)
 mongoc_bulkwriteresult_acknowledged (mongoc_bulkwriteresult_t *self);
 
 /**
@@ -441,37 +441,37 @@ mongoc_bulkwriteresult_acknowledged (mongoc_bulkwriteresult_t *self);
  * NOT REQUIRED TO IMPLEMENT. See below for other ways to differentiate
  * summary results from verbose results.
  */
-bool
+BSON_EXPORT (bool)
 mongoc_bulkwriteresult_hasVerboseResults (mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents inserted across all insert operations.
  */
-int64_t
+BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_insertedCount (mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents upserted across all update operations.
  */
-int64_t
+BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_upsertedCount (mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents matched across all update operations.
  */
-int64_t
+BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_matchedCount (mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents modified across all update operations.
  */
-int64_t
+BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_modifiedCount (mongoc_bulkwriteresult_t *self);
 
 /**
  * The total number of documents deleted across all delete operations.
  */
-int64_t
+BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_deletedCount (mongoc_bulkwriteresult_t *self);
 
 /**
@@ -479,7 +479,7 @@ mongoc_bulkwriteresult_deletedCount (mongoc_bulkwriteresult_t *self);
  * performed.
  */
 // May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
-mongoc_mapof_insertoneresult_t *
+BSON_EXPORT (mongoc_mapof_insertoneresult_t *)
 mongoc_bulkwriteresult_insertResults (mongoc_bulkwriteresult_t *self);
 
 /**
@@ -487,7 +487,7 @@ mongoc_bulkwriteresult_insertResults (mongoc_bulkwriteresult_t *self);
  * performed.
  */
 // May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
-mongoc_mapof_updateresult_t *
+BSON_EXPORT (mongoc_mapof_updateresult_t *)
 mongoc_bulkwriteresult_updateResult (mongoc_bulkwriteresult_t *self);
 
 /**
@@ -495,25 +495,25 @@ mongoc_bulkwriteresult_updateResult (mongoc_bulkwriteresult_t *self);
  * performed.
  */
 // May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
-mongoc_mapof_deleteresult_t *
+BSON_EXPORT (mongoc_mapof_deleteresult_t *)
 mongoc_bulkwriteresult_deleteResults (mongoc_bulkwriteresult_t *self);
 
 /**
  * The _id of the inserted document.
  */
-const bson_value_t *
+BSON_EXPORT (const bson_value_t *)
 mongoc_insertoneresult_inserted_id (mongoc_insertoneresult_t *self);
 
 /**
  * The number of documents that matched the filter.
  */
-int64_t
+BSON_EXPORT (int64_t)
 mongoc_updateresult_matchedCount (mongoc_updateresult_t *self);
 
 /**
  * The number of documents that were modified.
  */
-int64_t
+BSON_EXPORT (int64_t)
 mongoc_updateresult_modifiedCount (mongoc_updateresult_t *self);
 
 /**
@@ -522,20 +522,20 @@ mongoc_updateresult_modifiedCount (mongoc_updateresult_t *self);
  * NOT REQUIRED TO IMPLEMENT. Drivers may choose not to provide this property
  * so long as it is always possible to discern whether an upsert took place.
  */
-int64_t
+BSON_EXPORT (int64_t)
 mongoc_updateresult_upsertedCount (mongoc_updateresult_t *self);
 
 /**
  * The _id field of the upserted document if an upsert occurred.
  */
 // May be NULL.
-const bson_value_t *
+BSON_EXPORT (const bson_value_t *)
 mongoc_updateresult_upsertedId (mongoc_updateresult_t *self);
 
 /**
  * The number of documents that were deleted.
  */
-int64_t
+BSON_EXPORT (int64_t)
 mongoc_deleteresult_deletedCount (mongoc_deleteresult_t *self);
 
 typedef struct _mongoc_listof_writeconcernerror_t
@@ -561,14 +561,14 @@ mongoc_mapof_writeerror_lookup (mongoc_mapof_writeerror_t *self, size_t idx);
  * exception was thrown due to errors occurring on individual writes.
  */
 // Returns false if no error is set.
-bool
+BSON_EXPORT (bool)
 mongoc_bulkwriteexception_error (mongoc_bulkwriteexception_t *self,
                                  bson_error_t *error,
                                  const bson_t **error_document);
 
 typedef struct _mongoc_listof_errorlabel_t mongoc_listof_errorlabel_t;
 
-mongoc_listof_errorlabel_t *
+BSON_EXPORT (mongoc_listof_errorlabel_t *)
 mongoc_bulkwriteexception_errorLabels (mongoc_bulkwriteexception_t *self);
 
 BSON_EXPORT (const char *)
@@ -583,7 +583,7 @@ mongoc_listof_errorlabel_len (mongoc_listof_errorlabel_t *self);
  * list may have multiple items if more than one server command was required
  * to execute the bulk write.
  */
-mongoc_listof_writeconcernerror_t *
+BSON_EXPORT (mongoc_listof_writeconcernerror_t *)
 mongoc_bulkwriteexception_writeConcernErrors (
    mongoc_bulkwriteexception_t *self);
 
@@ -591,7 +591,7 @@ mongoc_bulkwriteexception_writeConcernErrors (
  * Errors that occurred during the execution of individual write operations.
  * This map will contain at most one entry if the bulk write was ordered.
  */
-mongoc_mapof_writeerror_t *
+BSON_EXPORT (mongoc_mapof_writeerror_t *)
 mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self);
 
 /**
@@ -601,7 +601,7 @@ mongoc_bulkwriteexception_writeErrors (mongoc_bulkwriteexception_t *self);
 // May be NULL.
 // TODO: consider removing. May not be needed since
 // `mongoc_bulkwritereturn_t` contains a `mongoc_bulkwriteresult_t`.
-mongoc_bulkwriteresult_t *
+BSON_EXPORT (mongoc_bulkwriteresult_t *)
 mongoc_bulkwriteexception_partialResult (mongoc_bulkwriteexception_t *self);
 
 /**
@@ -610,7 +610,7 @@ mongoc_bulkwriteexception_partialResult (mongoc_bulkwriteexception_t *self);
  *
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
-int32_t
+BSON_EXPORT (int32_t)
 mongoc_writeconcernerror_code (mongoc_writeconcernerror_t *self);
 
 /**
@@ -621,7 +621,7 @@ mongoc_writeconcernerror_code (mongoc_writeconcernerror_t *self);
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
 // May be NULL.
-bson_t *
+BSON_EXPORT (bson_t *)
 mongoc_writeconcernerror_details (mongoc_writeconcernerror_t *self);
 
 /**
@@ -630,7 +630,7 @@ mongoc_writeconcernerror_details (mongoc_writeconcernerror_t *self);
  *
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
-char *
+BSON_EXPORT (char *)
 mongoc_writeconcernerror_message (mongoc_writeconcernerror_t *self);
 
 /**
@@ -639,7 +639,7 @@ mongoc_writeconcernerror_message (mongoc_writeconcernerror_t *self);
  *
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
-int32_t
+BSON_EXPORT (int32_t)
 mongoc_writeerror_code (mongoc_writeerror_t *self);
 
 /**
@@ -649,7 +649,7 @@ mongoc_writeerror_code (mongoc_writeerror_t *self);
  *
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
-bson_t *
+BSON_EXPORT (bson_t *)
 mongoc_writeerror_details (mongoc_writeerror_t *self);
 
 /**
@@ -658,7 +658,7 @@ mongoc_writeerror_details (mongoc_writeerror_t *self);
  *
  * @see https://www.mongodb.com/docs/manual/reference/method/WriteResult/
  */
-char *
+BSON_EXPORT (char *)
 mongoc_writeerror_message (mongoc_writeerror_t *self);
 
 BSON_END_DECLS
