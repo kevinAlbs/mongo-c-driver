@@ -449,23 +449,20 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
       BSON_ASSERT (bson_append_int32 (&cmd, "bulkWrite", 9, 1));
       // errorsOnly is default true. Set to false if verboseResults requested.
       BSON_ASSERT (bson_append_bool (
-         &cmd,
-         "errorsOnly",
-         10,
-         (options && options->verboseResults) ? false : true));
+         &cmd, "errorsOnly", 10, (options->verboseResults) ? false : true));
       // ordered is default true.
       BSON_ASSERT (bson_append_bool (
          &cmd,
          "ordered",
          7,
-         (options && options->ordered.isset) ? options->ordered.value : true));
+         (options->ordered.isset) ? options->ordered.value : true));
 
-      if (options && options->comment) {
+      if (options->comment) {
          BSON_ASSERT (
             bson_append_document (&cmd, "comment", 7, options->comment));
       }
 
-      if (options && options->bypassDocumentValidation.isset) {
+      if (options->bypassDocumentValidation.isset) {
          BSON_ASSERT (
             bson_append_bool (&cmd,
                               "bypassDocumentValidation",
@@ -473,7 +470,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                               options->bypassDocumentValidation.value));
       }
 
-      if (options && options->let) {
+      if (options->let) {
          BSON_ASSERT (bson_append_document (&cmd, "let", 3, options->let));
       }
 
@@ -509,7 +506,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
       }
       parts.is_write_command = true; // To append `txnNumber`.
 
-      if (options && options->session) {
+      if (options->session) {
          // TODO: do not set session if write is unacknowledged? (matches
          // existing behavior)
          mongoc_cmd_parts_set_session (&parts, options->session);
@@ -518,7 +515,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
       // Apply write concern:
       {
          mongoc_write_concern_t *wc = self->write_concern; // Default to client.
-         if (options && options->writeConcern) {
+         if (options->writeConcern) {
             wc = options->writeConcern;
          }
          if (!mongoc_cmd_parts_set_write_concern (&parts, wc, &error)) {
