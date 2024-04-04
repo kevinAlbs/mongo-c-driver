@@ -45,6 +45,7 @@ mongoc_listof_bulkwritemodel_destroy (mongoc_listof_bulkwritemodel_t *self);
 typedef struct {
    // `res` may be NULL if an error occurred or if an unacknowledged write
    // concern was used.
+   // `res` may contain a partial result if an error occurred.
    mongoc_bulkwriteresult_t *res;
    // `exc` may be NULL if no error occurred or if an unacknowledged write
    // concern was used.
@@ -596,17 +597,6 @@ mongoc_bulkwriteexception_writeConcernErrors (
  */
 BSON_EXPORT (const mongoc_mapof_writeerror_t *)
 mongoc_bulkwriteexception_writeErrors (const mongoc_bulkwriteexception_t *self);
-
-/**
- * The results of any successful operations that were performed before the
- * error was encountered.
- */
-// May be NULL.
-// TODO: consider removing. May not be needed since
-// `mongoc_bulkwritereturn_t` contains a `mongoc_bulkwriteresult_t`.
-BSON_EXPORT (const mongoc_bulkwriteresult_t *)
-mongoc_bulkwriteexception_partialResult (
-   const mongoc_bulkwriteexception_t *self);
 
 /**
  * An integer value identifying the write concern error. Corresponds to
