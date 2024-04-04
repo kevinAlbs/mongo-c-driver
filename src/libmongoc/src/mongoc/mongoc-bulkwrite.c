@@ -1517,7 +1517,7 @@ mongoc_listof_bulkwritemodel_append_updateone (
 
 
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
-   if (model.is_pipeline) {
+   if (_mongoc_document_is_pipeline (update)) {
       BSON_ASSERT (bson_append_array (&op, "updateMods", 10, update));
    } else {
       BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
@@ -1608,7 +1608,7 @@ mongoc_listof_bulkwritemodel_append_updatemany (
 
 
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
-   if (model.is_pipeline) {
+   if (_mongoc_document_is_pipeline (update)) {
       BSON_ASSERT (bson_append_array (&op, "updateMods", 10, update));
    } else {
       BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));

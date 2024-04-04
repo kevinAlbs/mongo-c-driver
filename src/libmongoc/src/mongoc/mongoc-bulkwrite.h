@@ -133,8 +133,6 @@ typedef struct {
     * The update document or pipeline to apply to the selected document.
     */
    const bson_t *update;
-   // If `is_pipeline` is true, `update` is treated as a pipeline.
-   bool is_pipeline;
    /**
     * A set of filters specifying to which array elements an update should
     * apply.
@@ -193,8 +191,6 @@ typedef struct {
     */
 
    const bson_t *update;
-   // If `is_pipeline` is true, `update` is treated as a pipeline.
-   bool is_pipeline;
 
    /**
     * A set of filters specifying to which array elements an update should
