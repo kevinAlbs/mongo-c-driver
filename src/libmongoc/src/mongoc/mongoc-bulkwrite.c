@@ -1382,6 +1382,15 @@ mongoc_listof_bulkwritemodel_append_insertone (
    BSON_ASSERT_PARAM (document);
    BSON_ASSERT (document->len >= 5);
 
+   bson_validate_flags_t validate_flags = _mongoc_default_insert_vflags;
+   if (model.validate_flags.isset) {
+      validate_flags = model.validate_flags.value;
+   }
+
+   if (!_mongoc_validate_new_document (document, validate_flags, error)) {
+      return false;
+   }
+
    bson_t op = BSON_INITIALIZER;
 
    // Find or create the namespace index.
@@ -1469,6 +1478,15 @@ mongoc_listof_bulkwritemodel_append_updateone (
    BSON_ASSERT_PARAM (update);
    BSON_ASSERT (update->len >= 5);
 
+   bson_validate_flags_t validate_flags = _mongoc_default_update_vflags;
+   if (model.validate_flags.isset) {
+      validate_flags = model.validate_flags.value;
+   }
+
+   if (!_mongoc_validate_update (update, validate_flags, error)) {
+      return false;
+   }
+
    bson_t op = BSON_INITIALIZER;
 
    // Find or create the namespace index.
@@ -1546,6 +1564,15 @@ mongoc_listof_bulkwritemodel_append_updatemany (
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (update);
    BSON_ASSERT (update->len >= 5);
+
+   bson_validate_flags_t validate_flags = _mongoc_default_update_vflags;
+   if (model.validate_flags.isset) {
+      validate_flags = model.validate_flags.value;
+   }
+
+   if (!_mongoc_validate_update (update, validate_flags, error)) {
+      return false;
+   }
 
    bson_t op = BSON_INITIALIZER;
 
@@ -1628,6 +1655,15 @@ mongoc_listof_bulkwritemodel_append_replaceone (
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (replacement);
    BSON_ASSERT (replacement->len >= 5);
+
+   bson_validate_flags_t validate_flags = _mongoc_default_replace_vflags;
+   if (model.validate_flags.isset) {
+      validate_flags = model.validate_flags.value;
+   }
+
+   if (!_mongoc_validate_replace (replacement, validate_flags, error)) {
+      return false;
+   }
 
    bson_t op = BSON_INITIALIZER;
 

@@ -67,6 +67,22 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 );
 
 typedef struct {
+   bson_validate_flags_t value;
+   bool isset;
+} mongoc_opt_validate_flags_t;
+
+#define MONGOC_OPT_VALIDATE_FLAGS_VAL(val) \
+   (mongoc_opt_validate_flags_t)           \
+   {                                       \
+      .value = val, .isset = true          \
+   }
+#define MONGOC_OPT_VALIDATE_FLAGS_UNSET \
+   (mongoc_opt_validate_flags_t)        \
+   {                                    \
+      .isset = false                    \
+   }
+
+typedef struct {
    /**
     * The document to insert.
     */
@@ -74,6 +90,9 @@ typedef struct {
    // `extra` is appended to the update operation.
    // It is included to support future server options.
    const bson_t *extra; // may be NULL.
+   // `validate_flags` controls validation of the `document` document.
+   // If unset, default validation occurs.
+   mongoc_opt_validate_flags_t validate_flags;
 } mongoc_insertone_model_t;
 
 BSON_EXPORT (bool)
@@ -114,6 +133,8 @@ typedef struct {
     * The update document or pipeline to apply to the selected document.
     */
    const bson_t *update;
+   // If `is_pipeline` is true, `update` is treated as a pipeline.
+   bool is_pipeline;
    /**
     * A set of filters specifying to which array elements an update should
     * apply.
@@ -148,6 +169,10 @@ typedef struct {
    // `extra` is appended to the update operation.
    // It is included to support future server options.
    const bson_t *extra; // may be NULL.
+
+   // `validate_flags` controls validation of the `update` document.
+   // If unset, default validation occurs.
+   mongoc_opt_validate_flags_t validate_flags;
 } mongoc_updateone_model_t;
 
 BSON_EXPORT (bool)
@@ -205,6 +230,10 @@ typedef struct {
    // `extra` is appended to the update operation.
    // It is included to support future server options.
    const bson_t *extra; // may be NULL.
+
+   // `validate_flags` controls validation of the `update` document.
+   // If unset, default validation occurs.
+   mongoc_opt_validate_flags_t validate_flags;
 } mongoc_updatemany_model_t;
 
 BSON_EXPORT (bool)
@@ -259,6 +288,10 @@ typedef struct {
    // `extra` is appended to the update operation.
    // It is included to support future server options.
    const bson_t *extra; // may be NULL.
+
+   // `validate_flags` controls validation of the `replace` document.
+   // If unset, default validation occurs.
+   mongoc_opt_validate_flags_t validate_flags;
 } mongoc_replaceone_model_t;
 
 BSON_EXPORT (bool)

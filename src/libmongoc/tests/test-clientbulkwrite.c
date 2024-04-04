@@ -107,6 +107,137 @@ test_clientbulkwrite_insert (void *unused)
    mongoc_client_destroy (client);
 }
 
+static void
+test_clientbulkwrite_validate (void *unused)
+{
+   BSON_UNUSED (unused);
+   mongoc_client_t *client = test_framework_new_default_client ();
+   // Drop prior data.
+   {
+      mongoc_collection_t *coll =
+         mongoc_client_get_collection (client, "db", "coll");
+      mongoc_collection_drop (coll, NULL); // Ignore return.
+      mongoc_collection_destroy (coll);
+   }
+
+   mongoc_listof_bulkwritemodel_t *lb = mongoc_listof_bulkwritemodel_new ();
+   bson_t doc_with_empty_key = BSON_INITIALIZER;
+   BSON_ASSERT (BSON_APPEND_UTF8 (&doc_with_empty_key, "", "foo"));
+
+   // Test default validation for insertone.
+   {
+      bson_error_t error;
+      mongoc_insertone_model_t m = {.document = &doc_with_empty_key};
+      bool ok;
+      ok = mongoc_listof_bulkwritemodel_append_insertone (
+         lb, "db.coll", -1, m, &error);
+      ASSERT (!ok);
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_COMMAND,
+                             MONGOC_ERROR_COMMAND_INVALID_ARG,
+                             "invalid document for insert: empty key");
+   }
+
+   // Test disabling validation for insertone.
+   {
+      bson_error_t error;
+      mongoc_insertone_model_t m = {
+         .document = &doc_with_empty_key,
+         .validate_flags = MONGOC_OPT_VALIDATE_FLAGS_VAL (BSON_VALIDATE_NONE)};
+      bool ok;
+      ok = mongoc_listof_bulkwritemodel_append_insertone (
+         lb, "db.coll", -1, m, &error);
+      ASSERT_OR_PRINT (ok, error);
+   }
+
+   // Test default validation for updateone.
+   {
+      bson_error_t error;
+      mongoc_updateone_model_t m = {.filter = tmp_bson ("{}"),
+                                    .update = &doc_with_empty_key};
+      bool ok;
+      ok = mongoc_listof_bulkwritemodel_append_updateone (
+         lb, "db.coll", -1, m, &error);
+      ASSERT (!ok);
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_COMMAND,
+                             MONGOC_ERROR_COMMAND_INVALID_ARG,
+                             "invalid argument for update: empty key");
+   }
+
+   // Test disabling validation for updateone.
+   {
+      bson_error_t error;
+      mongoc_updateone_model_t m = {
+         .filter = tmp_bson ("{}"),
+         .update = &doc_with_empty_key,
+         .validate_flags = MONGOC_OPT_VALIDATE_FLAGS_VAL (BSON_VALIDATE_NONE)};
+      bool ok;
+      ok = mongoc_listof_bulkwritemodel_append_updateone (
+         lb, "db.coll", -1, m, &error);
+      ASSERT_OR_PRINT (ok, error);
+   }
+
+   // Test default validation for updatemany.
+   {
+      bson_error_t error;
+      mongoc_updatemany_model_t m = {.filter = tmp_bson ("{}"),
+                                     .update = &doc_with_empty_key};
+      bool ok;
+      ok = mongoc_listof_bulkwritemodel_append_updatemany (
+         lb, "db.coll", -1, m, &error);
+      ASSERT (!ok);
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_COMMAND,
+                             MONGOC_ERROR_COMMAND_INVALID_ARG,
+                             "invalid argument for update: empty key");
+   }
+
+   // Test disabling validation for updatemany.
+   {
+      bson_error_t error;
+      mongoc_updatemany_model_t m = {
+         .filter = tmp_bson ("{}"),
+         .update = &doc_with_empty_key,
+         .validate_flags = MONGOC_OPT_VALIDATE_FLAGS_VAL (BSON_VALIDATE_NONE)};
+      bool ok;
+      ok = mongoc_listof_bulkwritemodel_append_updatemany (
+         lb, "db.coll", -1, m, &error);
+      ASSERT_OR_PRINT (ok, error);
+   }
+
+   // Test default validation for replaceone.
+   {
+      bson_error_t error;
+      mongoc_replaceone_model_t m = {.filter = tmp_bson ("{}"),
+                                     .replacement = &doc_with_empty_key};
+      bool ok;
+      ok = mongoc_listof_bulkwritemodel_append_replaceone (
+         lb, "db.coll", -1, m, &error);
+      ASSERT (!ok);
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_COMMAND,
+                             MONGOC_ERROR_COMMAND_INVALID_ARG,
+                             "invalid argument for replace: empty key");
+   }
+
+   // Test disabling validation for replaceone.
+   {
+      bson_error_t error;
+      mongoc_replaceone_model_t m = {
+         .filter = tmp_bson ("{}"),
+         .replacement = &doc_with_empty_key,
+         .validate_flags = MONGOC_OPT_VALIDATE_FLAGS_VAL (BSON_VALIDATE_NONE)};
+      bool ok;
+      ok = mongoc_listof_bulkwritemodel_append_replaceone (
+         lb, "db.coll", -1, m, &error);
+      ASSERT_OR_PRINT (ok, error);
+   }
+
+   mongoc_listof_bulkwritemodel_destroy (lb);
+   mongoc_client_destroy (client);
+}
+
 void
 test_clientbulkwrite_install (TestSuite *suite)
 {
@@ -114,6 +245,15 @@ test_clientbulkwrite_install (TestSuite *suite)
       suite,
       "/clientbulkwrite/insert",
       test_clientbulkwrite_insert,
+      NULL /* dtor */,
+      NULL /* ctx */,
+      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
+
+   TestSuite_AddFull (
+      suite,
+      "/clientbulkwrite/validate",
+      test_clientbulkwrite_validate,
       NULL /* dtor */,
       NULL /* ctx */,
       test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0

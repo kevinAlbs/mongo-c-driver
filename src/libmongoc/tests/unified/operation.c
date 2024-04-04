@@ -514,6 +514,16 @@ operation_client_bulkwrite (test_t *test,
          bson_t model_wrapper;
          bson_iter_bson (&args_models_iter, &model_wrapper);
          if (!append_client_bulkwritemodel (models, &model_wrapper, error)) {
+            if (error->domain != TEST_ERROR_DOMAIN) {
+               // Propagate error as a test result.
+               result_from_val_and_reply (result, NULL, NULL, error);
+               // Return with a success (to not abort test runner) and propagate
+               // the error as a result.
+               ret = true;
+               *error = (bson_error_t){0};
+               bson_parser_destroy_with_parsed_fields (parser);
+               goto done;
+            }
             goto parse_done;
          }
       }
