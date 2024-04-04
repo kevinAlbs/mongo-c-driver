@@ -1517,7 +1517,11 @@ mongoc_listof_bulkwritemodel_append_updateone (
 
 
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
-   BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
+   if (model.is_pipeline) {
+      BSON_ASSERT (bson_append_array (&op, "updateMods", 10, update));
+   } else {
+      BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
+   }
    BSON_ASSERT (bson_append_bool (&op, "multi", 5, false));
    if (model.arrayFilters) {
       BSON_ASSERT (
@@ -1604,7 +1608,11 @@ mongoc_listof_bulkwritemodel_append_updatemany (
 
 
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
-   BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
+   if (model.is_pipeline) {
+      BSON_ASSERT (bson_append_array (&op, "updateMods", 10, update));
+   } else {
+      BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
+   }
    BSON_ASSERT (bson_append_bool (&op, "multi", 5, true));
    if (model.arrayFilters) {
       BSON_ASSERT (

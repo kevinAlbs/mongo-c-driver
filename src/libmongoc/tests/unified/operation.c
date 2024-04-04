@@ -292,7 +292,15 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
       // Parse an "updateOne".
       bson_parser_utf8 (parser, "namespace", &namespace);
       bson_parser_doc (parser, "filter", &filter);
-      bson_parser_doc (parser, "update", &update);
+      bson_parser_array_or_doc (parser, "update", &update);
+      bool is_pipeline = false;
+      {
+         bson_iter_t iter;
+         if (bson_iter_init_find (&iter, &model_bson, "update") &&
+             BSON_ITER_HOLDS_ARRAY (&iter)) {
+            is_pipeline = true;
+         }
+      }
       bson_parser_array_optional (parser, "arrayFilters", &arrayFilters);
       bson_parser_doc_optional (parser, "collation", &collation);
       bson_parser_any_optional (parser, "hint", &hint);
@@ -308,6 +316,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              (mongoc_updateone_model_t){
                 .filter = filter,
                 .update = update,
+                .is_pipeline = is_pipeline,
                 .arrayFilters = arrayFilters,
                 .collation = collation,
                 .hint = hint ? bson_val_to_value (hint) : NULL,
@@ -322,7 +331,15 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
       // Parse an "updateOne".
       bson_parser_utf8 (parser, "namespace", &namespace);
       bson_parser_doc (parser, "filter", &filter);
-      bson_parser_doc (parser, "update", &update);
+      bson_parser_array_or_doc (parser, "update", &update);
+      bool is_pipeline = false;
+      {
+         bson_iter_t iter;
+         if (bson_iter_init_find (&iter, &model_bson, "update") &&
+             BSON_ITER_HOLDS_ARRAY (&iter)) {
+            is_pipeline = true;
+         }
+      }
       bson_parser_array_optional (parser, "arrayFilters", &arrayFilters);
       bson_parser_doc_optional (parser, "collation", &collation);
       bson_parser_any_optional (parser, "hint", &hint);
@@ -338,6 +355,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              (mongoc_updatemany_model_t){
                 .filter = filter,
                 .update = update,
+                .is_pipeline = is_pipeline,
                 .arrayFilters = arrayFilters,
                 .collation = collation,
                 .hint = hint ? bson_val_to_value (hint) : NULL,

@@ -37,49 +37,21 @@
       "documents": [
         {
           "_id": 1,
-          "array": [
-            1,
-            2,
-            3
-          ]
+          "x": 1
         },
         {
           "_id": 2,
-          "array": [
-            1,
-            2,
-            3
-          ]
-        },
-        {
-          "_id": 3,
-          "array": [
-            1,
-            2,
-            3
-          ]
-        },
-        {
-          "_id": 4,
-          "array": [
-            1,
-            2,
-            3
-          ]
+          "x": 2
         }
       ]
     }
   ],
   "_yamlAnchors": {
-    "namespace": "crud-tests.coll0",
-    "collation": {
-      "locale": "simple"
-    },
-    "hint": "_id_"
+    "namespace": "crud-tests.coll0"
   },
   "tests": [
     {
-      "description": "client bulkWrite update with arrayFilters",
+      "description": "client bulkWrite updateOne with pipeline",
       "operations": [
         {
           "object": "client0",
@@ -92,46 +64,10 @@
                   "filter": {
                     "_id": 1
                   },
-                  "update": {
-                    "$set": {
-                      "array.$[i]": 4
-                    }
-                  },
-                  "arrayFilters": [
+                  "update": [
                     {
-                      "i": {
-                        "$gte": 2
-                      }
-                    }
-                  ]
-                }
-              },
-              {
-                "updateMany": {
-                  "namespace": "crud-tests.coll0",
-                  "filter": {
-                    "$and": [
-                      {
-                        "_id": {
-                          "$gt": 1
-                        }
-                      },
-                      {
-                        "_id": {
-                          "$lte": 3
-                        }
-                      }
-                    ]
-                  },
-                  "update": {
-                    "$set": {
-                      "array.$[i]": 5
-                    }
-                  },
-                  "arrayFilters": [
-                    {
-                      "i": {
-                        "$gte": 2
+                      "$addFields": {
+                        "foo": 1
                       }
                     }
                   ]
@@ -143,21 +79,14 @@
           "expectResult": {
             "insertedCount": 0,
             "upsertedCount": 0,
-            "matchedCount": 3,
-            "modifiedCount": 3,
+            "matchedCount": 1,
+            "modifiedCount": 1,
             "deletedCount": 0,
             "insertResults": {},
             "updateResults": {
               "0": {
                 "matchedCount": 1,
                 "modifiedCount": 1,
-                "upsertedId": {
-                  "$$exists": false
-                }
-              },
-              "1": {
-                "matchedCount": 2,
-                "modifiedCount": 2,
                 "upsertedId": {
                   "$$exists": false
                 }
@@ -185,45 +114,109 @@
                       "filter": {
                         "_id": 1
                       },
-                      "updateMods": {
-                        "$set": {
-                          "array.$[i]": 4
-                        }
-                      },
-                      "arrayFilters": [
+                      "updateMods": [
                         {
-                          "i": {
-                            "$gte": 2
+                          "$addFields": {
+                            "foo": 1
                           }
                         }
                       ],
                       "multi": false
-                    },
+                    }
+                  ],
+                  "nsInfo": [
+                    {
+                      "ns": "crud-tests.coll0"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": [
+        {
+          "databaseName": "crud-tests",
+          "collectionName": "coll0",
+          "documents": [
+            {
+              "_id": 1,
+              "x": 1,
+              "foo": 1
+            },
+            {
+              "_id": 2,
+              "x": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "client bulkWrite updateMany with pipeline",
+      "operations": [
+        {
+          "object": "client0",
+          "name": "clientBulkWrite",
+          "arguments": {
+            "models": [
+              {
+                "updateMany": {
+                  "namespace": "crud-tests.coll0",
+                  "filter": {},
+                  "update": [
+                    {
+                      "$addFields": {
+                        "foo": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "verboseResults": true
+          },
+          "expectResult": {
+            "insertedCount": 0,
+            "upsertedCount": 0,
+            "matchedCount": 2,
+            "modifiedCount": 2,
+            "deletedCount": 0,
+            "insertResults": {},
+            "updateResults": {
+              "0": {
+                "matchedCount": 2,
+                "modifiedCount": 2,
+                "upsertedId": {
+                  "$$exists": false
+                }
+              }
+            },
+            "deleteResults": {}
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "commandName": "bulkWrite",
+                "databaseName": "admin",
+                "command": {
+                  "bulkWrite": 1,
+                  "errorsOnly": false,
+                  "ordered": true,
+                  "ops": [
                     {
                       "update": 0,
-                      "filter": {
-                        "$and": [
-                          {
-                            "_id": {
-                              "$gt": 1
-                            }
-                          },
-                          {
-                            "_id": {
-                              "$lte": 3
-                            }
-                          }
-                        ]
-                      },
-                      "updateMods": {
-                        "$set": {
-                          "array.$[i]": 5
-                        }
-                      },
-                      "arrayFilters": [
+                      "filter": {},
+                      "updateMods": [
                         {
-                          "i": {
-                            "$gte": 2
+                          "$addFields": {
+                            "foo": 1
                           }
                         }
                       ],
@@ -248,697 +241,13 @@
           "documents": [
             {
               "_id": 1,
-              "array": [
-                1,
-                4,
-                4
-              ]
+              "x": 1,
+              "foo": 1
             },
             {
               "_id": 2,
-              "array": [
-                1,
-                5,
-                5
-              ]
-            },
-            {
-              "_id": 3,
-              "array": [
-                1,
-                5,
-                5
-              ]
-            },
-            {
-              "_id": 4,
-              "array": [
-                1,
-                2,
-                3
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "description": "client bulkWrite update with collation",
-      "operations": [
-        {
-          "object": "client0",
-          "name": "clientBulkWrite",
-          "arguments": {
-            "models": [
-              {
-                "updateOne": {
-                  "namespace": "crud-tests.coll0",
-                  "filter": {
-                    "_id": 1
-                  },
-                  "update": {
-                    "$set": {
-                      "array": [
-                        1,
-                        2,
-                        4
-                      ]
-                    }
-                  },
-                  "collation": {
-                    "locale": "simple"
-                  }
-                }
-              },
-              {
-                "updateMany": {
-                  "namespace": "crud-tests.coll0",
-                  "filter": {
-                    "$and": [
-                      {
-                        "_id": {
-                          "$gt": 1
-                        }
-                      },
-                      {
-                        "_id": {
-                          "$lte": 3
-                        }
-                      }
-                    ]
-                  },
-                  "update": {
-                    "$set": {
-                      "array": [
-                        1,
-                        2,
-                        5
-                      ]
-                    }
-                  },
-                  "collation": {
-                    "locale": "simple"
-                  }
-                }
-              },
-              {
-                "replaceOne": {
-                  "namespace": "crud-tests.coll0",
-                  "filter": {
-                    "_id": 4
-                  },
-                  "replacement": {
-                    "array": [
-                      1,
-                      2,
-                      6
-                    ]
-                  },
-                  "collation": {
-                    "locale": "simple"
-                  }
-                }
-              }
-            ],
-            "verboseResults": true
-          },
-          "expectResult": {
-            "insertedCount": 0,
-            "upsertedCount": 0,
-            "matchedCount": 4,
-            "modifiedCount": 4,
-            "deletedCount": 0,
-            "insertResults": {},
-            "updateResults": {
-              "0": {
-                "matchedCount": 1,
-                "modifiedCount": 1,
-                "upsertedId": {
-                  "$$exists": false
-                }
-              },
-              "1": {
-                "matchedCount": 2,
-                "modifiedCount": 2,
-                "upsertedId": {
-                  "$$exists": false
-                }
-              },
-              "2": {
-                "matchedCount": 1,
-                "modifiedCount": 1,
-                "upsertedId": {
-                  "$$exists": false
-                }
-              }
-            },
-            "deleteResults": {}
-          }
-        }
-      ],
-      "expectEvents": [
-        {
-          "client": "client0",
-          "events": [
-            {
-              "commandStartedEvent": {
-                "commandName": "bulkWrite",
-                "databaseName": "admin",
-                "command": {
-                  "bulkWrite": 1,
-                  "errorsOnly": false,
-                  "ordered": true,
-                  "ops": [
-                    {
-                      "update": 0,
-                      "filter": {
-                        "_id": 1
-                      },
-                      "updateMods": {
-                        "$set": {
-                          "array": [
-                            1,
-                            2,
-                            4
-                          ]
-                        }
-                      },
-                      "collation": {
-                        "locale": "simple"
-                      },
-                      "multi": false
-                    },
-                    {
-                      "update": 0,
-                      "filter": {
-                        "$and": [
-                          {
-                            "_id": {
-                              "$gt": 1
-                            }
-                          },
-                          {
-                            "_id": {
-                              "$lte": 3
-                            }
-                          }
-                        ]
-                      },
-                      "updateMods": {
-                        "$set": {
-                          "array": [
-                            1,
-                            2,
-                            5
-                          ]
-                        }
-                      },
-                      "collation": {
-                        "locale": "simple"
-                      },
-                      "multi": true
-                    },
-                    {
-                      "update": 0,
-                      "filter": {
-                        "_id": 4
-                      },
-                      "updateMods": {
-                        "array": [
-                          1,
-                          2,
-                          6
-                        ]
-                      },
-                      "collation": {
-                        "locale": "simple"
-                      },
-                      "multi": false
-                    }
-                  ],
-                  "nsInfo": [
-                    {
-                      "ns": "crud-tests.coll0"
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      ],
-      "outcome": [
-        {
-          "databaseName": "crud-tests",
-          "collectionName": "coll0",
-          "documents": [
-            {
-              "_id": 1,
-              "array": [
-                1,
-                2,
-                4
-              ]
-            },
-            {
-              "_id": 2,
-              "array": [
-                1,
-                2,
-                5
-              ]
-            },
-            {
-              "_id": 3,
-              "array": [
-                1,
-                2,
-                5
-              ]
-            },
-            {
-              "_id": 4,
-              "array": [
-                1,
-                2,
-                6
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "description": "client bulkWrite update with hint",
-      "operations": [
-        {
-          "object": "client0",
-          "name": "clientBulkWrite",
-          "arguments": {
-            "models": [
-              {
-                "updateOne": {
-                  "namespace": "crud-tests.coll0",
-                  "filter": {
-                    "_id": 1
-                  },
-                  "update": {
-                    "$set": {
-                      "array": [
-                        1,
-                        2,
-                        4
-                      ]
-                    }
-                  },
-                  "hint": "_id_"
-                }
-              },
-              {
-                "updateMany": {
-                  "namespace": "crud-tests.coll0",
-                  "filter": {
-                    "$and": [
-                      {
-                        "_id": {
-                          "$gt": 1
-                        }
-                      },
-                      {
-                        "_id": {
-                          "$lte": 3
-                        }
-                      }
-                    ]
-                  },
-                  "update": {
-                    "$set": {
-                      "array": [
-                        1,
-                        2,
-                        5
-                      ]
-                    }
-                  },
-                  "hint": "_id_"
-                }
-              },
-              {
-                "replaceOne": {
-                  "namespace": "crud-tests.coll0",
-                  "filter": {
-                    "_id": 4
-                  },
-                  "replacement": {
-                    "array": [
-                      1,
-                      2,
-                      6
-                    ]
-                  },
-                  "hint": "_id_"
-                }
-              }
-            ],
-            "verboseResults": true
-          },
-          "expectResult": {
-            "insertedCount": 0,
-            "upsertedCount": 0,
-            "matchedCount": 4,
-            "modifiedCount": 4,
-            "deletedCount": 0,
-            "insertResults": {},
-            "updateResults": {
-              "0": {
-                "matchedCount": 1,
-                "modifiedCount": 1,
-                "upsertedId": {
-                  "$$exists": false
-                }
-              },
-              "1": {
-                "matchedCount": 2,
-                "modifiedCount": 2,
-                "upsertedId": {
-                  "$$exists": false
-                }
-              },
-              "2": {
-                "matchedCount": 1,
-                "modifiedCount": 1,
-                "upsertedId": {
-                  "$$exists": false
-                }
-              }
-            },
-            "deleteResults": {}
-          }
-        }
-      ],
-      "expectEvents": [
-        {
-          "client": "client0",
-          "events": [
-            {
-              "commandStartedEvent": {
-                "commandName": "bulkWrite",
-                "databaseName": "admin",
-                "command": {
-                  "bulkWrite": 1,
-                  "errorsOnly": false,
-                  "ordered": true,
-                  "ops": [
-                    {
-                      "update": 0,
-                      "filter": {
-                        "_id": 1
-                      },
-                      "updateMods": {
-                        "$set": {
-                          "array": [
-                            1,
-                            2,
-                            4
-                          ]
-                        }
-                      },
-                      "hint": "_id_",
-                      "multi": false
-                    },
-                    {
-                      "update": 0,
-                      "filter": {
-                        "$and": [
-                          {
-                            "_id": {
-                              "$gt": 1
-                            }
-                          },
-                          {
-                            "_id": {
-                              "$lte": 3
-                            }
-                          }
-                        ]
-                      },
-                      "updateMods": {
-                        "$set": {
-                          "array": [
-                            1,
-                            2,
-                            5
-                          ]
-                        }
-                      },
-                      "hint": "_id_",
-                      "multi": true
-                    },
-                    {
-                      "update": 0,
-                      "filter": {
-                        "_id": 4
-                      },
-                      "updateMods": {
-                        "array": [
-                          1,
-                          2,
-                          6
-                        ]
-                      },
-                      "hint": "_id_",
-                      "multi": false
-                    }
-                  ],
-                  "nsInfo": [
-                    {
-                      "ns": "crud-tests.coll0"
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      ],
-      "outcome": [
-        {
-          "databaseName": "crud-tests",
-          "collectionName": "coll0",
-          "documents": [
-            {
-              "_id": 1,
-              "array": [
-                1,
-                2,
-                4
-              ]
-            },
-            {
-              "_id": 2,
-              "array": [
-                1,
-                2,
-                5
-              ]
-            },
-            {
-              "_id": 3,
-              "array": [
-                1,
-                2,
-                5
-              ]
-            },
-            {
-              "_id": 4,
-              "array": [
-                1,
-                2,
-                6
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "description": "client bulkWrite update with upsert",
-      "operations": [
-        {
-          "object": "client0",
-          "name": "clientBulkWrite",
-          "arguments": {
-            "models": [
-              {
-                "updateOne": {
-                  "namespace": "crud-tests.coll0",
-                  "filter": {
-                    "_id": 5
-                  },
-                  "update": {
-                    "$set": {
-                      "array": [
-                        1,
-                        2,
-                        4
-                      ]
-                    }
-                  },
-                  "upsert": true
-                }
-              },
-              {
-                "replaceOne": {
-                  "namespace": "crud-tests.coll0",
-                  "filter": {
-                    "_id": 6
-                  },
-                  "replacement": {
-                    "array": [
-                      1,
-                      2,
-                      6
-                    ]
-                  },
-                  "upsert": true
-                }
-              }
-            ],
-            "verboseResults": true
-          },
-          "expectResult": {
-            "insertedCount": 0,
-            "upsertedCount": 2,
-            "matchedCount": 0,
-            "modifiedCount": 0,
-            "deletedCount": 0,
-            "insertResults": {},
-            "updateResults": {
-              "0": {
-                "matchedCount": 1,
-                "modifiedCount": 0,
-                "upsertedId": 5
-              },
-              "1": {
-                "matchedCount": 1,
-                "modifiedCount": 0,
-                "upsertedId": 6
-              }
-            },
-            "deleteResults": {}
-          }
-        }
-      ],
-      "expectEvents": [
-        {
-          "client": "client0",
-          "events": [
-            {
-              "commandStartedEvent": {
-                "commandName": "bulkWrite",
-                "databaseName": "admin",
-                "command": {
-                  "bulkWrite": 1,
-                  "errorsOnly": false,
-                  "ordered": true,
-                  "ops": [
-                    {
-                      "update": 0,
-                      "filter": {
-                        "_id": 5
-                      },
-                      "updateMods": {
-                        "$set": {
-                          "array": [
-                            1,
-                            2,
-                            4
-                          ]
-                        }
-                      },
-                      "upsert": true,
-                      "multi": false
-                    },
-                    {
-                      "update": 0,
-                      "filter": {
-                        "_id": 6
-                      },
-                      "updateMods": {
-                        "array": [
-                          1,
-                          2,
-                          6
-                        ]
-                      },
-                      "upsert": true,
-                      "multi": false
-                    }
-                  ],
-                  "nsInfo": [
-                    {
-                      "ns": "crud-tests.coll0"
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      ],
-      "outcome": [
-        {
-          "databaseName": "crud-tests",
-          "collectionName": "coll0",
-          "documents": [
-            {
-              "_id": 1,
-              "array": [
-                1,
-                2,
-                3
-              ]
-            },
-            {
-              "_id": 2,
-              "array": [
-                1,
-                2,
-                3
-              ]
-            },
-            {
-              "_id": 3,
-              "array": [
-                1,
-                2,
-                3
-              ]
-            },
-            {
-              "_id": 4,
-              "array": [
-                1,
-                2,
-                3
-              ]
-            },
-            {
-              "_id": 5,
-              "array": [
-                1,
-                2,
-                4
-              ]
-            },
-            {
-              "_id": 6,
-              "array": [
-                1,
-                2,
-                6
-              ]
+              "x": 2,
+              "foo": 1
             }
           ]
         }
