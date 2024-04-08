@@ -1,143 +1,139 @@
-#include <mongoc/mongoc.h>
+/*
+ * Copyright 2024-present MongoDB, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-#include "test-libmongoc.h"
-#include "mongoc-bulkwrite.h"
-#include "TestSuite.h"
-#include "test-conveniences.h"
+#include <mongoc/mongoc.h>
+#include <test-libmongoc.h>
+#include <TestSuite.h>
+#include <test-conveniences.h>
+#include <mongoc-bulkwrite.h>
 
 static void
-test_bulkwrite_insert_errors (void *ctx)
+test_bulkwrite_insert (void *unused)
 {
-   mongoc_client_t *client;
-   BSON_UNUSED (ctx);
-   bool ok;
+   BSON_UNUSED (unused);
+
    bson_error_t error;
+   bool ok;
+   mongoc_client_t *client = test_framework_new_default_client ();
 
-   client = test_framework_new_default_client ();
-
-   // Drop prior test data.
+   // Drop prior data.
    {
       mongoc_collection_t *coll = mongoc_client_get_collection (client, "db", "coll");
-      mongoc_collection_drop (coll, NULL);
+      mongoc_collection_drop (coll, NULL); // Ignore return.
       mongoc_collection_destroy (coll);
    }
 
-   mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
-   size_t numModels = 0;
-
-   ok = mongoc_listof_bulkwritemodel_append_insertone (
-      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'_id': 1 }")}, &error);
+   // Insert two documents with verbose results.
+   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{'_id': 123}"), NULL /* opts */, &error);
    ASSERT_OR_PRINT (ok, error);
-   numModels++;
-   ok = mongoc_listof_bulkwritemodel_append_insertone (
-      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'_id': 1 }")}, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{'_id': 456}"), NULL /* opts */, &error);
    ASSERT_OR_PRINT (ok, error);
-   numModels++;
-   ok = mongoc_listof_bulkwritemodel_append_insertone (
-      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'_id': 1 }")}, &error);
-   ASSERT_OR_PRINT (ok, error);
-   numModels++;
 
-   mongoc_bulkwriteoptions_t opts = {.verboseResults = true};
-   mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
-   ASSERT (ret.exc);
+   // Do the bulk write.
+   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
+   mongoc_bulkwriteoptions_set_verboseresults (opts, true);
+   mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, opts);
 
-   ASSERT (ret.res);
-   const mongoc_mapof_insertoneresult_t *mapof_ir = mongoc_bulkwriteresult_insertResults (ret.res);
-   size_t numInsertResults = 0;
-   for (size_t i = 0; i < numModels; i++) {
-      if (mongoc_mapof_insertoneresult_lookup (mapof_ir, i)) {
-         numInsertResults++;
+   // Ensure no error.
+   if (bwr.exc) {
+      const char *msg = "(none)";
+      if (mongoc_bulkwriteexception_error (bwr.exc, &error)) {
+         msg = error.message;
       }
+      const bson_t *doc = mongoc_bulkwriteexception_error_document (bwr.exc);
+      test_error ("Expected no bulk write exception, but got:\n"
+                  "  Error     : %s\n"
+                  "  Document  : %s",
+                  msg,
+                  tmp_json (doc));
    }
-   // Expect only one insert reported.
-   ASSERT_CMPSIZE_T (numInsertResults, ==, 1);
-   mongoc_bulkwritereturn_cleanup (&ret);
-   mongoc_listof_bulkwritemodel_destroy (models);
+
+   // Ensure results report IDs inserted.
+   {
+      ASSERT (bwr.res);
+      const bson_t *vr = mongoc_bulkwriteresult_verboseresults (bwr.res);
+      ASSERT (vr);
+      ASSERT_MATCH (vr, BSON_STR ({"insertResults" : {"0" : {"insertedId" : 123}, "1" : {"insertedId" : 456}}}));
+   }
+
+   mongoc_bulkwriteexception_destroy (bwr.exc);
+   mongoc_bulkwriteresult_destroy (bwr.res);
+   mongoc_bulkwrite_destroy (bw);
+   mongoc_bulkwriteoptions_destroy (opts);
    mongoc_client_destroy (client);
 }
 
 static void
-test_unacknowledged (void *ctx)
+test_bulkwrite_writeError (void *unused)
 {
-   mongoc_client_t *client;
-   BSON_UNUSED (ctx);
-   bool ok;
+   BSON_UNUSED (unused);
+
    bson_error_t error;
-   mongoc_write_concern_t *wc = mongoc_write_concern_new ();
-
-   mongoc_write_concern_set_w (wc, MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
-
-   client = test_framework_new_default_client ();
-
-   mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
-   ok = mongoc_listof_bulkwritemodel_append_insertone (
-      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'a': 1 }")}, &error);
-   ASSERT_OR_PRINT (ok, error);
-   mongoc_bulkwriteoptions_t opts = {.writeConcern = wc};
-   mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
-   // Expect no result.
-   ASSERT (!ret.res);
-   mongoc_bulkwritereturn_cleanup (&ret);
-   mongoc_listof_bulkwritemodel_destroy (models);
-   mongoc_client_destroy (client);
-   mongoc_write_concern_destroy (wc);
-}
-
-static void
-test_session_with_unacknowledged (void *ctx)
-{
-   mongoc_client_t *client;
-   BSON_UNUSED (ctx);
    bool ok;
-   bson_error_t error;
-   mongoc_write_concern_t *wc = mongoc_write_concern_new ();
+   mongoc_client_t *client = test_framework_new_default_client ();
 
-   mongoc_write_concern_set_w (wc, MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
+   // Drop prior data.
+   {
+      mongoc_collection_t *coll = mongoc_client_get_collection (client, "db", "coll");
+      mongoc_collection_drop (coll, NULL); // Ignore return.
+      mongoc_collection_destroy (coll);
+   }
 
-   client = test_framework_new_default_client ();
-   mongoc_client_session_t *session = mongoc_client_start_session (client, NULL, &error);
-   ASSERT_OR_PRINT (session, error);
-
-   mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
-   ok = mongoc_listof_bulkwritemodel_append_insertone (
-      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'a': 1 }")}, &error);
+   // Insert two documents with verbose results.
+   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{'_id': 123}"), NULL /* opts */, &error);
    ASSERT_OR_PRINT (ok, error);
-   mongoc_bulkwriteoptions_t opts = {.session = session, .writeConcern = wc};
-   mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
-   ASSERT (ret.exc);
-   ASSERT (mongoc_bulkwriteexception_error (ret.exc, &error, NULL));
-   ASSERT_ERROR_CONTAINS (error,
-                          MONGOC_ERROR_COMMAND,
-                          MONGOC_ERROR_COMMAND_INVALID_ARG,
-                          "Cannot use client session with unacknowledged command");
-   mongoc_bulkwritereturn_cleanup (&ret);
-   mongoc_listof_bulkwritemodel_destroy (models);
-   mongoc_client_session_destroy (session);
-   mongoc_client_destroy (client);
-   mongoc_write_concern_destroy (wc);
-}
-
-static void
-test_verbose (void *ctx)
-{
-   mongoc_client_t *client;
-   BSON_UNUSED (ctx);
-   bool ok;
-   bson_error_t error;
-
-   client = test_framework_new_default_client ();
-
-   mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
-   ok = mongoc_listof_bulkwritemodel_append_insertone (
-      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'a': 1 }")}, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{'_id': 123}"), NULL /* opts */, &error);
    ASSERT_OR_PRINT (ok, error);
-   mongoc_bulkwriteoptions_t opts = {.verboseResults = true};
-   mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
-   ASSERT (ret.res);
-   ASSERT (mongoc_bulkwriteresult_hasVerboseResults (ret.res));
-   mongoc_bulkwritereturn_cleanup (&ret);
-   mongoc_listof_bulkwritemodel_destroy (models);
+
+   // Do the bulk write.
+   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
+   mongoc_bulkwriteoptions_set_verboseresults (opts, true);
+   mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, opts);
+
+   // Expect an error.
+   ASSERT (bwr.exc);
+   const bson_t *ed = mongoc_bulkwriteexception_error_document (bwr.exc);
+   ASSERT_MATCH (
+      ed, BSON_STR ({
+         "errorLabels" : [],
+         "writeErrors" : {
+            "1" : {
+               "code" : 11000,
+               "message" : "E11000 duplicate key error collection: db.coll index: _id_ dup key: { _id: 123 }",
+               "details" : {}
+            }
+         },
+         "writeConcernErrors" : [],
+         "errorReply" : {}
+      }));
+
+   // Ensure results report only one ID inserted.
+   {
+      ASSERT (bwr.res);
+      const bson_t *vr = mongoc_bulkwriteresult_verboseresults (bwr.res);
+      ASSERT (vr);
+      ASSERT_MATCH (vr, BSON_STR ({"insertResults" : {"0" : {"insertedId" : 123}}}));
+   }
+
+   mongoc_bulkwriteexception_destroy (bwr.exc);
+   mongoc_bulkwriteresult_destroy (bwr.res);
+   mongoc_bulkwrite_destroy (bw);
+   mongoc_bulkwriteoptions_destroy (opts);
    mongoc_client_destroy (client);
 }
 
@@ -145,27 +141,18 @@ void
 test_bulkwrite_install (TestSuite *suite)
 {
    TestSuite_AddFull (suite,
-                      "/bulkwrite/insert_errors",
-                      test_bulkwrite_insert_errors,
-                      NULL, /* dtor */
-                      NULL, /* ctx */
-                      test_framework_skip_if_max_wire_version_less_than_25);
+                      "/bulkwrite/insert",
+                      test_bulkwrite_insert,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
+
    TestSuite_AddFull (suite,
-                      "/bulkwrite/unacknowledged",
-                      test_unacknowledged,
-                      NULL, /* dtor */
-                      NULL, /* ctx */
-                      test_framework_skip_if_max_wire_version_less_than_25);
-   TestSuite_AddFull (suite,
-                      "/bulkwrite/session_with_unacknowledged",
-                      test_session_with_unacknowledged,
-                      NULL, /* dtor */
-                      NULL, /* ctx */
-                      test_framework_skip_if_max_wire_version_less_than_25);
-   TestSuite_AddFull (suite,
-                      "/bulkwrite/verbose",
-                      test_verbose,
-                      NULL, /* dtor */
-                      NULL, /* ctx */
-                      test_framework_skip_if_max_wire_version_less_than_25);
+                      "/bulkwrite/writeError",
+                      test_bulkwrite_writeError,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
 }
