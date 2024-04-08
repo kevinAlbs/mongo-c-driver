@@ -25,6 +25,50 @@
 
 BSON_BEGIN_DECLS
 
+#define MONGOC_BULKWRITEOPTIONSV2_NONE \
+   (mongoc_bulkwriteoptionsv2_t)       \
+   {                                   \
+      0                                \
+   }
+
+typedef struct {
+   bool value;
+   bool isset;
+} mongoc_opt_boolv2_t;
+
+#define MONGOC_OPT_BOOLV2_TRUE     \
+   (mongoc_opt_boolv2_t)           \
+   {                               \
+      .value = true, .isset = true \
+   }
+#define MONGOC_OPT_BOOLV2_FALSE     \
+   (mongoc_opt_boolv2_t)            \
+   {                                \
+      .value = false, .isset = true \
+   }
+#define MONGOC_OPT_BOOLV2_UNSET \
+   (mongoc_opt_boolv2_t)        \
+   {                            \
+      .isset = false            \
+   }
+
+typedef struct {
+   bson_validate_flags_t value;
+   bool isset;
+} mongoc_opt_validate_flagsv2_t;
+
+#define MONGOC_OPT_VALIDATE_FLAGSV2_VAL(val) \
+   (mongoc_opt_validate_flagsv2_t)           \
+   {                                         \
+      .value = val, .isset = true            \
+   }
+#define MONGOC_OPT_VALIDATE_FLAGSV2_UNSET \
+   (mongoc_opt_validate_flagsv2_t)        \
+   {                                      \
+      .isset = false                      \
+   }
+
+
 typedef struct {
    bool value;
    bool is_set;
