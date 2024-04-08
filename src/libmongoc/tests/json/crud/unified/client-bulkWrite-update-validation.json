@@ -50,7 +50,7 @@
   },
   "tests": [
     {
-      "description": "Client bulkWrite replaceOne prohibits atomic modifiers",
+      "description": "client bulkWrite replaceOne prohibits atomic modifiers",
       "operations": [
         {
           "name": "clientBulkWrite",
@@ -105,7 +105,7 @@
       ]
     },
     {
-      "description": "Client bulkWrite updateOne requires atomic modifiers",
+      "description": "client bulkWrite updateOne requires atomic modifiers",
       "operations": [
         {
           "name": "clientBulkWrite",
@@ -158,7 +158,7 @@
       ]
     },
     {
-      "description": "Client bulkWrite updateMany requires atomic modifiers",
+      "description": "client bulkWrite updateMany requires atomic modifiers",
       "operations": [
         {
           "name": "clientBulkWrite",
