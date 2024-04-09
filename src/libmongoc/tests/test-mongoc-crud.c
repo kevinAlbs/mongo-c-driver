@@ -453,7 +453,8 @@ prose_test_4 (void *ctx)
       // Assert the sum of the total models sent:
       int64_t ops_count_0 = bson_lookup_int64 (&cb_ctx.ops_counts, "0");
       int64_t ops_count_1 = bson_lookup_int64 (&cb_ctx.ops_counts, "1");
-      ASSERT_CMPINT64 (ops_count_0 + ops_count_1, ==, numModels);
+      ASSERT_CMPINT64 (ops_count_0, ==, numModels - 1);
+      ASSERT_CMPINT64 (ops_count_1, ==, 1);
 
       // Assert both have the same `operation_id`.
       int64_t operation_id_0 = bson_lookup_int64 (&cb_ctx.operation_ids, "0");
