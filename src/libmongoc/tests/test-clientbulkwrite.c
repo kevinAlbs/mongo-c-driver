@@ -238,6 +238,26 @@ test_clientbulkwrite_validate (void *unused)
    mongoc_client_destroy (client);
 }
 
+
+static void
+test_insert_validate (void)
+{
+   mongoc_client_t *client = test_framework_new_default_client ();
+   mongoc_collection_t *coll =
+      mongoc_client_get_collection (client, "db", "coll");
+   bson_error_t error;
+   // Create BSON with an invalid UTF-8 string value.
+   bson_t has_invalid_utf8 = BSON_INITIALIZER;
+   BSON_APPEND_UTF8 (&has_invalid_utf8, "invalid_utf8", "\xFF");
+   // Inserting `{ "invalid_utf8": "\xFF" }` does not get expected error.
+   bool ok = mongoc_collection_insert_one (
+      coll, &has_invalid_utf8, NULL /* opts */, NULL /* reply */, &error);
+   ASSERT (!ok); // Assert fails. No error is returned.
+   bson_destroy (&has_invalid_utf8);
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client);
+}
+
 void
 test_clientbulkwrite_install (TestSuite *suite)
 {
@@ -258,4 +278,7 @@ test_clientbulkwrite_install (TestSuite *suite)
       NULL /* ctx */,
       test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
    );
+
+   TestSuite_AddLive (
+      suite, "/collectionbulkwrite/validate", test_insert_validate);
 }
