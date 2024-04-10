@@ -1124,7 +1124,8 @@ test_crud_install (TestSuite *suite)
                       prose_test_6,
                       NULL, /* dtor */
                       NULL, /* ctx */
-                      test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */);
+                      test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */,
+                      skip_if_no_SERVER_88895);
 
 
    TestSuite_AddFull (
