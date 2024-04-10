@@ -697,10 +697,15 @@ prose_test_6 (void *ctx)
             mongoc_bulkwriteresult_insertedCount (ret.res), ==, 0);
       }
 
-      bson_destroy (&cb_ctx.operation_ids);
-      bson_destroy (&cb_ctx.ops_counts);
       mongoc_bulkwritereturn_cleanup (&ret);
       mongoc_listof_bulkwritemodel_destroy (models);
+   }
+
+   {
+      bson_destroy (&cb_ctx.operation_ids);
+      bson_destroy (&cb_ctx.ops_counts);
+      bson_init (&cb_ctx.operation_ids);
+      bson_init (&cb_ctx.ops_counts);
    }
 
    // Test Ordered
@@ -748,7 +753,7 @@ prose_test_6 (void *ctx)
                numWriteErrors += 1;
             }
          }
-         ASSERT_CMPSIZE_T (numWriteErrors, ==, maxWriteBatchSize + 1);
+         ASSERT_CMPSIZE_T (numWriteErrors, ==, 1);
       }
 
       // Assert partial results.
