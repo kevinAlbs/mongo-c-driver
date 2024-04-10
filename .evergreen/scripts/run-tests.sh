@@ -124,6 +124,13 @@ declare -a test_args=(
   ".evergreen/etc/skip-tests.txt"
 )
 
+# Limit tests to client bulk write tests
+test_args+=("-l" "/crud/unified/client-bulkWrite*")
+test_args+=("-l" "/retryable_writes/unified/client-bulkWrite*")
+test_args+=("-l" "/transactions/unified/client-bulkWrite*")
+test_args+=("-l" "/versioned_api/crud-api-version-1")
+test_args+=("-l" "/crud/prose_test*")
+
 # TODO (CDRIVER-4045): consolidate DNS tests into regular test tasks.
 if [[ "${DNS}" != "nodns" ]]; then
   if [[ "${CC}" =~ mingw ]]; then
