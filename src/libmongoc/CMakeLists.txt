@@ -658,7 +658,6 @@ set (SOURCES ${SOURCES}
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-openssl.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-ocsp-cache.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-bulkwrite.c
-   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-bulkwritev2.c
 )
 
 set (HEADERS
@@ -1094,8 +1093,6 @@ set (test-libmongoc-sources
    ${PROJECT_SOURCE_DIR}/tests/unified/runner.c
    ${PROJECT_SOURCE_DIR}/tests/unified/test-diagnostics.c
    ${PROJECT_SOURCE_DIR}/tests/unified/util.c
-   # ${PROJECT_SOURCE_DIR}/tests/test-bulkWrite.c
-   ${PROJECT_SOURCE_DIR}/tests/test-clientbulkwrite.c
 )
 
 if (MONGOC_ENABLE_SSL)
@@ -1221,7 +1218,6 @@ if (ENABLE_EXAMPLES AND ENABLE_SHARED)
    mongoc_add_example (mongoc-ping ${PROJECT_SOURCE_DIR}/examples/mongoc-ping.c)
    mongoc_add_example (mongoc-tail ${PROJECT_SOURCE_DIR}/examples/mongoc-tail.c)
    mongoc_add_example (example-collection-command ${PROJECT_SOURCE_DIR}/examples/example-collection-command.c)
-   mongoc_add_example (example-clientbulkwrite ${PROJECT_SOURCE_DIR}/examples/example-clientbulkwrite.c)
 
    # examples/aggregation/
    mongoc_add_example (aggregation1 ${PROJECT_SOURCE_DIR}/examples/aggregation/aggregation1.c)
@@ -1255,7 +1251,6 @@ if (ENABLE_EXAMPLES AND ENABLE_SHARED)
    # examples/tutorial
    mongoc_add_example (executing ${PROJECT_SOURCE_DIR}/examples/tutorial/executing.c)
    mongoc_add_example (appending ${PROJECT_SOURCE_DIR}/examples/tutorial/appending.c)
-   mongoc_add_example (benchmark-bulkWrite ${PROJECT_SOURCE_DIR}/tests/benchmark-bulkWrite.c)
 endif ()
 
 file (COPY ${PROJECT_SOURCE_DIR}/tests/binary DESTINATION ${PROJECT_BINARY_DIR}/tests)
