@@ -96,12 +96,11 @@ typedef struct {
 } mongoc_insertone_model_t;
 
 BSON_EXPORT (bool)
-mongoc_listof_bulkwritemodel_append_insertone (
-   mongoc_listof_bulkwritemodel_t *self,
-   const char *namespace,
-   int namespace_len,
-   mongoc_insertone_model_t model,
-   bson_error_t *error);
+mongoc_listof_bulkwritemodel_append_insertone (mongoc_listof_bulkwritemodel_t *self,
+                                               const char *namespace,
+                                               int namespace_len,
+                                               mongoc_insertone_model_t model,
+                                               bson_error_t *error);
 
 typedef struct {
    bool value;
@@ -174,12 +173,11 @@ typedef struct {
 } mongoc_updateone_model_t;
 
 BSON_EXPORT (bool)
-mongoc_listof_bulkwritemodel_append_updateone (
-   mongoc_listof_bulkwritemodel_t *self,
-   const char *namespace,
-   int namespace_len,
-   mongoc_updateone_model_t model,
-   bson_error_t *error);
+mongoc_listof_bulkwritemodel_append_updateone (mongoc_listof_bulkwritemodel_t *self,
+                                               const char *namespace,
+                                               int namespace_len,
+                                               mongoc_updateone_model_t model,
+                                               bson_error_t *error);
 
 typedef struct {
    /**
@@ -233,12 +231,11 @@ typedef struct {
 } mongoc_updatemany_model_t;
 
 BSON_EXPORT (bool)
-mongoc_listof_bulkwritemodel_append_updatemany (
-   mongoc_listof_bulkwritemodel_t *self,
-   const char *namespace,
-   int namespace_len,
-   mongoc_updatemany_model_t model,
-   bson_error_t *error);
+mongoc_listof_bulkwritemodel_append_updatemany (mongoc_listof_bulkwritemodel_t *self,
+                                                const char *namespace,
+                                                int namespace_len,
+                                                mongoc_updatemany_model_t model,
+                                                bson_error_t *error);
 
 typedef struct {
    /**
@@ -291,12 +288,11 @@ typedef struct {
 } mongoc_replaceone_model_t;
 
 BSON_EXPORT (bool)
-mongoc_listof_bulkwritemodel_append_replaceone (
-   mongoc_listof_bulkwritemodel_t *self,
-   const char *namespace,
-   int namespace_len,
-   mongoc_replaceone_model_t model,
-   bson_error_t *error);
+mongoc_listof_bulkwritemodel_append_replaceone (mongoc_listof_bulkwritemodel_t *self,
+                                                const char *namespace,
+                                                int namespace_len,
+                                                mongoc_replaceone_model_t model,
+                                                bson_error_t *error);
 
 typedef struct {
    /**
@@ -326,12 +322,11 @@ typedef struct {
 } mongoc_deleteone_model_t;
 
 BSON_EXPORT (bool)
-mongoc_listof_bulkwritemodel_append_deleteone (
-   mongoc_listof_bulkwritemodel_t *self,
-   const char *namespace,
-   int namespace_len,
-   mongoc_deleteone_model_t model,
-   bson_error_t *error);
+mongoc_listof_bulkwritemodel_append_deleteone (mongoc_listof_bulkwritemodel_t *self,
+                                               const char *namespace,
+                                               int namespace_len,
+                                               mongoc_deleteone_model_t model,
+                                               bson_error_t *error);
 
 typedef struct {
    /**
@@ -361,12 +356,11 @@ typedef struct {
 } mongoc_deletemany_model_t;
 
 BSON_EXPORT (bool)
-mongoc_listof_bulkwritemodel_append_deletemany (
-   mongoc_listof_bulkwritemodel_t *self,
-   const char *namespace,
-   int namespace_len,
-   mongoc_deletemany_model_t model,
-   bson_error_t *error);
+mongoc_listof_bulkwritemodel_append_deletemany (mongoc_listof_bulkwritemodel_t *self,
+                                                const char *namespace,
+                                                int namespace_len,
+                                                mongoc_deletemany_model_t model,
+                                                bson_error_t *error);
 
 struct _mongoc_bulkwriteoptions_t {
    /**
@@ -438,20 +432,17 @@ struct _mongoc_bulkwriteoptions_t {
 typedef struct _mongoc_mapof_insertoneresult_t mongoc_mapof_insertoneresult_t;
 typedef struct _mongoc_insertoneresult_t mongoc_insertoneresult_t;
 BSON_EXPORT (const mongoc_insertoneresult_t *)
-mongoc_mapof_insertoneresult_lookup (const mongoc_mapof_insertoneresult_t *self,
-                                     size_t idx);
+mongoc_mapof_insertoneresult_lookup (const mongoc_mapof_insertoneresult_t *self, size_t idx);
 
 typedef struct _mongoc_mapof_updateresult_t mongoc_mapof_updateresult_t;
 typedef struct _mongoc_updateresult_t mongoc_updateresult_t;
 BSON_EXPORT (const mongoc_updateresult_t *)
-mongoc_mapof_updateresult_lookup (const mongoc_mapof_updateresult_t *self,
-                                  size_t idx);
+mongoc_mapof_updateresult_lookup (const mongoc_mapof_updateresult_t *self, size_t idx);
 
 typedef struct _mongoc_mapof_deleteresult_t mongoc_mapof_deleteresult_t;
 typedef struct _mongoc_deleteresult_t mongoc_deleteresult_t;
 BSON_EXPORT (const mongoc_deleteresult_t *)
-mongoc_mapof_deleteresult_lookup (const mongoc_mapof_deleteresult_t *self,
-                                  size_t idx);
+mongoc_mapof_deleteresult_lookup (const mongoc_mapof_deleteresult_t *self, size_t idx);
 
 
 /**
@@ -568,24 +559,20 @@ mongoc_updateresult_upsertedId (const mongoc_updateresult_t *self);
 BSON_EXPORT (int64_t)
 mongoc_deleteresult_deletedCount (const mongoc_deleteresult_t *self);
 
-typedef struct _mongoc_listof_writeconcernerror_t
-   mongoc_listof_writeconcernerror_t;
+typedef struct _mongoc_listof_writeconcernerror_t mongoc_listof_writeconcernerror_t;
 typedef struct _mongoc_writeconcernerror_t mongoc_writeconcernerror_t;
 
 BSON_EXPORT (const mongoc_writeconcernerror_t *)
-mongoc_listof_writeconcernerror_at (
-   const mongoc_listof_writeconcernerror_t *self, size_t idx);
+mongoc_listof_writeconcernerror_at (const mongoc_listof_writeconcernerror_t *self, size_t idx);
 
 BSON_EXPORT (size_t)
-mongoc_listof_writeconcernerror_len (
-   const mongoc_listof_writeconcernerror_t *self);
+mongoc_listof_writeconcernerror_len (const mongoc_listof_writeconcernerror_t *self);
 
 typedef struct _mongoc_mapof_writeerror_t mongoc_mapof_writeerror_t;
 typedef struct _mongoc_writeerror_t mongoc_writeerror_t;
 
 BSON_EXPORT (const mongoc_writeerror_t *)
-mongoc_mapof_writeerror_lookup (const mongoc_mapof_writeerror_t *self,
-                                size_t idx);
+mongoc_mapof_writeerror_lookup (const mongoc_mapof_writeerror_t *self, size_t idx);
 
 /**
  * A top-level error that occurred when attempting to communicate with the
@@ -604,8 +591,7 @@ BSON_EXPORT (const mongoc_listof_errorlabel_t *)
 mongoc_bulkwriteexception_errorLabels (const mongoc_bulkwriteexception_t *self);
 
 BSON_EXPORT (const char *)
-mongoc_listof_errorlabel_at (const mongoc_listof_errorlabel_t *self,
-                             size_t idx);
+mongoc_listof_errorlabel_at (const mongoc_listof_errorlabel_t *self, size_t idx);
 
 BSON_EXPORT (size_t)
 mongoc_listof_errorlabel_len (const mongoc_listof_errorlabel_t *self);
@@ -617,8 +603,7 @@ mongoc_listof_errorlabel_len (const mongoc_listof_errorlabel_t *self);
  * to execute the bulk write.
  */
 BSON_EXPORT (const mongoc_listof_writeconcernerror_t *)
-mongoc_bulkwriteexception_writeConcernErrors (
-   const mongoc_bulkwriteexception_t *self);
+mongoc_bulkwriteexception_writeConcernErrors (const mongoc_bulkwriteexception_t *self);
 
 /**
  * Errors that occurred during the execution of individual write operations.
