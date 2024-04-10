@@ -558,6 +558,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
    size_t writeBatchSize_offset = 0;
    size_t payload_offset = 0;
    while (true) {
+      bool has_write_errors = false;
       bool batch_ok = false;
       bson_t cmd_reply = BSON_INITIALIZER;
       mongoc_cursor_t *reply_cursor = NULL;
@@ -924,6 +925,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                   size_t models_idx = (size_t) idx + writeBatchSize_offset;
                   if (ok == 0) {
                      bson_iter_t result_iter;
+                     has_write_errors = true;
 
                      // Parse `code`.
                      int32_t code;
@@ -1132,6 +1134,13 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
       bson_destroy (&cmd_reply);
       if (!batch_ok) {
          goto fail;
+      }
+      bool is_ordered =
+         options->ordered.isset ? options->ordered.value : true; // default.
+      if (has_write_errors && is_ordered) {
+         // Ordered writes must not continue to send batches once an error is
+         // occurred. An individual write error is not a top-level error.
+         break;
       }
    }
 
