@@ -1087,6 +1087,12 @@ prose_test_9 (void *ctx)
    mongoc_client_destroy (client);
 }
 
+static int
+skip_if_no_SERVER_88895 (void)
+{
+   return test_framework_getenv_bool ("HAS_SERVER_888895") ? 1 : 0;
+}
+
 void
 test_crud_install (TestSuite *suite)
 {
@@ -1136,20 +1142,27 @@ test_crud_install (TestSuite *suite)
                       test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */);
 
 
-   TestSuite_AddFull (suite,
-                      "/crud/prose_test_7",
-                      prose_test_7,
-                      NULL, /* dtor */
-                      NULL, /* ctx */
-                      test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */);
+   TestSuite_AddFull (
+      suite,
+      "/crud/prose_test_7",
+      prose_test_7,
+      NULL,                                                 /* dtor */
+      NULL,                                                 /* ctx */
+      test_framework_skip_if_max_wire_version_less_than_25, /* require 8.0+
+                                                               server */
+      skip_if_no_SERVER_88895);
 
 
-   TestSuite_AddFull (suite,
-                      "/crud/prose_test_8",
-                      prose_test_8,
-                      NULL, /* dtor */
-                      NULL, /* ctx */
-                      test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */);
+   TestSuite_AddFull (
+      suite,
+      "/crud/prose_test_8",
+      prose_test_8,
+      NULL,                                                /* dtor */
+      NULL,                                                /* ctx */
+      test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+
+                                                              server */
+      ,
+      skip_if_no_SERVER_88895);
 
    TestSuite_AddFull (suite,
                       "/crud/prose_test_9",
