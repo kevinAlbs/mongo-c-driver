@@ -47,10 +47,7 @@ result_new (void)
 }
 
 static void
-_result_init (result_t *result,
-              const bson_val_t *value,
-              const bson_t *reply,
-              const bson_error_t *error)
+_result_init (result_t *result, const bson_val_t *value, const bson_t *reply, const bson_error_t *error)
 {
    bson_string_t *str;
 
@@ -124,8 +121,7 @@ rewrite_upserted_ids (bson_t *mongoc_upserted_ids)
       bson_parser_int (el_bp, "index", &index);
       bson_parser_any (el_bp, "_id", &id);
       bson_parser_parse_or_assert (el_bp, &el);
-      bson_uint32_to_string (
-         (uint32_t) *index, &key, storage, sizeof (storage));
+      bson_uint32_to_string ((uint32_t) *index, &key, storage, sizeof (storage));
       BSON_APPEND_VALUE (upserted_ids, key, bson_val_to_value (id));
       bson_parser_destroy_with_parsed_fields (el_bp);
    }
@@ -138,24 +134,21 @@ rewrite_bulk_write_result (const bson_t *bulk_write_result)
 {
    bson_t *const res = bson_new ();
    if (!bson_empty0 (bulk_write_result)) {
-      BCON_APPEND (
-         res,
-         "insertedCount",
-         BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nInserted")),
-         "deletedCount",
-         BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nRemoved")),
-         "matchedCount",
-         BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nMatched")),
-         "modifiedCount",
-         BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nModified")),
-         "upsertedCount",
-         BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nUpserted")));
+      BCON_APPEND (res,
+                   "insertedCount",
+                   BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nInserted")),
+                   "deletedCount",
+                   BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nRemoved")),
+                   "matchedCount",
+                   BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nMatched")),
+                   "modifiedCount",
+                   BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nModified")),
+                   "upsertedCount",
+                   BCON_INT32 (bson_lookup_int32 (bulk_write_result, "nUpserted")));
 
       if (bson_has_field (bulk_write_result, "upserted")) {
-         bson_t *const upserted_ids =
-            bson_lookup_bson (bulk_write_result, "upserted");
-         bson_t *const rewritten_upserted_ids =
-            rewrite_upserted_ids (upserted_ids);
+         bson_t *const upserted_ids = bson_lookup_bson (bulk_write_result, "upserted");
+         bson_t *const rewritten_upserted_ids = rewrite_upserted_ids (upserted_ids);
          BSON_APPEND_DOCUMENT (res, "upsertedIds", rewritten_upserted_ids);
          bson_destroy (upserted_ids);
          bson_destroy (rewritten_upserted_ids);
@@ -170,9 +163,7 @@ rewrite_bulk_write_result (const bson_t *bulk_write_result)
 }
 
 void
-result_from_bulk_write (result_t *result,
-                        const bson_t *reply,
-                        const bson_error_t *error)
+result_from_bulk_write (result_t *result, const bson_t *reply, const bson_error_t *error)
 {
    bson_t *const write_result = rewrite_bulk_write_result (reply);
    bson_val_t *const val = bson_val_from_bson (write_result);
@@ -184,18 +175,14 @@ result_from_bulk_write (result_t *result,
 }
 
 void
-result_from_insert_one (result_t *result,
-                        const bson_t *reply,
-                        const bson_error_t *error)
+result_from_insert_one (result_t *result, const bson_t *reply, const bson_error_t *error)
 {
    bson_t *write_result;
    bson_val_t *val;
 
    write_result = bson_new ();
    if (!bson_empty (reply)) {
-      BCON_APPEND (write_result,
-                   "insertedCount",
-                   BCON_INT32 (bson_lookup_int32 (reply, "insertedCount")));
+      BCON_APPEND (write_result, "insertedCount", BCON_INT32 (bson_lookup_int32 (reply, "insertedCount")));
    }
 
    val = bson_val_from_bson (write_result);
@@ -205,9 +192,7 @@ result_from_insert_one (result_t *result,
 }
 
 void
-result_from_insert_many (result_t *result,
-                         const bson_t *reply,
-                         const bson_error_t *error)
+result_from_insert_many (result_t *result, const bson_t *reply, const bson_error_t *error)
 {
    bson_t *write_result;
    bson_val_t *val;
@@ -237,9 +222,7 @@ result_from_insert_many (result_t *result,
 }
 
 void
-result_from_update_or_replace (result_t *result,
-                               const bson_t *reply,
-                               const bson_error_t *error)
+result_from_update_or_replace (result_t *result, const bson_t *reply, const bson_error_t *error)
 {
    bson_t *write_result;
    bson_val_t *val;
@@ -256,8 +239,7 @@ result_from_update_or_replace (result_t *result,
                    BCON_INT32 (bson_lookup_int32 (reply, "upsertedCount")));
 
       if (bson_iter_init_find (&iter, reply, "upsertedId")) {
-         BSON_APPEND_VALUE (
-            write_result, "upsertedId", bson_iter_value (&iter));
+         BSON_APPEND_VALUE (write_result, "upsertedId", bson_iter_value (&iter));
       }
    }
 
@@ -268,18 +250,14 @@ result_from_update_or_replace (result_t *result,
 }
 
 void
-result_from_delete (result_t *result,
-                    const bson_t *reply,
-                    const bson_error_t *error)
+result_from_delete (result_t *result, const bson_t *reply, const bson_error_t *error)
 {
    bson_t *write_result;
    bson_val_t *val;
 
    write_result = bson_new ();
    if (!bson_empty (reply)) {
-      BCON_APPEND (write_result,
-                   "deletedCount",
-                   BCON_INT32 (bson_lookup_int32 (reply, "deletedCount")));
+      BCON_APPEND (write_result, "deletedCount", BCON_INT32 (bson_lookup_int32 (reply, "deletedCount")));
    }
 
    val = bson_val_from_bson (write_result);
@@ -289,9 +267,7 @@ result_from_delete (result_t *result,
 }
 
 void
-result_from_distinct (result_t *result,
-                      const bson_t *reply,
-                      const bson_error_t *error)
+result_from_distinct (result_t *result, const bson_t *reply, const bson_error_t *error)
 {
    bson_val_t *val = NULL;
    bson_iter_t iter;
@@ -320,8 +296,7 @@ result_from_cursor (result_t *result, mongoc_cursor_t *cursor)
       const char *key;
       char storage[16];
 
-      bson_uint32_to_string (
-         i, &key, storage, sizeof (storage) / sizeof (char));
+      bson_uint32_to_string (i, &key, storage, sizeof (storage) / sizeof (char));
       BSON_APPEND_DOCUMENT (documents, key, doc);
       i++;
    }
@@ -336,10 +311,7 @@ result_from_cursor (result_t *result, mongoc_cursor_t *cursor)
 }
 
 void
-result_from_val_and_reply (result_t *result,
-                           const bson_val_t *val,
-                           const bson_t *reply,
-                           const bson_error_t *error)
+result_from_val_and_reply (result_t *result, const bson_val_t *val, const bson_t *reply, const bson_error_t *error)
 {
    _result_init (result, val, reply, error);
 }
@@ -352,11 +324,7 @@ result_from_ok (result_t *result)
 }
 
 bool
-result_check (result_t *result,
-              entity_map_t *em,
-              bson_val_t *expect_result,
-              bson_t *expect_error,
-              bson_error_t *error)
+result_check (result_t *result, entity_map_t *em, bson_val_t *expect_result, bson_t *expect_error, bson_error_t *error)
 {
    bool ret = false;
    bson_parser_t *parser = NULL;
@@ -374,9 +342,7 @@ result_check (result_t *result,
 
    if (!expect_result && !expect_error) {
       if (!result->ok) {
-         test_set_error (error,
-                         "expected success, but got error: %s",
-                         result->error.message);
+         test_set_error (error, "expected success, but got error: %s", result->error.message);
          goto done;
       }
       ret = true;
@@ -387,26 +353,19 @@ result_check (result_t *result,
    if (expect_result) {
       if (!result->ok) {
          if (!bson_empty (result->write_errors)) {
-            char *as_json =
-               bson_as_canonical_extended_json (result->write_errors, NULL);
+            char *as_json = bson_as_canonical_extended_json (result->write_errors, NULL);
             test_diagnostics_error_info ("Write errors: %s", as_json);
             bson_free (as_json);
          }
          if (!bson_empty (result->write_concern_errors)) {
-            char *as_json = bson_as_canonical_extended_json (
-               result->write_concern_errors, NULL);
+            char *as_json = bson_as_canonical_extended_json (result->write_concern_errors, NULL);
             test_diagnostics_error_info ("Write concern errors: %s", as_json);
             bson_free (as_json);
          }
-         test_set_error (
-            error, "expected result, but got error: %s", result->error.message);
+         test_set_error (error, "expected result, but got error: %s", result->error.message);
          goto done;
       }
-      if (!entity_map_match (em,
-                             expect_result,
-                             result->value,
-                             result->array_of_root_docs,
-                             error)) {
+      if (!entity_map_match (em, expect_result, result->value, result->array_of_root_docs, error)) {
          test_diagnostics_error_info ("Result mismatch:\n"
                                       "Expected: %s\n"
                                       "Actual:   %s\n",
@@ -423,15 +382,12 @@ result_check (result_t *result,
       bson_parser_utf8_optional (parser, "errorContains", &error_contains);
       bson_parser_int_optional (parser, "errorCode", &error_code);
       bson_parser_utf8_optional (parser, "errorCodeName", &error_code_name);
-      bson_parser_array_optional (
-         parser, "errorLabelsContain", &error_labels_contain);
-      bson_parser_array_optional (
-         parser, "errorLabelsOmit", &error_labels_omit);
+      bson_parser_array_optional (parser, "errorLabelsContain", &error_labels_contain);
+      bson_parser_array_optional (parser, "errorLabelsOmit", &error_labels_omit);
       bson_parser_any_optional (parser, "expectResult", &error_expect_result);
       bson_parser_any_optional (parser, "errorResponse", &error_response);
       bson_parser_doc_optional (parser, "writeErrors", &write_errors);
-      bson_parser_array_optional (
-         parser, "writeConcernErrors", &write_concern_errors);
+      bson_parser_array_optional (parser, "writeConcernErrors", &write_concern_errors);
       if (!bson_parser_parse (parser, expect_error, error)) {
          goto done;
       }
@@ -439,9 +395,7 @@ result_check (result_t *result,
       MONGOC_DEBUG ("expected error");
 
       if (result->ok) {
-         test_set_error (error,
-                         "expected error, but no error: %s",
-                         bson_val_to_json (result->value));
+         test_set_error (error, "expected error, but no error: %s", bson_val_to_json (result->value));
          goto done;
       }
 
@@ -449,11 +403,9 @@ result_check (result_t *result,
          /* from errors.rst: "In Version 2, error codes originating on the
           * server always have error domain ``MONGOC_ERROR_SERVER`` or
           * ``MONGOC_ERROR_WRITE_CONCERN``" */
-         if (result->error.domain == MONGOC_ERROR_SERVER ||
-             result->error.domain == MONGOC_ERROR_WRITE_CONCERN_ERROR) {
+         if (result->error.domain == MONGOC_ERROR_SERVER || result->error.domain == MONGOC_ERROR_WRITE_CONCERN_ERROR) {
             test_set_error (error,
-                            "expected client side error, but got: %" PRIu32
-                            ", %" PRIu32,
+                            "expected client side error, but got: %" PRIu32 ", %" PRIu32,
                             result->error.domain,
                             result->error.code);
             goto done;
@@ -462,21 +414,16 @@ result_check (result_t *result,
 
       if (error_contains) {
          if (strstr (result->error.message, error_contains) == NULL) {
-            test_set_error (error,
-                            "expected error to contain \"%s\", but got: \"%s\"",
-                            error_contains,
-                            result->error.message);
+            test_set_error (
+               error, "expected error to contain \"%s\", but got: \"%s\"", error_contains, result->error.message);
             goto done;
          }
       }
 
       if (error_code) {
          if ((*error_code) != (int64_t) result->error.code) {
-            test_set_error (error,
-                            "expected error code %" PRIi64
-                            ", but got: %" PRIi64,
-                            *error_code,
-                            (int64_t) result->error.code);
+            test_set_error (
+               error, "expected error code %" PRIi64 ", but got: %" PRIi64, *error_code, (int64_t) result->error.code);
             goto done;
          }
       }
@@ -508,10 +455,7 @@ result_check (result_t *result,
          bson_iter_t iter;
 
          if (!result->reply) {
-            test_set_error (
-               error,
-               "%s",
-               "expected error to contain labels, but got no error document");
+            test_set_error (error, "%s", "expected error to contain labels, but got no error document");
             goto done;
          }
 
@@ -520,19 +464,15 @@ result_check (result_t *result,
             const char *label;
 
             if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
-               test_set_error (error,
-                               "expected UTF8 error label, got: %s",
-                               bson_type_to_string (bson_iter_type (&iter)));
+               test_set_error (
+                  error, "expected UTF8 error label, got: %s", bson_type_to_string (bson_iter_type (&iter)));
                goto done;
             }
 
             label = bson_iter_utf8 (&iter, NULL);
             if (!mongoc_error_has_label (result->reply, label)) {
                test_set_error (
-                  error,
-                  "expected error to contain label: %s, but got: %s",
-                  label,
-                  tmp_json (result->reply));
+                  error, "expected error to contain label: %s, but got: %s", label, tmp_json (result->reply));
                goto done;
             }
          }
@@ -542,10 +482,7 @@ result_check (result_t *result,
          bson_iter_t iter;
 
          if (!result->reply) {
-            test_set_error (
-               error,
-               "%s",
-               "expected error to omit labels, but got no error document");
+            test_set_error (error, "%s", "expected error to omit labels, but got no error document");
             goto done;
          }
 
@@ -554,18 +491,14 @@ result_check (result_t *result,
             const char *label;
 
             if (!BSON_ITER_HOLDS_UTF8 (&iter)) {
-               test_set_error (error,
-                               "expected UTF8 error label, got: %s",
-                               bson_type_to_string (bson_iter_type (&iter)));
+               test_set_error (
+                  error, "expected UTF8 error label, got: %s", bson_type_to_string (bson_iter_type (&iter)));
                goto done;
             }
 
             label = bson_iter_utf8 (&iter, NULL);
             if (mongoc_error_has_label (result->reply, label)) {
-               test_set_error (error,
-                               "expected error to omit label: %s, but got: %s",
-                               label,
-                               tmp_json (result->reply));
+               test_set_error (error, "expected error to omit label: %s, but got: %s", label, tmp_json (result->reply));
                goto done;
             }
          }
@@ -573,8 +506,7 @@ result_check (result_t *result,
 
       if (error_expect_result) {
          if (!result->value) {
-            test_set_error (
-               error, "%s", "expected error with result, but result unset");
+            test_set_error (error, "%s", "expected error with result, but result unset");
             goto done;
          }
 
@@ -582,22 +514,17 @@ result_check (result_t *result,
           * operations, so array_of_root_docs should always be false */
          BSON_ASSERT (!result->array_of_root_docs);
 
-         if (!bson_match (error_expect_result,
-                          result->value,
-                          result->array_of_root_docs,
-                          error)) {
-            test_diagnostics_error_info (
-               "error.expectResult mismatch:\nExpected: %s\nActual: %s\n",
-               bson_val_to_json (error_expect_result),
-               bson_val_to_json (result->value));
+         if (!bson_match (error_expect_result, result->value, result->array_of_root_docs, error)) {
+            test_diagnostics_error_info ("error.expectResult mismatch:\nExpected: %s\nActual: %s\n",
+                                         bson_val_to_json (error_expect_result),
+                                         bson_val_to_json (result->value));
             goto done;
          }
       }
 
       if (error_response) {
          if (!result->reply) {
-            test_set_error (
-               error, "%s", "expected error with a reply, but reply unset");
+            test_set_error (error, "%s", "expected error with a reply, but reply unset");
             goto done;
          }
 
@@ -610,19 +537,17 @@ result_check (result_t *result,
             bson_iter_t child;
 
             if (!BSON_ITER_HOLDS_ARRAY (&iter)) {
-               test_set_error (
-                  error,
-                  "expected errorReplies to be an array, but received %s",
-                  bson_type_to_string (bson_iter_type (&iter)));
+               test_set_error (error,
+                               "expected errorReplies to be an array, but received %s",
+                               bson_type_to_string (bson_iter_type (&iter)));
                goto done;
             }
             bson_iter_recurse (&iter, &child);
             bson_iter_next (&child);
             if (!BSON_ITER_HOLDS_DOCUMENT (&child)) {
-               test_set_error (
-                  error,
-                  "expected errorReplies.0 to be a document but received %s",
-                  bson_type_to_string (bson_iter_type (&iter)));
+               test_set_error (error,
+                               "expected errorReplies.0 to be a document but received %s",
+                               bson_type_to_string (bson_iter_type (&iter)));
                goto done;
             }
             bson_iter_bson (&child, &doc_to_match);
@@ -632,14 +557,10 @@ result_check (result_t *result,
 
          bson_val_t *val_to_match = bson_val_from_bson (&doc_to_match);
 
-         if (!bson_match (error_response,
-                          val_to_match,
-                          result->array_of_root_docs,
-                          error)) {
-            test_diagnostics_error_info (
-               "error.errorResponse mismatch:\nExpected: %s\nActual: %s\n",
-               bson_val_to_json (error_response),
-               bson_as_json (result->reply, NULL));
+         if (!bson_match (error_response, val_to_match, result->array_of_root_docs, error)) {
+            test_diagnostics_error_info ("error.errorResponse mismatch:\nExpected: %s\nActual: %s\n",
+                                         bson_val_to_json (error_response),
+                                         bson_as_json (result->reply, NULL));
             bson_val_destroy (val_to_match);
             bson_destroy (&doc_to_match);
             goto done;
@@ -681,13 +602,12 @@ result_check (result_t *result,
                actual_val = bson_val_from_iter (&actual_iter);
 
                if (!bson_match (expected_val, actual_val, false, error)) {
-                  test_diagnostics_error_info (
-                     "error.writeErrors[%s] mismatch:\n"
-                     "Expected: %s\n"
-                     "Actual:   %s\n",
-                     key,
-                     bson_val_to_json (expected_val),
-                     bson_val_to_json (actual_val));
+                  test_diagnostics_error_info ("error.writeErrors[%s] mismatch:\n"
+                                               "Expected: %s\n"
+                                               "Actual:   %s\n",
+                                               key,
+                                               bson_val_to_json (expected_val),
+                                               bson_val_to_json (actual_val));
                   bson_val_destroy (actual_val);
                   bson_val_destroy (expected_val);
                   goto done;
@@ -719,12 +639,8 @@ result_check (result_t *result,
 
       if (write_concern_errors) {
          bson_val_t *expected_val = bson_val_from_array (write_concern_errors);
-         bson_val_t *actual_val =
-            bson_val_from_array (result->write_concern_errors);
-         if (!bson_match (expected_val,
-                          actual_val,
-                          true /* array of root documents */,
-                          error)) {
+         bson_val_t *actual_val = bson_val_from_array (result->write_concern_errors);
+         if (!bson_match (expected_val, actual_val, true /* array of root documents */, error)) {
             test_diagnostics_error_info ("error.writeConcernErrors mismatch:\n"
                                          "Expected: %s\n"
                                          "Actual:   %s\n",
@@ -746,46 +662,28 @@ done:
 }
 
 void
-result_from_bulkwritereturn (result_t *result,
-                             mongoc_bulkwritereturn_t bwr,
-                             size_t nmodels)
+result_from_bulkwritereturn (result_t *result, mongoc_bulkwritereturn_t bwr, size_t nmodels)
 {
    // Build up the result value as a BSON document.
    bson_t bwr_bson = BSON_INITIALIZER;
    if (bwr.res) {
-      BSON_APPEND_INT32 (&bwr_bson,
-                         "insertedCount",
-                         mongoc_bulkwriteresult_insertedCount (bwr.res));
-      BSON_APPEND_INT32 (&bwr_bson,
-                         "upsertedCount",
-                         mongoc_bulkwriteresult_upsertedCount (bwr.res));
-      BSON_APPEND_INT32 (&bwr_bson,
-                         "matchedCount",
-                         mongoc_bulkwriteresult_matchedCount (bwr.res));
-      BSON_APPEND_INT32 (&bwr_bson,
-                         "modifiedCount",
-                         mongoc_bulkwriteresult_modifiedCount (bwr.res));
-      BSON_APPEND_INT32 (&bwr_bson,
-                         "deletedCount",
-                         mongoc_bulkwriteresult_deletedCount (bwr.res));
-      const mongoc_mapof_insertoneresult_t *mapof_ior =
-         mongoc_bulkwriteresult_insertResults (bwr.res);
+      BSON_APPEND_INT32 (&bwr_bson, "insertedCount", mongoc_bulkwriteresult_insertedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson, "upsertedCount", mongoc_bulkwriteresult_upsertedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson, "matchedCount", mongoc_bulkwriteresult_matchedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson, "modifiedCount", mongoc_bulkwriteresult_modifiedCount (bwr.res));
+      BSON_APPEND_INT32 (&bwr_bson, "deletedCount", mongoc_bulkwriteresult_deletedCount (bwr.res));
+      const mongoc_mapof_insertoneresult_t *mapof_ior = mongoc_bulkwriteresult_insertResults (bwr.res);
       if (mapof_ior) {
          bson_t insertResults_bson;
-         BSON_APPEND_DOCUMENT_BEGIN (
-            &bwr_bson, "insertResults", &insertResults_bson);
+         BSON_APPEND_DOCUMENT_BEGIN (&bwr_bson, "insertResults", &insertResults_bson);
          // For simplicity: iterate over all indices.
          for (int64_t idx = 0; idx < nmodels; idx++) {
-            const mongoc_insertoneresult_t *ior =
-               mongoc_mapof_insertoneresult_lookup (mapof_ior, idx);
+            const mongoc_insertoneresult_t *ior = mongoc_mapof_insertoneresult_lookup (mapof_ior, idx);
             if (ior) {
                bson_t ior_bson;
                char *idx_str = bson_strdup_printf ("%" PRId64, idx);
-               BSON_APPEND_DOCUMENT_BEGIN (
-                  &insertResults_bson, idx_str, &ior_bson);
-               BSON_APPEND_VALUE (&ior_bson,
-                                  "insertedId",
-                                  mongoc_insertoneresult_inserted_id (ior));
+               BSON_APPEND_DOCUMENT_BEGIN (&insertResults_bson, idx_str, &ior_bson);
+               BSON_APPEND_VALUE (&ior_bson, "insertedId", mongoc_insertoneresult_inserted_id (ior));
                bson_append_document_end (&insertResults_bson, &ior_bson);
                bson_free (idx_str);
             }
@@ -793,33 +691,22 @@ result_from_bulkwritereturn (result_t *result,
          bson_append_document_end (&bwr_bson, &insertResults_bson);
       }
 
-      const mongoc_mapof_updateresult_t *mapof_ur =
-         mongoc_bulkwriteresult_updateResult (bwr.res);
+      const mongoc_mapof_updateresult_t *mapof_ur = mongoc_bulkwriteresult_updateResult (bwr.res);
       if (mapof_ur) {
          bson_t updateResults_bson;
-         BSON_APPEND_DOCUMENT_BEGIN (
-            &bwr_bson, "updateResults", &updateResults_bson);
+         BSON_APPEND_DOCUMENT_BEGIN (&bwr_bson, "updateResults", &updateResults_bson);
          // For simplicity: iterate over all indices.
          for (int64_t idx = 0; idx < nmodels; idx++) {
-            const mongoc_updateresult_t *ur =
-               mongoc_mapof_updateresult_lookup (mapof_ur, idx);
+            const mongoc_updateresult_t *ur = mongoc_mapof_updateresult_lookup (mapof_ur, idx);
             if (ur) {
                bson_t ur_bson;
                char *idx_str = bson_strdup_printf ("%" PRId64, idx);
-               BSON_APPEND_DOCUMENT_BEGIN (
-                  &updateResults_bson, idx_str, &ur_bson);
-               BSON_APPEND_INT32 (&ur_bson,
-                                  "matchedCount",
-                                  mongoc_updateresult_matchedCount (ur));
-               BSON_APPEND_INT32 (&ur_bson,
-                                  "modifiedCount",
-                                  mongoc_updateresult_modifiedCount (ur));
-               const bson_value_t *upsert_id =
-                  mongoc_updateresult_upsertedId (ur);
+               BSON_APPEND_DOCUMENT_BEGIN (&updateResults_bson, idx_str, &ur_bson);
+               BSON_APPEND_INT32 (&ur_bson, "matchedCount", mongoc_updateresult_matchedCount (ur));
+               BSON_APPEND_INT32 (&ur_bson, "modifiedCount", mongoc_updateresult_modifiedCount (ur));
+               const bson_value_t *upsert_id = mongoc_updateresult_upsertedId (ur);
                if (upsert_id) {
-                  BSON_APPEND_VALUE (&ur_bson,
-                                     "upsertedId",
-                                     mongoc_updateresult_upsertedId (ur));
+                  BSON_APPEND_VALUE (&ur_bson, "upsertedId", mongoc_updateresult_upsertedId (ur));
                }
                bson_append_document_end (&updateResults_bson, &ur_bson);
                bson_free (idx_str);
@@ -828,24 +715,18 @@ result_from_bulkwritereturn (result_t *result,
          bson_append_document_end (&bwr_bson, &updateResults_bson);
       }
 
-      const mongoc_mapof_deleteresult_t *mapof_dr =
-         mongoc_bulkwriteresult_deleteResults (bwr.res);
+      const mongoc_mapof_deleteresult_t *mapof_dr = mongoc_bulkwriteresult_deleteResults (bwr.res);
       if (mapof_dr) {
          bson_t deleteResults_bson;
-         BSON_APPEND_DOCUMENT_BEGIN (
-            &bwr_bson, "deleteResults", &deleteResults_bson);
+         BSON_APPEND_DOCUMENT_BEGIN (&bwr_bson, "deleteResults", &deleteResults_bson);
          // For simplicity: iterate over all indices.
          for (int64_t idx = 0; idx < nmodels; idx++) {
-            const mongoc_deleteresult_t *dr =
-               mongoc_mapof_deleteresult_lookup (mapof_dr, idx);
+            const mongoc_deleteresult_t *dr = mongoc_mapof_deleteresult_lookup (mapof_dr, idx);
             if (dr) {
                bson_t dr_bson;
                char *idx_str = bson_strdup_printf ("%" PRId64, idx);
-               BSON_APPEND_DOCUMENT_BEGIN (
-                  &deleteResults_bson, idx_str, &dr_bson);
-               BSON_APPEND_INT32 (&dr_bson,
-                                  "deletedCount",
-                                  mongoc_deleteresult_deletedCount (dr));
+               BSON_APPEND_DOCUMENT_BEGIN (&deleteResults_bson, idx_str, &dr_bson);
+               BSON_APPEND_INT32 (&dr_bson, "deletedCount", mongoc_deleteresult_deletedCount (dr));
                bson_append_document_end (&deleteResults_bson, &dr_bson);
                bson_free (idx_str);
             }
@@ -860,11 +741,9 @@ result_from_bulkwritereturn (result_t *result,
       mongoc_bulkwriteexception_error (bwr.exc, &error, NULL);
       // Construct an error document from the collected error labels.
       {
-         const mongoc_listof_errorlabel_t *listof_el =
-            mongoc_bulkwriteexception_errorLabels (bwr.exc);
+         const mongoc_listof_errorlabel_t *listof_el = mongoc_bulkwriteexception_errorLabels (bwr.exc);
          bson_array_builder_t *bab;
-         BSON_APPEND_ARRAY_BUILDER_BEGIN (
-            &error_labels_document, "errorLabels", &bab);
+         BSON_APPEND_ARRAY_BUILDER_BEGIN (&error_labels_document, "errorLabels", &bab);
          for (size_t i = 0; i < mongoc_listof_errorlabel_len (listof_el); i++) {
             const char *el = mongoc_listof_errorlabel_at (listof_el, i);
             ASSERT (el);
@@ -880,23 +759,18 @@ result_from_bulkwritereturn (result_t *result,
 
    if (bwr.exc) {
       result->ok = false; // An error occurred.
-      const mongoc_mapof_writeerror_t *mapof_we =
-         mongoc_bulkwriteexception_writeErrors (bwr.exc);
+      const mongoc_mapof_writeerror_t *mapof_we = mongoc_bulkwriteexception_writeErrors (bwr.exc);
       BSON_ASSERT (mapof_we);
       {
          // For simplicity: iterate over all indices.
          for (int64_t idx = 0; idx < nmodels; idx++) {
-            const mongoc_writeerror_t *we =
-               mongoc_mapof_writeerror_lookup (mapof_we, idx);
+            const mongoc_writeerror_t *we = mongoc_mapof_writeerror_lookup (mapof_we, idx);
             if (we) {
                bson_t we_bson;
                char *idx_str = bson_strdup_printf ("%" PRId64, idx);
-               BSON_APPEND_DOCUMENT_BEGIN (
-                  result->write_errors, idx_str, &we_bson);
-               BSON_APPEND_INT32 (
-                  &we_bson, "code", mongoc_writeerror_code (we));
-               BSON_APPEND_UTF8 (
-                  &we_bson, "message", mongoc_writeerror_message (we));
+               BSON_APPEND_DOCUMENT_BEGIN (result->write_errors, idx_str, &we_bson);
+               BSON_APPEND_INT32 (&we_bson, "code", mongoc_writeerror_code (we));
+               BSON_APPEND_UTF8 (&we_bson, "message", mongoc_writeerror_message (we));
                const bson_t *details = mongoc_writeerror_details (we);
                if (details) {
                   BSON_APPEND_DOCUMENT (&we_bson, "details", details);
@@ -907,23 +781,16 @@ result_from_bulkwritereturn (result_t *result,
          }
       }
 
-      const mongoc_listof_writeconcernerror_t *listof_wce =
-         mongoc_bulkwriteexception_writeConcernErrors (bwr.exc);
+      const mongoc_listof_writeconcernerror_t *listof_wce = mongoc_bulkwriteexception_writeConcernErrors (bwr.exc);
       {
-         for (size_t idx = 0;
-              idx < mongoc_listof_writeconcernerror_len (listof_wce);
-              idx++) {
-            const mongoc_writeconcernerror_t *wce =
-               mongoc_listof_writeconcernerror_at (listof_wce, idx);
+         for (size_t idx = 0; idx < mongoc_listof_writeconcernerror_len (listof_wce); idx++) {
+            const mongoc_writeconcernerror_t *wce = mongoc_listof_writeconcernerror_at (listof_wce, idx);
             ASSERT (wce);
             bson_t wce_bson;
             char *idx_str = bson_strdup_printf ("%zu", idx);
-            BSON_APPEND_DOCUMENT_BEGIN (
-               result->write_concern_errors, idx_str, &wce_bson);
-            BSON_APPEND_INT32 (
-               &wce_bson, "code", mongoc_writeconcernerror_code (wce));
-            BSON_APPEND_UTF8 (
-               &wce_bson, "message", mongoc_writeconcernerror_message (wce));
+            BSON_APPEND_DOCUMENT_BEGIN (result->write_concern_errors, idx_str, &wce_bson);
+            BSON_APPEND_INT32 (&wce_bson, "code", mongoc_writeconcernerror_code (wce));
+            BSON_APPEND_UTF8 (&wce_bson, "message", mongoc_writeconcernerror_message (wce));
             const bson_t *details = mongoc_writeconcernerror_details (wce);
             if (details) {
                BSON_APPEND_DOCUMENT (&wce_bson, "details", details);
@@ -950,9 +817,8 @@ test_resultfrombulkwrite (void)
    result = result_new ();
    reply = tmp_bson ("{ 'nInserted': 0, 'nRemoved' : 1, 'nMatched' : 2, "
                      "'nModified' : 3, 'nUpserted' : 4 }");
-   expect = bson_val_from_json (
-      "{ 'insertedCount': 0, 'deletedCount': 1, 'matchedCount': 2, "
-      "'modifiedCount': 3, 'upsertedCount': 4}");
+   expect = bson_val_from_json ("{ 'insertedCount': 0, 'deletedCount': 1, 'matchedCount': 2, "
+                                "'modifiedCount': 3, 'upsertedCount': 4}");
    result_from_bulk_write (result, reply, &empty);
    MONGOC_DEBUG ("rewritten to: %s", bson_val_to_json (result->value));
    if (!result_check (result, NULL, expect, NULL, &error)) {
@@ -965,6 +831,5 @@ test_resultfrombulkwrite (void)
 void
 test_result_install (TestSuite *suite)
 {
-   TestSuite_Add (
-      suite, "/unified/result/resultfrombulkwrite", test_resultfrombulkwrite);
+   TestSuite_Add (suite, "/unified/result/resultfrombulkwrite", test_resultfrombulkwrite);
 }
