@@ -989,7 +989,7 @@ prose_test_8 (void *ctx)
 
 
 static void
-prose_test_TBD (void *ctx)
+prose_test_9 (void *ctx)
 {
    /*
    Test a client-side error is returned if a Clientinsert is attempted for an
@@ -1152,8 +1152,8 @@ test_crud_install (TestSuite *suite)
                       test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */);
 
    TestSuite_AddFull (suite,
-                      "/crud/prose_test_TBD",
-                      prose_test_TBD,
+                      "/crud/prose_test_9",
+                      prose_test_9,
                       NULL, /* dtor */
                       NULL, /* ctx */
                       test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */);
