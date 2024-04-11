@@ -2928,6 +2928,9 @@ operation_start_transaction (test_t *test, operation_t *op, result_t *result, bs
    bson_parser_read_concern_optional (bp, &rc);
    bson_parser_write_concern_optional (bp, &wc);
    bson_parser_read_prefs_optional (bp, &rp);
+   if (!bson_parser_parse (bp, op->arguments, error)) {
+      goto done;
+   }
    if (rc) {
       mongoc_transaction_opts_set_read_concern (opts, rc);
    }
