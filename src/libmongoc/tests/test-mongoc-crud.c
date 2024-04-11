@@ -158,6 +158,19 @@ typedef struct {
    int numKillCursors;
 } bulkWrite_ctx;
 
+static void
+print_truncated (const char *prefix, const bson_t *doc)
+{
+   char *as_str = bson_as_json (doc, NULL);
+   if (strlen (as_str) > 1000) {
+      as_str[997] = '.';
+      as_str[998] = '.';
+      as_str[999] = '.';
+      as_str[1000] = '\0'; // truncate
+   }
+   printf ("%s: %s\n", prefix, as_str);
+   bson_free (as_str);
+}
 
 // `bulkWrite_cb` records the number of `ops` in each sent `bulkWrite` to a BSON
 // document of this form:
@@ -167,6 +180,8 @@ bulkWrite_cb (const mongoc_apm_command_started_t *event)
 {
    bulkWrite_ctx *ctx = mongoc_apm_command_started_get_context (event);
    const char *cmd_name = mongoc_apm_command_started_get_command_name (event);
+
+   print_truncated ("starting command", mongoc_apm_command_started_get_command (event));
 
    if (0 == strcmp (cmd_name, "bulkWrite")) {
       const bson_t *cmd = mongoc_apm_command_started_get_command (event);
@@ -714,51 +729,128 @@ prose_test_7 (void *ctx)
       mongoc_apm_callbacks_destroy (cbs);
    }
 
-   bson_t document = BSON_INITIALIZER;
-   char *large_str = bson_malloc0 ((maxBsonObjectSize / 2) + 1);
-   memset (large_str, 'a', maxBsonObjectSize / 2);
-   BSON_APPEND_UTF8 (&document, "_id", large_str);
-   ok = mongoc_collection_insert_one (coll, &document, NULL, NULL, &error);
-   ASSERT_OR_PRINT (ok, error);
-
-   // Construct models.
-   size_t numModels = 0;
-   mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
-
-   for (int32_t i = 0; i < 2; i++) {
-      ok = mongoc_listof_bulkwritemodel_append_insertone (
-         models, "db.coll", -1, (mongoc_insertone_model_t){.document = &document}, &error);
-      ASSERT_OR_PRINT (ok, error);
-      numModels++;
-   }
-
-   mongoc_bulkwriteoptions_t opts = {.ordered = MONGOC_OPT_BOOL_FALSE, .verboseResults = true};
-   mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
-   ASSERT (ret.exc);
-
-   const bson_t *error_document;
-   if (mongoc_bulkwriteexception_error (ret.exc, &error, &error_document)) {
-      test_error ("unexpected error: %s\n%s", error.message, tmp_json (error_document));
-   }
-
-   // Count write errors.
+   // Without a transaction
    {
-      const mongoc_mapof_writeerror_t *mapof_we = mongoc_bulkwriteexception_writeErrors (ret.exc);
-      size_t numWriteErrors = 0;
-      for (size_t i = 0; i < numModels; i++) {
-         if (mongoc_mapof_writeerror_lookup (mapof_we, i)) {
-            numWriteErrors += 1;
-         }
+      // Construct models.
+      size_t numModels = 0;
+      mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
+
+      bson_t document = BSON_INITIALIZER;
+      {
+         char *large_str = bson_malloc0 ((maxBsonObjectSize / 2) + 1);
+         memset (large_str, 'a', maxBsonObjectSize / 2);
+         BSON_APPEND_UTF8 (&document, "_id", large_str);
+         bson_free (large_str);
       }
-      ASSERT_CMPSIZE_T (numWriteErrors, ==, 2);
+      ok = mongoc_collection_insert_one (coll, &document, NULL, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+
+
+      for (int32_t i = 0; i < 2; i++) {
+         ok = mongoc_listof_bulkwritemodel_append_insertone (
+            models, "db.coll", -1, (mongoc_insertone_model_t){.document = &document}, &error);
+         ASSERT_OR_PRINT (ok, error);
+         numModels++;
+      }
+
+      mongoc_bulkwriteoptions_t opts = {.ordered = MONGOC_OPT_BOOL_FALSE, .verboseResults = true};
+      mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
+      ASSERT (ret.exc);
+
+      const bson_t *error_document;
+      if (mongoc_bulkwriteexception_error (ret.exc, &error, &error_document)) {
+         test_error ("unexpected error: %s\n%s", error.message, tmp_json (error_document));
+      }
+
+      // Count write errors.
+      {
+         const mongoc_mapof_writeerror_t *mapof_we = mongoc_bulkwriteexception_writeErrors (ret.exc);
+         size_t numWriteErrors = 0;
+         for (size_t i = 0; i < numModels; i++) {
+            if (mongoc_mapof_writeerror_lookup (mapof_we, i)) {
+               numWriteErrors += 1;
+            }
+         }
+         ASSERT_CMPSIZE_T (numWriteErrors, ==, 2);
+      }
+
+      ASSERT_CMPINT (cb_ctx.numGetMore, ==, 1);
+
+      bson_destroy (&document);
+      mongoc_bulkwritereturn_cleanup (&ret);
+      mongoc_listof_bulkwritemodel_destroy (models);
    }
 
-   ASSERT_CMPINT (cb_ctx.numGetMore, ==, 1);
+   // Reset state.
+   cb_ctx.numGetMore = 0;
+   mongoc_collection_drop (coll, NULL);
 
-   bson_free (large_str);
-   bson_destroy (&document);
-   mongoc_bulkwritereturn_cleanup (&ret);
-   mongoc_listof_bulkwritemodel_destroy (models);
+
+   // With a transaction
+   {
+      // Construct models.
+      mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
+
+      bson_t *update = BCON_NEW ("$set", "{", "x", BCON_INT32 (1), "}");
+      mongoc_client_session_t *sess = mongoc_client_start_session (client, NULL, &error);
+      ASSERT_OR_PRINT (sess, error);
+      ASSERT_OR_PRINT (mongoc_client_session_start_transaction (sess, NULL, &error), error);
+
+      bson_t d1 = BSON_INITIALIZER;
+      {
+         char *large_str = bson_malloc0 ((maxBsonObjectSize / 2) + 1);
+         memset (large_str, 'a', maxBsonObjectSize / 2);
+         BSON_APPEND_UTF8 (&d1, "_id", large_str);
+         bson_free (large_str);
+      }
+
+      ok = mongoc_listof_bulkwritemodel_append_updateone (
+         models,
+         "db.coll",
+         -1,
+         (mongoc_updateone_model_t){.filter = &d1, .update = update, .upsert = MONGOC_OPT_BOOL_TRUE},
+         &error);
+      ASSERT_OR_PRINT (ok, error);
+
+      bson_t d2 = BSON_INITIALIZER;
+      {
+         char *large_str = bson_malloc0 ((maxBsonObjectSize / 2) + 1);
+         memset (large_str, 'b', maxBsonObjectSize / 2);
+         BSON_APPEND_UTF8 (&d2, "_id", large_str);
+         bson_free (large_str);
+      }
+
+      ok = mongoc_listof_bulkwritemodel_append_updateone (
+         models,
+         "db.coll",
+         -1,
+         (mongoc_updateone_model_t){.filter = &d2, .update = update, .upsert = MONGOC_OPT_BOOL_TRUE},
+         &error);
+      ASSERT_OR_PRINT (ok, error);
+
+      mongoc_bulkwriteoptions_t opts = {.ordered = MONGOC_OPT_BOOL_FALSE, .verboseResults = true, .session = sess};
+      mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
+
+      if (ret.exc) {
+         const bson_t *error_document;
+         if (mongoc_bulkwriteexception_error (ret.exc, &error, &error_document)) {
+            test_error ("unexpected error: %s\n%s", error.message, tmp_json (error_document));
+         }
+         test_error ("unexpected error");
+      }
+
+      ASSERT_CMPINT64 (mongoc_bulkwriteresult_upsertedCount (ret.res), ==, 2);
+
+      ASSERT_CMPINT (cb_ctx.numGetMore, ==, 1);
+
+      bson_destroy (&d2);
+      bson_destroy (&d1);
+      bson_destroy (update);
+      mongoc_client_session_destroy (sess);
+      mongoc_bulkwritereturn_cleanup (&ret);
+      mongoc_listof_bulkwritemodel_destroy (models);
+   }
+
    mongoc_collection_destroy (coll);
    bson_destroy (&cb_ctx.operation_ids);
    bson_destroy (&cb_ctx.ops_counts);
@@ -769,7 +861,7 @@ static void
 prose_test_8 (void *ctx)
 {
    /*
-   `MongoClient.bulkWrite` handles a cursor requiring a `getMore`
+   `MongoClient` handles a `getMore` error
    */
    mongoc_client_t *client;
    BSON_UNUSED (ctx);
