@@ -482,6 +482,14 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
       {
          const mongoc_write_concern_t *wc = self->write_concern; // Default to client.
          if (options->writeConcern) {
+            if (_mongoc_client_session_in_txn (options->session)) {
+               bson_set_error (&error,
+                               MONGOC_ERROR_COMMAND,
+                               MONGOC_ERROR_COMMAND_INVALID_ARG,
+                               "Cannot set write concern after starting a transaction.");
+               mongoc_bulkwriteexception_set_error (ret.exc, &error, NULL);
+               goto fail;
+            }
             wc = options->writeConcern;
          }
          if (!mongoc_cmd_parts_set_write_concern (&parts, wc, &error)) {
