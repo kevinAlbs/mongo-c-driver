@@ -46,6 +46,17 @@
         "database": "database0",
         "collectionName": "coll0"
       }
+    },
+    {
+      "client": {
+        "id": "client_no_retry",
+        "observeEvents": [
+          "commandStartedEvent"
+        ],
+        "uriOptions": {
+          "retryWrites": false
+        }
+      }
     }
   ],
   "initialData": [
