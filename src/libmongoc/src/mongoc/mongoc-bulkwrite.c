@@ -377,6 +377,88 @@ mongoc_bulkwriteresult_destroy (mongoc_bulkwriteresult_t *self)
    bson_free (self);
 }
 
+static bool
+lookup_int32 (const bson_t *bson, const char *key, int32_t *out, const char *source, mongoc_bulkwriteexception_t *exc)
+{
+   bson_iter_t iter;
+   if (bson_iter_init_find (&iter, bson, key) && BSON_ITER_HOLDS_INT32 (&iter)) {
+      *out = bson_iter_int32 (&iter);
+      return true;
+   }
+   bson_error_t error;
+   if (source) {
+      bson_set_error (&error,
+                      MONGOC_ERROR_COMMAND,
+                      MONGOC_ERROR_COMMAND_INVALID_ARG,
+                      "expected to find int32 `%s` in %s, but did not",
+                      key,
+                      source);
+   } else {
+      bson_set_error (&error,
+                      MONGOC_ERROR_COMMAND,
+                      MONGOC_ERROR_COMMAND_INVALID_ARG,
+                      "expected to find int32 `%s`, but did not",
+                      key);
+   }
+   mongoc_bulkwriteexception_set_error (exc, &error, bson);
+   return false;
+}
+
+static bool
+lookup_double (const bson_t *bson, const char *key, double *out, const char *source, mongoc_bulkwriteexception_t *exc)
+{
+   bson_iter_t iter;
+   if (bson_iter_init_find (&iter, bson, key) && BSON_ITER_HOLDS_DOUBLE (&iter)) {
+      *out = bson_iter_double (&iter);
+      return true;
+   }
+   bson_error_t error;
+   if (source) {
+      bson_set_error (&error,
+                      MONGOC_ERROR_COMMAND,
+                      MONGOC_ERROR_COMMAND_INVALID_ARG,
+                      "expected to find double `%s` in %s, but did not",
+                      key,
+                      source);
+   } else {
+      bson_set_error (&error,
+                      MONGOC_ERROR_COMMAND,
+                      MONGOC_ERROR_COMMAND_INVALID_ARG,
+                      "expected to find double `%s`, but did not",
+                      key);
+   }
+   mongoc_bulkwriteexception_set_error (exc, &error, bson);
+   return false;
+}
+
+static bool
+lookup_string (
+   const bson_t *bson, const char *key, const char **out, const char *source, mongoc_bulkwriteexception_t *exc)
+{
+   bson_iter_t iter;
+   if (bson_iter_init_find (&iter, bson, key) && BSON_ITER_HOLDS_UTF8 (&iter)) {
+      *out = bson_iter_utf8 (&iter, NULL);
+      return true;
+   }
+   bson_error_t error;
+   if (source) {
+      bson_set_error (&error,
+                      MONGOC_ERROR_COMMAND,
+                      MONGOC_ERROR_COMMAND_INVALID_ARG,
+                      "expected to find string `%s` in %s, but did not",
+                      key,
+                      source);
+   } else {
+      bson_set_error (&error,
+                      MONGOC_ERROR_COMMAND,
+                      MONGOC_ERROR_COMMAND_INVALID_ARG,
+                      "expected to find string `%s`, but did not",
+                      key);
+   }
+   mongoc_bulkwriteexception_set_error (exc, &error, bson);
+   return false;
+}
+
 
 mongoc_bulkwritereturn_t
 mongoc_client_bulkwrite (mongoc_client_t *self,
@@ -653,65 +735,35 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
          if (is_acknowledged) {
             bson_iter_t iter;
 
-            if (bson_iter_init_find (&iter, &cmd_reply, "nInserted") && BSON_ITER_HOLDS_INT32 (&iter)) {
-               ret.res->insertedcount += (int64_t) bson_iter_int32 (&iter);
-            } else {
-               bson_error_t error;
-               bson_set_error (&error,
-                               MONGOC_ERROR_COMMAND,
-                               MONGOC_ERROR_COMMAND_INVALID_ARG,
-                               "expected to find int32 `nInserted`, but did not");
-               mongoc_bulkwriteexception_set_error (ret.exc, &error, &cmd_reply);
+            int32_t nInserted;
+            if (!lookup_int32 (&cmd_reply, "nInserted", &nInserted, NULL, ret.exc)) {
                goto batch_fail;
             }
+            ret.res->insertedcount += (int64_t) nInserted;
 
-            if (bson_iter_init_find (&iter, &cmd_reply, "nMatched") && BSON_ITER_HOLDS_INT32 (&iter)) {
-               ret.res->matchedcount += (int64_t) bson_iter_int32 (&iter);
-            } else {
-               bson_error_t error;
-               bson_set_error (&error,
-                               MONGOC_ERROR_COMMAND,
-                               MONGOC_ERROR_COMMAND_INVALID_ARG,
-                               "expected to find int32 `nMatched`, but did not");
-               mongoc_bulkwriteexception_set_error (ret.exc, &error, &cmd_reply);
+            int32_t nMatched;
+            if (!lookup_int32 (&cmd_reply, "nMatched", &nMatched, NULL, ret.exc)) {
                goto batch_fail;
             }
+            ret.res->matchedcount += (int64_t) nMatched;
 
-            if (bson_iter_init_find (&iter, &cmd_reply, "nModified") && BSON_ITER_HOLDS_INT32 (&iter)) {
-               ret.res->modifiedcount += (int64_t) bson_iter_int32 (&iter);
-            } else {
-               bson_error_t error;
-               bson_set_error (&error,
-                               MONGOC_ERROR_COMMAND,
-                               MONGOC_ERROR_COMMAND_INVALID_ARG,
-                               "expected to find int32 `nModified`, but did not");
-               mongoc_bulkwriteexception_set_error (ret.exc, &error, &cmd_reply);
+            int32_t nModified;
+            if (!lookup_int32 (&cmd_reply, "nModified", &nModified, NULL, ret.exc)) {
                goto batch_fail;
             }
+            ret.res->modifiedcount += (int64_t) nModified;
 
-            if (bson_iter_init_find (&iter, &cmd_reply, "nDeleted") && BSON_ITER_HOLDS_INT32 (&iter)) {
-               ret.res->deletedcount += (int64_t) bson_iter_int32 (&iter);
-            } else {
-               bson_error_t error;
-               bson_set_error (&error,
-                               MONGOC_ERROR_COMMAND,
-                               MONGOC_ERROR_COMMAND_INVALID_ARG,
-                               "expected to find int32 `nDeleted`, but did not");
-               mongoc_bulkwriteexception_set_error (ret.exc, &error, &cmd_reply);
+            int32_t nDeleted;
+            if (!lookup_int32 (&cmd_reply, "nDeleted", &nDeleted, NULL, ret.exc)) {
                goto batch_fail;
             }
+            ret.res->deletedcount += (int64_t) nDeleted;
 
-            if (bson_iter_init_find (&iter, &cmd_reply, "nUpserted") && BSON_ITER_HOLDS_INT32 (&iter)) {
-               ret.res->upsertedcount += (int64_t) bson_iter_int32 (&iter);
-            } else {
-               bson_error_t error;
-               bson_set_error (&error,
-                               MONGOC_ERROR_COMMAND,
-                               MONGOC_ERROR_COMMAND_INVALID_ARG,
-                               "expected to find int32 `nUpserted`, but did not");
-               mongoc_bulkwriteexception_set_error (ret.exc, &error, &cmd_reply);
+            int32_t nUpserted;
+            if (!lookup_int32 (&cmd_reply, "nUpserted", &nUpserted, NULL, ret.exc)) {
                goto batch_fail;
             }
+            ret.res->upsertedcount += (int64_t) nUpserted;
 
             if (bson_iter_init_find (&iter, &cmd_reply, "writeConcernError")) {
                bson_iter_t wce_iter;
@@ -727,34 +779,14 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 
                // Parse `code`.
                int32_t code;
-               {
-                  if (!bson_iter_init_find (&wce_iter, &wce_bson, "code") || !BSON_ITER_HOLDS_INT32 (&wce_iter)) {
-                     bson_error_t error;
-                     bson_set_error (&error,
-                                     MONGOC_ERROR_COMMAND,
-                                     MONGOC_ERROR_COMMAND_INVALID_ARG,
-                                     "expected to find int32 `code` in "
-                                     "writeConcernError, but did not");
-                     mongoc_bulkwriteexception_set_error (ret.exc, &error, &wce_bson);
-                     goto batch_fail;
-                  }
-                  code = bson_iter_int32 (&wce_iter);
+               if (!lookup_int32 (&wce_bson, "code", &code, "writeConcernError", ret.exc)) {
+                  goto batch_fail;
                }
 
                // Parse `errmsg`.
                const char *errmsg;
-               {
-                  if (!bson_iter_init_find (&wce_iter, &wce_bson, "errmsg") || !BSON_ITER_HOLDS_UTF8 (&wce_iter)) {
-                     bson_error_t error;
-                     bson_set_error (&error,
-                                     MONGOC_ERROR_COMMAND,
-                                     MONGOC_ERROR_COMMAND_INVALID_ARG,
-                                     "expected to find utf8 `errmsg` in "
-                                     "writeConcernError, but did not");
-                     mongoc_bulkwriteexception_set_error (ret.exc, &error, &wce_bson);
-                     goto batch_fail;
-                  }
-                  errmsg = bson_iter_utf8 (&wce_iter, NULL);
+               if (!lookup_string (&wce_bson, "errmsg", &errmsg, "writeConcernError", ret.exc)) {
+                  goto batch_fail;
                }
 
                // Parse optional `errInfo`.
@@ -808,30 +840,18 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                while (mongoc_cursor_next (reply_cursor, &result)) {
                   // Parse for `ok`.
                   double ok;
-                  {
-                     bson_iter_t result_iter;
-                     // The server BulkWriteReplyItem represents `ok` as double.
-                     if (!bson_iter_init_find (&result_iter, result, "ok") || !BSON_ITER_HOLDS_DOUBLE (&result_iter)) {
-                        bson_error_t error;
-                        bson_set_error (&error,
-                                        MONGOC_ERROR_COMMAND,
-                                        MONGOC_ERROR_COMMAND_INVALID_ARG,
-                                        "expected to find double `ok` in "
-                                        "result, but did not");
-                        mongoc_bulkwriteexception_set_error (ret.exc, &error, result);
-                        goto batch_fail;
-                     }
-                     ok = bson_iter_double (&result_iter);
+                  if (!lookup_double (result, "ok", &ok, "result", ret.exc)) {
+                     goto batch_fail;
                   }
+
 
                   // Parse `idx`.
                   int32_t idx;
                   {
-                     bson_iter_t result_iter;
-                     // The server BulkWriteReplyItem represents `index` as
-                     // int32.
-                     if (!bson_iter_init_find (&result_iter, result, "idx") || !BSON_ITER_HOLDS_INT32 (&result_iter) ||
-                         bson_iter_int32 (&result_iter) < 0) {
+                     if (!lookup_int32 (result, "idx", &idx, "result", ret.exc)) {
+                        goto batch_fail;
+                     }
+                     if (idx < 0) {
                         bson_error_t error;
                         bson_set_error (&error,
                                         MONGOC_ERROR_COMMAND,
@@ -841,7 +861,6 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                         mongoc_bulkwriteexception_set_error (ret.exc, &error, result);
                         goto batch_fail;
                      }
-                     idx = bson_iter_int32 (&result_iter);
                   }
 
 
@@ -855,36 +874,14 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 
                      // Parse `code`.
                      int32_t code;
-                     {
-                        if (!bson_iter_init_find (&result_iter, result, "code") ||
-                            !BSON_ITER_HOLDS_INT32 (&result_iter)) {
-                           bson_error_t error;
-                           bson_set_error (&error,
-                                           MONGOC_ERROR_COMMAND,
-                                           MONGOC_ERROR_COMMAND_INVALID_ARG,
-                                           "expected to find int32 `code` in "
-                                           "result, but did not");
-                           mongoc_bulkwriteexception_set_error (ret.exc, &error, result);
-                           goto batch_fail;
-                        }
-                        code = bson_iter_int32 (&result_iter);
+                     if (!lookup_int32 (result, "code", &code, "result", ret.exc)) {
+                        goto batch_fail;
                      }
 
                      // Parse `errmsg`.
                      const char *errmsg;
-                     {
-                        if (!bson_iter_init_find (&result_iter, result, "errmsg") ||
-                            !BSON_ITER_HOLDS_UTF8 (&result_iter)) {
-                           bson_error_t error;
-                           bson_set_error (&error,
-                                           MONGOC_ERROR_COMMAND,
-                                           MONGOC_ERROR_COMMAND_INVALID_ARG,
-                                           "expected to find utf8 `errmsg` in "
-                                           "result, but did not");
-                           mongoc_bulkwriteexception_set_error (ret.exc, &error, result);
-                           goto batch_fail;
-                        }
-                        errmsg = bson_iter_utf8 (&result_iter, NULL);
+                     if (!lookup_string (result, "errmsg", &errmsg, "result", ret.exc)) {
+                        goto batch_fail;
                      }
 
                      // Parse optional `errInfo`.
@@ -922,36 +919,14 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                            bson_iter_t result_iter;
                            // Parse `n`.
                            int32_t n;
-                           {
-                              if (!bson_iter_init_find (&result_iter, result, "n") ||
-                                  !BSON_ITER_HOLDS_INT32 (&result_iter)) {
-                                 bson_error_t error;
-                                 bson_set_error (&error,
-                                                 MONGOC_ERROR_COMMAND,
-                                                 MONGOC_ERROR_COMMAND_INVALID_ARG,
-                                                 "expected to find int32 `n` in "
-                                                 "result, but did not");
-                                 mongoc_bulkwriteexception_set_error (ret.exc, &error, result);
-                                 goto batch_fail;
-                              }
-                              n = bson_iter_int32 (&result_iter);
+                           if (!lookup_int32 (result, "n", &n, "result", ret.exc)) {
+                              goto batch_fail;
                            }
 
                            // Parse `nModified`.
-                           int32_t nModified;
-                           {
-                              if (!bson_iter_init_find (&result_iter, result, "nModified") ||
-                                  !BSON_ITER_HOLDS_INT32 (&result_iter)) {
-                                 bson_error_t error;
-                                 bson_set_error (&error,
-                                                 MONGOC_ERROR_COMMAND,
-                                                 MONGOC_ERROR_COMMAND_INVALID_ARG,
-                                                 "expected to find int32 `nModified` in "
-                                                 "result, but did not");
-                                 mongoc_bulkwriteexception_set_error (ret.exc, &error, result);
-                                 goto batch_fail;
-                              }
-                              nModified = bson_iter_int32 (&result_iter);
+                           int32_t upserted_nModified;
+                           if (!lookup_int32 (result, "nModified", &upserted_nModified, "result", ret.exc)) {
+                              goto batch_fail;
                            }
 
                            // Check for an optional `upsertId`.
@@ -975,7 +950,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 
 
                            ur->matchedCount = n;
-                           ur->modifiedCount = nModified;
+                           ur->modifiedCount = upserted_nModified;
                         }
                      }
 
@@ -984,22 +959,10 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                         mongoc_deleteresult_t *dr =
                            &_mongoc_array_index (&ret.res->mapof_dr.entries, mongoc_deleteresult_t, models_idx);
                         if (dr->is_delete) {
-                           bson_iter_t result_iter;
                            // Parse `n`.
                            int32_t n;
-                           {
-                              if (!bson_iter_init_find (&result_iter, result, "n") ||
-                                  !BSON_ITER_HOLDS_INT32 (&result_iter)) {
-                                 bson_error_t error;
-                                 bson_set_error (&error,
-                                                 MONGOC_ERROR_COMMAND,
-                                                 MONGOC_ERROR_COMMAND_INVALID_ARG,
-                                                 "expected to find int32 `n` in "
-                                                 "result, but did not");
-                                 mongoc_bulkwriteexception_set_error (ret.exc, &error, result);
-                                 goto batch_fail;
-                              }
-                              n = bson_iter_int32 (&result_iter);
+                           if (!lookup_int32 (result, "n", &n, "result", ret.exc)) {
+                              goto batch_fail;
                            }
 
                            dr->deletedCount = n;
