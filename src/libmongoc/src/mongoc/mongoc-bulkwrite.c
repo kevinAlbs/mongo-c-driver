@@ -387,6 +387,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (models);
 
+   bool is_acknowledged = false;
    mongoc_bulkwritereturn_t ret = {0};
    mongoc_server_stream_t *ss = NULL;
    bson_t cmd = BSON_INITIALIZER;
@@ -499,6 +500,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
             mongoc_bulkwriteexception_set_error (ret.exc, &error, NULL);
             goto fail;
          }
+         is_acknowledged = mongoc_write_concern_is_acknowledged (wc);
       }
 
       if (!mongoc_cmd_parts_assemble (&parts, ss, &error)) {
@@ -640,7 +642,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
          }
 
          // Add to result and/or exception.
-         {
+         if (is_acknowledged) {
             bson_iter_t iter;
 
             if (bson_iter_init_find (&iter, &cmd_reply, "nInserted") && BSON_ITER_HOLDS_INT32 (&iter)) {
