@@ -134,6 +134,7 @@ struct _mongoc_bulkwriteexception_t {
 
    // If `has_any_error` is false, the bulk write exception is not returned.
    bool has_any_error;
+   bson_t *error_reply;
 };
 
 
@@ -320,6 +321,9 @@ mongoc_bulkwriteexception_destroy (mongoc_bulkwriteexception_t *self)
       bson_free (entry);
    }
    _mongoc_array_destroy (&self->listof_el.entries);
+
+
+   bson_destroy (self->error_reply);
 
    bson_free (self);
 }
@@ -629,6 +633,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
             // Check for a command ('ok': 0) error.
             if (!ok) {
                mongoc_bulkwriteexception_set_error (ret.exc, &error, &cmd_reply);
+               ret.exc->error_reply = bson_copy (&cmd_reply);
                goto batch_fail;
             }
          }
@@ -999,6 +1004,7 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                   const bson_t *error_document;
                   if (mongoc_cursor_error_document (reply_cursor, &error, &error_document)) {
                      mongoc_bulkwriteexception_set_error (ret.exc, &error, result);
+                     ret.exc->error_reply = bson_copy (&cmd_reply);
                      goto batch_fail;
                   }
                }
@@ -1773,6 +1779,14 @@ mongoc_bulkwriteexception_writeErrors (const mongoc_bulkwriteexception_t *self)
    BSON_ASSERT_PARAM (self);
    return &self->mapof_we;
 }
+
+const bson_t *
+mongoc_bulkwriteexception_errorReply (const mongoc_bulkwriteexception_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->error_reply;
+}
+
 
 const mongoc_writeerror_t *
 mongoc_mapof_writeerror_lookup (const mongoc_mapof_writeerror_t *self, size_t idx)

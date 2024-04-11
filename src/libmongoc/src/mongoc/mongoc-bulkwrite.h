@@ -612,6 +612,10 @@ mongoc_bulkwriteexception_writeConcernErrors (const mongoc_bulkwriteexception_t 
 BSON_EXPORT (const mongoc_mapof_writeerror_t *)
 mongoc_bulkwriteexception_writeErrors (const mongoc_bulkwriteexception_t *self);
 
+// Returns the server error reply for a command error (`ok: 0`)
+BSON_EXPORT (const bson_t *)
+mongoc_bulkwriteexception_errorReply (const mongoc_bulkwriteexception_t *self);
+
 /**
  * An integer value identifying the write concern error. Corresponds to
  * the "writeConcernError.code" field in the command response.
