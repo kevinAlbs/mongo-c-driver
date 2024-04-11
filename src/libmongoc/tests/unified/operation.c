@@ -224,9 +224,7 @@ done:
 #include <mongoc-bulkwrite.h>
 
 static bool
-append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
-                              bson_t *model_wrapper,
-                              bson_error_t *error)
+append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models, bson_t *model_wrapper, bson_error_t *error)
 {
    bool ok = false;
    // Example `model_wrapper`:
@@ -266,11 +264,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
       }
 
       if (!mongoc_listof_bulkwritemodel_append_insertone (
-             models,
-             namespace,
-             -1,
-             (mongoc_insertone_model_t){.document = document},
-             error)) {
+             models, namespace, -1, (mongoc_insertone_model_t){.document = document}, error)) {
          goto done;
       }
    } else if (0 == strcmp ("updateOne", model_name)) {
@@ -296,9 +290,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
                 .arrayFilters = arrayFilters,
                 .collation = collation,
                 .hint = hint ? bson_val_to_value (hint) : NULL,
-                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE
-                                            : MONGOC_OPT_BOOL_FALSE)
-                                 : MONGOC_OPT_BOOL_UNSET,
+                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE) : MONGOC_OPT_BOOL_UNSET,
              },
              error)) {
          goto done;
@@ -326,9 +318,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
                 .arrayFilters = arrayFilters,
                 .collation = collation,
                 .hint = hint ? bson_val_to_value (hint) : NULL,
-                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE
-                                            : MONGOC_OPT_BOOL_FALSE)
-                                 : MONGOC_OPT_BOOL_UNSET,
+                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE) : MONGOC_OPT_BOOL_UNSET,
 
              },
              error)) {
@@ -348,10 +338,8 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              models,
              namespace,
              -1,
-             (mongoc_deleteone_model_t){.filter = filter,
-                                        .collation = collation,
-                                        .hint = hint ? bson_val_to_value (hint)
-                                                     : NULL},
+             (mongoc_deleteone_model_t){
+                .filter = filter, .collation = collation, .hint = hint ? bson_val_to_value (hint) : NULL},
              error)) {
          goto done;
       }
@@ -369,10 +357,8 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              models,
              namespace,
              -1,
-             (mongoc_deletemany_model_t){.filter = filter,
-                                         .collation = collation,
-                                         .hint = hint ? bson_val_to_value (hint)
-                                                      : NULL},
+             (mongoc_deletemany_model_t){
+                .filter = filter, .collation = collation, .hint = hint ? bson_val_to_value (hint) : NULL},
              error)) {
          goto done;
       }
@@ -392,14 +378,12 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models,
              models,
              namespace,
              -1,
-             (mongoc_replaceone_model_t){
-                .filter = filter,
-                .replacement = replacement,
-                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE
-                                            : MONGOC_OPT_BOOL_FALSE)
-                                 : MONGOC_OPT_BOOL_UNSET,
-                .collation = collation,
-                .hint = hint ? bson_val_to_value (hint) : NULL
+             (mongoc_replaceone_model_t){.filter = filter,
+                                         .replacement = replacement,
+                                         .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE)
+                                                          : MONGOC_OPT_BOOL_UNSET,
+                                         .collation = collation,
+                                         .hint = hint ? bson_val_to_value (hint) : NULL
 
              },
 
@@ -418,10 +402,7 @@ done:
 }
 
 static bool
-operation_client_bulkwrite (test_t *test,
-                            operation_t *op,
-                            result_t *result,
-                            bson_error_t *error)
+operation_client_bulkwrite (test_t *test, operation_t *op, result_t *result, bson_error_t *error)
 {
    bool ret = false;
    mongoc_client_t *client = NULL;
@@ -452,12 +433,10 @@ operation_client_bulkwrite (test_t *test,
       bson_parser_t *parser = bson_parser_new ();
 
       bson_parser_array (parser, "models", &args_models);
-      bson_parser_bool_optional (
-         parser, "verboseResults", &args_verboseResults);
+      bson_parser_bool_optional (parser, "verboseResults", &args_verboseResults);
       bson_parser_bool_optional (parser, "ordered", &args_ordered);
       bson_parser_doc_optional (parser, "comment", &args_comment);
-      bson_parser_bool_optional (
-         parser, "bypassDocumentValidation", &args_bypassDocumentValidation);
+      bson_parser_bool_optional (parser, "bypassDocumentValidation", &args_bypassDocumentValidation);
       bson_parser_doc_optional (parser, "let", &args_let);
       bson_parser_write_concern_optional (parser, &args_wc);
       if (!bson_parser_parse (parser, op->arguments, error)) {
@@ -467,8 +446,7 @@ operation_client_bulkwrite (test_t *test,
          opts.verboseResults = true;
       }
       if (args_ordered) {
-         opts.ordered =
-            *args_ordered ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE;
+         opts.ordered = *args_ordered ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE;
       }
       if (args_comment) {
          // Copy `args_comment` to extend lifetime beyond `parser`.
@@ -476,9 +454,7 @@ operation_client_bulkwrite (test_t *test,
          opts.comment = comment;
       }
       if (args_bypassDocumentValidation) {
-         opts.bypassDocumentValidation = *args_bypassDocumentValidation
-                                            ? MONGOC_OPT_BOOL_TRUE
-                                            : MONGOC_OPT_BOOL_FALSE;
+         opts.bypassDocumentValidation = *args_bypassDocumentValidation ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE;
       }
       if (args_let) {
          // Copy `args_let` to extend lifetime beyond `parser`.
@@ -526,8 +502,7 @@ operation_client_bulkwrite (test_t *test,
    }
 
    // Do client bulk write.
-   mongoc_bulkwritereturn_t bwr =
-      mongoc_client_bulkwrite (client, models, &opts);
+   mongoc_bulkwritereturn_t bwr = mongoc_client_bulkwrite (client, models, &opts);
 
    result_from_bulkwritereturn (result, bwr, nmodels);
    mongoc_bulkwritereturn_cleanup (&bwr);
