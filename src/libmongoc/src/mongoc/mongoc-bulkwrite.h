@@ -392,9 +392,6 @@ mongoc_mapof_deleteresult_lookup (const mongoc_mapof_deleteresult_t *self, size_
 /**
  * Indicates whether the results are verbose. If false, the insertResults,
  * updateResults, and deleteResults fields in this result will be undefined.
- *
- * NOT REQUIRED TO IMPLEMENT. See below for other ways to differentiate
- * summary results from verbose results.
  */
 BSON_EXPORT (bool)
 mongoc_bulkwriteresult_hasVerboseResults (const mongoc_bulkwriteresult_t *self);

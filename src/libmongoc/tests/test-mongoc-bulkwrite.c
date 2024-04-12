@@ -132,6 +132,29 @@ test_session_with_unacknowledged (void *ctx)
    mongoc_write_concern_destroy (wc);
 }
 
+static void
+test_verbose (void *ctx)
+{
+   mongoc_client_t *client;
+   BSON_UNUSED (ctx);
+   bool ok;
+   bson_error_t error;
+
+   client = test_framework_new_default_client ();
+
+   mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
+   ok = mongoc_listof_bulkwritemodel_append_insertone (
+      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'a': 1 }")}, &error);
+   ASSERT_OR_PRINT (ok, error);
+   mongoc_bulkwriteoptions_t opts = {.verboseResults = true};
+   mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
+   ASSERT (ret.res);
+   ASSERT (mongoc_bulkwriteresult_hasVerboseResults (ret.res));
+   mongoc_bulkwritereturn_cleanup (&ret);
+   mongoc_listof_bulkwritemodel_destroy (models);
+   mongoc_client_destroy (client);
+}
+
 void
 test_bulkwrite_install (TestSuite *suite)
 {
@@ -150,6 +173,12 @@ test_bulkwrite_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/bulkwrite/session_with_unacknowledged",
                       test_session_with_unacknowledged,
+                      NULL, /* dtor */
+                      NULL, /* ctx */
+                      test_framework_skip_if_max_wire_version_less_than_25);
+   TestSuite_AddFull (suite,
+                      "/bulkwrite/verbose",
+                      test_verbose,
                       NULL, /* dtor */
                       NULL, /* ctx */
                       test_framework_skip_if_max_wire_version_less_than_25);

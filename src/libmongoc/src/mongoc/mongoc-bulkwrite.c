@@ -69,6 +69,7 @@ struct _mongoc_bulkwriteresult_t {
    mongoc_mapof_insertoneresult_t mapof_ior;
    mongoc_mapof_updateresult_t mapof_ur;
    mongoc_mapof_deleteresult_t mapof_dr;
+   bool has_verbose_results;
 };
 
 struct _mongoc_updateresult_t {
@@ -498,6 +499,8 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 
    // Create empty result and exception to collect results/errors from batches.
    ret.res = mongoc_bulkwriteresult_new (models);
+   ret.res->has_verbose_results = options->verboseResults;
+
    // Copy `entries` to the result.
    _mongoc_array_copy (&ret.res->mapof_ior.entries, &models->entries);
    ret.exc = mongoc_bulkwriteexception_new (models->n_ops);
@@ -1878,4 +1881,11 @@ mongoc_writeerror_message (const mongoc_writeerror_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return self->message;
+}
+
+bool
+mongoc_bulkwriteresult_hasVerboseResults (const mongoc_bulkwriteresult_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return self->has_verbose_results;
 }
