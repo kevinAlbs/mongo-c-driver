@@ -571,8 +571,6 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
       parts.is_write_command = true; // To append `txnNumber`.
 
       if (options->session) {
-         // TODO: do not set session if write is unacknowledged? (matches
-         // existing behavior)
          mongoc_cmd_parts_set_session (&parts, options->session);
       }
 
