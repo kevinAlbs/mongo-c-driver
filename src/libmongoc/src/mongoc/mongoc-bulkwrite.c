@@ -1004,6 +1004,28 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                }
             }
          }
+
+         // Check if stream is valid.
+         // `mongoc_cluster_run_command_monitored` may have invalidated stream (e.g. due to processing an error).
+         // If invalid, select a new stream before processing more batches.
+         if (!mongoc_cluster_stream_valid (&self->cluster, parts.assembled.server_stream)) {
+            bson_error_t error;
+
+            if (retry_ss) {
+               mongoc_server_stream_cleanup (retry_ss);
+               retry_ss = NULL;
+            }
+            // Select a server and create a stream again.
+            retry_ss = mongoc_cluster_stream_for_writes (
+               &self->cluster, NULL /* session */, NULL /* deprioritized servers */, NULL /* reply */, &error);
+
+            if (retry_ss) {
+               parts.assembled.server_stream = retry_ss;
+            } else {
+               mongoc_bulkwriteexception_set_error (ret.exc, &error, NULL);
+               goto batch_fail;
+            }
+         }
       }
 
       writeBatchSize_offset += payload_writeBatchSize;
