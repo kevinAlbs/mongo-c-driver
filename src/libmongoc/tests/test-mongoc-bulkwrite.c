@@ -70,16 +70,9 @@ test_unacknowledged (void *ctx)
 
    client = test_framework_new_default_client ();
 
-   // Drop prior test data.
-   {
-      mongoc_collection_t *coll = mongoc_client_get_collection (client, "db", "coll");
-      mongoc_collection_drop (coll, NULL);
-      mongoc_collection_destroy (coll);
-   }
-
    mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
    ok = mongoc_listof_bulkwritemodel_append_insertone (
-      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'_id': 1 }")}, &error);
+      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'a': 1 }")}, &error);
    ASSERT_OR_PRINT (ok, error);
    mongoc_bulkwriteoptions_t opts = {.writeConcern = wc};
    mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
@@ -106,16 +99,9 @@ test_session_with_unacknowledged (void *ctx)
    mongoc_client_session_t *session = mongoc_client_start_session (client, NULL, &error);
    ASSERT_OR_PRINT (session, error);
 
-   // Drop prior test data.
-   {
-      mongoc_collection_t *coll = mongoc_client_get_collection (client, "db", "coll");
-      mongoc_collection_drop (coll, NULL);
-      mongoc_collection_destroy (coll);
-   }
-
    mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
    ok = mongoc_listof_bulkwritemodel_append_insertone (
-      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'_id': 1 }")}, &error);
+      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'a': 1 }")}, &error);
    ASSERT_OR_PRINT (ok, error);
    mongoc_bulkwriteoptions_t opts = {.session = session, .writeConcern = wc};
    mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
