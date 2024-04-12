@@ -1286,15 +1286,6 @@ mongoc_listof_bulkwritemodel_append_insertone (mongoc_listof_bulkwritemodel_t *s
    BSON_ASSERT_PARAM (document);
    BSON_ASSERT (document->len >= 5);
 
-   bson_validate_flags_t validate_flags = _mongoc_default_insert_vflags;
-   if (model.validate_flags.isset) {
-      validate_flags = model.validate_flags.value;
-   }
-
-   if (!_mongoc_validate_new_document (document, validate_flags, error)) {
-      return false;
-   }
-
    bson_t op = BSON_INITIALIZER;
 
    // Find or create the namespace index.
@@ -1359,6 +1350,35 @@ mongoc_listof_bulkwritemodel_append_insertone (mongoc_listof_bulkwritemodel_t *s
    return true;
 }
 
+static bool
+validate_update (const bson_t *update, bson_error_t *error)
+{
+   bson_iter_t iter;
+   if (_mongoc_document_is_pipeline (update)) {
+      return true;
+   }
+
+   if (!bson_iter_init (&iter, update)) {
+      bson_set_error (error, MONGOC_ERROR_BSON, MONGOC_ERROR_BSON_INVALID, "update document is corrupt");
+      return false;
+   }
+
+   if (bson_iter_next (&iter)) {
+      const char *key = bson_iter_key (&iter);
+      if (key[0] != '$') {
+         bson_set_error (error,
+                         MONGOC_ERROR_COMMAND,
+                         MONGOC_ERROR_COMMAND_INVALID_ARG,
+                         "Invalid key '%s': update only works with $ operators"
+                         " and pipelines",
+                         key);
+
+         return false;
+      }
+   }
+   return true;
+}
+
 bool
 mongoc_listof_bulkwritemodel_append_updateone (mongoc_listof_bulkwritemodel_t *self,
                                                const char *namespace,
@@ -1375,12 +1395,7 @@ mongoc_listof_bulkwritemodel_append_updateone (mongoc_listof_bulkwritemodel_t *s
    BSON_ASSERT_PARAM (update);
    BSON_ASSERT (update->len >= 5);
 
-   bson_validate_flags_t validate_flags = _mongoc_default_update_vflags;
-   if (model.validate_flags.isset) {
-      validate_flags = model.validate_flags.value;
-   }
-
-   if (!_mongoc_validate_update (update, validate_flags, error)) {
+   if (!validate_update (update, error)) {
       return false;
    }
 
@@ -1444,6 +1459,7 @@ mongoc_listof_bulkwritemodel_append_updateone (mongoc_listof_bulkwritemodel_t *s
    return true;
 }
 
+
 bool
 mongoc_listof_bulkwritemodel_append_updatemany (mongoc_listof_bulkwritemodel_t *self,
                                                 const char *namespace,
@@ -1460,12 +1476,8 @@ mongoc_listof_bulkwritemodel_append_updatemany (mongoc_listof_bulkwritemodel_t *
    BSON_ASSERT_PARAM (update);
    BSON_ASSERT (update->len >= 5);
 
-   bson_validate_flags_t validate_flags = _mongoc_default_update_vflags;
-   if (model.validate_flags.isset) {
-      validate_flags = model.validate_flags.value;
-   }
 
-   if (!_mongoc_validate_update (update, validate_flags, error)) {
+   if (!validate_update (update, error)) {
       return false;
    }
 
@@ -1534,6 +1546,33 @@ mongoc_listof_bulkwritemodel_append_updatemany (mongoc_listof_bulkwritemodel_t *
 
 
 bool
+validate_replace (const bson_t *doc, bson_error_t *error)
+{
+   bson_iter_t iter;
+
+   if (!bson_iter_init (&iter, doc)) {
+      bson_set_error (error, MONGOC_ERROR_BSON, MONGOC_ERROR_BSON_INVALID, "replace document is corrupt");
+      return false;
+   }
+
+   if (bson_iter_next (&iter)) {
+      const char *key = bson_iter_key (&iter);
+      if (key[0] == '$') {
+         bson_set_error (error,
+                         MONGOC_ERROR_COMMAND,
+                         MONGOC_ERROR_COMMAND_INVALID_ARG,
+                         "Invalid key '%s': replace prohibits $ operators",
+                         key);
+
+         return false;
+      }
+   }
+
+   return true;
+}
+
+
+bool
 mongoc_listof_bulkwritemodel_append_replaceone (mongoc_listof_bulkwritemodel_t *self,
                                                 const char *namespace,
                                                 int namespace_len,
@@ -1549,12 +1588,7 @@ mongoc_listof_bulkwritemodel_append_replaceone (mongoc_listof_bulkwritemodel_t *
    BSON_ASSERT_PARAM (replacement);
    BSON_ASSERT (replacement->len >= 5);
 
-   bson_validate_flags_t validate_flags = _mongoc_default_replace_vflags;
-   if (model.validate_flags.isset) {
-      validate_flags = model.validate_flags.value;
-   }
-
-   if (!_mongoc_validate_replace (replacement, validate_flags, error)) {
+   if (!validate_replace (replacement, error)) {
       return false;
    }
 
