@@ -691,7 +691,7 @@ result_from_bulkwritereturn (result_t *result, mongoc_bulkwritereturn_t bwr, siz
          bson_append_document_end (&bwr_bson, &insertResults_bson);
       }
 
-      const mongoc_mapof_updateresult_t *mapof_ur = mongoc_bulkwriteresult_updateResult (bwr.res);
+      const mongoc_mapof_updateresult_t *mapof_ur = mongoc_bulkwriteresult_updateResults (bwr.res);
       if (mapof_ur) {
          bson_t updateResults_bson;
          BSON_APPEND_DOCUMENT_BEGIN (&bwr_bson, "updateResults", &updateResults_bson);

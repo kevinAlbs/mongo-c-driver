@@ -1147,7 +1147,7 @@ mongoc_updateresult_upsertedId (const mongoc_updateresult_t *self)
 }
 
 const mongoc_mapof_updateresult_t *
-mongoc_bulkwriteresult_updateResult (const mongoc_bulkwriteresult_t *self)
+mongoc_bulkwriteresult_updateResults (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
    return &self->mapof_ur;

@@ -431,7 +431,7 @@ mongoc_bulkwriteresult_insertResults (const mongoc_bulkwriteresult_t *self);
  * performed.
  */
 BSON_EXPORT (const mongoc_mapof_updateresult_t *)
-mongoc_bulkwriteresult_updateResult (const mongoc_bulkwriteresult_t *self);
+mongoc_bulkwriteresult_updateResults (const mongoc_bulkwriteresult_t *self);
 
 /**
  * The results of each individual delete operation that was successfully

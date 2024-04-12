@@ -714,7 +714,7 @@ prose_test_7 (void *ctx)
    // Check length of update results.
    {
       size_t numUpdateResults = 0;
-      const mongoc_mapof_updateresult_t *mapof_ur = mongoc_bulkwriteresult_updateResult (ret.res);
+      const mongoc_mapof_updateresult_t *mapof_ur = mongoc_bulkwriteresult_updateResults (ret.res);
       for (size_t i = 0; i < numModels; i++) {
          if (mongoc_mapof_updateresult_lookup (mapof_ur, i)) {
             numUpdateResults++;
@@ -836,7 +836,7 @@ prose_test_8 (void *ctx)
    // Check length of update results.
    {
       size_t numUpdateResults = 0;
-      const mongoc_mapof_updateresult_t *mapof_ur = mongoc_bulkwriteresult_updateResult (ret.res);
+      const mongoc_mapof_updateresult_t *mapof_ur = mongoc_bulkwriteresult_updateResults (ret.res);
       for (size_t i = 0; i < numModels; i++) {
          if (mongoc_mapof_updateresult_lookup (mapof_ur, i)) {
             numUpdateResults++;
@@ -966,7 +966,7 @@ prose_test_9 (void *ctx)
    // Check length of update results.
    {
       size_t numUpdateResults = 0;
-      const mongoc_mapof_updateresult_t *mapof_ur = mongoc_bulkwriteresult_updateResult (ret.res);
+      const mongoc_mapof_updateresult_t *mapof_ur = mongoc_bulkwriteresult_updateResults (ret.res);
       for (size_t i = 0; i < numModels; i++) {
          if (mongoc_mapof_updateresult_lookup (mapof_ur, i)) {
             numUpdateResults++;
