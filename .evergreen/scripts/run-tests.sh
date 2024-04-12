@@ -133,6 +133,7 @@ test_args+=("-l" "/crud/prose_test*")
 test_args+=("-l" "/command-logging-and-monitoring/monitoring/unacknowledged-client-bulkWrite")
 test_args+=("-l" "/transactions/unified/mongos-pin-auto")
 test_args+=("-l" "/retryable_writes/unified/handshakeError")
+test_args+=("-l" "/bulkwrite/*")
 
 # TODO (CDRIVER-4045): consolidate DNS tests into regular test tasks.
 if [[ "${DNS}" != "nodns" ]]; then
