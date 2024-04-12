@@ -344,13 +344,6 @@ struct _mongoc_bulkwriteoptions_t {
 
    /**
     * The write concern to use for this bulk write.
-    *
-    * NOT REQUIRED TO IMPLEMENT. Drivers MUST expose this option if retrieving a
-    * handle to a client with a different write concern configured than that of
-    * the user's standard URI options is nontrivial. Drivers MAY omit this
-    * option if they provide a way to retrieve a lightweight handle to a client
-    * with a custom write concern configured, e.g. a
-    * MongoClient.withWriteConcern() method.
     */
    // May be NULL.
    const mongoc_write_concern_t *writeConcern;
@@ -430,7 +423,6 @@ mongoc_bulkwriteresult_deletedCount (const mongoc_bulkwriteresult_t *self);
  * The results of each individual insert operation that was successfully
  * performed.
  */
-// May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
 BSON_EXPORT (const mongoc_mapof_insertoneresult_t *)
 mongoc_bulkwriteresult_insertResults (const mongoc_bulkwriteresult_t *self);
 
@@ -438,7 +430,6 @@ mongoc_bulkwriteresult_insertResults (const mongoc_bulkwriteresult_t *self);
  * The results of each individual update operation that was successfully
  * performed.
  */
-// May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
 BSON_EXPORT (const mongoc_mapof_updateresult_t *)
 mongoc_bulkwriteresult_updateResult (const mongoc_bulkwriteresult_t *self);
 
@@ -446,7 +437,6 @@ mongoc_bulkwriteresult_updateResult (const mongoc_bulkwriteresult_t *self);
  * The results of each individual delete operation that was successfully
  * performed.
  */
-// May be NULL if mongoc_bulkwriteoptions_t::verboseResults was false.
 BSON_EXPORT (const mongoc_mapof_deleteresult_t *)
 mongoc_bulkwriteresult_deleteResults (const mongoc_bulkwriteresult_t *self);
 
@@ -469,18 +459,9 @@ BSON_EXPORT (int64_t)
 mongoc_updateresult_modifiedCount (const mongoc_updateresult_t *self);
 
 /**
- * The number of documents that were upserted.
- *
- * NOT REQUIRED TO IMPLEMENT. Drivers may choose not to provide this property
- * so long as it is always possible to discern whether an upsert took place.
- */
-BSON_EXPORT (int64_t)
-mongoc_updateresult_upsertedCount (const mongoc_updateresult_t *self);
-
-/**
  * The _id field of the upserted document if an upsert occurred.
  */
-// May be NULL.
+// May be NULL if no upsert occurred.
 BSON_EXPORT (const bson_value_t *)
 mongoc_updateresult_upsertedId (const mongoc_updateresult_t *self);
 
