@@ -39,17 +39,6 @@
         "database": "database0",
         "collectionName": "coll0"
       }
-    },
-    {
-      "client": {
-        "id": "client_with_w1",
-        "uriOptions": {
-          "w": 1
-        },
-        "observeEvents": [
-          "commandStartedEvent"
-        ]
-      }
     }
   ],
   "initialData": [
