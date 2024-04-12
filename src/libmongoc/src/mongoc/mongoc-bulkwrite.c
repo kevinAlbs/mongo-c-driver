@@ -13,8 +13,8 @@ int32_t _mock_maxMessageSizeBytes = 0;
 
 struct _mongoc_insertoneresult_t {
    bool is_insert;
-   bson_iter_t id_iter;  // Iterator to the `_id` field.
-   bool has_write_error; // True if insert was attempted but failed.
+   bson_iter_t id_iter; // Iterator to the `_id` field.
+   bool succeeded;      // True if insert succeeded.
 };
 
 struct _mongoc_listof_bulkwritemodel_t {
@@ -920,11 +920,6 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                      we->details = bson_copy (&errInfo);
 
                      mongoc_bulkwriteexception_set_writeerror (ret.exc, we, models_idx);
-
-                     // Mark in the insert so the insert IDs are not reported.
-                     mongoc_insertoneresult_t *ior =
-                        &_mongoc_array_index (&ret.res->mapof_ior.entries, mongoc_insertoneresult_t, models_idx);
-                     ior->has_write_error = true;
                   } else {
                      // This is a successful result of an individual operation.
                      // Server only reports successful results of individual
@@ -988,6 +983,16 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
 
                            dr->deletedCount = n;
                            dr->succeeded = true;
+                        }
+                     }
+
+                     // Check if model is insert.
+                     {
+                        // Mark in the insert so the insert IDs are not reported.
+                        mongoc_insertoneresult_t *ior =
+                           &_mongoc_array_index (&ret.res->mapof_ior.entries, mongoc_insertoneresult_t, models_idx);
+                        if (ior->is_insert) {
+                           ior->succeeded = true;
                         }
                      }
                   }
@@ -1073,10 +1078,7 @@ mongoc_mapof_insertoneresult_lookup (const mongoc_mapof_insertoneresult_t *self,
    if (!ior->is_insert) {
       return NULL;
    }
-   if (ior->has_write_error) {
-      // TODO: do not return if operation did not return success.
-      // If operation was not run (due to earlier error), `has_write_error` may
-      // be false.
+   if (!ior->succeeded) {
       return NULL;
    }
    return ior;
