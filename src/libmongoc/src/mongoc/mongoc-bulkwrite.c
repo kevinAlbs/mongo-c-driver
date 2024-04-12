@@ -1062,6 +1062,10 @@ fail:
       mongoc_bulkwriteexception_destroy (ret.exc);
       ret.exc = NULL;
    }
+   if (!is_acknowledged) {
+      mongoc_bulkwriteresult_destroy (ret.res);
+      ret.res = NULL;
+   }
    return ret;
 }
 

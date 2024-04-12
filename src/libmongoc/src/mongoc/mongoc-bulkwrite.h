@@ -389,17 +389,6 @@ typedef struct _mongoc_deleteresult_t mongoc_deleteresult_t;
 BSON_EXPORT (const mongoc_deleteresult_t *)
 mongoc_mapof_deleteresult_lookup (const mongoc_mapof_deleteresult_t *self, size_t idx);
 
-
-/**
- * Indicates whether this write result was acknowledged. If not, then all
- * other members of this result will be undefined.
- *
- * NOT REQUIRED TO IMPLEMENT. See the CRUD specification for more guidance on
- * modeling unacknowledged results.
- */
-BSON_EXPORT (bool)
-mongoc_bulkwriteresult_acknowledged (const mongoc_bulkwriteresult_t *self);
-
 /**
  * Indicates whether the results are verbose. If false, the insertResults,
  * updateResults, and deleteResults fields in this result will be undefined.

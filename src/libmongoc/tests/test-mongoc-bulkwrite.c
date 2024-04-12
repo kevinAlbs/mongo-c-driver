@@ -58,6 +58,40 @@ test_bulkwrite_insert_errors (void *ctx)
 }
 
 static void
+test_unacknowledged (void *ctx)
+{
+   mongoc_client_t *client;
+   BSON_UNUSED (ctx);
+   bool ok;
+   bson_error_t error;
+   mongoc_write_concern_t *wc = mongoc_write_concern_new ();
+
+   mongoc_write_concern_set_w (wc, MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
+
+   client = test_framework_new_default_client ();
+
+   // Drop prior test data.
+   {
+      mongoc_collection_t *coll = mongoc_client_get_collection (client, "db", "coll");
+      mongoc_collection_drop (coll, NULL);
+      mongoc_collection_destroy (coll);
+   }
+
+   mongoc_listof_bulkwritemodel_t *models = mongoc_listof_bulkwritemodel_new ();
+   ok = mongoc_listof_bulkwritemodel_append_insertone (
+      models, "db.coll", -1, (mongoc_insertone_model_t){.document = tmp_bson ("{'_id': 1 }")}, &error);
+   ASSERT_OR_PRINT (ok, error);
+   mongoc_bulkwriteoptions_t opts = {.writeConcern = wc};
+   mongoc_bulkwritereturn_t ret = mongoc_client_bulkwrite (client, models, &opts);
+   // Expect no result.
+   ASSERT (!ret.res);
+   mongoc_bulkwritereturn_cleanup (&ret);
+   mongoc_listof_bulkwritemodel_destroy (models);
+   mongoc_client_destroy (client);
+   mongoc_write_concern_destroy (wc);
+}
+
+static void
 test_session_with_unacknowledged (void *ctx)
 {
    mongoc_client_t *client;
@@ -104,6 +138,12 @@ test_bulkwrite_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/bulkwrite/insert_errors",
                       test_bulkwrite_insert_errors,
+                      NULL, /* dtor */
+                      NULL, /* ctx */
+                      test_framework_skip_if_max_wire_version_less_than_25);
+   TestSuite_AddFull (suite,
+                      "/bulkwrite/unacknowledged",
+                      test_unacknowledged,
                       NULL, /* dtor */
                       NULL, /* ctx */
                       test_framework_skip_if_max_wire_version_less_than_25);
