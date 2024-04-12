@@ -272,10 +272,6 @@ typedef struct {
     * This option is only sent if the caller explicitly provides a value.
     */
    const bson_value_t *hint; // may be NULL
-
-   // `extra` is appended to the delete operation.
-   // It is included to support future server options.
-   const bson_t *extra; // may be NULL.
 } mongoc_deleteone_model_t;
 
 BSON_EXPORT (bool)
@@ -306,10 +302,6 @@ typedef struct {
     * This option is only sent if the caller explicitly provides a value.
     */
    const bson_value_t *hint; // may be NULL
-
-   // `extra` is appended to the delete operation.
-   // It is included to support future server options.
-   const bson_t *extra; // may be NULL.
 } mongoc_deletemany_model_t;
 
 BSON_EXPORT (bool)
@@ -380,10 +372,6 @@ struct _mongoc_bulkwriteoptions_t {
 
    // An optional session. May be NULL.
    mongoc_client_session_t *session;
-
-   // `extra` is appended to the bulkWrite command.
-   // It is included to support future server options.
-   const bson_t *extra;
 };
 
 typedef struct _mongoc_mapof_insertoneresult_t mongoc_mapof_insertoneresult_t;
