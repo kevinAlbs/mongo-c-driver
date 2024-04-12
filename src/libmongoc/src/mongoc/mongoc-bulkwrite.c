@@ -380,20 +380,6 @@ mongoc_bulkwriteresult_destroy (mongoc_bulkwriteresult_t *self)
    bson_free (self);
 }
 
-static void
-print_truncated (const char *prefix, const bson_t *doc)
-{
-   char *as_str = bson_as_json (doc, NULL);
-   if (strlen (as_str) > 1000) {
-      as_str[997] = '.';
-      as_str[998] = '.';
-      as_str[999] = '.';
-      as_str[1000] = '\0'; // truncate
-   }
-   printf ("%s: %s\n", prefix, as_str);
-   bson_free (as_str);
-}
-
 static bool
 lookup_int32 (const bson_t *bson, const char *key, int32_t *out, const char *source, mongoc_bulkwriteexception_t *exc)
 {
@@ -837,8 +823,6 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                   }
                }
 
-               print_truncated ("got reply", &cmd_reply);
-
                // Construct the reply cursor.
                reply_cursor = mongoc_cursor_new_from_command_reply_with_opts (self, &cmd_reply, &cursor_opts);
                bson_destroy (&cursor_opts);
@@ -858,7 +842,6 @@ mongoc_client_bulkwrite (mongoc_client_t *self,
                // Iterate.
                const bson_t *result;
                while (mongoc_cursor_next (reply_cursor, &result)) {
-                  print_truncated ("got cursor result", result);
                   // Parse for `ok`.
                   double ok;
                   if (!lookup_double (result, "ok", &ok, "result", ret.exc)) {

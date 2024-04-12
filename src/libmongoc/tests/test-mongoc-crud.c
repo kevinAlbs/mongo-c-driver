@@ -158,20 +158,6 @@ typedef struct {
    int numKillCursors;
 } bulkWrite_ctx;
 
-static void
-print_truncated (const char *prefix, const bson_t *doc)
-{
-   char *as_str = bson_as_json (doc, NULL);
-   if (strlen (as_str) > 1000) {
-      as_str[997] = '.';
-      as_str[998] = '.';
-      as_str[999] = '.';
-      as_str[1000] = '\0'; // truncate
-   }
-   printf ("%s: %s\n", prefix, as_str);
-   bson_free (as_str);
-}
-
 // `bulkWrite_cb` records the number of `ops` in each sent `bulkWrite` to a BSON
 // document of this form:
 // { "0": <int64>, "1": <int64> ... }
@@ -180,8 +166,6 @@ bulkWrite_cb (const mongoc_apm_command_started_t *event)
 {
    bulkWrite_ctx *ctx = mongoc_apm_command_started_get_context (event);
    const char *cmd_name = mongoc_apm_command_started_get_command_name (event);
-
-   print_truncated ("starting command", mongoc_apm_command_started_get_command (event));
 
    if (0 == strcmp (cmd_name, "bulkWrite")) {
       const bson_t *cmd = mongoc_apm_command_started_get_command (event);
