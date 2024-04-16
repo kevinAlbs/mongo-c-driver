@@ -996,7 +996,9 @@ _bulkwriteresult_complete (mongoc_bulkwriteresult_t *self, bool includeVerboseRe
 struct _mongoc_bulkwriteexception_t {
    bson_error_t error;
    bson_t error_reply;
-   bson_array_builder_t *write_concern_errors;
+   bson_t write_concern_errors;
+   size_t write_concern_errors_len;
+
    bson_t write_errors;
    // `error_document` is created in `_bulkwriteexception_complete`.
    bson_t error_document;
@@ -1009,7 +1011,7 @@ _bulkwriteexception_new (void)
 {
    mongoc_bulkwriteexception_t *self = bson_malloc0 (sizeof (*self));
    bson_init (&self->error_document);
-   self->write_concern_errors = bson_array_builder_new ();
+   bson_init (&self->write_concern_errors);
    bson_init (&self->write_errors);
    bson_init (&self->error_reply);
    return self;
@@ -1078,21 +1080,26 @@ _bulkwriteexception_append_writeconcernerror (mongoc_bulkwriteexception_t *self,
    BSON_ASSERT_PARAM (errmsg);
    BSON_ASSERT_PARAM (errInfo);
 
+   char *key = bson_strdup_printf ("%zu", self->write_concern_errors_len);
+   self->write_concern_errors_len++;
+
    bson_error_t error;
    bson_t write_concern_error;
    bool bson_ok = true;
-   bson_ok = bson_ok && bson_array_builder_append_document_begin (self->write_concern_errors, &write_concern_error);
+   bson_ok = bson_ok && bson_append_document_begin (&self->write_concern_errors, key, -1, &write_concern_error);
    bson_ok = bson_ok && bson_append_int32 (&write_concern_error, "code", 4, code);
    bson_ok = bson_ok && bson_append_utf8 (&write_concern_error, "message", 7, errmsg, -1);
    bson_ok = bson_ok && bson_append_document (&write_concern_error, "details", 7, errInfo);
-   bson_ok = bson_ok && bson_array_builder_append_document_end (self->write_concern_errors, &write_concern_error);
+   bson_ok = bson_ok && bson_append_document_end (&self->write_concern_errors, &write_concern_error);
    if (!bson_ok) {
       // Check for BSON building error. `errmsg` and `errInfo` come from a server reply.
       bson_set_error (&error, MONGOC_ERROR_BSON, MONGOC_ERROR_BSON_INVALID, "failed to build writeConcernError");
       _bulkwriteexception_set_error (self, &error);
+      bson_free (key);
       return false;
    }
    self->has_any_error = true;
+   bson_free (key);
    return true;
 }
 
@@ -1146,12 +1153,8 @@ _bulkwriteexception_complete (mongoc_bulkwriteexception_t *self)
    }
 
    // Add `writeConcernErrors`.
-   {
-      bson_t writeConcernErrors = BSON_INITIALIZER;
-      bson_ok = bson_ok && bson_array_builder_build (self->write_concern_errors, &writeConcernErrors);
-      bson_ok = bson_ok && bson_append_array (&self->error_document, "writeConcernErrors", 18, &writeConcernErrors);
-      bson_destroy (&writeConcernErrors);
-   }
+   bson_ok =
+      bson_ok && bson_append_array (&self->error_document, "writeConcernErrors", 18, &self->write_concern_errors);
 
    // Add `writeErrors`.
    bson_ok = bson_ok && bson_append_document (&self->error_document, "writeErrors", 11, &self->write_errors);
