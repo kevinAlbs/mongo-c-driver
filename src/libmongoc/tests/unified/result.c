@@ -679,37 +679,25 @@ result_from_bulkwritereturn (result_t *result, mongoc_bulkwritereturn_t bwr, siz
    }
 
    bson_error_t error = {0};
-   bson_t result_error_document = BSON_INITIALIZER;
+   const bson_t *errorReply = NULL;
    // Include `errorLabels` and `errorReply` when initializing `result`.
    if (bwr.exc) {
       mongoc_bulkwriteexception_error (bwr.exc, &error);
-      const bson_t *ed = mongoc_bulkwriteexception_error_document (bwr.exc);
-
-      bson_iter_t iter;
-      ASSERT (bson_iter_init_find (&iter, ed, "errorLabels"));
-      BSON_APPEND_ITER (&result_error_document, "errorLabels", &iter);
-
-      // Add the one server reply.
-      ASSERT (bson_iter_init_find (&iter, ed, "errorReply"));
-      bson_array_builder_t *bab;
-      BSON_APPEND_ARRAY_BUILDER_BEGIN (&result_error_document, "errorReplies", &bab);
-      bson_array_builder_append_iter (bab, &iter);
-      bson_append_array_builder_end (&result_error_document, bab);
+      errorReply = mongoc_bulkwriteexception_errorreply (bwr.exc);
    }
 
    bson_val_t *bwr_val = bson_val_from_bson (&bwr_bson);
-   // TODO: consider including `writeErrors` and `writeConcernErrors` in `result->str`.
-   result_from_val_and_reply (result, bwr_val, &result_error_document, &error);
-   bson_destroy (&result_error_document);
+   result_from_val_and_reply (result, bwr_val, errorReply, &error);
 
    // Add `writeErrors` and `writeConcernErrors` after initializing.
    if (bwr.exc) {
       result->ok = false; // An error occurred.
-      const bson_t *ed = mongoc_bulkwriteexception_error_document (bwr.exc);
+      const bson_t *writeErrors = mongoc_bulkwriteexception_writeerrors (bwr.exc);
       bson_destroy (result->write_errors);
-      result->write_errors = bson_lookup_bson (ed, "writeErrors");
+      result->write_errors = bson_copy (writeErrors);
+      const bson_t *writeConcernErrors = mongoc_bulkwriteexception_writeconcernerrors (bwr.exc);
       bson_destroy (result->write_concern_errors);
-      result->write_concern_errors = bson_lookup_bson (ed, "writeConcernErrors");
+      result->write_concern_errors = bson_copy (writeConcernErrors);
    }
 
    bson_destroy (&bwr_bson);

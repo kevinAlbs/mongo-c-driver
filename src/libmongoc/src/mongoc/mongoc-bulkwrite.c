@@ -998,10 +998,7 @@ struct _mongoc_bulkwriteexception_t {
    bson_t error_reply;
    bson_t write_concern_errors;
    size_t write_concern_errors_len;
-
    bson_t write_errors;
-   // `error_document` is created in `_bulkwriteexception_complete`.
-   bson_t error_document;
    // If `has_any_error` is false, the bulk write exception is not returned.
    bool has_any_error;
 };
@@ -1010,7 +1007,6 @@ static mongoc_bulkwriteexception_t *
 _bulkwriteexception_new (void)
 {
    mongoc_bulkwriteexception_t *self = bson_malloc0 (sizeof (*self));
-   bson_init (&self->error_document);
    bson_init (&self->write_concern_errors);
    bson_init (&self->write_errors);
    bson_init (&self->error_reply);
@@ -1029,12 +1025,25 @@ mongoc_bulkwriteexception_error (const mongoc_bulkwriteexception_t *self, bson_e
    return false; // No top-level error.
 }
 
-// Returns a document with the fields: `errorLabels`, `writeConcernErrors`, `writeErrors`, `errorReplies`.
 const bson_t *
-mongoc_bulkwriteexception_error_document (const mongoc_bulkwriteexception_t *self)
+mongoc_bulkwriteexception_writeerrors (const mongoc_bulkwriteexception_t *self)
 {
    BSON_ASSERT_PARAM (self);
-   return &self->error_document;
+   return &self->write_errors;
+}
+
+const bson_t *
+mongoc_bulkwriteexception_writeconcernerrors (const mongoc_bulkwriteexception_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return &self->write_concern_errors;
+}
+
+BSON_EXPORT (const bson_t *)
+mongoc_bulkwriteexception_errorreply (const mongoc_bulkwriteexception_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return &self->error_reply;
 }
 
 void
@@ -1044,8 +1053,7 @@ mongoc_bulkwriteexception_destroy (mongoc_bulkwriteexception_t *self)
       return;
    }
    bson_destroy (&self->write_errors);
-   bson_array_builder_destroy (self->write_concern_errors);
-   bson_destroy (&self->error_document);
+   bson_destroy (&self->write_concern_errors);
    bson_destroy (&self->error_reply);
    bson_free (self);
 }
@@ -1130,45 +1138,6 @@ _bulkwriteexception_set_writeerror (
       return false;
    }
    self->has_any_error = true;
-   return true;
-}
-
-static bool
-_bulkwriteexception_complete (mongoc_bulkwriteexception_t *self)
-{
-   BSON_ASSERT_PARAM (self);
-
-   bool bson_ok = true;
-   // Add `errorLabels`. Copy from server reply if present.
-   bson_iter_t iter;
-   if (bson_iter_init_find (&iter, &self->error_reply, "errorLabels")) {
-      const bson_value_t *val = bson_iter_value (&iter);
-      if (!val) {
-         bson_ok = false;
-      }
-      bson_ok = bson_ok && bson_append_value (&self->error_document, "errorLabels", 11, val);
-   } else {
-      bson_t empty = BSON_INITIALIZER;
-      bson_ok = bson_ok && bson_append_array (&self->error_document, "errorLabels", 11, &empty);
-   }
-
-   // Add `writeConcernErrors`.
-   bson_ok =
-      bson_ok && bson_append_array (&self->error_document, "writeConcernErrors", 18, &self->write_concern_errors);
-
-   // Add `writeErrors`.
-   bson_ok = bson_ok && bson_append_document (&self->error_document, "writeErrors", 11, &self->write_errors);
-
-   // Add `errorReply`.
-   bson_ok = bson_ok && bson_append_document (&self->error_document, "errorReply", 10, &self->error_reply);
-
-   if (!bson_ok) {
-      bson_error_t error;
-      bson_set_error (&error, MONGOC_ERROR_BSON, MONGOC_ERROR_BSON_INVALID, "failed to build error document");
-      _bulkwriteexception_set_error (self, &error);
-      return false;
-   }
-
    return true;
 }
 
@@ -1819,9 +1788,7 @@ fail:
    }
    bson_destroy (&cmd);
    mongoc_server_stream_cleanup (ss);
-   if (ret.exc->has_any_error) {
-      _bulkwriteexception_complete (ret.exc);
-   } else {
+   if (!ret.exc->has_any_error) {
       mongoc_bulkwriteexception_destroy (ret.exc);
       ret.exc = NULL;
    }

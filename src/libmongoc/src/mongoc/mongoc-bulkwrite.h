@@ -83,10 +83,17 @@ typedef struct _mongoc_bulkwriteexception_t mongoc_bulkwriteexception_t;
 BSON_EXPORT (bool)
 mongoc_bulkwriteexception_error (const mongoc_bulkwriteexception_t *self, bson_error_t *error);
 
-// Returns a document with the fields: `errorLabels`, `writeConcernErrors`, `writeErrors`, `errorReply`.
-// `errorReply` is an optional server reply.
+// `mongoc_bulkwriteexception_writeerrors` returns a BSON document mapping model indexes to write errors.
 BSON_EXPORT (const bson_t *)
-mongoc_bulkwriteexception_error_document (const mongoc_bulkwriteexception_t *self);
+mongoc_bulkwriteexception_writeerrors (const mongoc_bulkwriteexception_t *self);
+
+// `mongoc_bulkwriteexception_writeconcernerrors` returns a BSON array of write concern errors.
+BSON_EXPORT (const bson_t *)
+mongoc_bulkwriteexception_writeconcernerrors (const mongoc_bulkwriteexception_t *self);
+
+// `mongoc_bulkwriteexception_errorreply` returns a possible server reply related to the error, or an empty document.
+BSON_EXPORT (const bson_t *)
+mongoc_bulkwriteexception_errorreply (const mongoc_bulkwriteexception_t *self);
 
 BSON_EXPORT (void)
 mongoc_bulkwriteexception_destroy (mongoc_bulkwriteexception_t *self);

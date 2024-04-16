@@ -432,16 +432,12 @@ prose_test_5 (void *ctx)
 
    // Count write concern errors.
    {
-      const bson_t *error_document = mongoc_bulkwriteexception_error_document (ret.exc);
-      bson_t *wces = bson_lookup_bson (error_document, "writeConcernErrors");
-      ASSERT_CMPUINT32 (bson_count_keys (wces), ==, 2);
-      bson_destroy (wces);
+      const bson_t *writeConcernErrors = mongoc_bulkwriteexception_writeconcernerrors (ret.exc);
+      ASSERT_CMPUINT32 (bson_count_keys (writeConcernErrors), ==, 2);
    }
 
    // Assert partial results.
-   {
-      ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedcount (ret.res), ==, maxWriteBatchSize + 1);
-   }
+   ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedcount (ret.res), ==, maxWriteBatchSize + 1);
 
    bson_destroy (&cb_ctx.operation_ids);
    bson_destroy (&cb_ctx.ops_counts);
@@ -523,17 +519,13 @@ prose_test_6 (void *ctx)
 
       // Count write errors.
       {
-         const bson_t *error_document = mongoc_bulkwriteexception_error_document (ret.exc);
-         bson_t *wes = bson_lookup_bson (error_document, "writeErrors");
+         const bson_t *writeErrors = mongoc_bulkwriteexception_writeerrors (ret.exc);
          ASSERT (bson_in_range_uint32_t_signed (maxWriteBatchSize + 1));
-         ASSERT_CMPUINT32 (bson_count_keys (wes), ==, (uint32_t) maxWriteBatchSize + 1);
-         bson_destroy (wes);
+         ASSERT_CMPUINT32 (bson_count_keys (writeErrors), ==, (uint32_t) maxWriteBatchSize + 1);
       }
 
       // Assert partial results.
-      {
-         ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedcount (ret.res), ==, 0);
-      }
+      ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedcount (ret.res), ==, 0);
 
       mongoc_bulkwriteexception_destroy (ret.exc);
       mongoc_bulkwriteresult_destroy (ret.res);
@@ -575,10 +567,8 @@ prose_test_6 (void *ctx)
 
       // Count write errors.
       {
-         const bson_t *error_document = mongoc_bulkwriteexception_error_document (ret.exc);
-         bson_t *wes = bson_lookup_bson (error_document, "writeErrors");
-         ASSERT_CMPUINT32 (bson_count_keys (wes), ==, 1);
-         bson_destroy (wes);
+         const bson_t *writeErrors = mongoc_bulkwriteexception_writeerrors (ret.exc);
+         ASSERT_CMPUINT32 (bson_count_keys (writeErrors), ==, 1);
       }
 
       // Assert partial results.

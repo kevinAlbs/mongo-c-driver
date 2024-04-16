@@ -54,12 +54,15 @@ test_bulkwrite_insert (void *unused)
       if (mongoc_bulkwriteexception_error (bwr.exc, &error)) {
          msg = error.message;
       }
-      const bson_t *doc = mongoc_bulkwriteexception_error_document (bwr.exc);
       test_error ("Expected no bulk write exception, but got:\n"
-                  "  Error     : %s\n"
-                  "  Document  : %s",
+                  "  Error                 : %s\n"
+                  "  Write Errors          : %s\n"
+                  "  Write Concern Errors  : %s\n"
+                  "  Error Reply           : %s",
                   msg,
-                  tmp_json (doc));
+                  tmp_json (mongoc_bulkwriteexception_writeerrors (bwr.exc)),
+                  tmp_json (mongoc_bulkwriteexception_writeconcernerrors (bwr.exc)),
+                  tmp_json (mongoc_bulkwriteexception_errorreply (bwr.exc)));
    }
 
    // Ensure results report IDs inserted.
@@ -107,20 +110,14 @@ test_bulkwrite_writeError (void *unused)
 
    // Expect an error.
    ASSERT (bwr.exc);
-   const bson_t *ed = mongoc_bulkwriteexception_error_document (bwr.exc);
-   ASSERT_MATCH (
-      ed, BSON_STR ({
-         "errorLabels" : [],
-         "writeErrors" : {
-            "1" : {
-               "code" : 11000,
-               "message" : "E11000 duplicate key error collection: db.coll index: _id_ dup key: { _id: 123 }",
-               "details" : {}
-            }
-         },
-         "writeConcernErrors" : [],
-         "errorReply" : {}
-      }));
+   const bson_t *ed = mongoc_bulkwriteexception_writeerrors (bwr.exc);
+   ASSERT_MATCH (ed, BSON_STR ({
+                    "1" : {
+                       "code" : 11000,
+                       "message" : "E11000 duplicate key error collection: db.coll index: _id_ dup key: { _id: 123 }",
+                       "details" : {}
+                    }
+                 }));
 
    // Ensure results report only one ID inserted.
    {
