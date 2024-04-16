@@ -65,10 +65,6 @@ BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_modifiedcount (const mongoc_bulkwriteresult_t *self);
 BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_deletedcount (const mongoc_bulkwriteresult_t *self);
-// `mongoc_bulkwriteresult_verboseresults` returns a document with the fields: `insertResults`, `updateResult`,
-// `deleteResults`. Returns NULL if verbose results were not requested.
-BSON_EXPORT (const bson_t *)
-mongoc_bulkwriteresult_verboseresults (const mongoc_bulkwriteresult_t *self);
 
 // `mongoc_bulkwriteresult_insertresults` returns a BSON document mapping model indexes to insert results.
 BSON_EXPORT (const bson_t *)

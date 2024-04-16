@@ -807,7 +807,6 @@ struct _mongoc_bulkwriteresult_t {
    int64_t matchedcount;
    int64_t modifiedcount;
    int64_t deletedcount;
-   bson_t *verbose_results;
    uint32_t serverid;
    bson_t insertresults;
    bson_t updateresults;
@@ -856,13 +855,6 @@ mongoc_bulkwriteresult_deletedcount (const mongoc_bulkwriteresult_t *self)
    return self->deletedcount;
 }
 
-const bson_t *
-mongoc_bulkwriteresult_verboseresults (const mongoc_bulkwriteresult_t *self)
-{
-   BSON_ASSERT_PARAM (self);
-   return self->verbose_results;
-}
-
 // `mongoc_bulkwriteresult_insertresults` returns a BSON document mapping model indexes to insert results.
 const bson_t *
 mongoc_bulkwriteresult_insertresults (const mongoc_bulkwriteresult_t *self)
@@ -900,7 +892,6 @@ mongoc_bulkwriteresult_destroy (mongoc_bulkwriteresult_t *self)
    if (!self) {
       return;
    }
-   bson_destroy (self->verbose_results);
    bson_destroy (&self->deleteresults);
    bson_destroy (&self->updateresults);
    bson_destroy (&self->insertresults);
@@ -996,26 +987,6 @@ _bulkwriteresult_set_insertresult (mongoc_bulkwriteresult_t *self,
 
    return true;
 }
-
-static bool
-_bulkwriteresult_complete (mongoc_bulkwriteresult_t *self, bool includeVerboseResults, bson_error_t *error)
-{
-   if (!includeVerboseResults) {
-      return true;
-   }
-   // Ignore errors building BSON.
-   self->verbose_results = bson_new ();
-   bool bson_ok = true;
-   bson_ok = bson_ok && bson_append_document (self->verbose_results, "insertResults", 13, &self->insertresults);
-   bson_ok = bson_ok && bson_append_document (self->verbose_results, "updateResults", 13, &self->updateresults);
-   bson_ok = bson_ok && bson_append_document (self->verbose_results, "deleteResults", 13, &self->deleteresults);
-   if (!bson_ok) {
-      bson_set_error (error, MONGOC_ERROR_BSON, MONGOC_ERROR_BSON_INVALID, "failed to build verbose results");
-      return false;
-   }
-   return true;
-}
-
 
 struct _mongoc_bulkwriteexception_t {
    bson_error_t error;
@@ -1795,11 +1766,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
    }
 
 fail:
-   if (is_acknowledged) {
-      if (!_bulkwriteresult_complete (ret.res, opts->verboseresults.isset ? opts->verboseresults.val : false, &error)) {
-         _bulkwriteexception_set_error (ret.exc, &error);
-      }
-   } else {
+   if (!is_acknowledged) {
       mongoc_bulkwriteresult_destroy (ret.res);
       ret.res = NULL;
    }
