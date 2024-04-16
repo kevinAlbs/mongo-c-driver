@@ -224,7 +224,7 @@ done:
 #include <mongoc-bulkwrite.h>
 
 static bool
-append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models, bson_t *model_wrapper, bson_error_t *error)
+append_client_bulkwritemodel (mongoc_bulkwrite_t *bw, bson_t *model_wrapper, bson_error_t *error)
 {
    bool ok = false;
    // Example `model_wrapper`:
@@ -263,8 +263,7 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models, bson_t *mo
          goto done;
       }
 
-      if (!mongoc_listof_bulkwritemodel_append_insertone (
-             models, namespace, -1, (mongoc_insertone_model_t){.document = document}, error)) {
+      if (!mongoc_bulkwrite_append_insertone (bw, namespace, -1, document, NULL, error)) {
          goto done;
       }
    } else if (0 == strcmp ("updateOne", model_name)) {
@@ -280,23 +279,23 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models, bson_t *mo
          goto done;
       }
 
-      if (!mongoc_listof_bulkwritemodel_append_updateone (
-             models,
-             namespace,
-             -1,
-             (mongoc_updateone_model_t){
-                .filter = filter,
-                .update = update,
-                .arrayFilters = arrayFilters,
-                .collation = collation,
-                .hint = hint ? bson_val_to_value (hint) : NULL,
-                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE) : MONGOC_OPT_BOOL_UNSET,
-             },
-             error)) {
+      mongoc_updateoneopts_t *opts = mongoc_updateoneopts_new ();
+      mongoc_updateoneopts_set_arrayfilters (opts, arrayFilters);
+      mongoc_updateoneopts_set_collation (opts, collation);
+      if (hint) {
+         mongoc_updateoneopts_set_hint (opts, bson_val_to_value (hint));
+      }
+      if (upsert) {
+         mongoc_updateoneopts_set_upsert (opts, *upsert);
+      }
+
+      if (!mongoc_bulkwrite_append_updateone (bw, namespace, -1, filter, update, opts, error)) {
+         mongoc_updateoneopts_destroy (opts);
          goto done;
       }
+      mongoc_updateoneopts_destroy (opts);
    } else if (0 == strcmp ("updateMany", model_name)) {
-      // Parse an "updateOne".
+      // Parse an "updateMany".
       bson_parser_utf8 (parser, "namespace", &namespace);
       bson_parser_doc (parser, "filter", &filter);
       bson_parser_array_or_doc (parser, "update", &update);
@@ -308,22 +307,21 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models, bson_t *mo
          goto done;
       }
 
-      if (!mongoc_listof_bulkwritemodel_append_updatemany (
-             models,
-             namespace,
-             -1,
-             (mongoc_updatemany_model_t){
-                .filter = filter,
-                .update = update,
-                .arrayFilters = arrayFilters,
-                .collation = collation,
-                .hint = hint ? bson_val_to_value (hint) : NULL,
-                .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE) : MONGOC_OPT_BOOL_UNSET,
+      mongoc_updatemanyopts_t *opts = mongoc_updatemanyopts_new ();
+      mongoc_updatemanyopts_set_arrayfilters (opts, arrayFilters);
+      mongoc_updatemanyopts_set_collation (opts, collation);
+      if (hint) {
+         mongoc_updatemanyopts_set_hint (opts, bson_val_to_value (hint));
+      }
+      if (upsert) {
+         mongoc_updatemanyopts_set_upsert (opts, *upsert);
+      }
 
-             },
-             error)) {
+      if (!mongoc_bulkwrite_append_updatemany (bw, namespace, -1, filter, update, opts, error)) {
+         mongoc_updatemanyopts_destroy (opts);
          goto done;
       }
+      mongoc_updatemanyopts_destroy (opts);
    } else if (0 == strcmp ("deleteOne", model_name)) {
       // Parse a "deleteOne".
       bson_parser_utf8 (parser, "namespace", &namespace);
@@ -334,15 +332,17 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models, bson_t *mo
          goto done;
       }
 
-      if (!mongoc_listof_bulkwritemodel_append_deleteone (
-             models,
-             namespace,
-             -1,
-             (mongoc_deleteone_model_t){
-                .filter = filter, .collation = collation, .hint = hint ? bson_val_to_value (hint) : NULL},
-             error)) {
+      mongoc_deleteoneopts_t *opts = mongoc_deleteoneopts_new ();
+      mongoc_deleteoneopts_set_collation (opts, collation);
+      if (hint) {
+         mongoc_deleteoneopts_set_hint (opts, bson_val_to_value (hint));
+      }
+
+      if (!mongoc_bulkwrite_append_deleteone (bw, namespace, -1, filter, opts, error)) {
+         mongoc_deleteoneopts_destroy (opts);
          goto done;
       }
+      mongoc_deleteoneopts_destroy (opts);
    } else if (0 == strcmp ("deleteMany", model_name)) {
       // Parse a "deleteMany".
       bson_parser_utf8 (parser, "namespace", &namespace);
@@ -353,15 +353,17 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models, bson_t *mo
          goto done;
       }
 
-      if (!mongoc_listof_bulkwritemodel_append_deletemany (
-             models,
-             namespace,
-             -1,
-             (mongoc_deletemany_model_t){
-                .filter = filter, .collation = collation, .hint = hint ? bson_val_to_value (hint) : NULL},
-             error)) {
+      mongoc_deletemanyopts_t *opts = mongoc_deletemanyopts_new ();
+      mongoc_deletemanyopts_set_collation (opts, collation);
+      if (hint) {
+         mongoc_deletemanyopts_set_hint (opts, bson_val_to_value (hint));
+      }
+
+      if (!mongoc_bulkwrite_append_deletemany (bw, namespace, -1, filter, opts, error)) {
+         mongoc_deletemanyopts_destroy (opts);
          goto done;
       }
+      mongoc_deletemanyopts_destroy (opts);
    } else if (0 == strcmp ("replaceOne", model_name)) {
       // Parse a "replaceOne".
       bson_parser_utf8 (parser, "namespace", &namespace);
@@ -374,22 +376,21 @@ append_client_bulkwritemodel (mongoc_listof_bulkwritemodel_t *models, bson_t *mo
          goto done;
       }
 
-      if (!mongoc_listof_bulkwritemodel_append_replaceone (
-             models,
-             namespace,
-             -1,
-             (mongoc_replaceone_model_t){.filter = filter,
-                                         .replacement = replacement,
-                                         .upsert = upsert ? (*upsert ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE)
-                                                          : MONGOC_OPT_BOOL_UNSET,
-                                         .collation = collation,
-                                         .hint = hint ? bson_val_to_value (hint) : NULL
+      mongoc_replaceoneopts_t *opts = mongoc_replaceoneopts_new ();
+      mongoc_replaceoneopts_set_arrayfilters (opts, arrayFilters);
+      mongoc_replaceoneopts_set_collation (opts, collation);
+      if (hint) {
+         mongoc_replaceoneopts_set_hint (opts, bson_val_to_value (hint));
+      }
+      if (upsert) {
+         mongoc_replaceoneopts_set_upsert (opts, *upsert);
+      }
 
-             },
-
-             error)) {
+      if (!mongoc_bulkwrite_append_replaceone (bw, namespace, -1, filter, replacement, opts, error)) {
+         mongoc_replaceoneopts_destroy (opts);
          goto done;
       }
+      mongoc_replaceoneopts_destroy (opts);
    } else {
       test_set_error (error, "unsupported model: %s", model_name);
       goto done;
@@ -410,14 +411,14 @@ operation_client_bulkwrite (test_t *test, operation_t *op, result_t *result, bso
    bson_t *let = NULL;
    mongoc_write_concern_t *wc = NULL;
 
-   mongoc_listof_bulkwritemodel_t *models = NULL;
+   mongoc_bulkwrite_t *bw = NULL;
+   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
 
    client = entity_map_get_client (test->entity_map, op->object, error);
    if (!client) {
       goto done;
    }
 
-   mongoc_bulkwriteoptions_t opts = {0};
    int64_t nmodels = 0;
 
    // Parse arguments.
@@ -443,38 +444,38 @@ operation_client_bulkwrite (test_t *test, operation_t *op, result_t *result, bso
          goto parse_done;
       }
       if (args_verboseResults && *args_verboseResults) {
-         opts.verboseResults = true;
+         mongoc_bulkwriteoptions_set_verboseresults (opts, true);
       }
       if (args_ordered) {
-         opts.ordered = *args_ordered ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE;
+         mongoc_bulkwriteoptions_set_ordered (opts, *args_ordered);
       }
       if (args_comment) {
          // Copy `args_comment` to extend lifetime beyond `parser`.
          comment = bson_copy (args_comment);
-         opts.comment = comment;
+         mongoc_bulkwriteoptions_set_comment (opts, comment);
       }
       if (args_bypassDocumentValidation) {
-         opts.bypassDocumentValidation = *args_bypassDocumentValidation ? MONGOC_OPT_BOOL_TRUE : MONGOC_OPT_BOOL_FALSE;
+         mongoc_bulkwriteoptions_set_bypassdocumentvalidation (opts, *args_bypassDocumentValidation);
       }
       if (args_let) {
          // Copy `args_let` to extend lifetime beyond `parser`.
          let = bson_copy (args_let);
-         opts.let = let;
+         mongoc_bulkwriteoptions_set_let (opts, let);
       }
       if (args_wc) {
          wc = mongoc_write_concern_copy (args_wc);
-         opts.writeConcern = wc;
+         mongoc_bulkwriteoptions_set_writeconcern (opts, wc);
       }
 
       // Parse models.
       bson_iter_t args_models_iter;
       BSON_ASSERT (bson_iter_init (&args_models_iter, args_models));
-      models = mongoc_listof_bulkwritemodel_new ();
+      bw = mongoc_client_bulkwrite_new (client);
       while (bson_iter_next (&args_models_iter)) {
          nmodels++;
          bson_t model_wrapper;
          bson_iter_bson (&args_models_iter, &model_wrapper);
-         if (!append_client_bulkwritemodel (models, &model_wrapper, error)) {
+         if (!append_client_bulkwritemodel (bw, &model_wrapper, error)) {
             if (error->domain != TEST_ERROR_DOMAIN) {
                // Propagate error as a test result.
                result_from_val_and_reply (result, NULL, NULL, error);
@@ -498,20 +499,22 @@ operation_client_bulkwrite (test_t *test, operation_t *op, result_t *result, bso
    }
 
    if (op->session) {
-      opts.session = op->session;
+      mongoc_bulkwriteoptions_set_session (opts, op->session);
    }
 
    // Do client bulk write.
-   mongoc_bulkwritereturn_t bwr = mongoc_client_bulkwrite (client, models, &opts);
+   mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, opts);
 
    result_from_bulkwritereturn (result, bwr, nmodels);
-   mongoc_bulkwritereturn_cleanup (&bwr);
+   mongoc_bulkwriteexception_destroy (bwr.exc);
+   mongoc_bulkwriteresult_destroy (bwr.res);
    ret = true;
 done:
    mongoc_write_concern_destroy (wc);
    bson_destroy (let);
    bson_destroy (comment);
-   mongoc_listof_bulkwritemodel_destroy (models);
+   mongoc_bulkwriteoptions_destroy (opts);
+   mongoc_bulkwrite_destroy (bw);
    return ret;
 }
 

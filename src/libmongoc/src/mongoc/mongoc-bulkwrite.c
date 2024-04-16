@@ -316,14 +316,12 @@ void
 mongoc_updateoneopts_set_arrayfilters (mongoc_updateoneopts_t *self, const bson_t *arrayfilters)
 {
    BSON_ASSERT_PARAM (self);
-   BSON_ASSERT_PARAM (arrayfilters);
    self->arrayfilters = arrayfilters;
 }
 void
 mongoc_updateoneopts_set_collation (mongoc_updateoneopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   BSON_ASSERT_PARAM (collation);
    self->collation = collation;
 }
 void
@@ -426,14 +424,12 @@ void
 mongoc_replaceoneopts_set_arrayfilters (mongoc_replaceoneopts_t *self, const bson_t *arrayfilters)
 {
    BSON_ASSERT_PARAM (self);
-   BSON_ASSERT_PARAM (arrayfilters);
    self->arrayfilters = arrayfilters;
 }
 void
 mongoc_replaceoneopts_set_collation (mongoc_replaceoneopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   BSON_ASSERT_PARAM (collation);
    self->collation = collation;
 }
 void
@@ -536,6 +532,7 @@ mongoc_bulkwrite_append_replaceone (mongoc_bulkwrite_t *self,
    BSON_ASSERT (_mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
 
    self->n_ops++;
+   self->max_insert_len = BSON_MAX (self->max_insert_len, replacement->len);
    model_data_t md = {.op = MODEL_OP_UPDATE};
    _mongoc_array_append_val (&self->model_entries, md);
    bson_destroy (&op);
@@ -558,14 +555,12 @@ void
 mongoc_updatemanyopts_set_arrayfilters (mongoc_updatemanyopts_t *self, const bson_t *arrayfilters)
 {
    BSON_ASSERT_PARAM (self);
-   BSON_ASSERT_PARAM (arrayfilters);
    self->arrayfilters = arrayfilters;
 }
 void
 mongoc_updatemanyopts_set_collation (mongoc_updatemanyopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   BSON_ASSERT_PARAM (collation);
    self->collation = collation;
 }
 void
@@ -629,7 +624,7 @@ mongoc_bulkwrite_append_updatemany (mongoc_bulkwrite_t *self,
    } else {
       BSON_ASSERT (bson_append_document (&op, "updateMods", 10, update));
    }
-   BSON_ASSERT (bson_append_bool (&op, "multi", 5, false));
+   BSON_ASSERT (bson_append_bool (&op, "multi", 5, true));
    if (opts->arrayfilters) {
       BSON_ASSERT (bson_append_array (&op, "arrayFilters", 12, opts->arrayfilters));
    }
@@ -667,7 +662,6 @@ void
 mongoc_deleteoneopts_set_collation (mongoc_deleteoneopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   BSON_ASSERT_PARAM (collation);
    self->collation = collation;
 }
 void
@@ -723,7 +717,7 @@ mongoc_bulkwrite_append_deleteone (mongoc_bulkwrite_t *self,
    BSON_ASSERT (_mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
 
    self->n_ops++;
-   model_data_t md = {.op = MODEL_OP_UPDATE};
+   model_data_t md = {.op = MODEL_OP_DELETE};
    _mongoc_array_append_val (&self->model_entries, md);
    bson_destroy (&op);
    return true;
@@ -743,7 +737,6 @@ void
 mongoc_deletemanyopts_set_collation (mongoc_deletemanyopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   BSON_ASSERT_PARAM (collation);
    self->collation = collation;
 }
 void
@@ -788,7 +781,7 @@ mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
 
    BSON_ASSERT (bson_append_int32 (&op, "delete", 6, ns_index));
    BSON_ASSERT (bson_append_document (&op, "filter", 6, filter));
-   BSON_ASSERT (bson_append_bool (&op, "multi", 5, false));
+   BSON_ASSERT (bson_append_bool (&op, "multi", 5, true));
    if (opts->collation) {
       BSON_ASSERT (bson_append_document (&op, "collation", 9, opts->collation));
    }
@@ -800,7 +793,7 @@ mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
 
    self->has_multi_write = true;
    self->n_ops++;
-   model_data_t md = {.op = MODEL_OP_UPDATE};
+   model_data_t md = {.op = MODEL_OP_DELETE};
    _mongoc_array_append_val (&self->model_entries, md);
    bson_destroy (&op);
    return true;
@@ -923,6 +916,7 @@ _bulkwriteresult_set_updateresult (mongoc_bulkwriteresult_t *self,
    if (upserted_id) {
       bson_ok = bson_ok && bson_append_value (&updateresult, "upsertedId", 10, upserted_id);
    }
+   bson_ok = bson_ok && bson_append_document_end (&self->updateresults, &updateresult);
    if (!bson_ok) {
       bson_set_error (error, MONGOC_ERROR_BSON, MONGOC_ERROR_BSON_INVALID, "failed to build update result");
       return false;
@@ -944,6 +938,7 @@ _bulkwriteresult_set_deleteresult (mongoc_bulkwriteresult_t *self, int32_t n, si
 
    bool bson_ok = true;
    bson_ok = bson_ok && bson_append_int32 (&deleteresult, "deletedCount", 12, n);
+   bson_ok = bson_ok && bson_append_document_end (&self->deleteresults, &deleteresult);
    if (!bson_ok) {
       bson_set_error (error, MONGOC_ERROR_BSON, MONGOC_ERROR_BSON_INVALID, "failed to build delete result");
       return false;
@@ -982,7 +977,7 @@ static bool
 _bulkwriteresult_complete (mongoc_bulkwriteresult_t *self, bool includeVerboseResults, bson_error_t *error)
 {
    if (!includeVerboseResults) {
-      return false;
+      return true;
    }
    // Ignore errors building BSON.
    self->verbose_results = bson_new ();
@@ -1084,10 +1079,13 @@ _bulkwriteexception_append_writeconcernerror (mongoc_bulkwriteexception_t *self,
    BSON_ASSERT_PARAM (errInfo);
 
    bson_error_t error;
-   bson_t write_concern_error = BSON_INITIALIZER;
-   bool bson_ok = bson_append_int32 (&write_concern_error, "code", 4, code);
+   bson_t write_concern_error;
+   bool bson_ok = true;
+   bson_ok = bson_ok && bson_array_builder_append_document_begin (self->write_concern_errors, &write_concern_error);
+   bson_ok = bson_ok && bson_append_int32 (&write_concern_error, "code", 4, code);
    bson_ok = bson_ok && bson_append_utf8 (&write_concern_error, "message", 7, errmsg, -1);
    bson_ok = bson_ok && bson_append_document (&write_concern_error, "details", 7, errInfo);
+   bson_ok = bson_ok && bson_array_builder_append_document_end (self->write_concern_errors, &write_concern_error);
    if (!bson_ok) {
       // Check for BSON building error. `errmsg` and `errInfo` come from a server reply.
       bson_set_error (&error, MONGOC_ERROR_BSON, MONGOC_ERROR_BSON_INVALID, "failed to build writeConcernError");
@@ -1702,8 +1700,8 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
 
                         // Check for an optional `upsertedId`.
                         const bson_value_t *upserted_id = NULL;
+                        bson_iter_t id_iter;
                         if (bson_iter_init_find (&result_iter, result, "upserted")) {
-                           bson_iter_t id_iter;
                            BSON_ASSERT (bson_iter_init (&result_iter, result));
                            if (!bson_iter_find_descendant (&result_iter, "upserted._id", &id_iter)) {
                               bson_set_error (&error,
@@ -1722,6 +1720,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
                            _bulkwriteexception_set_error (ret.exc, &error);
                            goto batch_fail;
                         }
+                        break;
                      }
                      case MODEL_OP_DELETE: {
                         // Parse `n`.
@@ -1734,12 +1733,14 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
                            _bulkwriteexception_set_error (ret.exc, &error);
                            goto batch_fail;
                         }
+                        break;
                      }
                      case MODEL_OP_INSERT: {
                         if (!_bulkwriteresult_set_insertresult (ret.res, &md->id_iter, models_idx, &error)) {
                            _bulkwriteexception_set_error (ret.exc, &error);
                            goto batch_fail;
                         }
+                        break;
                      }
                      }
                   }

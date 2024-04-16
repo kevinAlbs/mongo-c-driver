@@ -137,6 +137,76 @@ test_bulkwrite_writeError (void *unused)
    mongoc_client_destroy (client);
 }
 
+static void
+test_bulkwrite_unacknowledged (void *ctx)
+{
+   mongoc_client_t *client;
+   BSON_UNUSED (ctx);
+   bool ok;
+   bson_error_t error;
+   mongoc_write_concern_t *wc = mongoc_write_concern_new ();
+
+   mongoc_write_concern_set_w (wc, MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
+
+   client = test_framework_new_default_client ();
+   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
+   mongoc_bulkwriteoptions_set_writeconcern (opts, wc);
+
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+   ASSERT_OR_PRINT (ok, error);
+   mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
+   // Expect no result.
+   ASSERT (!ret.res);
+   ASSERT (!ret.exc);
+   mongoc_bulkwriteresult_destroy (ret.res);
+   mongoc_bulkwriteexception_destroy (ret.exc);
+   mongoc_bulkwriteoptions_destroy (opts);
+   mongoc_bulkwrite_destroy (bw);
+   mongoc_client_destroy (client);
+   mongoc_write_concern_destroy (wc);
+}
+
+static void
+test_bulkwrite_session_with_unacknowledged (void *ctx)
+{
+   mongoc_client_t *client;
+   BSON_UNUSED (ctx);
+   bool ok;
+   bson_error_t error;
+   mongoc_write_concern_t *wc = mongoc_write_concern_new ();
+
+   mongoc_write_concern_set_w (wc, MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
+
+   client = test_framework_new_default_client ();
+   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+
+   mongoc_client_session_t *session = mongoc_client_start_session (client, NULL, &error);
+   ASSERT_OR_PRINT (session, error);
+   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
+   mongoc_bulkwriteoptions_set_writeconcern (opts, wc);
+   mongoc_bulkwriteoptions_set_session (opts, session);
+
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+   ASSERT_OR_PRINT (ok, error);
+   mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
+   // Expect no result.
+   ASSERT (!ret.res);
+   ASSERT (ret.exc);
+   ASSERT (mongoc_bulkwriteexception_error (ret.exc, &error));
+   ASSERT_ERROR_CONTAINS (error,
+                          MONGOC_ERROR_COMMAND,
+                          MONGOC_ERROR_COMMAND_INVALID_ARG,
+                          "Cannot use client session with unacknowledged command");
+   mongoc_bulkwriteresult_destroy (ret.res);
+   mongoc_bulkwriteexception_destroy (ret.exc);
+   mongoc_client_session_destroy (session);
+   mongoc_bulkwriteoptions_destroy (opts);
+   mongoc_bulkwrite_destroy (bw);
+   mongoc_client_destroy (client);
+   mongoc_write_concern_destroy (wc);
+}
+
 void
 test_bulkwrite_install (TestSuite *suite)
 {
@@ -151,6 +221,22 @@ test_bulkwrite_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/bulkwrite/writeError",
                       test_bulkwrite_writeError,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
+
+   TestSuite_AddFull (suite,
+                      "/bulkwrite/unacknowledged",
+                      test_bulkwrite_unacknowledged,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
+
+   TestSuite_AddFull (suite,
+                      "/bulkwrite/session_with_unacknowledged",
+                      test_bulkwrite_session_with_unacknowledged,
                       NULL /* dtor */,
                       NULL /* ctx */,
                       test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
