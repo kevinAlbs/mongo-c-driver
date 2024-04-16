@@ -94,7 +94,7 @@ mongoc_bulkwriteoptions_set_extra (mongoc_bulkwriteoptions_t *self, const bson_t
    BSON_ASSERT_PARAM (self);
    self->extra = extra;
 }
-BSON_EXPORT (void)
+void
 mongoc_bulkwriteoptions_set_serverid (mongoc_bulkwriteoptions_t *self, uint32_t serverid)
 {
    BSON_ASSERT_PARAM (self);
@@ -863,6 +863,30 @@ mongoc_bulkwriteresult_verboseresults (const mongoc_bulkwriteresult_t *self)
    return self->verbose_results;
 }
 
+// `mongoc_bulkwriteresult_insertresults` returns a BSON document mapping model indexes to insert results.
+const bson_t *
+mongoc_bulkwriteresult_insertresults (const mongoc_bulkwriteresult_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return &self->insertresults;
+}
+
+// `mongoc_bulkwriteresult_updateresults` returns a BSON document mapping model indexes to update results.
+const bson_t *
+mongoc_bulkwriteresult_updateresults (const mongoc_bulkwriteresult_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return &self->updateresults;
+}
+
+// `mongoc_bulkwriteresult_deleteresults` returns a BSON document mapping model indexes to delete results.
+const bson_t *
+mongoc_bulkwriteresult_deleteresults (const mongoc_bulkwriteresult_t *self)
+{
+   BSON_ASSERT_PARAM (self);
+   return &self->deleteresults;
+}
+
 uint32_t
 mongoc_bulkwriteresult_serverid (const mongoc_bulkwriteresult_t *self)
 {
@@ -1039,7 +1063,7 @@ mongoc_bulkwriteexception_writeconcernerrors (const mongoc_bulkwriteexception_t 
    return &self->write_concern_errors;
 }
 
-BSON_EXPORT (const bson_t *)
+const bson_t *
 mongoc_bulkwriteexception_errorreply (const mongoc_bulkwriteexception_t *self)
 {
    BSON_ASSERT_PARAM (self);

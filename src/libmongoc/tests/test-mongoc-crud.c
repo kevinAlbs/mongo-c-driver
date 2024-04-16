@@ -674,10 +674,8 @@ prose_test_7 (void *ctx)
 
    // Check length of update results.
    {
-      const bson_t *vr = mongoc_bulkwriteresult_verboseresults (ret.res);
-      bson_t *urs = bson_lookup_bson (vr, "updateResults");
-      ASSERT_CMPSIZE_T ((size_t) bson_count_keys (urs), ==, numModels);
-      bson_destroy (urs);
+      const bson_t *updateResults = mongoc_bulkwriteresult_updateresults (ret.res);
+      ASSERT_CMPSIZE_T ((size_t) bson_count_keys (updateResults), ==, numModels);
    }
 
    ASSERT_CMPINT (cb_ctx.numGetMore, ==, 1);
@@ -789,10 +787,8 @@ prose_test_8 (void *ctx)
 
    // Check length of update results.
    {
-      const bson_t *vr = mongoc_bulkwriteresult_verboseresults (ret.res);
-      bson_t *urs = bson_lookup_bson (vr, "updateResults");
-      ASSERT_CMPSIZE_T ((size_t) bson_count_keys (urs), ==, numModels);
-      bson_destroy (urs);
+      const bson_t *updateResults = mongoc_bulkwriteresult_updateresults (ret.res);
+      ASSERT_CMPSIZE_T ((size_t) bson_count_keys (updateResults), ==, numModels);
    }
 
    mongoc_updateoneopts_destroy (uo);
@@ -914,12 +910,9 @@ prose_test_9 (void *ctx)
 
    // Check length of update results.
    {
-      const bson_t *vr = mongoc_bulkwriteresult_verboseresults (ret.res);
-      bson_t *urs = bson_lookup_bson (vr, "updateResults");
-      ASSERT_CMPSIZE_T ((size_t) bson_count_keys (urs), ==, 1);
-      bson_destroy (urs);
+      const bson_t *updateResults = mongoc_bulkwriteresult_updateresults (ret.res);
+      ASSERT_CMPSIZE_T ((size_t) bson_count_keys (updateResults), ==, 1);
    }
-
    ASSERT_CMPINT (cb_ctx.numGetMore, ==, 1);
    ASSERT_CMPINT (cb_ctx.numKillCursors, ==, 1);
 

@@ -68,9 +68,8 @@ test_bulkwrite_insert (void *unused)
    // Ensure results report IDs inserted.
    {
       ASSERT (bwr.res);
-      const bson_t *vr = mongoc_bulkwriteresult_verboseresults (bwr.res);
-      ASSERT (vr);
-      ASSERT_MATCH (vr, BSON_STR ({"insertResults" : {"0" : {"insertedId" : 123}, "1" : {"insertedId" : 456}}}));
+      const bson_t *insertResults = mongoc_bulkwriteresult_insertresults (bwr.res);
+      ASSERT_MATCH (insertResults, BSON_STR ({"0" : {"insertedId" : 123}, "1" : {"insertedId" : 456}}));
    }
 
    mongoc_bulkwriteexception_destroy (bwr.exc);
@@ -120,12 +119,9 @@ test_bulkwrite_writeError (void *unused)
                  }));
 
    // Ensure results report only one ID inserted.
-   {
-      ASSERT (bwr.res);
-      const bson_t *vr = mongoc_bulkwriteresult_verboseresults (bwr.res);
-      ASSERT (vr);
-      ASSERT_MATCH (vr, BSON_STR ({"insertResults" : {"0" : {"insertedId" : 123}}}));
-   }
+   ASSERT (bwr.res);
+   const bson_t *insertResults = mongoc_bulkwriteresult_insertresults (bwr.res);
+   ASSERT_MATCH (insertResults, BSON_STR ({"0" : {"insertedId" : 123}}));
 
    mongoc_bulkwriteexception_destroy (bwr.exc);
    mongoc_bulkwriteresult_destroy (bwr.res);

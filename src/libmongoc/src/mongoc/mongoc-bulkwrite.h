@@ -69,6 +69,19 @@ mongoc_bulkwriteresult_deletedcount (const mongoc_bulkwriteresult_t *self);
 // `deleteResults`. Returns NULL if verbose results were not requested.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_verboseresults (const mongoc_bulkwriteresult_t *self);
+
+// `mongoc_bulkwriteresult_insertresults` returns a BSON document mapping model indexes to insert results.
+BSON_EXPORT (const bson_t *)
+mongoc_bulkwriteresult_insertresults (const mongoc_bulkwriteresult_t *self);
+
+// `mongoc_bulkwriteresult_updateresults` returns a BSON document mapping model indexes to update results.
+BSON_EXPORT (const bson_t *)
+mongoc_bulkwriteresult_updateresults (const mongoc_bulkwriteresult_t *self);
+
+// `mongoc_bulkwriteresult_deleteresults` returns a BSON document mapping model indexes to delete results.
+BSON_EXPORT (const bson_t *)
+mongoc_bulkwriteresult_deleteresults (const mongoc_bulkwriteresult_t *self);
+
 // `mongoc_bulkwriteresult_get_serverid` identifies which server to performed the operation. This may differ from a
 // previously set serverid if a retry occurred. This is intended for use by wrapping drivers that select a server before
 // running the operation.

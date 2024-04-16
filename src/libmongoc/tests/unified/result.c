@@ -672,10 +672,9 @@ result_from_bulkwritereturn (result_t *result, mongoc_bulkwritereturn_t bwr, siz
       BSON_APPEND_INT32 (&bwr_bson, "matchedCount", mongoc_bulkwriteresult_matchedcount (bwr.res));
       BSON_APPEND_INT32 (&bwr_bson, "modifiedCount", mongoc_bulkwriteresult_modifiedcount (bwr.res));
       BSON_APPEND_INT32 (&bwr_bson, "deletedCount", mongoc_bulkwriteresult_deletedcount (bwr.res));
-      const bson_t *vr = mongoc_bulkwriteresult_verboseresults (bwr.res);
-      if (vr) {
-         bson_concat (&bwr_bson, vr);
-      }
+      BSON_APPEND_DOCUMENT (&bwr_bson, "insertResults", mongoc_bulkwriteresult_insertresults (bwr.res));
+      BSON_APPEND_DOCUMENT (&bwr_bson, "updateResults", mongoc_bulkwriteresult_updateresults (bwr.res));
+      BSON_APPEND_DOCUMENT (&bwr_bson, "deleteResults", mongoc_bulkwriteresult_deleteresults (bwr.res));
    }
 
    bson_error_t error = {0};
