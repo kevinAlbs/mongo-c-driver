@@ -742,6 +742,46 @@ retryable_writes_original_error_general_command (void *ctx)
    bson_destroy (cmd);
 }
 
+static void
+retryable_writes_original_error_bulkwrite (void *ctx)
+{
+   mongoc_client_t *client;
+   mongoc_collection_t *coll;
+   bson_error_t error = {0};
+   mongoc_apm_callbacks_t *callbacks = {0};
+   prose_test_3_apm_ctx_t apm_ctx = {0};
+
+   BSON_UNUSED (ctx);
+
+   // setting up the client
+   client = test_framework_new_default_client ();
+   coll = get_test_collection (client, "retryable_writes");
+   callbacks = mongoc_apm_callbacks_new ();
+
+   // setup test
+   const uint32_t server_id = set_up_original_error_test (callbacks, &apm_ctx, "bulkWrite", client);
+
+   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+   bool ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+   ASSERT_OR_PRINT (ok, error);
+
+   mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, NULL);
+   ASSERT (bwr.exc);
+   // Expect no top-level error (only a write concern error):
+   ASSERT_OR_PRINT (!mongoc_bulkwriteexception_error (bwr.exc, &error), error);
+   // Expect the original write concern error is returned:
+   const bson_t *reply = mongoc_bulkwriteexception_errorreply (bwr.exc);
+   ASSERT_MATCH (reply,
+                 "{'writeConcernError' : { 'code' : { '$numberInt' : '91' } }, "
+                 "'errorLabels' : [ 'RetryableWriteError' ], 'ok': { "
+                 "'$numberDouble' : '1.0' }}");
+
+   cleanup_original_error_test (client, server_id, NULL, coll, callbacks);
+   mongoc_bulkwriteresult_destroy (bwr.res);
+   mongoc_bulkwriteexception_destroy (bwr.exc);
+   mongoc_bulkwrite_destroy (bw);
+}
+
 /*
  *-----------------------------------------------------------------------
  *
@@ -1219,6 +1259,14 @@ test_retryable_writes_install (TestSuite *suite)
                       NULL,
                       test_framework_skip_if_not_replset,
                       test_framework_skip_if_max_wire_version_less_than_17,
+                      test_framework_skip_if_no_crypto);
+   TestSuite_AddFull (suite,
+                      "/retryable_writes/prose_test_3/bulkwrite",
+                      retryable_writes_original_error_bulkwrite,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_not_replset,
+                      test_framework_skip_if_max_wire_version_less_than_25, // require server 8.0
                       test_framework_skip_if_no_crypto);
    TestSuite_AddFull (suite,
                       "/retryable_writes/prose_test_4",

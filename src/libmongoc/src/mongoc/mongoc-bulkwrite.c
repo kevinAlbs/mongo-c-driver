@@ -1254,7 +1254,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
 {
    BSON_ASSERT_PARAM (self);
    mongoc_bulkwritereturn_t ret = {0};
-   bson_error_t error;
+   bson_error_t error = {0};
    mongoc_server_stream_t *ss = NULL;
    bson_t cmd = BSON_INITIALIZER;
    mongoc_cmd_parts_t parts = {0};
@@ -1470,6 +1470,13 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
                bson_iter_overwrite_int64 (&txn_number_iter, ++parts.assembled.session->server_session->txn_number);
             }
 
+            // Store the original error and reply if needed.
+            struct {
+               bson_t reply;
+               bson_error_t error;
+               bool set;
+            } original_error = {.reply = {0}, .error = {0}, .set = false};
+
             // Send in possible retry.
          retry: {
             bool ok =
@@ -1494,6 +1501,15 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
 
                if (retry_ss) {
                   parts.assembled.server_stream = retry_ss;
+
+                  {
+                     // Store the original error and reply before retry.
+                     BSON_ASSERT (!original_error.set); // Retry only happens once.
+                     original_error.set = true;
+                     bson_copy_to (&cmd_reply, &original_error.reply);
+                     original_error.error = error;
+                  }
+
                   bson_destroy (&cmd_reply);
                   bson_init (&cmd_reply);
                   goto retry;
@@ -1502,9 +1518,28 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
 
             // Check for a command ('ok': 0) error.
             if (!ok) {
-               _bulkwriteexception_set_error (ret.exc, &error);
+               // If a retry attempt fails with an error labeled NoWritesPerformed,
+               // drivers MUST return the original error.
+               if (original_error.set && mongoc_error_has_label (&cmd_reply, "NoWritesPerformed")) {
+                  error = original_error.error;
+                  bson_destroy (&cmd_reply);
+                  bson_copy_to (&original_error.reply, &cmd_reply);
+               }
+
+               if (original_error.set) {
+                  bson_destroy (&original_error.reply);
+               }
+
+               if (error.code != 0) {
+                  // The original error was a command ('ok': 0) error.
+                  _bulkwriteexception_set_error (ret.exc, &error);
+               }
                _bulkwriteexception_set_error_reply (ret.exc, &cmd_reply);
                goto batch_fail;
+            }
+
+            if (original_error.set) {
+               bson_destroy (&original_error.reply);
             }
          }
          }
