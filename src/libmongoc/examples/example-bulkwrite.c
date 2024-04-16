@@ -21,49 +21,55 @@ main (int argc, char *argv[])
    mongoc_client_t *client = mongoc_client_new ("mongodb://localhost:27017");
    mongoc_bulkwriteoptions_t *bwo = mongoc_bulkwriteoptions_new ();
    mongoc_bulkwriteoptions_set_verboseresults (bwo, true);
-   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client, bwo);
+   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
 
    // Insert a document to `db.coll1`
    {
-      bson_t *doc = BCON_NEW ("foo", "1");
-      if (!mongoc_client_bulkwrite_append_insertone (bw, "db.coll1", -1, doc, NULL, &error)) {
-         HANDLE_ERROR ("error appending insert one: %s", error.message);
+      bson_t *doc = BCON_NEW ("foo", "bar");
+      if (!mongoc_bulkwrite_append_insertone (bw, "db.coll1", -1, doc, NULL, &error)) {
+         HANDLE_ERROR ("Error appending insert one: %s", error.message);
       }
       bson_destroy (doc);
    }
    // Insert a document to `db.coll2`
    {
-      bson_t *doc = BCON_NEW ("foo", "2");
-      if (!mongoc_client_bulkwrite_append_insertone (bw, "db.coll2", -1, doc, NULL, &error)) {
-         HANDLE_ERROR ("error appending insert one: %s", error.message);
+      bson_t *doc = BCON_NEW ("foo", "baz");
+      if (!mongoc_bulkwrite_append_insertone (bw, "db.coll2", -1, doc, NULL, &error)) {
+         HANDLE_ERROR ("Error appending insert one: %s", error.message);
       }
       bson_destroy (doc);
    }
 
-   mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw);
+   mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, bwo);
 
-   printf ("insert count: %" PRId64 "\n", mongoc_bulkwriteresult_insertedcount (bwr.res));
-
-   // Print verbose results.
-   {
-      const bson_t *vr = mongoc_bulkwriteresult_verboseresults (bwr.res);
-      BSON_ASSERT (vr);
-      char *vr_str = bson_as_relaxed_extended_json (vr, NULL);
-      printf ("verbose results: %s\n", vr_str);
-      bson_free (vr_str);
+   // Print results.
+   if (bwr.res) {
+      printf ("Insert count          : %" PRId64 "\n", mongoc_bulkwriteresult_insertedcount (bwr.res));
+      const bson_t *ir = mongoc_bulkwriteresult_insertresults (bwr.res);
+      char *ir_str = bson_as_relaxed_extended_json (ir, NULL);
+      printf ("Insert results        : %s\n", ir_str);
+      bson_free (ir_str);
    }
 
-   // Print exception.
+   // Print all error information. To observe: try setting the `_id` fields to cause a duplicate key error.
    if (bwr.exc) {
-      const bson_t *error_doc;
-      mongoc_bulkwriteexception_error (bwr.exc, &error, &error_doc);
-      if (mongoc_error_has_label (error_doc, "RetryableWriteError")) {
-         printf ("error has label: RetryableWriteError\n");
+      const char *msg = "(none)";
+      if (mongoc_bulkwriteexception_error (bwr.exc, &error)) {
+         msg = error.message;
       }
-      printf ("error: %s\n", error.message);
-      char *error_doc_str = bson_as_relaxed_extended_json (error_doc, NULL);
-      printf ("exception: %s\n", error_doc_str);
-      bson_free (error_doc_str);
+      const bson_t *we = mongoc_bulkwriteexception_writeerrors (bwr.exc);
+      char *we_str = bson_as_relaxed_extended_json (we, NULL);
+      const bson_t *wce = mongoc_bulkwriteexception_writeconcernerrors (bwr.exc);
+      char *wce_str = bson_as_relaxed_extended_json (wce, NULL);
+      const bson_t *er = mongoc_bulkwriteexception_errorreply (bwr.exc);
+      char *er_str = bson_as_relaxed_extended_json (er, NULL);
+      printf ("Top-level error       : %s\n", msg);
+      printf ("Write errors          : %s\n", we_str);
+      printf ("Write concern errors  : %s\n", wce_str);
+      printf ("Error reply           : %s\n", er_str);
+      bson_free (er_str);
+      bson_free (wce_str);
+      bson_free (we_str);
    }
 
    mongoc_bulkwriteresult_destroy (bwr.res);
