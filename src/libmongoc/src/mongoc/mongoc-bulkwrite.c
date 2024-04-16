@@ -1267,6 +1267,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
    // Create empty result and exception to collect results/errors from batches.
    ret.res = _bulkwriteresult_new ();
    ret.exc = _bulkwriteexception_new ();
+   ret.res->serverid = opts->serverid;
 
    if (self->executed) {
       bson_set_error (&error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
@@ -1285,13 +1286,22 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
    // Select a stream.
    {
       bson_t reply;
-      ss = mongoc_cluster_stream_for_writes (
-         &self->client->cluster, NULL /* session */, NULL /* deprioritized servers */, &reply, &error);
+
+      if (opts->serverid) {
+         ss = mongoc_cluster_stream_for_server (
+            &self->client->cluster, opts->serverid, true /* reconnect_ok */, opts->session, &reply, &error);
+      } else {
+         ss = mongoc_cluster_stream_for_writes (
+            &self->client->cluster, opts->session, NULL /* deprioritized servers */, &reply, &error);
+      }
+
       if (!ss) {
          _bulkwriteexception_set_error (ret.exc, &error);
          _bulkwriteexception_set_error_reply (ret.exc, &reply);
          bson_destroy (&reply);
          goto fail;
+      } else {
+         ret.res->serverid = ss->sd->id;
       }
    }
 
@@ -1494,13 +1504,14 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
 
                // Select a server and create a stream again.
                retry_ss = mongoc_cluster_stream_for_writes (&self->client->cluster,
-                                                            NULL /* session */,
+                                                            opts->session,
                                                             NULL /* deprioritized servers */,
                                                             NULL /* reply */,
                                                             &ignored_error);
 
                if (retry_ss) {
                   parts.assembled.server_stream = retry_ss;
+                  ret.res->serverid = retry_ss->sd->id;
 
                   {
                      // Store the original error and reply before retry.
