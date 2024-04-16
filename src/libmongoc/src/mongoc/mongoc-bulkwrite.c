@@ -360,6 +360,12 @@ mongoc_bulkwrite_append_updateone (mongoc_bulkwrite_t *self,
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (update);
    BSON_ASSERT (update->len >= 5);
+
+   if (self->executed) {
+      bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
+      return false;
+   }
+
    mongoc_updateoneopts_t defaults = {0};
    if (!opts) {
       opts = &defaults;
@@ -494,6 +500,12 @@ mongoc_bulkwrite_append_replaceone (mongoc_bulkwrite_t *self,
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (replacement);
    BSON_ASSERT (replacement->len >= 5);
+
+   if (self->executed) {
+      bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
+      return false;
+   }
+
    mongoc_replaceoneopts_t defaults = {0};
    if (!opts) {
       opts = &defaults;
@@ -599,6 +611,12 @@ mongoc_bulkwrite_append_updatemany (mongoc_bulkwrite_t *self,
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (update);
    BSON_ASSERT (update->len >= 5);
+
+   if (self->executed) {
+      bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
+      return false;
+   }
+
    mongoc_updatemanyopts_t defaults = {0};
    if (!opts) {
       opts = &defaults;
@@ -691,6 +709,12 @@ mongoc_bulkwrite_append_deleteone (mongoc_bulkwrite_t *self,
    BSON_ASSERT_PARAM (ns);
    BSON_ASSERT_PARAM (filter);
    BSON_ASSERT (filter->len >= 5);
+
+   if (self->executed) {
+      bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
+      return false;
+   }
+
    mongoc_deleteoneopts_t defaults = {0};
    if (!opts) {
       opts = &defaults;
@@ -766,6 +790,12 @@ mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
    BSON_ASSERT_PARAM (ns);
    BSON_ASSERT_PARAM (filter);
    BSON_ASSERT (filter->len >= 5);
+
+   if (self->executed) {
+      bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
+      return false;
+   }
+
    mongoc_deletemanyopts_t defaults = {0};
    if (!opts) {
       opts = &defaults;
@@ -1234,6 +1264,9 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
       opts = &defaults;
    }
    bool is_acknowledged = false;
+   // Create empty result and exception to collect results/errors from batches.
+   ret.res = _bulkwriteresult_new ();
+   ret.exc = _bulkwriteexception_new ();
 
    if (self->executed) {
       bson_set_error (&error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
@@ -1241,10 +1274,6 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
       goto fail;
    }
    self->executed = true;
-
-   // Create empty result and exception to collect results/errors from batches.
-   ret.res = _bulkwriteresult_new ();
-   ret.exc = _bulkwriteexception_new ();
 
    if (self->n_ops == 0) {
       bson_set_error (
