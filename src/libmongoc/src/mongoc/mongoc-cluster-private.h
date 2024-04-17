@@ -253,6 +253,16 @@ mcd_rpc_message_decompress (mcd_rpc_message *rpc, void **data, size_t *data_len)
 bool
 mcd_rpc_message_decompress_if_necessary (mcd_rpc_message *rpc, void **data, size_t *data_len);
 
+// `mongoc_cluster_write_cmd` executes a write command and may apply retryable writes behavior.
+// `*retry_server_stream` is set to a new stream on retry. The caller must call `mongoc_server_stream_cleanup`.
+bool
+mongoc_cluster_write_cmd (mongoc_cluster_t *cluster,
+                          mongoc_cmd_t *cmd,
+                          bool is_retryable,
+                          mongoc_server_stream_t **retry_server_stream,
+                          bson_t *reply,
+                          bson_error_t *error);
+
 BSON_END_DECLS
 
 
