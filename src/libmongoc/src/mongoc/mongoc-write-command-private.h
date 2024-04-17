@@ -105,8 +105,6 @@ typedef enum {
 void
 _mongoc_write_command_destroy (mongoc_write_command_t *command);
 void
-_mongoc_write_command_init (bson_t *doc, mongoc_write_command_t *command, const char *collection);
-void
 _mongoc_write_command_init_insert (mongoc_write_command_t *command,
                                    const bson_t *document,
                                    const bson_t *cmd_opts,
