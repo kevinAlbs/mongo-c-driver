@@ -3640,7 +3640,7 @@ mcd_rpc_message_decompress_if_necessary (mcd_rpc_message *rpc, void **data, size
 bool
 mongoc_cluster_write_cmd (mongoc_cluster_t *cluster,
                           mongoc_cmd_t *cmd,
-                          bool is_retryable,
+                          bool is_retryable_write,
                           mongoc_server_stream_t **retry_server_stream,
                           bson_t *reply,
                           bson_error_t *error)
@@ -3654,6 +3654,7 @@ mongoc_cluster_write_cmd (mongoc_cluster_t *cluster,
 
    *retry_server_stream = NULL;
    bool ok;
+   bool is_retryable = is_retryable_write;
 
    if (is_retryable) {
       // Increment the transaction number for the first attempt of each retryable write command.
@@ -3671,7 +3672,11 @@ mongoc_cluster_write_cmd (mongoc_cluster_t *cluster,
 
 retry:
    ok = mongoc_cluster_run_command_monitored (cluster, cmd, reply, error);
-   _mongoc_write_error_handle_labels (ok, error, reply, cmd->server_stream->sd);
+
+   if (is_retryable_write) {
+      _mongoc_write_error_handle_labels (ok, error, reply, cmd->server_stream->sd);
+   }
+
    if (is_retryable) {
       _mongoc_write_error_update_if_unsupported_storage_engine (ok, error, reply);
    }
