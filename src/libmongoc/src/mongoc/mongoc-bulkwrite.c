@@ -1260,7 +1260,6 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
    mongoc_server_stream_t *ss = NULL;
    bson_t cmd = BSON_INITIALIZER;
    mongoc_cmd_parts_t parts = {0};
-   mongoc_server_stream_t *retry_ss = NULL;
    mongoc_bulkwriteoptions_t defaults = {0};
    if (!opts) {
       opts = &defaults;
@@ -1473,87 +1472,17 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
             BSON_ASSERT (bson_in_range_int32_t_unsigned (payload_len));
             parts.assembled.payload_size = (int32_t) payload_len;
 
-            bool is_retryable = parts.is_retryable_write;
-
-            /* increment the transaction number for the first attempt of each
-             * retryable write command */
-            if (is_retryable) {
-               bson_iter_t txn_number_iter;
-               BSON_ASSERT (bson_iter_init_find (&txn_number_iter, parts.assembled.command, "txnNumber"));
-               bson_iter_overwrite_int64 (&txn_number_iter, ++parts.assembled.session->server_session->txn_number);
-            }
-
-            // Store the original error and reply if needed.
-            struct {
-               bson_t reply;
-               bson_error_t error;
-               bool set;
-            } original_error = {.reply = {0}, .error = {0}, .set = false};
-
-            // Send in possible retry.
-         retry: {
-            bool ok =
-               mongoc_cluster_run_command_monitored (&self->client->cluster, &parts.assembled, &cmd_reply, &error);
-
-            if (parts.is_retryable_write) {
-               _mongoc_write_error_handle_labels (ok, &error, &cmd_reply, parts.assembled.server_stream->sd);
-            }
-
-            mongoc_write_err_type_t error_type = _mongoc_write_error_get_type (&cmd_reply);
-            // Check for a retryable write error.
-            if (error_type == MONGOC_WRITE_ERR_RETRY && is_retryable) {
-               is_retryable = false; // Only retry once.
-               bson_error_t ignored_error;
-
-               // Select a server and create a stream again.
-               {
-                  mongoc_deprioritized_servers_t *const ds = mongoc_deprioritized_servers_new ();
-
-                  if (retry_ss) {
-                     mongoc_deprioritized_servers_add_if_sharded (ds, retry_ss->topology_type, retry_ss->sd);
-                     mongoc_server_stream_cleanup (retry_ss);
-                  } else {
-                     mongoc_deprioritized_servers_add_if_sharded (ds, ss->topology_type, ss->sd);
-                  }
-
-                  retry_ss =
-                     mongoc_cluster_stream_for_writes (&self->client->cluster, opts->session, ds, NULL, &ignored_error);
-
-                  mongoc_deprioritized_servers_destroy (ds);
-               }
-
-               if (retry_ss) {
-                  parts.assembled.server_stream = retry_ss;
-                  ret.res->serverid = retry_ss->sd->id;
-
-                  {
-                     // Store the original error and reply before retry.
-                     BSON_ASSERT (!original_error.set); // Retry only happens once.
-                     original_error.set = true;
-                     bson_copy_to (&cmd_reply, &original_error.reply);
-                     original_error.error = error;
-                  }
-
-                  bson_destroy (&cmd_reply);
-                  bson_init (&cmd_reply);
-                  goto retry;
-               }
+            mongoc_server_stream_t *new_ss = NULL;
+            bool ok = mongoc_cluster_run_retryable_write (
+               &self->client->cluster, &parts.assembled, parts.is_retryable_write, &new_ss, &cmd_reply, &error);
+            if (new_ss) {
+               mongoc_server_stream_cleanup (ss);
+               ss = new_ss;
+               parts.assembled.server_stream = ss;
             }
 
             // Check for a command ('ok': 0) error.
             if (!ok) {
-               // If a retry attempt fails with an error labeled NoWritesPerformed,
-               // drivers MUST return the original error.
-               if (original_error.set && mongoc_error_has_label (&cmd_reply, "NoWritesPerformed")) {
-                  error = original_error.error;
-                  bson_destroy (&cmd_reply);
-                  bson_copy_to (&original_error.reply, &cmd_reply);
-               }
-
-               if (original_error.set) {
-                  bson_destroy (&original_error.reply);
-               }
-
                if (error.code != 0) {
                   // The original error was a command ('ok': 0) error.
                   _bulkwriteexception_set_error (ret.exc, &error);
@@ -1561,11 +1490,6 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
                _bulkwriteexception_set_error_reply (ret.exc, &cmd_reply);
                goto batch_fail;
             }
-
-            if (original_error.set) {
-               bson_destroy (&original_error.reply);
-            }
-         }
          }
 
          // Add to result and/or exception.
@@ -1815,20 +1739,17 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
          }
 
          // Check if stream is valid.
-         // `mongoc_cluster_run_command_monitored` may have invalidated stream (e.g. due to processing an error).
+         // `mongoc_cluster_run_retryable_write` may have invalidated stream (e.g. due to processing an error).
          // If invalid, select a new stream before processing more batches.
          if (!mongoc_cluster_stream_valid (&self->client->cluster, parts.assembled.server_stream)) {
-            if (retry_ss) {
-               mongoc_server_stream_cleanup (retry_ss);
-               retry_ss = NULL;
-            }
             bson_t reply;
             // Select a server and create a stream again.
-            retry_ss = mongoc_cluster_stream_for_writes (
+            mongoc_server_stream_cleanup (ss);
+            ss = mongoc_cluster_stream_for_writes (
                &self->client->cluster, NULL /* session */, NULL /* deprioritized servers */, &reply, &error);
 
-            if (retry_ss) {
-               parts.assembled.server_stream = retry_ss;
+            if (ss) {
+               parts.assembled.server_stream = ss;
             } else {
                _bulkwriteexception_set_error (ret.exc, &error);
                goto batch_fail;
@@ -1857,9 +1778,6 @@ fail:
    if (!is_acknowledged) {
       mongoc_bulkwriteresult_destroy (ret.res);
       ret.res = NULL;
-   }
-   if (retry_ss) {
-      mongoc_server_stream_cleanup (retry_ss);
    }
    if (parts.body) {
       // Only clean-up if initialized.
