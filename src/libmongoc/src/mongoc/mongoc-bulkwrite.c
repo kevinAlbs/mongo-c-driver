@@ -1503,11 +1503,21 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
                bson_error_t ignored_error;
 
                // Select a server and create a stream again.
-               retry_ss = mongoc_cluster_stream_for_writes (&self->client->cluster,
-                                                            opts->session,
-                                                            NULL /* deprioritized servers */,
-                                                            NULL /* reply */,
-                                                            &ignored_error);
+               {
+                  mongoc_deprioritized_servers_t *const ds = mongoc_deprioritized_servers_new ();
+
+                  if (retry_ss) {
+                     mongoc_deprioritized_servers_add_if_sharded (ds, retry_ss->topology_type, retry_ss->sd);
+                     mongoc_server_stream_cleanup (retry_ss);
+                  } else {
+                     mongoc_deprioritized_servers_add_if_sharded (ds, ss->topology_type, ss->sd);
+                  }
+
+                  retry_ss =
+                     mongoc_cluster_stream_for_writes (&self->client->cluster, opts->session, ds, NULL, &ignored_error);
+
+                  mongoc_deprioritized_servers_destroy (ds);
+               }
 
                if (retry_ss) {
                   parts.assembled.server_stream = retry_ss;
