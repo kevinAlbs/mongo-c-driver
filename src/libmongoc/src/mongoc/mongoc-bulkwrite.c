@@ -133,6 +133,7 @@ struct _mongoc_bulkwrite_t {
    // `has_multi_write` is true if there are any multi-document update or delete operations. Multi-document
    // writes are ineligible for retryable writes.
    bool has_multi_write;
+   int64_t operation_id;
 };
 
 
@@ -146,6 +147,7 @@ mongoc_client_bulkwrite_new (mongoc_client_t *self)
    _mongoc_buffer_init (&bw->ops, NULL, 0, NULL, NULL);
    bson_init (&bw->ns_to_index);
    _mongoc_array_init (&bw->model_entries, sizeof (model_data_t));
+   bw->operation_id = ++self->cluster.operation_id;
    return bw;
 }
 
@@ -1342,6 +1344,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
       BSON_ASSERT (bson_append_array_builder_end (&cmd, nsInfo));
 
       mongoc_cmd_parts_init (&parts, self->client, "admin", MONGOC_QUERY_NONE, &cmd);
+      parts.assembled.operation_id = self->operation_id;
 
       parts.allow_txn_number = MONGOC_CMD_PARTS_ALLOW_TXN_NUMBER_YES; // To append `lsid`.
       if (self->has_multi_write) {
