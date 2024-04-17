@@ -20,24 +20,6 @@
 #include <test-conveniences.h>
 #include <mongoc-bulkwrite.h>
 
-#define ASSERT_NO_BULKWRITEEXCEPTION(bwr)                                            \
-   if (bwr.exc) {                                                                    \
-      bson_error_t _error;                                                           \
-      const char *_msg = "(none)";                                                   \
-      if (mongoc_bulkwriteexception_error (bwr.exc, &_error)) {                      \
-         _msg = _error.message;                                                      \
-      }                                                                              \
-      test_error ("Expected no bulk write exception, but got:\n"                     \
-                  "  Error                 : %s\n"                                   \
-                  "  Write Errors          : %s\n"                                   \
-                  "  Write Concern Errors  : %s\n"                                   \
-                  "  Error Reply           : %s",                                    \
-                  _msg,                                                              \
-                  tmp_json (mongoc_bulkwriteexception_writeerrors (bwr.exc)),        \
-                  tmp_json (mongoc_bulkwriteexception_writeconcernerrors (bwr.exc)), \
-                  tmp_json (mongoc_bulkwriteexception_errorreply (bwr.exc)));        \
-   }
-
 static void
 test_bulkwrite_insert (void *unused)
 {

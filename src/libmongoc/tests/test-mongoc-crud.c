@@ -663,12 +663,7 @@ prose_test_7 (void *ctx)
    mongoc_bulkwriteoptions_set_verboseresults (opts, true);
    mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
 
-   if (ret.exc) {
-      if (mongoc_bulkwriteexception_error (ret.exc, &error)) {
-         test_error ("unexpected error: %s", error.message);
-      }
-      test_error ("unexpected error");
-   }
+   ASSERT_NO_BULKWRITEEXCEPTION (ret);
 
    ASSERT_CMPINT64 (mongoc_bulkwriteresult_upsertedcount (ret.res), ==, 2);
 
@@ -773,13 +768,7 @@ prose_test_8 (void *ctx)
    mongoc_bulkwriteoptions_set_verboseresults (opts, true);
    mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
 
-   if (ret.exc) {
-      const bson_t *error_document;
-      if (mongoc_bulkwriteexception_error (ret.exc, &error)) {
-         test_error ("unexpected top-level error: %s\n%s", error.message, tmp_json (error_document));
-      }
-      test_error ("unexpected error");
-   }
+   ASSERT_NO_BULKWRITEEXCEPTION (ret);
 
    ASSERT_CMPINT64 (mongoc_bulkwriteresult_upsertedcount (ret.res), ==, 2);
 
