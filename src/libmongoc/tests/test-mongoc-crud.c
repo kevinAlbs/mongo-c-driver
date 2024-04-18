@@ -312,9 +312,7 @@ prose_test_4 (void *ctx)
    }
 
    mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, NULL /* options */);
-   if (ret.exc) {
-      ASSERT_OR_PRINT (!mongoc_bulkwriteexception_error (ret.exc, &error), error);
-   }
+   ASSERT_NO_BULKWRITEEXCEPTION (ret);
    ASSERT (ret.res);
    ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedcount (ret.res), ==, numModels);
    mongoc_bulkwriteexception_destroy (ret.exc);
@@ -425,7 +423,9 @@ prose_test_5 (void *ctx)
    ASSERT (ret.exc);
 
    // Expect no top-level error.
-   ASSERT_OR_PRINT (!mongoc_bulkwriteexception_error (ret.exc, &error), error);
+   if (mongoc_bulkwriteexception_error (ret.exc, &error)) {
+      test_error ("Expected no top-level error but got:\n%s", test_bulkwriteexception_str (ret.exc));
+   }
 
    // Assert two batches were sent.
    ASSERT_CMPUINT32 (bson_count_keys (&cb_ctx.ops_counts), ==, 2);
@@ -509,9 +509,8 @@ prose_test_6 (void *ctx)
       mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
       ASSERT (ret.exc);
 
-      // TODO: use a macro to dump all error information on unexpected error.
       if (mongoc_bulkwriteexception_error (ret.exc, &error)) {
-         test_error ("unexpected error: %s", error.message);
+         test_error ("Expected no top-level error but got:\n%s", test_bulkwriteexception_str (ret.exc));
       }
 
       // Assert two batches were sent.
@@ -559,7 +558,7 @@ prose_test_6 (void *ctx)
       ASSERT (ret.exc);
 
       if (mongoc_bulkwriteexception_error (ret.exc, &error)) {
-         test_error ("unexpected error: %s", error.message);
+         test_error ("Expected no top-level error but got:\n%s", test_bulkwriteexception_str (ret.exc));
       }
 
       // Assert one batch was sent.
@@ -891,7 +890,9 @@ prose_test_9 (void *ctx)
    mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
    ASSERT (ret.exc);
 
-   ASSERT (mongoc_bulkwriteexception_error (ret.exc, &error));
+   if (!mongoc_bulkwriteexception_error (ret.exc, &error)) {
+      test_error ("Expected top-level error but got:\n%s", test_bulkwriteexception_str (ret.exc));
+   }
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_QUERY, 8, "Failing command via 'failCommand' failpoint");
 
    ASSERT (ret.res);
@@ -970,7 +971,9 @@ prose_test_10 (void *ctx)
 
       mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
       ASSERT (ret.exc);
-      ASSERT (mongoc_bulkwriteexception_error (ret.exc, &error));
+      if (!mongoc_bulkwriteexception_error (ret.exc, &error)) {
+         test_error ("Expected top-level error but got:\n%s", test_bulkwriteexception_str (ret.exc));
+      }
       ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "of size");
 
       mongoc_bulkwriteexception_destroy (ret.exc);
@@ -986,7 +989,9 @@ prose_test_10 (void *ctx)
 
       mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
       ASSERT (ret.exc);
-      ASSERT (mongoc_bulkwriteexception_error (ret.exc, &error));
+      if (!mongoc_bulkwriteexception_error (ret.exc, &error)) {
+         test_error ("Expected top-level error but got:\n%s", test_bulkwriteexception_str (ret.exc));
+      }
       ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "of size");
 
       mongoc_bulkwriteexception_destroy (ret.exc);
