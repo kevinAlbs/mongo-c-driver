@@ -65,19 +65,15 @@ BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_modifiedcount (const mongoc_bulkwriteresult_t *self);
 BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_deletedcount (const mongoc_bulkwriteresult_t *self);
-
 // `mongoc_bulkwriteresult_insertresults` returns a BSON document mapping model indexes to insert results.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_insertresults (const mongoc_bulkwriteresult_t *self);
-
 // `mongoc_bulkwriteresult_updateresults` returns a BSON document mapping model indexes to update results.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_updateresults (const mongoc_bulkwriteresult_t *self);
-
 // `mongoc_bulkwriteresult_deleteresults` returns a BSON document mapping model indexes to delete results.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_deleteresults (const mongoc_bulkwriteresult_t *self);
-
 // `mongoc_bulkwriteresult_get_serverid` identifies which server to performed the operation. This may differ from a
 // previously set serverid if a retry occurred. This is intended for use by wrapping drivers that select a server before
 // running the operation.
@@ -87,23 +83,18 @@ BSON_EXPORT (void)
 mongoc_bulkwriteresult_destroy (mongoc_bulkwriteresult_t *self);
 
 typedef struct _mongoc_bulkwriteexception_t mongoc_bulkwriteexception_t;
-
 // Returns true if there was a top-level error.
 BSON_EXPORT (bool)
 mongoc_bulkwriteexception_error (const mongoc_bulkwriteexception_t *self, bson_error_t *error);
-
 // `mongoc_bulkwriteexception_writeerrors` returns a BSON document mapping model indexes to write errors.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteexception_writeerrors (const mongoc_bulkwriteexception_t *self);
-
 // `mongoc_bulkwriteexception_writeconcernerrors` returns a BSON array of write concern errors.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteexception_writeconcernerrors (const mongoc_bulkwriteexception_t *self);
-
 // `mongoc_bulkwriteexception_errorreply` returns a possible server reply related to the error, or an empty document.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteexception_errorreply (const mongoc_bulkwriteexception_t *self);
-
 BSON_EXPORT (void)
 mongoc_bulkwriteexception_destroy (mongoc_bulkwriteexception_t *self);
 
@@ -226,7 +217,7 @@ mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
 
 // `mongoc_bulkwritereturn_t` may outlive `mongoc_bulkwrite_t`.
 typedef struct {
-   mongoc_bulkwriteresult_t *res;
+   mongoc_bulkwriteresult_t *res;    // May be NULL
    mongoc_bulkwriteexception_t *exc; // May be NULL
 } mongoc_bulkwritereturn_t;
 BSON_EXPORT (mongoc_bulkwritereturn_t)
