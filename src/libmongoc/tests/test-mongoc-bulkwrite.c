@@ -306,6 +306,67 @@ test_bulkwrite_serverid (void *ctx)
    mongoc_client_destroy (client);
 }
 
+static void
+capture_last_bulkWrite_command (const mongoc_apm_command_started_t *event)
+{
+   if (0 == strcmp (mongoc_apm_command_started_get_command_name (event), "bulkWrite")) {
+      bson_t *last_captured = mongoc_apm_command_started_get_context (event);
+      bson_destroy (last_captured);
+      const bson_t *cmd = mongoc_apm_command_started_get_command (event);
+      bson_copy_to (cmd, last_captured);
+   }
+}
+
+static void
+test_bulkwrite_extra (void *ctx)
+{
+   mongoc_client_t *client;
+   BSON_UNUSED (ctx);
+   bool ok;
+   bson_error_t error;
+
+   client = test_framework_new_default_client ();
+
+   bson_t last_captured = BSON_INITIALIZER;
+   // Set callback to capture the last `bulkWrite` command.
+   {
+      mongoc_apm_callbacks_t *cbs = mongoc_apm_callbacks_new ();
+      mongoc_apm_set_command_started_cb (cbs, capture_last_bulkWrite_command);
+      mongoc_client_set_apm_callbacks (client, cbs, &last_captured);
+      mongoc_apm_callbacks_destroy (cbs);
+   }
+
+   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+   // Create bulk write.
+   {
+      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+   }
+
+   mongoc_bulkwriteoptions_t *bwo = mongoc_bulkwriteoptions_new ();
+   // Create bulk write options with extra options.
+   {
+      bson_t *extra = tmp_bson ("{'comment': 'foo'}");
+      mongoc_bulkwriteoptions_set_extra (bwo, extra);
+   }
+
+   // Execute.
+   {
+      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, bwo);
+      ASSERT_NO_BULKWRITEEXCEPTION (bwr);
+      mongoc_bulkwriteresult_destroy (bwr.res);
+      mongoc_bulkwriteexception_destroy (bwr.exc);
+   }
+
+   // Expect `bulkWrite` command was sent with extra option.
+   ASSERT_MATCH (&last_captured, "{'comment': 'foo'}");
+
+   mongoc_bulkwriteoptions_destroy (bwo);
+   mongoc_bulkwrite_destroy (bw);
+   bson_destroy (&last_captured);
+   mongoc_client_destroy (client);
+}
+
 
 void
 test_bulkwrite_install (TestSuite *suite)
@@ -353,6 +414,14 @@ test_bulkwrite_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/bulkwrite/server_id",
                       test_bulkwrite_serverid,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
+
+   TestSuite_AddFull (suite,
+                      "/bulkwrite/extra",
+                      test_bulkwrite_extra,
                       NULL /* dtor */,
                       NULL /* ctx */,
                       test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0

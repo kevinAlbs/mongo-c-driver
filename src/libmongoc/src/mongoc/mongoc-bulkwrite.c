@@ -37,7 +37,7 @@ struct _mongoc_bulkwriteoptions_t {
    mongoc_opt_bool_t verboseresults;
    const bson_t *comment;
    mongoc_client_session_t *session;
-   const bson_t *extra;
+   bson_t *extra;
    uint32_t serverid;
 };
 
@@ -92,7 +92,8 @@ void
 mongoc_bulkwriteoptions_set_extra (mongoc_bulkwriteoptions_t *self, const bson_t *extra)
 {
    BSON_ASSERT_PARAM (self);
-   self->extra = extra;
+   bson_destroy (self->extra);
+   self->extra = bson_copy (extra);
 }
 void
 mongoc_bulkwriteoptions_set_serverid (mongoc_bulkwriteoptions_t *self, uint32_t serverid)
@@ -106,6 +107,7 @@ mongoc_bulkwriteoptions_destroy (mongoc_bulkwriteoptions_t *self)
    if (!self) {
       return;
    }
+   bson_destroy (self->extra);
    bson_free (self);
 }
 
@@ -1341,6 +1343,15 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
          BSON_ASSERT (bson_array_builder_append_document_end (nsInfo, &nsInfo_element));
       }
       BSON_ASSERT (bson_append_array_builder_end (&cmd, nsInfo));
+
+      // Add optional extra fields.
+      if (opts->extra) {
+         if (!bson_concat (&cmd, opts->extra)) {
+            bson_set_error (&error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "failed to append extra");
+            _bulkwriteexception_set_error (ret.exc, &error);
+            goto fail;
+         }
+      }
 
       mongoc_cmd_parts_init (&parts, self->client, "admin", MONGOC_QUERY_NONE, &cmd);
       parts.assembled.operation_id = self->operation_id;
