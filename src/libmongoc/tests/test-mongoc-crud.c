@@ -1006,9 +1006,16 @@ prose_test_10 (void *ctx)
 }
 
 static int
-skip_if_no_SERVER_88895 (void)
+skip_if_no_SERVER_89464 (void)
 {
-   return test_framework_getenv_bool ("HAS_SERVER_888895") ? 1 : 0;
+   bool is_mongos = test_framework_is_mongos ();
+   bool has_SERVER_89464 = test_framework_getenv_bool ("HAS_SERVER_89464");
+   if (!has_SERVER_89464) {
+      printf ("Skipping test. Detected mongos without changes of SERVER-89464");
+      return 0;
+   }
+
+   return 1;
 }
 
 void
@@ -1058,7 +1065,7 @@ test_crud_install (TestSuite *suite)
                       NULL, /* dtor */
                       NULL, /* ctx */
                       test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */,
-                      skip_if_no_SERVER_88895);
+                      skip_if_no_SERVER_89464);
 
 
    TestSuite_AddFull (suite,
@@ -1068,7 +1075,7 @@ test_crud_install (TestSuite *suite)
                       NULL,                                                 /* ctx */
                       test_framework_skip_if_max_wire_version_less_than_25, /* require 8.0+
                                                                                server */
-                      skip_if_no_SERVER_88895);
+                      skip_if_no_SERVER_89464);
 
 
    TestSuite_AddFull (suite,
@@ -1080,14 +1087,15 @@ test_crud_install (TestSuite *suite)
                                                                               server */
                       ,
                       test_framework_skip_if_single,
-                      skip_if_no_SERVER_88895);
+                      skip_if_no_SERVER_89464);
 
    TestSuite_AddFull (suite,
                       "/crud/prose_test_9",
                       prose_test_9,
                       NULL, /* dtor */
                       NULL, /* ctx */
-                      test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */);
+                      test_framework_skip_if_max_wire_version_less_than_25 /* require 8.0+ server */,
+                      skip_if_no_SERVER_89464);
 
    TestSuite_AddFull (suite,
                       "/crud/prose_test_10",
