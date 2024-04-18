@@ -32,14 +32,38 @@ typedef struct {
 struct _mongoc_bulkwriteoptions_t {
    mongoc_opt_bool_t ordered;
    mongoc_opt_bool_t bypassdocumentvalidation;
-   const bson_t *let;
-   const mongoc_write_concern_t *writeconcern;
+   bson_t *let;
+   mongoc_write_concern_t *writeconcern;
    mongoc_opt_bool_t verboseresults;
-   const bson_t *comment;
+   bson_t *comment;
    mongoc_client_session_t *session;
    bson_t *extra;
    uint32_t serverid;
 };
+
+
+// `set_bson_opt` sets `dst` by copying `src`. If NULL is passed, the `dst` is cleared.
+static void
+set_bson_opt (bson_t **dst, const bson_t *src)
+{
+   BSON_ASSERT_PARAM (dst);
+   bson_destroy (*dst);
+   *dst = NULL;
+   if (src) {
+      *dst = bson_copy (src);
+   }
+}
+
+static void
+set_hint_opt (bson_value_t *dst, const bson_value_t *src)
+{
+   BSON_ASSERT_PARAM (dst);
+   bson_value_destroy (dst);
+   *dst = (bson_value_t){0};
+   if (src) {
+      bson_value_copy (src, dst);
+   }
+}
 
 mongoc_bulkwriteoptions_t *
 mongoc_bulkwriteoptions_new (void)
@@ -62,13 +86,14 @@ void
 mongoc_bulkwriteoptions_set_let (mongoc_bulkwriteoptions_t *self, const bson_t *let)
 {
    BSON_ASSERT_PARAM (self);
-   self->let = let;
+   set_bson_opt (&self->let, let);
 }
 void
 mongoc_bulkwriteoptions_set_writeconcern (mongoc_bulkwriteoptions_t *self, const mongoc_write_concern_t *writeconcern)
 {
    BSON_ASSERT_PARAM (self);
-   self->writeconcern = writeconcern;
+   mongoc_write_concern_destroy (self->writeconcern);
+   self->writeconcern = mongoc_write_concern_copy (writeconcern);
 }
 void
 mongoc_bulkwriteoptions_set_verboseresults (mongoc_bulkwriteoptions_t *self, bool verboseresults)
@@ -80,20 +105,20 @@ void
 mongoc_bulkwriteoptions_set_comment (mongoc_bulkwriteoptions_t *self, const bson_t *comment)
 {
    BSON_ASSERT_PARAM (self);
-   self->comment = comment;
+   set_bson_opt (&self->comment, comment);
 }
 void
 mongoc_bulkwriteoptions_set_session (mongoc_bulkwriteoptions_t *self, mongoc_client_session_t *session)
 {
    BSON_ASSERT_PARAM (self);
+   // Client sessions cannot be copied. Do a non-owning assignment.
    self->session = session;
 }
 void
 mongoc_bulkwriteoptions_set_extra (mongoc_bulkwriteoptions_t *self, const bson_t *extra)
 {
    BSON_ASSERT_PARAM (self);
-   bson_destroy (self->extra);
-   self->extra = bson_copy (extra);
+   set_bson_opt (&self->extra, extra);
 }
 void
 mongoc_bulkwriteoptions_set_serverid (mongoc_bulkwriteoptions_t *self, uint32_t serverid)
@@ -108,6 +133,9 @@ mongoc_bulkwriteoptions_destroy (mongoc_bulkwriteoptions_t *self)
       return;
    }
    bson_destroy (self->extra);
+   bson_destroy (self->comment);
+   mongoc_write_concern_destroy (self->writeconcern);
+   bson_destroy (self->let);
    bson_free (self);
 }
 
@@ -305,9 +333,9 @@ validate_update (const bson_t *update, bson_error_t *error)
 }
 
 struct _mongoc_updateoneopts_t {
-   const bson_t *arrayfilters;
-   const bson_t *collation;
-   const bson_value_t *hint;
+   bson_t *arrayfilters;
+   bson_t *collation;
+   bson_value_t hint;
    mongoc_opt_bool_t upsert;
 };
 
@@ -320,19 +348,19 @@ void
 mongoc_updateoneopts_set_arrayfilters (mongoc_updateoneopts_t *self, const bson_t *arrayfilters)
 {
    BSON_ASSERT_PARAM (self);
-   self->arrayfilters = arrayfilters;
+   set_bson_opt (&self->arrayfilters, arrayfilters);
 }
 void
 mongoc_updateoneopts_set_collation (mongoc_updateoneopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   self->collation = collation;
+   set_bson_opt (&self->collation, collation);
 }
 void
 mongoc_updateoneopts_set_hint (mongoc_updateoneopts_t *self, const bson_value_t *hint)
 {
    BSON_ASSERT_PARAM (self);
-   self->hint = hint;
+   set_hint_opt (&self->hint, hint);
 }
 void
 mongoc_updateoneopts_set_upsert (mongoc_updateoneopts_t *self, bool upsert)
@@ -346,6 +374,9 @@ mongoc_updateoneopts_destroy (mongoc_updateoneopts_t *self)
    if (!self) {
       return;
    }
+   bson_destroy (self->arrayfilters);
+   bson_destroy (self->collation);
+   bson_value_destroy (&self->hint);
    bson_free (self);
 }
 
@@ -402,8 +433,8 @@ mongoc_bulkwrite_append_updateone (mongoc_bulkwrite_t *self,
    if (opts->collation) {
       BSON_ASSERT (bson_append_document (&op, "collation", 9, opts->collation));
    }
-   if (opts->hint) {
-      BSON_ASSERT (bson_append_value (&op, "hint", 4, opts->hint));
+   if (opts->hint.value_type != BSON_TYPE_EOD) {
+      BSON_ASSERT (bson_append_value (&op, "hint", 4, &opts->hint));
    }
    if (opts->upsert.isset) {
       BSON_ASSERT (bson_append_bool (&op, "upsert", 6, opts->upsert.val));
@@ -419,9 +450,9 @@ mongoc_bulkwrite_append_updateone (mongoc_bulkwrite_t *self,
 }
 
 struct _mongoc_replaceoneopts_t {
-   const bson_t *arrayfilters;
-   const bson_t *collation;
-   const bson_value_t *hint;
+   bson_t *arrayfilters;
+   bson_t *collation;
+   bson_value_t hint;
    mongoc_opt_bool_t upsert;
 };
 
@@ -434,19 +465,19 @@ void
 mongoc_replaceoneopts_set_arrayfilters (mongoc_replaceoneopts_t *self, const bson_t *arrayfilters)
 {
    BSON_ASSERT_PARAM (self);
-   self->arrayfilters = arrayfilters;
+   set_bson_opt (&self->arrayfilters, arrayfilters);
 }
 void
 mongoc_replaceoneopts_set_collation (mongoc_replaceoneopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   self->collation = collation;
+   set_bson_opt (&self->collation, collation);
 }
 void
 mongoc_replaceoneopts_set_hint (mongoc_replaceoneopts_t *self, const bson_value_t *hint)
 {
    BSON_ASSERT_PARAM (self);
-   self->hint = hint;
+   set_hint_opt (&self->hint, hint);
 }
 void
 mongoc_replaceoneopts_set_upsert (mongoc_replaceoneopts_t *self, bool upsert)
@@ -460,6 +491,9 @@ mongoc_replaceoneopts_destroy (mongoc_replaceoneopts_t *self)
    if (!self) {
       return;
    }
+   bson_destroy (self->arrayfilters);
+   bson_destroy (self->collation);
+   bson_value_destroy (&self->hint);
    bson_free (self);
 }
 
@@ -538,8 +572,8 @@ mongoc_bulkwrite_append_replaceone (mongoc_bulkwrite_t *self,
    if (opts->collation) {
       BSON_ASSERT (bson_append_document (&op, "collation", 9, opts->collation));
    }
-   if (opts->hint) {
-      BSON_ASSERT (bson_append_value (&op, "hint", 4, opts->hint));
+   if (opts->hint.value_type != BSON_TYPE_EOD) {
+      BSON_ASSERT (bson_append_value (&op, "hint", 4, &opts->hint));
    }
    if (opts->upsert.isset) {
       BSON_ASSERT (bson_append_bool (&op, "upsert", 6, opts->upsert.val));
@@ -556,9 +590,9 @@ mongoc_bulkwrite_append_replaceone (mongoc_bulkwrite_t *self,
 }
 
 struct _mongoc_updatemanyopts_t {
-   const bson_t *arrayfilters;
-   const bson_t *collation;
-   const bson_value_t *hint;
+   bson_t *arrayfilters;
+   bson_t *collation;
+   bson_value_t hint;
    mongoc_opt_bool_t upsert;
 };
 
@@ -571,19 +605,19 @@ void
 mongoc_updatemanyopts_set_arrayfilters (mongoc_updatemanyopts_t *self, const bson_t *arrayfilters)
 {
    BSON_ASSERT_PARAM (self);
-   self->arrayfilters = arrayfilters;
+   set_bson_opt (&self->arrayfilters, arrayfilters);
 }
 void
 mongoc_updatemanyopts_set_collation (mongoc_updatemanyopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   self->collation = collation;
+   set_bson_opt (&self->collation, collation);
 }
 void
 mongoc_updatemanyopts_set_hint (mongoc_updatemanyopts_t *self, const bson_value_t *hint)
 {
    BSON_ASSERT_PARAM (self);
-   self->hint = hint;
+   set_hint_opt (&self->hint, hint);
 }
 void
 mongoc_updatemanyopts_set_upsert (mongoc_updatemanyopts_t *self, bool upsert)
@@ -597,6 +631,9 @@ mongoc_updatemanyopts_destroy (mongoc_updatemanyopts_t *self)
    if (!self) {
       return;
    }
+   bson_destroy (self->arrayfilters);
+   bson_destroy (self->collation);
+   bson_value_destroy (&self->hint);
    bson_free (self);
 }
 
@@ -653,8 +690,8 @@ mongoc_bulkwrite_append_updatemany (mongoc_bulkwrite_t *self,
    if (opts->collation) {
       BSON_ASSERT (bson_append_document (&op, "collation", 9, opts->collation));
    }
-   if (opts->hint) {
-      BSON_ASSERT (bson_append_value (&op, "hint", 4, opts->hint));
+   if (opts->hint.value_type != BSON_TYPE_EOD) {
+      BSON_ASSERT (bson_append_value (&op, "hint", 4, &opts->hint));
    }
    if (opts->upsert.isset) {
       BSON_ASSERT (bson_append_bool (&op, "upsert", 6, opts->upsert.val));
@@ -671,8 +708,8 @@ mongoc_bulkwrite_append_updatemany (mongoc_bulkwrite_t *self,
 }
 
 struct _mongoc_deleteoneopts_t {
-   const bson_t *collation;
-   const bson_value_t *hint;
+   bson_t *collation;
+   bson_value_t hint;
 };
 
 mongoc_deleteoneopts_t *
@@ -684,13 +721,13 @@ void
 mongoc_deleteoneopts_set_collation (mongoc_deleteoneopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   self->collation = collation;
+   set_bson_opt (&self->collation, collation);
 }
 void
 mongoc_deleteoneopts_set_hint (mongoc_deleteoneopts_t *self, const bson_value_t *hint)
 {
    BSON_ASSERT_PARAM (self);
-   self->hint = hint;
+   set_hint_opt (&self->hint, hint);
 }
 void
 mongoc_deleteoneopts_destroy (mongoc_deleteoneopts_t *self)
@@ -698,6 +735,8 @@ mongoc_deleteoneopts_destroy (mongoc_deleteoneopts_t *self)
    if (!self) {
       return;
    }
+   bson_value_destroy (&self->hint);
+   bson_destroy (self->collation);
    bson_free (self);
 }
 
@@ -738,8 +777,8 @@ mongoc_bulkwrite_append_deleteone (mongoc_bulkwrite_t *self,
    if (opts->collation) {
       BSON_ASSERT (bson_append_document (&op, "collation", 9, opts->collation));
    }
-   if (opts->hint) {
-      BSON_ASSERT (bson_append_value (&op, "hint", 4, opts->hint));
+   if (opts->hint.value_type != BSON_TYPE_EOD) {
+      BSON_ASSERT (bson_append_value (&op, "hint", 4, &opts->hint));
    }
 
    BSON_ASSERT (_mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
@@ -752,8 +791,8 @@ mongoc_bulkwrite_append_deleteone (mongoc_bulkwrite_t *self,
 }
 
 struct _mongoc_deletemanyopts_t {
-   const bson_t *collation;
-   const bson_value_t *hint;
+   bson_t *collation;
+   bson_value_t hint;
 };
 
 mongoc_deletemanyopts_t *
@@ -765,13 +804,13 @@ void
 mongoc_deletemanyopts_set_collation (mongoc_deletemanyopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
-   self->collation = collation;
+   set_bson_opt (&self->collation, collation);
 }
 void
 mongoc_deletemanyopts_set_hint (mongoc_deletemanyopts_t *self, const bson_value_t *hint)
 {
    BSON_ASSERT_PARAM (self);
-   self->hint = hint;
+   set_hint_opt (&self->hint, hint);
 }
 void
 mongoc_deletemanyopts_destroy (mongoc_deletemanyopts_t *self)
@@ -779,6 +818,8 @@ mongoc_deletemanyopts_destroy (mongoc_deletemanyopts_t *self)
    if (!self) {
       return;
    }
+   bson_value_destroy (&self->hint);
+   bson_destroy (self->collation);
    bson_free (self);
 }
 
@@ -819,8 +860,8 @@ mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
    if (opts->collation) {
       BSON_ASSERT (bson_append_document (&op, "collation", 9, opts->collation));
    }
-   if (opts->hint) {
-      BSON_ASSERT (bson_append_value (&op, "hint", 4, opts->hint));
+   if (opts->hint.value_type != BSON_TYPE_EOD) {
+      BSON_ASSERT (bson_append_value (&op, "hint", 4, &opts->hint));
    }
 
    BSON_ASSERT (_mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));

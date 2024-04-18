@@ -39,6 +39,7 @@ BSON_EXPORT (void)
 mongoc_bulkwriteoptions_set_verboseresults (mongoc_bulkwriteoptions_t *self, bool verboseresults);
 BSON_EXPORT (void)
 mongoc_bulkwriteoptions_set_comment (mongoc_bulkwriteoptions_t *self, const bson_t *comment);
+// `mongoc_bulkwriteoptions_set_session` does not copy `session`. The caller must ensure `session` outlives `self`.
 BSON_EXPORT (void)
 mongoc_bulkwriteoptions_set_session (mongoc_bulkwriteoptions_t *self, mongoc_client_session_t *session);
 // `mongoc_bulkwriteoptions_set_extra` appends `extra` to bulkWrite command.
