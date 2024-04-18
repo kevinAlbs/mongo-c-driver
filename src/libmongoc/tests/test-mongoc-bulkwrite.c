@@ -245,6 +245,15 @@ test_bulkwrite_double_execute (void *ctx)
 }
 
 static void
+capture_last_bulkWrite_serverid (const mongoc_apm_command_started_t *event)
+{
+   if (0 == strcmp (mongoc_apm_command_started_get_command_name (event), "bulkWrite")) {
+      uint32_t *last_captured = mongoc_apm_command_started_get_context (event);
+      *last_captured = mongoc_apm_command_started_get_server_id (event);
+   }
+}
+
+static void
 test_bulkwrite_serverid (void *ctx)
 {
    mongoc_client_t *client;
@@ -263,6 +272,16 @@ test_bulkwrite_serverid (void *ctx)
       mongoc_server_description_destroy (sd);
    }
 
+   uint32_t last_captured = 0;
+   // Set callback to capture the serverid used for the last `bulkWrite` command.
+   {
+      mongoc_apm_callbacks_t *cbs = mongoc_apm_callbacks_new ();
+      mongoc_apm_set_command_started_cb (cbs, capture_last_bulkWrite_serverid);
+      mongoc_client_set_apm_callbacks (client, cbs, &last_captured);
+      mongoc_apm_callbacks_destroy (cbs);
+   }
+
+
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
    mongoc_bulkwriteoptions_t *bwo = mongoc_bulkwriteoptions_new ();
    mongoc_bulkwriteoptions_set_serverid (bwo, selected_serverid);
@@ -271,7 +290,7 @@ test_bulkwrite_serverid (void *ctx)
    ASSERT_OR_PRINT (ok, error);
    // Execute.
    {
-      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, NULL);
+      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, bwo);
       ASSERT_NO_BULKWRITEEXCEPTION (bwr);
       // Expect used the same server ID.
       uint32_t used_serverid = mongoc_bulkwriteresult_serverid (bwr.res);
@@ -280,6 +299,7 @@ test_bulkwrite_serverid (void *ctx)
       mongoc_bulkwriteexception_destroy (bwr.exc);
    }
 
+   ASSERT_CMPUINT32 (last_captured, ==, selected_serverid);
 
    mongoc_bulkwriteoptions_destroy (bwo);
    mongoc_bulkwrite_destroy (bw);
