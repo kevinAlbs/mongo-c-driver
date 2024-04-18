@@ -1010,7 +1010,7 @@ skip_if_no_SERVER_89464 (void)
 {
    bool is_mongos = test_framework_is_mongos ();
    bool has_SERVER_89464 = test_framework_getenv_bool ("HAS_SERVER_89464");
-   if (!has_SERVER_89464) {
+   if (is_mongos && !has_SERVER_89464) {
       printf ("Skipping test. Detected mongos without changes of SERVER-89464");
       return 0;
    }
