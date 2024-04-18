@@ -1314,7 +1314,7 @@ test_retryable_writes_install (TestSuite *suite)
                       test_framework_skip_if_max_wire_version_less_than_9,
                       test_framework_skip_if_no_crypto);
    TestSuite_AddFull (suite,
-                      "/retryable_writes/prose_test_4/bulkWrite",
+                      "/retryable_writes/prose_test_4/bulkwrite",
                       retryable_writes_sharded_on_other_mongos_bulkWrite,
                       NULL,
                       NULL,
