@@ -125,15 +125,17 @@ declare -a test_args=(
 )
 
 # Limit tests to client bulk write tests
-test_args+=("-l" "/crud/unified/client-bulkWrite*")
-test_args+=("-l" "/retryable_writes/unified/client-bulkWrite*")
-test_args+=("-l" "/transactions/unified/client-bulkWrite*")
-test_args+=("-l" "/versioned_api/crud-api-version-1")
-test_args+=("-l" "/crud/prose_test*")
-test_args+=("-l" "/command-logging-and-monitoring/monitoring/unacknowledged-client-bulkWrite")
-test_args+=("-l" "/transactions/unified/mongos-pin-auto")
-test_args+=("-l" "/retryable_writes/unified/handshakeError")
-test_args+=("-l" "/bulkwrite/*")
+test_args+=("--match" "/bulkwrite/*")
+test_args+=("--match" "/crud/prose_test*")
+test_args+=("--match" "/crud/unified/client-bulkWrite*")
+test_args+=("--match" "/retryable_writes/prose_test_4/bulkwrite")
+test_args+=("--match" "/retryable_writes/prose_test_3/bulkwrite")
+test_args+=("--match" "/versioned_api/crud-api-version-1")
+test_args+=("--match" "/retryable_writes/unified/handshakeError")
+test_args+=("--match" "/retryable_writes/unified/client-bulkWrite*")
+test_args+=("--match" "/command-logging-and-monitoring/monitoring/unacknowledged-client-bulkWrite")
+test_args+=("--match" "/transactions/unified/client-bulkWrite")
+test_args+=("--match" "/transactions/unified/mongos-pin-auto")
 
 # TODO (CDRIVER-4045): consolidate DNS tests into regular test tasks.
 if [[ "${DNS}" != "nodns" ]]; then
