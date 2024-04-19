@@ -19,8 +19,8 @@ main (int argc, char *argv[])
 
    bson_error_t error;
    mongoc_client_t *client = mongoc_client_new ("mongodb://localhost:27017");
-   mongoc_bulkwriteoptions_t *bwo = mongoc_bulkwriteoptions_new ();
-   mongoc_bulkwriteoptions_set_verboseresults (bwo, true);
+   mongoc_bulkwriteopts_t *bwo = mongoc_bulkwriteopts_new ();
+   mongoc_bulkwriteopts_set_verboseresults (bwo, true);
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
 
    // Insert a document to `db.coll1`
@@ -79,7 +79,7 @@ main (int argc, char *argv[])
    ok = true;
 fail:
    mongoc_client_destroy (client);
-   mongoc_bulkwriteoptions_destroy (bwo);
+   mongoc_bulkwriteopts_destroy (bwo);
    mongoc_cleanup ();
    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

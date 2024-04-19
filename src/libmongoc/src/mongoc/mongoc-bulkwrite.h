@@ -24,34 +24,34 @@
 
 BSON_BEGIN_DECLS
 
-typedef struct _mongoc_bulkwriteoptions_t mongoc_bulkwriteoptions_t;
-BSON_EXPORT (mongoc_bulkwriteoptions_t *)
-mongoc_bulkwriteoptions_new (void);
+typedef struct _mongoc_bulkwriteopts_t mongoc_bulkwriteopts_t;
+BSON_EXPORT (mongoc_bulkwriteopts_t *)
+mongoc_bulkwriteopts_new (void);
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_set_ordered (mongoc_bulkwriteoptions_t *self, bool ordered);
+mongoc_bulkwriteopts_set_ordered (mongoc_bulkwriteopts_t *self, bool ordered);
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_set_bypassdocumentvalidation (mongoc_bulkwriteoptions_t *self, bool bypassdocumentvalidation);
+mongoc_bulkwriteopts_set_bypassdocumentvalidation (mongoc_bulkwriteopts_t *self, bool bypassdocumentvalidation);
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_set_let (mongoc_bulkwriteoptions_t *self, const bson_t *let);
+mongoc_bulkwriteopts_set_let (mongoc_bulkwriteopts_t *self, const bson_t *let);
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_set_writeconcern (mongoc_bulkwriteoptions_t *self, const mongoc_write_concern_t *writeconcern);
+mongoc_bulkwriteopts_set_writeconcern (mongoc_bulkwriteopts_t *self, const mongoc_write_concern_t *writeconcern);
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_set_verboseresults (mongoc_bulkwriteoptions_t *self, bool verboseresults);
+mongoc_bulkwriteopts_set_verboseresults (mongoc_bulkwriteopts_t *self, bool verboseresults);
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_set_comment (mongoc_bulkwriteoptions_t *self, const bson_t *comment);
-// `mongoc_bulkwriteoptions_set_session` does not copy `session`. The caller must ensure `session` outlives `self`.
+mongoc_bulkwriteopts_set_comment (mongoc_bulkwriteopts_t *self, const bson_t *comment);
+// `mongoc_bulkwriteopts_set_session` does not copy `session`. The caller must ensure `session` outlives `self`.
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_set_session (mongoc_bulkwriteoptions_t *self, mongoc_client_session_t *session);
-// `mongoc_bulkwriteoptions_set_extra` appends `extra` to bulkWrite command.
+mongoc_bulkwriteopts_set_session (mongoc_bulkwriteopts_t *self, mongoc_client_session_t *session);
+// `mongoc_bulkwriteopts_set_extra` appends `extra` to bulkWrite command.
 // It is intended to support future server options.
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_set_extra (mongoc_bulkwriteoptions_t *self, const bson_t *extra);
-// `mongoc_bulkwriteoptions_set_serverid` identifies which server to perform the operation. This is intended for use by
+mongoc_bulkwriteopts_set_extra (mongoc_bulkwriteopts_t *self, const bson_t *extra);
+// `mongoc_bulkwriteopts_set_serverid` identifies which server to perform the operation. This is intended for use by
 // wrapping drivers that select a server before running the operation.
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_set_serverid (mongoc_bulkwriteoptions_t *self, uint32_t serverid);
+mongoc_bulkwriteopts_set_serverid (mongoc_bulkwriteopts_t *self, uint32_t serverid);
 BSON_EXPORT (void)
-mongoc_bulkwriteoptions_destroy (mongoc_bulkwriteoptions_t *self);
+mongoc_bulkwriteopts_destroy (mongoc_bulkwriteopts_t *self);
 
 typedef struct _mongoc_bulkwriteresult_t mongoc_bulkwriteresult_t;
 BSON_EXPORT (bool)
@@ -222,7 +222,7 @@ typedef struct {
    mongoc_bulkwriteexception_t *exc; // May be NULL
 } mongoc_bulkwritereturn_t;
 BSON_EXPORT (mongoc_bulkwritereturn_t)
-mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *opts);
+mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts);
 BSON_EXPORT (void)
 mongoc_bulkwrite_destroy (mongoc_bulkwrite_t *self);
 

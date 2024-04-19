@@ -503,9 +503,9 @@ prose_test_6 (void *ctx)
          ASSERT_OR_PRINT (ok, error);
       }
 
-      mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
-      mongoc_bulkwriteoptions_set_ordered (opts, false);
-      mongoc_bulkwriteoptions_set_verboseresults (opts, true);
+      mongoc_bulkwriteopts_t *opts = mongoc_bulkwriteopts_new ();
+      mongoc_bulkwriteopts_set_ordered (opts, false);
+      mongoc_bulkwriteopts_set_verboseresults (opts, true);
       mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
       ASSERT (ret.exc);
 
@@ -528,7 +528,7 @@ prose_test_6 (void *ctx)
 
       mongoc_bulkwriteexception_destroy (ret.exc);
       mongoc_bulkwriteresult_destroy (ret.res);
-      mongoc_bulkwriteoptions_destroy (opts);
+      mongoc_bulkwriteopts_destroy (opts);
       mongoc_bulkwrite_destroy (bw);
    }
 
@@ -551,9 +551,9 @@ prose_test_6 (void *ctx)
       }
 
 
-      mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
-      mongoc_bulkwriteoptions_set_ordered (opts, true);
-      mongoc_bulkwriteoptions_set_verboseresults (opts, true);
+      mongoc_bulkwriteopts_t *opts = mongoc_bulkwriteopts_new ();
+      mongoc_bulkwriteopts_set_ordered (opts, true);
+      mongoc_bulkwriteopts_set_verboseresults (opts, true);
       mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
       ASSERT (ret.exc);
 
@@ -579,7 +579,7 @@ prose_test_6 (void *ctx)
       bson_destroy (&cb_ctx.ops_counts);
       mongoc_bulkwriteexception_destroy (ret.exc);
       mongoc_bulkwriteresult_destroy (ret.res);
-      mongoc_bulkwriteoptions_destroy (opts);
+      mongoc_bulkwriteopts_destroy (opts);
       mongoc_bulkwrite_destroy (bw);
    }
 
@@ -657,9 +657,9 @@ prose_test_7 (void *ctx)
    ASSERT_OR_PRINT (ok, error);
    numModels++;
 
-   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
-   mongoc_bulkwriteoptions_set_ordered (opts, false);
-   mongoc_bulkwriteoptions_set_verboseresults (opts, true);
+   mongoc_bulkwriteopts_t *opts = mongoc_bulkwriteopts_new ();
+   mongoc_bulkwriteopts_set_ordered (opts, false);
+   mongoc_bulkwriteopts_set_verboseresults (opts, true);
    mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
 
    ASSERT_NO_BULKWRITEEXCEPTION (ret);
@@ -674,7 +674,7 @@ prose_test_7 (void *ctx)
 
    ASSERT_CMPINT (cb_ctx.numGetMore, ==, 1);
 
-   mongoc_bulkwriteoptions_destroy (opts);
+   mongoc_bulkwriteopts_destroy (opts);
    bson_destroy (&d2);
    bson_destroy (&d1);
    bson_destroy (update);
@@ -762,9 +762,9 @@ prose_test_8 (void *ctx)
    ASSERT_OR_PRINT (ok, error);
    numModels++;
 
-   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
-   mongoc_bulkwriteoptions_set_ordered (opts, false);
-   mongoc_bulkwriteoptions_set_verboseresults (opts, true);
+   mongoc_bulkwriteopts_t *opts = mongoc_bulkwriteopts_new ();
+   mongoc_bulkwriteopts_set_ordered (opts, false);
+   mongoc_bulkwriteopts_set_verboseresults (opts, true);
    mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
 
    ASSERT_NO_BULKWRITEEXCEPTION (ret);
@@ -780,7 +780,7 @@ prose_test_8 (void *ctx)
    }
 
    mongoc_updateoneopts_destroy (uo);
-   mongoc_bulkwriteoptions_destroy (opts);
+   mongoc_bulkwriteopts_destroy (opts);
    bson_destroy (&d2);
    bson_destroy (&d1);
    bson_destroy (update);
@@ -884,9 +884,9 @@ prose_test_9 (void *ctx)
    ASSERT_OR_PRINT (ok, error);
    numModels++;
 
-   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
-   mongoc_bulkwriteoptions_set_ordered (opts, false);
-   mongoc_bulkwriteoptions_set_verboseresults (opts, true);
+   mongoc_bulkwriteopts_t *opts = mongoc_bulkwriteopts_new ();
+   mongoc_bulkwriteopts_set_ordered (opts, false);
+   mongoc_bulkwriteopts_set_verboseresults (opts, true);
    mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
    ASSERT (ret.exc);
 
@@ -907,7 +907,7 @@ prose_test_9 (void *ctx)
    ASSERT_CMPINT (cb_ctx.numKillCursors, ==, 1);
 
    mongoc_updateoneopts_destroy (uo);
-   mongoc_bulkwriteoptions_destroy (opts);
+   mongoc_bulkwriteopts_destroy (opts);
    bson_destroy (&d2);
    bson_destroy (&d1);
    bson_destroy (update);
@@ -960,8 +960,8 @@ prose_test_10 (void *ctx)
 
    wc = mongoc_write_concern_new ();
    mongoc_write_concern_set_w (wc, MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
-   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
-   mongoc_bulkwriteoptions_set_writeconcern (opts, wc);
+   mongoc_bulkwriteopts_t *opts = mongoc_bulkwriteopts_new ();
+   mongoc_bulkwriteopts_set_writeconcern (opts, wc);
 
    // Test a large insert.
    {
@@ -999,7 +999,7 @@ prose_test_10 (void *ctx)
       mongoc_bulkwrite_destroy (bw);
    }
 
-   mongoc_bulkwriteoptions_destroy (opts);
+   mongoc_bulkwriteopts_destroy (opts);
    bson_destroy (&doc);
    mongoc_write_concern_destroy (wc);
    mongoc_client_destroy (client);

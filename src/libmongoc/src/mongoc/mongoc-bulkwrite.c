@@ -29,7 +29,7 @@ typedef struct {
    bool val;
 } mongoc_opt_bool_t;
 
-struct _mongoc_bulkwriteoptions_t {
+struct _mongoc_bulkwriteopts_t {
    mongoc_opt_bool_t ordered;
    mongoc_opt_bool_t bypassdocumentvalidation;
    bson_t *let;
@@ -65,69 +65,69 @@ set_hint_opt (bson_value_t *dst, const bson_value_t *src)
    }
 }
 
-mongoc_bulkwriteoptions_t *
-mongoc_bulkwriteoptions_new (void)
+mongoc_bulkwriteopts_t *
+mongoc_bulkwriteopts_new (void)
 {
-   return bson_malloc0 (sizeof (mongoc_bulkwriteoptions_t));
+   return bson_malloc0 (sizeof (mongoc_bulkwriteopts_t));
 }
 void
-mongoc_bulkwriteoptions_set_ordered (mongoc_bulkwriteoptions_t *self, bool ordered)
+mongoc_bulkwriteopts_set_ordered (mongoc_bulkwriteopts_t *self, bool ordered)
 {
    BSON_ASSERT_PARAM (self);
    self->ordered = (mongoc_opt_bool_t){.isset = true, .val = ordered};
 }
 void
-mongoc_bulkwriteoptions_set_bypassdocumentvalidation (mongoc_bulkwriteoptions_t *self, bool bypassdocumentvalidation)
+mongoc_bulkwriteopts_set_bypassdocumentvalidation (mongoc_bulkwriteopts_t *self, bool bypassdocumentvalidation)
 {
    BSON_ASSERT_PARAM (self);
    self->bypassdocumentvalidation = (mongoc_opt_bool_t){.isset = true, .val = bypassdocumentvalidation};
 }
 void
-mongoc_bulkwriteoptions_set_let (mongoc_bulkwriteoptions_t *self, const bson_t *let)
+mongoc_bulkwriteopts_set_let (mongoc_bulkwriteopts_t *self, const bson_t *let)
 {
    BSON_ASSERT_PARAM (self);
    set_bson_opt (&self->let, let);
 }
 void
-mongoc_bulkwriteoptions_set_writeconcern (mongoc_bulkwriteoptions_t *self, const mongoc_write_concern_t *writeconcern)
+mongoc_bulkwriteopts_set_writeconcern (mongoc_bulkwriteopts_t *self, const mongoc_write_concern_t *writeconcern)
 {
    BSON_ASSERT_PARAM (self);
    mongoc_write_concern_destroy (self->writeconcern);
    self->writeconcern = mongoc_write_concern_copy (writeconcern);
 }
 void
-mongoc_bulkwriteoptions_set_verboseresults (mongoc_bulkwriteoptions_t *self, bool verboseresults)
+mongoc_bulkwriteopts_set_verboseresults (mongoc_bulkwriteopts_t *self, bool verboseresults)
 {
    BSON_ASSERT_PARAM (self);
    self->verboseresults = (mongoc_opt_bool_t){.isset = true, .val = verboseresults};
 }
 void
-mongoc_bulkwriteoptions_set_comment (mongoc_bulkwriteoptions_t *self, const bson_t *comment)
+mongoc_bulkwriteopts_set_comment (mongoc_bulkwriteopts_t *self, const bson_t *comment)
 {
    BSON_ASSERT_PARAM (self);
    set_bson_opt (&self->comment, comment);
 }
 void
-mongoc_bulkwriteoptions_set_session (mongoc_bulkwriteoptions_t *self, mongoc_client_session_t *session)
+mongoc_bulkwriteopts_set_session (mongoc_bulkwriteopts_t *self, mongoc_client_session_t *session)
 {
    BSON_ASSERT_PARAM (self);
    // Client sessions cannot be copied. Do a non-owning assignment.
    self->session = session;
 }
 void
-mongoc_bulkwriteoptions_set_extra (mongoc_bulkwriteoptions_t *self, const bson_t *extra)
+mongoc_bulkwriteopts_set_extra (mongoc_bulkwriteopts_t *self, const bson_t *extra)
 {
    BSON_ASSERT_PARAM (self);
    set_bson_opt (&self->extra, extra);
 }
 void
-mongoc_bulkwriteoptions_set_serverid (mongoc_bulkwriteoptions_t *self, uint32_t serverid)
+mongoc_bulkwriteopts_set_serverid (mongoc_bulkwriteopts_t *self, uint32_t serverid)
 {
    BSON_ASSERT_PARAM (self);
    self->serverid = serverid;
 }
 void
-mongoc_bulkwriteoptions_destroy (mongoc_bulkwriteoptions_t *self)
+mongoc_bulkwriteopts_destroy (mongoc_bulkwriteopts_t *self)
 {
    if (!self) {
       return;
@@ -379,6 +379,8 @@ mongoc_updateoneopts_destroy (mongoc_updateoneopts_t *self)
    bson_value_destroy (&self->hint);
    bson_free (self);
 }
+
+#include <bson-dsl.h>
 
 bool
 mongoc_bulkwrite_append_updateone (mongoc_bulkwrite_t *self,
@@ -1295,7 +1297,7 @@ lookup_string (
 
 
 mongoc_bulkwritereturn_t
-mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *opts)
+mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts)
 {
    BSON_ASSERT_PARAM (self);
    mongoc_bulkwritereturn_t ret = {0};
@@ -1303,7 +1305,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteoptions_t *o
    mongoc_server_stream_t *ss = NULL;
    bson_t cmd = BSON_INITIALIZER;
    mongoc_cmd_parts_t parts = {0};
-   mongoc_bulkwriteoptions_t defaults = {0};
+   mongoc_bulkwriteopts_t defaults = {0};
    if (!opts) {
       opts = &defaults;
    }

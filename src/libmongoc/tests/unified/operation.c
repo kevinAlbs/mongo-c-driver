@@ -412,7 +412,7 @@ operation_client_bulkwrite (test_t *test, operation_t *op, result_t *result, bso
    mongoc_write_concern_t *wc = NULL;
 
    mongoc_bulkwrite_t *bw = NULL;
-   mongoc_bulkwriteoptions_t *opts = mongoc_bulkwriteoptions_new ();
+   mongoc_bulkwriteopts_t *opts = mongoc_bulkwriteopts_new ();
 
    client = entity_map_get_client (test->entity_map, op->object, error);
    if (!client) {
@@ -444,27 +444,27 @@ operation_client_bulkwrite (test_t *test, operation_t *op, result_t *result, bso
          goto parse_done;
       }
       if (args_verboseResults && *args_verboseResults) {
-         mongoc_bulkwriteoptions_set_verboseresults (opts, true);
+         mongoc_bulkwriteopts_set_verboseresults (opts, true);
       }
       if (args_ordered) {
-         mongoc_bulkwriteoptions_set_ordered (opts, *args_ordered);
+         mongoc_bulkwriteopts_set_ordered (opts, *args_ordered);
       }
       if (args_comment) {
          // Copy `args_comment` to extend lifetime beyond `parser`.
          comment = bson_copy (args_comment);
-         mongoc_bulkwriteoptions_set_comment (opts, comment);
+         mongoc_bulkwriteopts_set_comment (opts, comment);
       }
       if (args_bypassDocumentValidation) {
-         mongoc_bulkwriteoptions_set_bypassdocumentvalidation (opts, *args_bypassDocumentValidation);
+         mongoc_bulkwriteopts_set_bypassdocumentvalidation (opts, *args_bypassDocumentValidation);
       }
       if (args_let) {
          // Copy `args_let` to extend lifetime beyond `parser`.
          let = bson_copy (args_let);
-         mongoc_bulkwriteoptions_set_let (opts, let);
+         mongoc_bulkwriteopts_set_let (opts, let);
       }
       if (args_wc) {
          wc = mongoc_write_concern_copy (args_wc);
-         mongoc_bulkwriteoptions_set_writeconcern (opts, wc);
+         mongoc_bulkwriteopts_set_writeconcern (opts, wc);
       }
 
       // Parse models.
@@ -499,7 +499,7 @@ operation_client_bulkwrite (test_t *test, operation_t *op, result_t *result, bso
    }
 
    if (op->session) {
-      mongoc_bulkwriteoptions_set_session (opts, op->session);
+      mongoc_bulkwriteopts_set_session (opts, op->session);
    }
 
    // Do client bulk write.
@@ -513,7 +513,7 @@ done:
    mongoc_write_concern_destroy (wc);
    bson_destroy (let);
    bson_destroy (comment);
-   mongoc_bulkwriteoptions_destroy (opts);
+   mongoc_bulkwriteopts_destroy (opts);
    mongoc_bulkwrite_destroy (bw);
    return ret;
 }
