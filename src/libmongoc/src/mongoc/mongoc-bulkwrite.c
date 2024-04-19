@@ -1306,6 +1306,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
    bson_t cmd = BSON_INITIALIZER;
    mongoc_cmd_parts_t parts = {0};
    mongoc_bulkwriteopts_t defaults = {0};
+   mongoc_buffer_t nsInfo_payload;
    if (!opts) {
       opts = &defaults;
    }
@@ -1314,6 +1315,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
    ret.res = _bulkwriteresult_new ();
    ret.exc = _bulkwriteexception_new ();
    ret.res->serverid = opts->serverid;
+   _mongoc_buffer_init (&nsInfo_payload, NULL, 0, NULL, NULL);
 
    if (self->executed) {
       bson_set_error (&error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
@@ -1372,20 +1374,6 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
       if (opts->let) {
          BSON_ASSERT (bson_append_document (&cmd, "let", 3, opts->let));
       }
-
-      // Append 'nsInfo' array.
-      bson_array_builder_t *nsInfo;
-      BSON_ASSERT (bson_append_array_builder_begin (&cmd, "nsInfo", 6, &nsInfo));
-      bson_iter_t ns_iter;
-      BSON_ASSERT (bson_iter_init (&ns_iter, &self->ns_to_index));
-      while (bson_iter_next (&ns_iter)) {
-         bson_t nsInfo_element;
-         BSON_ASSERT (bson_array_builder_append_document_begin (nsInfo, &nsInfo_element));
-         BSON_ASSERT (
-            bson_append_utf8 (&nsInfo_element, "ns", 2, bson_iter_key (&ns_iter), bson_iter_key_len (&ns_iter)));
-         BSON_ASSERT (bson_array_builder_append_document_end (nsInfo, &nsInfo_element));
-      }
-      BSON_ASSERT (bson_append_array_builder_end (&cmd, nsInfo));
 
       // Add optional extra fields.
       if (opts->extra) {
@@ -1450,6 +1438,34 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
       }
    }
 
+   // Create 'nsInfo' payload 1.
+   {
+      bson_iter_t ns_iter;
+      BSON_ASSERT (bson_iter_init (&ns_iter, &self->ns_to_index));
+      while (bson_iter_next (&ns_iter)) {
+         bson_t nsInfo_element = BSON_INITIALIZER;
+         BSON_ASSERT (
+            bson_append_utf8 (&nsInfo_element, "ns", 2, bson_iter_key (&ns_iter), bson_iter_key_len (&ns_iter)));
+         BSON_ASSERT (_mongoc_buffer_append (&nsInfo_payload, bson_get_data (&nsInfo_element), nsInfo_element.len));
+      }
+      parts.assembled.payload2_identifier = "ops";
+      parts.assembled.payload2 = nsInfo_payload.data;
+      if (!bson_in_range_int32_t_unsigned (nsInfo_payload.datalen)) {
+         bson_set_error (&error,
+                         MONGOC_ERROR_COMMAND,
+                         MONGOC_ERROR_COMMAND_INVALID_ARG,
+                         "Unsupported nsInfo size: %zu. Max supported is: %" PRId32,
+                         nsInfo_payload.datalen,
+                         INT32_MAX);
+         _bulkwriteexception_set_error (ret.exc, &error);
+         goto fail;
+      }
+      parts.assembled.payload2_size = (int32_t) nsInfo_payload.len;
+      parts.assembled.payload2_identifier = "nsInfo";
+      parts.assembled.payload2 = nsInfo_payload.data;
+   }
+
+
    // Send one or more `bulkWrite` commands. Split input payload if necessary to
    // satisfy server size limits.
    int32_t maxWriteBatchSize = mongoc_server_stream_max_write_batch_size (ss);
@@ -1466,6 +1482,11 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
       opmsg_overhead += 1;                            // OP_MSG.Section[1].payloadType (1)
       opmsg_overhead += 4;                            // OP_MSG.Section[1].payload.size
       opmsg_overhead += strlen ("ops") + 1;           // OP_MSG.Section[1].payload.identifier
+      // OP_MSG.Section[1].payload.documents is omitted. Calculated below with remaining size.
+      opmsg_overhead += 1;                     // OP_MSG.Section[2].payloadType (1)
+      opmsg_overhead += 4;                     // OP_MSG.Section[2].payload.size
+      opmsg_overhead += strlen ("nsInfo") + 1; // OP_MSG.Section[2].payload.identifier
+      opmsg_overhead += nsInfo_payload.len;    // OP_MSG.Section[2].payload.documents
    }
    while (true) {
       bool has_write_errors = false;
@@ -1828,6 +1849,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
    }
 
 fail:
+   _mongoc_buffer_destroy (&nsInfo_payload);
    if (!is_acknowledged) {
       mongoc_bulkwriteresult_destroy (ret.res);
       ret.res = NULL;
@@ -1842,6 +1864,5 @@ fail:
       mongoc_bulkwriteexception_destroy (ret.exc);
       ret.exc = NULL;
    }
-
    return ret;
 }
