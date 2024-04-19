@@ -1456,6 +1456,17 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
    int32_t maxMessageSizeBytes = mongoc_server_stream_max_msg_size (ss);
    size_t writeBatchSize_offset = 0;
    size_t payload_offset = 0;
+   // Calculate overhead of OP_MSG data. See OP_MSG spec for description of fields.
+   size_t opmsg_overhead = 0;
+   {
+      opmsg_overhead += 16;                           // OP_MSG.MsgHeader
+      opmsg_overhead += 4;                            // OP_MSG.flagBits
+      opmsg_overhead += 1;                            // OP_MSG.Section[0].payloadType (0)
+      opmsg_overhead += parts.assembled.command->len; // OP_MSG.Section[0].payload.document
+      opmsg_overhead += 1;                            // OP_MSG.Section[1].payloadType (1)
+      opmsg_overhead += 4;                            // OP_MSG.Section[1].payload.size
+      opmsg_overhead += strlen ("ops") + 1;           // OP_MSG.Section[1].payload.identifier
+   }
    while (true) {
       bool has_write_errors = false;
       bool batch_ok = false;
@@ -1485,19 +1496,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
          uint32_t ulen;
          memcpy (&ulen, self->ops.data + payload_offset + payload_len, 4);
          ulen = BSON_UINT32_FROM_LE (ulen);
-
-         /*
-          * OP_MSG header == 16 byte
-          * + 4 bytes flagBits
-          * + 1 byte payload type = 0
-          * + 1 byte payload type = 1
-          * + 4 byte size of payload
-          * == 26 bytes opcode overhead
-          * + X Payload 0 document: {bulkWrite: 1, writeConcern: {...}}
-          * + Y Payload 1 identifier: "ops" + \0
-          */
-         size_t overhead = 26 + parts.assembled.command->len + strlen ("ops") + 1;
-         if (overhead + payload_len + ulen > maxMessageSizeBytes) {
+         if (opmsg_overhead + payload_len + ulen > maxMessageSizeBytes) {
             if (payload_len == 0) {
                // Could not even fit one document within an OP_MSG.
                bson_set_error (&error,
