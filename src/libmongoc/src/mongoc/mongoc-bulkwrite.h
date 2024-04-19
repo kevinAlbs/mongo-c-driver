@@ -67,12 +67,27 @@ mongoc_bulkwriteresult_modifiedcount (const mongoc_bulkwriteresult_t *self);
 BSON_EXPORT (int64_t)
 mongoc_bulkwriteresult_deletedcount (const mongoc_bulkwriteresult_t *self);
 // `mongoc_bulkwriteresult_insertresults` returns a BSON document mapping model indexes to insert results.
+// Example:
+// {
+//   "0" : { "insertedId" : "foo" },
+//   "1" : { "insertedId" : "bar" }
+// }
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_insertresults (const mongoc_bulkwriteresult_t *self);
 // `mongoc_bulkwriteresult_updateresults` returns a BSON document mapping model indexes to update results.
+// Example:
+// {
+//   "0" : { "matchedCount" : 2, "modifiedCount" : 2 },
+//   "1" : { "matchedCount" : 1, "modifiedCount" : 0, "upsertedId" : "foo" }
+// }
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_updateresults (const mongoc_bulkwriteresult_t *self);
 // `mongoc_bulkwriteresult_deleteresults` returns a BSON document mapping model indexes to delete results.
+// Example:
+// {
+//   "0" : { "deletedCount" : 1 },
+//   "1" : { "deletedCount" : 2 }
+// }
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_deleteresults (const mongoc_bulkwriteresult_t *self);
 // `mongoc_bulkwriteresult_get_serverid` identifies which server to performed the operation. This may differ from a
@@ -88,9 +103,19 @@ typedef struct _mongoc_bulkwriteexception_t mongoc_bulkwriteexception_t;
 BSON_EXPORT (bool)
 mongoc_bulkwriteexception_error (const mongoc_bulkwriteexception_t *self, bson_error_t *error);
 // `mongoc_bulkwriteexception_writeerrors` returns a BSON document mapping model indexes to write errors.
+// Example:
+// {
+//   "0" : { "code" : 123, "message" : "foo", "details" : {  } },
+//   "1" : { "code" : 456, "message" : "bar", "details" : {  } }
+// }
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteexception_writeerrors (const mongoc_bulkwriteexception_t *self);
 // `mongoc_bulkwriteexception_writeconcernerrors` returns a BSON array of write concern errors.
+// Example:
+// [
+//    { "code" : 123, "message" : "foo", "details" : {  } },
+//    { "code" : 456, "message" : "bar", "details" : {  } }
+// ]
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteexception_writeconcernerrors (const mongoc_bulkwriteexception_t *self);
 // `mongoc_bulkwriteexception_errorreply` returns a possible server reply related to the error, or an empty document.
