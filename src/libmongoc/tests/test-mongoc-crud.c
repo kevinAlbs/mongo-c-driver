@@ -1092,7 +1092,7 @@ static void
 prose_test_12 (void *ctx)
 {
    /*
-   12 (proposed). `nsInfo` always contains all namespaces.
+   12 (proposed). `MongoClient.bulkWrite` uses same `nsInfo` in each batch
    */
    mongoc_client_t *client;
    BSON_UNUSED (ctx);
@@ -1151,11 +1151,8 @@ prose_test_12 (void *ctx)
    // Expect two `bulkWrite` commands are sent.
    ASSERT_CMPSIZE_T (captured_commands.len, ==, 2);
 
-   // Expect both `bulkWrite` commands include all `nsInfo` entries.
    bson_t *first = _mongoc_array_index (&captured_commands, bson_t *, 0);
-   ASSERT_MATCH (first, BSON_STR ({"nsInfo" : [ {"ns" : "db.coll1"}, {"ns" : "db.coll2"} ]}));
    bson_t *second = _mongoc_array_index (&captured_commands, bson_t *, 1);
-   ASSERT_MATCH (second, BSON_STR ({"nsInfo" : [ {"ns" : "db.coll1"}, {"ns" : "db.coll2"} ]}));
 
    // Expect first batch contains `maxWriteBatchSize` ops.
    {
@@ -1169,7 +1166,7 @@ prose_test_12 (void *ctx)
       }
       ASSERT_CMPSIZE_T (ops_count, ==, maxWriteBatchSize);
    }
-   // Assert second batch contains 1 op.
+   // Expect second batch contains 1 op.
    {
       size_t ops_count = 0;
       bson_iter_t ops_iter;
@@ -1181,6 +1178,11 @@ prose_test_12 (void *ctx)
       }
       ASSERT_CMPSIZE_T (ops_count, ==, 1);
    }
+
+   // Expect both `bulkWrite` commands include all `nsInfo` entries.
+   ASSERT_MATCH (first, BSON_STR ({"nsInfo" : [ {"ns" : "db.coll1"}, {"ns" : "db.coll2"} ]}));
+   ASSERT_MATCH (second, BSON_STR ({"nsInfo" : [ {"ns" : "db.coll1"}, {"ns" : "db.coll2"} ]}));
+
 
    for (size_t i = 0; i < captured_commands.len; i++) {
       bson_t *cmd = _mongoc_array_index (&captured_commands, bson_t *, i);
