@@ -72,6 +72,7 @@ mongoc_bulkwriteresult_deletedcount (const mongoc_bulkwriteresult_t *self);
 //   "0" : { "insertedId" : "foo" },
 //   "1" : { "insertedId" : "bar" }
 // }
+// Returns NULL if verbose results were not requested.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_insertresults (const mongoc_bulkwriteresult_t *self);
 // `mongoc_bulkwriteresult_updateresults` returns a BSON document mapping model indexes to update results.
@@ -80,6 +81,7 @@ mongoc_bulkwriteresult_insertresults (const mongoc_bulkwriteresult_t *self);
 //   "0" : { "matchedCount" : 2, "modifiedCount" : 2 },
 //   "1" : { "matchedCount" : 1, "modifiedCount" : 0, "upsertedId" : "foo" }
 // }
+// Returns NULL if verbose results were not requested.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_updateresults (const mongoc_bulkwriteresult_t *self);
 // `mongoc_bulkwriteresult_deleteresults` returns a BSON document mapping model indexes to delete results.
@@ -88,6 +90,7 @@ mongoc_bulkwriteresult_updateresults (const mongoc_bulkwriteresult_t *self);
 //   "0" : { "deletedCount" : 1 },
 //   "1" : { "deletedCount" : 2 }
 // }
+// Returns NULL if verbose results were not requested.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_deleteresults (const mongoc_bulkwriteresult_t *self);
 // `mongoc_bulkwriteresult_serverid` identifies which server to performed the operation. This may differ from a
@@ -108,6 +111,7 @@ mongoc_bulkwriteexception_error (const mongoc_bulkwriteexception_t *self, bson_e
 //   "0" : { "code" : 123, "message" : "foo", "details" : {  } },
 //   "1" : { "code" : 456, "message" : "bar", "details" : {  } }
 // }
+// Returns an empty document if there are no write errors.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteexception_writeerrors (const mongoc_bulkwriteexception_t *self);
 // `mongoc_bulkwriteexception_writeconcernerrors` returns a BSON array of write concern errors.
@@ -116,6 +120,7 @@ mongoc_bulkwriteexception_writeerrors (const mongoc_bulkwriteexception_t *self);
 //    { "code" : 123, "message" : "foo", "details" : {  } },
 //    { "code" : 456, "message" : "bar", "details" : {  } }
 // ]
+// Returns an empty array if there are no write concern errors.
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteexception_writeconcernerrors (const mongoc_bulkwriteexception_t *self);
 // `mongoc_bulkwriteexception_errorreply` returns a possible server reply related to the error, or an empty document.
@@ -243,8 +248,8 @@ mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
 
 // `mongoc_bulkwritereturn_t` may outlive `mongoc_bulkwrite_t`.
 typedef struct {
-   mongoc_bulkwriteresult_t *res;    // May be NULL
-   mongoc_bulkwriteexception_t *exc; // May be NULL
+   mongoc_bulkwriteresult_t *res;    // NULL if write was unacknowledged.
+   mongoc_bulkwriteexception_t *exc; // NULL if no error.
 } mongoc_bulkwritereturn_t;
 BSON_EXPORT (mongoc_bulkwritereturn_t)
 mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts);

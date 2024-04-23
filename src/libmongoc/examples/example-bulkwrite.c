@@ -43,9 +43,11 @@ main (int argc, char *argv[])
    mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, bwo);
 
    // Print results.
-   if (bwr.res) {
+   {
+      BSON_ASSERT (bwr.res); // Has results. NULL only returned for unacknowledged writes.
       printf ("Insert count          : %" PRId64 "\n", mongoc_bulkwriteresult_insertedcount (bwr.res));
       const bson_t *ir = mongoc_bulkwriteresult_insertresults (bwr.res);
+      BSON_ASSERT (ir); // Has verbose results. NULL only returned if verbose results not requested.
       char *ir_str = bson_as_relaxed_extended_json (ir, NULL);
       printf ("Insert results        : %s\n", ir_str);
       bson_free (ir_str);

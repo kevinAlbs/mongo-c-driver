@@ -926,6 +926,7 @@ struct _mongoc_bulkwriteresult_t {
    bson_t insertresults;
    bson_t updateresults;
    bson_t deleteresults;
+   bool verboseresults;
 };
 
 bool
@@ -970,27 +971,33 @@ mongoc_bulkwriteresult_deletedcount (const mongoc_bulkwriteresult_t *self)
    return self->deletedcount;
 }
 
-// `mongoc_bulkwriteresult_insertresults` returns a BSON document mapping model indexes to insert results.
 const bson_t *
 mongoc_bulkwriteresult_insertresults (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
+   if (!self->verboseresults) {
+      return NULL;
+   }
    return &self->insertresults;
 }
 
-// `mongoc_bulkwriteresult_updateresults` returns a BSON document mapping model indexes to update results.
 const bson_t *
 mongoc_bulkwriteresult_updateresults (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
+   if (!self->verboseresults) {
+      return NULL;
+   }
    return &self->updateresults;
 }
 
-// `mongoc_bulkwriteresult_deleteresults` returns a BSON document mapping model indexes to delete results.
 const bson_t *
 mongoc_bulkwriteresult_deleteresults (const mongoc_bulkwriteresult_t *self)
 {
    BSON_ASSERT_PARAM (self);
+   if (!self->verboseresults) {
+      return NULL;
+   }
    return &self->deleteresults;
 }
 
@@ -1418,13 +1425,15 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
       }
    }
 
+   bool verboseresults = (opts->verboseresults.isset) ? opts->verboseresults.val : false;
+   ret.res->verboseresults = verboseresults;
+
    int32_t maxBsonObjectSize = mongoc_server_stream_max_bson_obj_size (ss);
    // Create the payload 0.
    {
       BSON_ASSERT (bson_append_int32 (&cmd, "bulkWrite", 9, 1));
       // errorsOnly is default true. Set to false if verboseResults requested.
-      BSON_ASSERT (
-         bson_append_bool (&cmd, "errorsOnly", 10, (opts->verboseresults.isset) ? !opts->verboseresults.val : true));
+      BSON_ASSERT (bson_append_bool (&cmd, "errorsOnly", 10, !verboseresults));
       // ordered is default true.
       BSON_ASSERT (bson_append_bool (&cmd, "ordered", 7, (opts->ordered.isset) ? opts->ordered.val : true));
 

@@ -54,6 +54,7 @@ test_bulkwrite_insert (void *unused)
    {
       ASSERT (bwr.res);
       const bson_t *insertResults = mongoc_bulkwriteresult_insertresults (bwr.res);
+      ASSERT (insertResults);
       ASSERT_MATCH (insertResults, BSON_STR ({"0" : {"insertedId" : 123}, "1" : {"insertedId" : 456}}));
    }
 
@@ -106,6 +107,7 @@ test_bulkwrite_writeError (void *unused)
    // Ensure results report only one ID inserted.
    ASSERT (bwr.res);
    const bson_t *insertResults = mongoc_bulkwriteresult_insertresults (bwr.res);
+   ASSERT (insertResults);
    ASSERT_MATCH (insertResults, BSON_STR ({"0" : {"insertedId" : 123}}));
 
    mongoc_bulkwriteexception_destroy (bwr.exc);
@@ -367,6 +369,47 @@ test_bulkwrite_extra (void *ctx)
    mongoc_client_destroy (client);
 }
 
+static void
+test_bulkwrite_no_verbose_results (void *ctx)
+{
+   mongoc_client_t *client;
+   BSON_UNUSED (ctx);
+   bool ok;
+   bson_error_t error;
+
+   client = test_framework_new_default_client ();
+
+   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+   // Create bulk write.
+   {
+      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+
+      ok = mongoc_bulkwrite_append_updateone (
+         bw, "db.coll", -1, tmp_bson ("{}"), tmp_bson ("{'$set': {'x': 1}}"), NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+
+      ok = mongoc_bulkwrite_append_deleteone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+   }
+
+
+   // Execute.
+   {
+      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, NULL /* opts */);
+      ASSERT_NO_BULKWRITEEXCEPTION (bwr);
+      // Expect no verbose results.
+      ASSERT (NULL == mongoc_bulkwriteresult_insertresults (bwr.res));
+      ASSERT (NULL == mongoc_bulkwriteresult_updateresults (bwr.res));
+      ASSERT (NULL == mongoc_bulkwriteresult_deleteresults (bwr.res));
+      mongoc_bulkwriteresult_destroy (bwr.res);
+      mongoc_bulkwriteexception_destroy (bwr.exc);
+   }
+
+   mongoc_bulkwrite_destroy (bw);
+   mongoc_client_destroy (client);
+}
+
 
 void
 test_bulkwrite_install (TestSuite *suite)
@@ -422,6 +465,14 @@ test_bulkwrite_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/bulkwrite/extra",
                       test_bulkwrite_extra,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
+
+   TestSuite_AddFull (suite,
+                      "/bulkwrite/no_verbose_results",
+                      test_bulkwrite_no_verbose_results,
                       NULL /* dtor */,
                       NULL /* ctx */,
                       test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
