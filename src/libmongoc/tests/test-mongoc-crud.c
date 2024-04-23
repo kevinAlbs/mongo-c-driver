@@ -1072,6 +1072,7 @@ prose_test_11 (void *ctx)
       mongoc_bulkwriteexception_destroy (bwr.exc);
    }
 
+   bson_destroy (large_doc);
    mongoc_bulkwriteopts_destroy (NULL);
    mongoc_bulkwrite_destroy (bw);
    mongoc_client_destroy (client);
