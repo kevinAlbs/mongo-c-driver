@@ -90,7 +90,7 @@ mongoc_bulkwriteresult_updateresults (const mongoc_bulkwriteresult_t *self);
 // }
 BSON_EXPORT (const bson_t *)
 mongoc_bulkwriteresult_deleteresults (const mongoc_bulkwriteresult_t *self);
-// `mongoc_bulkwriteresult_get_serverid` identifies which server to performed the operation. This may differ from a
+// `mongoc_bulkwriteresult_serverid` identifies which server to performed the operation. This may differ from a
 // previously set serverid if a retry occurred. This is intended for use by wrapping drivers that select a server before
 // running the operation.
 BSON_EXPORT (uint32_t)
