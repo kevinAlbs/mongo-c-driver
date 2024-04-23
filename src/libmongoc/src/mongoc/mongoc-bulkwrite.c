@@ -21,8 +21,11 @@
 #include <mongoc-buffer-private.h>
 #include <mongoc-server-stream-private.h>
 #include <mongoc-client-private.h>
-#include <mongoc-error-private.h> // _mongoc_write_error_handle_labels
-#include <mongoc-util-private.h>  // _mongoc_iter_document_as_bson
+#include <mongoc-error-private.h>  // _mongoc_write_error_handle_labels
+#include <mongoc-util-private.h>   // _mongoc_iter_document_as_bson
+#include <common-macros-private.h> // MC_ENABLE_CONVERSION_WARNING_BEGIN
+
+MC_ENABLE_CONVERSION_WARNING_BEGIN
 
 typedef struct {
    bool isset;
@@ -1444,8 +1447,10 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
       BSON_ASSERT (bson_iter_init (&ns_iter, &self->ns_to_index));
       while (bson_iter_next (&ns_iter)) {
          bson_t nsInfo_element = BSON_INITIALIZER;
-         BSON_ASSERT (
-            bson_append_utf8 (&nsInfo_element, "ns", 2, bson_iter_key (&ns_iter), bson_iter_key_len (&ns_iter)));
+         uint32_t nsInfo_keylen = bson_iter_key_len (&ns_iter);
+         BSON_ASSERT (bson_in_range_int_unsigned (nsInfo_keylen));
+         int nsInfo_keylen_int = (int) nsInfo_keylen;
+         BSON_ASSERT (bson_append_utf8 (&nsInfo_element, "ns", 2, bson_iter_key (&ns_iter), nsInfo_keylen_int));
          BSON_ASSERT (_mongoc_buffer_append (&nsInfo_payload, bson_get_data (&nsInfo_element), nsInfo_element.len));
       }
       parts.assembled.payload2_identifier = "ops";
@@ -1642,7 +1647,10 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
             {
                bson_t cursor_opts = BSON_INITIALIZER;
                {
-                  BSON_ASSERT (bson_append_int32 (&cursor_opts, "serverId", 8, parts.assembled.server_stream->sd->id));
+                  uint32_t serverid = parts.assembled.server_stream->sd->id;
+                  BSON_ASSERT (bson_in_range_int_unsigned (serverid));
+                  int serverid_int = (int) serverid;
+                  BSON_ASSERT (bson_append_int32 (&cursor_opts, "serverId", 8, serverid_int));
                   // Use same session.
                   if (!mongoc_client_session_append (parts.assembled.session, &cursor_opts, &error)) {
                      _bulkwriteexception_set_error (ret.exc, &error);
@@ -1866,3 +1874,5 @@ fail:
    }
    return ret;
 }
+
+MC_ENABLE_CONVERSION_WARNING_END
