@@ -89,12 +89,14 @@ void
 mongoc_bulkwriteopts_set_let (mongoc_bulkwriteopts_t *self, const bson_t *let)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (let || true);
    set_bson_opt (&self->let, let);
 }
 void
 mongoc_bulkwriteopts_set_writeconcern (mongoc_bulkwriteopts_t *self, const mongoc_write_concern_t *writeconcern)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (writeconcern || true);
    mongoc_write_concern_destroy (self->writeconcern);
    self->writeconcern = mongoc_write_concern_copy (writeconcern);
 }
@@ -108,12 +110,14 @@ void
 mongoc_bulkwriteopts_set_comment (mongoc_bulkwriteopts_t *self, const bson_t *comment)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (comment || true);
    set_bson_opt (&self->comment, comment);
 }
 void
 mongoc_bulkwriteopts_set_session (mongoc_bulkwriteopts_t *self, mongoc_client_session_t *session)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (session || true);
    // Client sessions cannot be copied. Do a non-owning assignment.
    self->session = session;
 }
@@ -121,6 +125,7 @@ void
 mongoc_bulkwriteopts_set_extra (mongoc_bulkwriteopts_t *self, const bson_t *extra)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (extra || true);
    set_bson_opt (&self->extra, extra);
 }
 void
@@ -222,6 +227,10 @@ mongoc_insertoneopts_destroy (mongoc_insertoneopts_t *self)
 static bool
 upsert_namespace (bson_t *ns_to_index, const char *ns, int ns_len, int32_t *ns_index, bson_error_t *error)
 {
+   BSON_ASSERT_PARAM (ns_to_index);
+   BSON_ASSERT_PARAM (ns_index);
+   BSON_ASSERT (error || true);
+
    bson_iter_t iter;
    if (bson_iter_init_find (&iter, ns_to_index, ns)) {
       *ns_index = bson_iter_int32 (&iter);
@@ -254,7 +263,8 @@ mongoc_bulkwrite_append_insertone (mongoc_bulkwrite_t *self,
    BSON_ASSERT_PARAM (ns);
    BSON_ASSERT_PARAM (document);
    BSON_ASSERT (document->len >= 5);
-   BSON_UNUSED (opts);
+   BSON_ASSERT (opts || true);
+   BSON_ASSERT (error || true);
 
    if (self->executed) {
       bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
@@ -309,6 +319,9 @@ mongoc_bulkwrite_append_insertone (mongoc_bulkwrite_t *self,
 static bool
 validate_update (const bson_t *update, bson_error_t *error)
 {
+   BSON_ASSERT_PARAM (update);
+   BSON_ASSERT (error || true);
+
    bson_iter_t iter;
    if (_mongoc_document_is_pipeline (update)) {
       return true;
@@ -351,18 +364,21 @@ void
 mongoc_updateoneopts_set_arrayfilters (mongoc_updateoneopts_t *self, const bson_t *arrayfilters)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (arrayfilters || true);
    set_bson_opt (&self->arrayfilters, arrayfilters);
 }
 void
 mongoc_updateoneopts_set_collation (mongoc_updateoneopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (collation || true);
    set_bson_opt (&self->collation, collation);
 }
 void
 mongoc_updateoneopts_set_hint (mongoc_updateoneopts_t *self, const bson_value_t *hint)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (hint || true);
    set_hint_opt (&self->hint, hint);
 }
 void
@@ -383,8 +399,6 @@ mongoc_updateoneopts_destroy (mongoc_updateoneopts_t *self)
    bson_free (self);
 }
 
-#include <bson-dsl.h>
-
 bool
 mongoc_bulkwrite_append_updateone (mongoc_bulkwrite_t *self,
                                    const char *ns,
@@ -400,6 +414,8 @@ mongoc_bulkwrite_append_updateone (mongoc_bulkwrite_t *self,
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (update);
    BSON_ASSERT (update->len >= 5);
+   BSON_ASSERT (opts || true);
+   BSON_ASSERT (error || true);
 
    if (self->executed) {
       bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
@@ -470,18 +486,21 @@ void
 mongoc_replaceoneopts_set_arrayfilters (mongoc_replaceoneopts_t *self, const bson_t *arrayfilters)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (arrayfilters || true);
    set_bson_opt (&self->arrayfilters, arrayfilters);
 }
 void
 mongoc_replaceoneopts_set_collation (mongoc_replaceoneopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (collation || true);
    set_bson_opt (&self->collation, collation);
 }
 void
 mongoc_replaceoneopts_set_hint (mongoc_replaceoneopts_t *self, const bson_value_t *hint)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (hint || true);
    set_hint_opt (&self->hint, hint);
 }
 void
@@ -505,6 +524,9 @@ mongoc_replaceoneopts_destroy (mongoc_replaceoneopts_t *self)
 bool
 validate_replace (const bson_t *doc, bson_error_t *error)
 {
+   BSON_ASSERT (doc || true);
+   BSON_ASSERT (error || true);
+
    bson_iter_t iter;
 
    if (!bson_iter_init (&iter, doc)) {
@@ -543,6 +565,8 @@ mongoc_bulkwrite_append_replaceone (mongoc_bulkwrite_t *self,
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (replacement);
    BSON_ASSERT (replacement->len >= 5);
+   BSON_ASSERT (opts || true);
+   BSON_ASSERT (error || true);
 
    if (self->executed) {
       bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
@@ -610,18 +634,21 @@ void
 mongoc_updatemanyopts_set_arrayfilters (mongoc_updatemanyopts_t *self, const bson_t *arrayfilters)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (arrayfilters || true);
    set_bson_opt (&self->arrayfilters, arrayfilters);
 }
 void
 mongoc_updatemanyopts_set_collation (mongoc_updatemanyopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (collation || true);
    set_bson_opt (&self->collation, collation);
 }
 void
 mongoc_updatemanyopts_set_hint (mongoc_updatemanyopts_t *self, const bson_value_t *hint)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (hint || true);
    set_hint_opt (&self->hint, hint);
 }
 void
@@ -657,6 +684,8 @@ mongoc_bulkwrite_append_updatemany (mongoc_bulkwrite_t *self,
    BSON_ASSERT (filter->len >= 5);
    BSON_ASSERT_PARAM (update);
    BSON_ASSERT (update->len >= 5);
+   BSON_ASSERT (opts || true);
+   BSON_ASSERT (error || true);
 
    if (self->executed) {
       bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
@@ -726,12 +755,14 @@ void
 mongoc_deleteoneopts_set_collation (mongoc_deleteoneopts_t *self, const bson_t *collation)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (collation || true);
    set_bson_opt (&self->collation, collation);
 }
 void
 mongoc_deleteoneopts_set_hint (mongoc_deleteoneopts_t *self, const bson_value_t *hint)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (hint || true);
    set_hint_opt (&self->hint, hint);
 }
 void
@@ -757,6 +788,8 @@ mongoc_bulkwrite_append_deleteone (mongoc_bulkwrite_t *self,
    BSON_ASSERT_PARAM (ns);
    BSON_ASSERT_PARAM (filter);
    BSON_ASSERT (filter->len >= 5);
+   BSON_ASSERT (opts || true);
+   BSON_ASSERT (error || true);
 
    if (self->executed) {
       bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
@@ -840,6 +873,8 @@ mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
    BSON_ASSERT_PARAM (ns);
    BSON_ASSERT_PARAM (filter);
    BSON_ASSERT (filter->len >= 5);
+   BSON_ASSERT (opts || true);
+   BSON_ASSERT (error || true);
 
    if (self->executed) {
       bson_set_error (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
@@ -997,6 +1032,8 @@ _bulkwriteresult_set_updateresult (mongoc_bulkwriteresult_t *self,
                                    bson_error_t *error)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (upserted_id || true);
+   BSON_ASSERT (error || true);
 
    bson_t updateresult;
    {
@@ -1023,6 +1060,7 @@ static bool
 _bulkwriteresult_set_deleteresult (mongoc_bulkwriteresult_t *self, int32_t n, size_t models_idx, bson_error_t *error)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (error || true);
 
    bson_t deleteresult;
    {
@@ -1049,6 +1087,7 @@ _bulkwriteresult_set_insertresult (mongoc_bulkwriteresult_t *self,
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (id_iter);
+   BSON_ASSERT (error || true);
 
    bson_t insertresult;
    {
@@ -1093,6 +1132,8 @@ bool
 mongoc_bulkwriteexception_error (const mongoc_bulkwriteexception_t *self, bson_error_t *error)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (error || true);
+
    if (self->error.code != 0) {
       memcpy (error, &self->error, sizeof (*error));
       return true;
@@ -1149,6 +1190,7 @@ _bulkwriteexception_set_error_reply (mongoc_bulkwriteexception_t *self, const bs
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (error_reply);
+
    bson_copy_to (error_reply, &self->error_reply);
    self->has_any_error = true;
 }
@@ -1219,6 +1261,12 @@ _bulkwriteexception_set_writeerror (
 static bool
 lookup_int32 (const bson_t *bson, const char *key, int32_t *out, const char *source, mongoc_bulkwriteexception_t *exc)
 {
+   BSON_ASSERT_PARAM (bson);
+   BSON_ASSERT_PARAM (key);
+   BSON_ASSERT_PARAM (out);
+   BSON_ASSERT (source || true);
+   BSON_ASSERT_PARAM (exc);
+
    bson_iter_t iter;
    if (bson_iter_init_find (&iter, bson, key) && BSON_ITER_HOLDS_INT32 (&iter)) {
       *out = bson_iter_int32 (&iter);
@@ -1246,6 +1294,12 @@ lookup_int32 (const bson_t *bson, const char *key, int32_t *out, const char *sou
 static bool
 lookup_double (const bson_t *bson, const char *key, double *out, const char *source, mongoc_bulkwriteexception_t *exc)
 {
+   BSON_ASSERT_PARAM (bson);
+   BSON_ASSERT_PARAM (key);
+   BSON_ASSERT_PARAM (out);
+   BSON_ASSERT (source || true);
+   BSON_ASSERT_PARAM (exc);
+
    bson_iter_t iter;
    if (bson_iter_init_find (&iter, bson, key) && BSON_ITER_HOLDS_DOUBLE (&iter)) {
       *out = bson_iter_double (&iter);
@@ -1274,6 +1328,12 @@ static bool
 lookup_string (
    const bson_t *bson, const char *key, const char **out, const char *source, mongoc_bulkwriteexception_t *exc)
 {
+   BSON_ASSERT_PARAM (bson);
+   BSON_ASSERT_PARAM (key);
+   BSON_ASSERT_PARAM (out);
+   BSON_ASSERT (source || true);
+   BSON_ASSERT_PARAM (exc);
+
    bson_iter_t iter;
    if (bson_iter_init_find (&iter, bson, key) && BSON_ITER_HOLDS_UTF8 (&iter)) {
       *out = bson_iter_utf8 (&iter, NULL);
@@ -1303,6 +1363,8 @@ mongoc_bulkwritereturn_t
 mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts)
 {
    BSON_ASSERT_PARAM (self);
+   BSON_ASSERT (opts || true);
+
    mongoc_bulkwritereturn_t ret = {0};
    bson_error_t error = {0};
    mongoc_server_stream_t *ss = NULL;
