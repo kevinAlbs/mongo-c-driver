@@ -246,7 +246,7 @@ upsert_namespace (bson_t *ns_to_index, const char *ns, int ns_len, int32_t *ns_i
          return false;
       }
       *ns_index = (int32_t) key_count;
-      bson_append_int32 (ns_to_index, ns, ns_len, *ns_index);
+      BSON_ASSERT (bson_append_int32 (ns_to_index, ns, ns_len, *ns_index));
    }
    return true;
 }
@@ -1365,6 +1365,31 @@ lookup_string (
    return false;
 }
 
+// typedef struct {
+// } nsinfo_list_t;
+
+// static bool
+// nsinfo_list_upsert (nsinfo_list_t *self, const char *ns, int ns_len)
+// {
+//    return false;
+// }
+
+// static bool
+// nsinfo_list_has (nsinfo_list_t *self, const char *ns, int ns_len)
+// {
+//    return false;
+// }
+
+// static uint32_t
+// nsinfo_list_get_bson_size (nsinfo_list_t *self, const char *ns, int ns_len)
+// {
+//    return false;
+// }
+
+// const _mongoc_buffer_t*
+// nsinfo_list_as_document_sequence (nsinfo_list_t *self)
+// {
+// }
 
 mongoc_bulkwritereturn_t
 mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts)
@@ -1378,6 +1403,14 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
    bson_t cmd = BSON_INITIALIZER;
    mongoc_cmd_parts_t parts = {0};
    mongoc_bulkwriteopts_t defaults = {0};
+
+   typedef struct {
+      bson_t *bson; // Use a pointer since `bson_t` is not trivially relocatable.
+      bool used;
+      int32_t index; // Index into the batch payload.
+   } nsinfo_t;
+   mongoc_array_t all_nsinfos; // Maps the command index into the batch index.
+   _mongoc_array_init (&all_nsinfos, sizeof (nsinfo_t));
    mongoc_buffer_t nsInfo_payload;
    if (!opts) {
       opts = &defaults;
@@ -1512,33 +1545,19 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
       }
    }
 
-   // Create 'nsInfo' payload 1.
+   // Create an array mapping the command-wide nsinfo index to bson.
    {
       bson_iter_t ns_iter;
       BSON_ASSERT (bson_iter_init (&ns_iter, &self->ns_to_index));
       while (bson_iter_next (&ns_iter)) {
-         bson_t nsInfo_element = BSON_INITIALIZER;
+         nsinfo_t nsinfo = {0};
+         nsinfo.bson = bson_new ();
          uint32_t nsInfo_keylen = bson_iter_key_len (&ns_iter);
          BSON_ASSERT (bson_in_range_int_unsigned (nsInfo_keylen));
          int nsInfo_keylen_int = (int) nsInfo_keylen;
-         BSON_ASSERT (bson_append_utf8 (&nsInfo_element, "ns", 2, bson_iter_key (&ns_iter), nsInfo_keylen_int));
-         BSON_ASSERT (_mongoc_buffer_append (&nsInfo_payload, bson_get_data (&nsInfo_element), nsInfo_element.len));
+         BSON_ASSERT (bson_append_utf8 (nsinfo.bson, "ns", 2, bson_iter_key (&ns_iter), nsInfo_keylen_int));
+         _mongoc_array_append_val (&all_nsinfos, nsinfo);
       }
-      parts.assembled.payload2_identifier = "ops";
-      parts.assembled.payload2 = nsInfo_payload.data;
-      if (!bson_in_range_int32_t_unsigned (nsInfo_payload.datalen)) {
-         bson_set_error (&error,
-                         MONGOC_ERROR_COMMAND,
-                         MONGOC_ERROR_COMMAND_INVALID_ARG,
-                         "Unsupported nsInfo size: %zu. Max supported is: %" PRId32,
-                         nsInfo_payload.datalen,
-                         INT32_MAX);
-         _bulkwriteexception_set_error (ret.exc, &error);
-         goto fail;
-      }
-      parts.assembled.payload2_size = (int32_t) nsInfo_payload.len;
-      parts.assembled.payload2_identifier = "nsInfo";
-      parts.assembled.payload2 = nsInfo_payload.data;
    }
 
 
@@ -1562,7 +1581,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
       opmsg_overhead += 1;                     // OP_MSG.Section[2].payloadType (1)
       opmsg_overhead += 4;                     // OP_MSG.Section[2].payload.size
       opmsg_overhead += strlen ("nsInfo") + 1; // OP_MSG.Section[2].payload.identifier
-      opmsg_overhead += nsInfo_payload.len;    // OP_MSG.Section[2].payload.documents
+      // OP_MSG.Section[2].payload.documents is omitted. Calculated below with remaining size.
    }
    while (true) {
       bool has_write_errors = false;
@@ -1576,6 +1595,15 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
          // All write models were sent.
          break;
       }
+
+      // Reset state to compute which nsinfos to include in this batch.
+      _mongoc_buffer_destroy (&nsInfo_payload);
+      _mongoc_buffer_init (&nsInfo_payload, NULL, 0, NULL, NULL);
+      for (size_t i = 0; i < all_nsinfos.len; i++) {
+         nsinfo_t *nsinfo = &_mongoc_array_index (&all_nsinfos, nsinfo_t, i);
+         nsinfo->used = false;
+      }
+      int32_t nsinfo_count = 0;
 
       // Read as many documents from payload as possible.
       while (true) {
@@ -1593,7 +1621,30 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
          uint32_t ulen;
          memcpy (&ulen, self->ops.data + payload_offset + payload_len, 4);
          ulen = BSON_UINT32_FROM_LE (ulen);
-         if (opmsg_overhead + payload_len + ulen > maxMessageSizeBytes) {
+
+         nsinfo_t *nsinfo;
+         uint32_t nsinfo_len = 0;
+         bson_iter_t nsinfo_iter;
+         // Check if adding this operation requires adding an `nsInfo` entry to this batch.
+         {
+            bson_t doc;
+            BSON_ASSERT (bson_init_static (&doc, self->ops.data + payload_offset + payload_len, ulen));
+            // Find the index.
+            BSON_ASSERT (bson_iter_init (&nsinfo_iter, &doc));
+            BSON_ASSERT (bson_iter_next (&nsinfo_iter));
+            BSON_ASSERT (BSON_ITER_HOLDS_INT32 (&nsinfo_iter));
+            int32_t idx = bson_iter_int32 (&nsinfo_iter);
+            // Look up the nsinfo.
+            nsinfo = &_mongoc_array_index (&all_nsinfos, nsinfo_t, idx);
+            if (!nsinfo->used) {
+               // nsInfo needs to be added to payload.
+               nsinfo_len = nsinfo->bson->len;
+               nsinfo->index = nsinfo_count;
+               nsinfo_count++;
+            }
+         }
+
+         if (opmsg_overhead + payload_len + ulen + nsinfo_len > maxMessageSizeBytes) {
             if (payload_len == 0) {
                // Could not even fit one document within an OP_MSG.
                bson_set_error (&error,
@@ -1611,10 +1662,25 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
          }
          payload_len += ulen;
          payload_writeBatchSize += 1;
+
+         if (!nsinfo->used) {
+            // Add to nsInfo payload 1.
+            BSON_ASSERT (_mongoc_buffer_append (&nsInfo_payload, bson_get_data (nsinfo->bson), nsinfo->bson->len));
+            nsinfo->used = true;
+         }
+         bson_iter_overwrite_int32 (&nsinfo_iter, nsinfo->index);
       }
 
       // Send batch.
       {
+         // Create the nsInfo payload 1.
+         {
+            parts.assembled.payload2 = nsInfo_payload.data;
+            BSON_ASSERT (bson_in_range_int32_t_unsigned (nsInfo_payload.len));
+            parts.assembled.payload2_size = (int32_t) nsInfo_payload.len;
+            parts.assembled.payload2_identifier = "nsInfo";
+         }
+
          // Create the payload 1 and send.
          {
             parts.assembled.payload_identifier = "ops";
@@ -1928,6 +1994,11 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
    }
 
 fail:
+   for (size_t i = 0; i < all_nsinfos.len; i++) {
+      nsinfo_t nsinfo = _mongoc_array_index (&all_nsinfos, nsinfo_t, i);
+      bson_destroy (nsinfo.bson);
+   }
+   _mongoc_array_destroy (&all_nsinfos);
    _mongoc_buffer_destroy (&nsInfo_payload);
    if (!is_acknowledged) {
       mongoc_bulkwriteresult_destroy (ret.res);
