@@ -410,6 +410,93 @@ test_bulkwrite_no_verbose_results (void *ctx)
    mongoc_client_destroy (client);
 }
 
+static void
+capture_all_bulkWrite_commands (const mongoc_apm_command_started_t *event)
+{
+   if (0 == strcmp (mongoc_apm_command_started_get_command_name (event), "bulkWrite")) {
+      mongoc_array_t *captured = mongoc_apm_command_started_get_context (event);
+      bson_t *cmd = bson_copy (mongoc_apm_command_started_get_command (event));
+      _mongoc_array_append_val (captured, cmd);
+   }
+}
+
+static void
+test_bulkwrite_splits_nsinfo (void *ctx)
+{
+   mongoc_client_t *client;
+   BSON_UNUSED (ctx);
+   bool ok;
+   bson_error_t error;
+
+   client = test_framework_new_default_client ();
+
+   // Get `maxWriteBatchSize` from the server.
+   int32_t maxWriteBatchSize;
+   {
+      bson_t reply;
+
+      ok = mongoc_client_command_simple (client, "admin", tmp_bson ("{'hello': 1}"), NULL, &reply, &error);
+      ASSERT_OR_PRINT (ok, error);
+
+      maxWriteBatchSize = bson_lookup_int32 (&reply, "maxWriteBatchSize");
+      bson_destroy (&reply);
+   }
+
+   mongoc_array_t captured;
+   _mongoc_array_init (&captured, sizeof (bson_t *));
+   // Set callback to capture all `bulkWrite` commands.
+   {
+      mongoc_apm_callbacks_t *cbs = mongoc_apm_callbacks_new ();
+      mongoc_apm_set_command_started_cb (cbs, capture_all_bulkWrite_commands);
+      mongoc_client_set_apm_callbacks (client, cbs, &captured);
+      mongoc_apm_callbacks_destroy (cbs);
+   }
+
+   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+   // Create bulk write large enough to split into two batches.
+   {
+      // First batch only references db.coll1.
+      for (int32_t i = 0; i < maxWriteBatchSize; i++) {
+         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll1", -1, tmp_bson ("{}"), NULL, &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+      // Second batch only references db.coll2.
+      for (int32_t i = 0; i < 1; i++) {
+         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll2", -1, tmp_bson ("{}"), NULL, &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+   }
+
+
+   // Execute.
+   {
+      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, NULL /* opts */);
+      ASSERT_NO_BULKWRITEEXCEPTION (bwr);
+      ASSERT_CMPINT64 (mongoc_bulkwriteresult_insertedcount (bwr.res), ==, maxWriteBatchSize + 1);
+      mongoc_bulkwriteresult_destroy (bwr.res);
+      mongoc_bulkwriteexception_destroy (bwr.exc);
+   }
+
+   // Expect two `bulkWrite` commands were sent.
+   ASSERT_CMPSIZE_T (captured.len, ==, 2);
+   bson_t *first = _mongoc_array_index (&captured, bson_t *, 0);
+   // Expect the first only contains the namespace for `db.coll1`.
+   ASSERT_MATCH (first, BSON_STR ({"nsInfo" : [ {"ns" : "db.coll1"} ]}));
+   // Expect the second only contains the namespace for `db.coll2`.
+   bson_t *second = _mongoc_array_index (&captured, bson_t *, 1);
+   // Expect the first only contains the namespace for `db.coll1`.
+   ASSERT_MATCH (second, BSON_STR ({"nsInfo" : [ {"ns" : "db.coll2"} ]}));
+
+   for (size_t i = 0; i < captured.len; i++) {
+      bson_t *el = _mongoc_array_index (&captured, bson_t *, i);
+      bson_destroy (el);
+   }
+   _mongoc_array_destroy (&captured);
+
+   mongoc_bulkwrite_destroy (bw);
+   mongoc_client_destroy (client);
+}
+
 
 void
 test_bulkwrite_install (TestSuite *suite)
@@ -473,6 +560,14 @@ test_bulkwrite_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/bulkwrite/no_verbose_results",
                       test_bulkwrite_no_verbose_results,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
+
+   TestSuite_AddFull (suite,
+                      "/bulkwrite/splits_nsinfo",
+                      test_bulkwrite_splits_nsinfo,
                       NULL /* dtor */,
                       NULL /* ctx */,
                       test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
