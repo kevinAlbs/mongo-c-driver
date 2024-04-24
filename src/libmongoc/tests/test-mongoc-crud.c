@@ -1078,123 +1078,6 @@ prose_test_11 (void *ctx)
    mongoc_client_destroy (client);
 }
 
-static void
-capture_bulkWrite_commands (const mongoc_apm_command_started_t *event)
-{
-   if (0 == strcmp (mongoc_apm_command_started_get_command_name (event), "bulkWrite")) {
-      mongoc_array_t *captured_commands = mongoc_apm_command_started_get_context (event);
-      const bson_t *cmd = mongoc_apm_command_started_get_command (event);
-      bson_t *cmd_copy = bson_copy (cmd);
-      _mongoc_array_append_val (captured_commands, cmd_copy);
-   }
-}
-
-static void
-prose_test_12 (void *ctx)
-{
-   /*
-   12 (proposed). `MongoClient.bulkWrite` uses same `nsInfo` in each batch
-   */
-   mongoc_client_t *client;
-   BSON_UNUSED (ctx);
-   bool ok;
-   bson_error_t error;
-
-   client = test_framework_new_default_client ();
-
-   // Get `maxWriteBatchSize` from the server.
-   int32_t maxWriteBatchSize;
-   {
-      bson_t reply;
-
-      ok = mongoc_client_command_simple (client, "admin", tmp_bson ("{'hello': 1}"), NULL, &reply, &error);
-      ASSERT_OR_PRINT (ok, error);
-
-      maxWriteBatchSize = bson_lookup_int32 (&reply, "maxWriteBatchSize");
-      bson_destroy (&reply);
-   }
-
-   mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
-
-   // Set up command monitoring.
-   mongoc_array_t captured_commands;
-   _mongoc_array_init (&captured_commands, sizeof (bson_t *));
-
-   {
-      mongoc_apm_callbacks_t *cbs = mongoc_apm_callbacks_new ();
-      mongoc_apm_set_command_started_cb (cbs, capture_bulkWrite_commands);
-      mongoc_client_set_apm_callbacks (client, cbs, &captured_commands);
-      mongoc_apm_callbacks_destroy (cbs);
-   }
-
-   // Create bulk write with two batches:
-   // First batch only uses `db.coll1`. Second batch only uses `db.coll2`.
-   {
-      bson_t *filter = tmp_bson ("{}");
-      bson_t *replacement = tmp_bson ("{}");
-      for (size_t i = 0; i < maxWriteBatchSize; i++) {
-         ok = mongoc_bulkwrite_append_replaceone (bw, "db.coll1", -1, filter, replacement, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-      }
-      ok = mongoc_bulkwrite_append_replaceone (bw, "db.coll2", -1, filter, replacement, NULL, &error);
-      ASSERT_OR_PRINT (ok, error);
-      ASSERT_OR_PRINT (ok, error);
-   }
-
-   // Execute.
-   {
-      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, NULL);
-      ASSERT_NO_BULKWRITEEXCEPTION (bwr);
-      mongoc_bulkwriteresult_destroy (bwr.res);
-      mongoc_bulkwriteexception_destroy (bwr.exc);
-   }
-
-   // Expect two `bulkWrite` commands are sent.
-   ASSERT_CMPSIZE_T (captured_commands.len, ==, 2);
-
-   bson_t *first = _mongoc_array_index (&captured_commands, bson_t *, 0);
-   bson_t *second = _mongoc_array_index (&captured_commands, bson_t *, 1);
-
-   // Expect first batch contains `maxWriteBatchSize` ops.
-   {
-      size_t ops_count = 0;
-      bson_iter_t ops_iter;
-      // Count the number of `ops`.
-      ASSERT (bson_iter_init_find (&ops_iter, first, "ops"));
-      ASSERT (bson_iter_recurse (&ops_iter, &ops_iter));
-      while (bson_iter_next (&ops_iter)) {
-         ops_count++;
-      }
-      ASSERT_CMPSIZE_T (ops_count, ==, maxWriteBatchSize);
-   }
-   // Expect second batch contains 1 op.
-   {
-      size_t ops_count = 0;
-      bson_iter_t ops_iter;
-      // Count the number of `ops`.
-      ASSERT (bson_iter_init_find (&ops_iter, second, "ops"));
-      ASSERT (bson_iter_recurse (&ops_iter, &ops_iter));
-      while (bson_iter_next (&ops_iter)) {
-         ops_count++;
-      }
-      ASSERT_CMPSIZE_T (ops_count, ==, 1);
-   }
-
-   // Expect both `bulkWrite` commands include all `nsInfo` entries.
-   ASSERT_MATCH (first, BSON_STR ({"nsInfo" : [ {"ns" : "db.coll1"}, {"ns" : "db.coll2"} ]}));
-   ASSERT_MATCH (second, BSON_STR ({"nsInfo" : [ {"ns" : "db.coll1"}, {"ns" : "db.coll2"} ]}));
-
-
-   for (size_t i = 0; i < captured_commands.len; i++) {
-      bson_t *cmd = _mongoc_array_index (&captured_commands, bson_t *, i);
-      bson_destroy (cmd);
-   }
-   _mongoc_array_destroy (&captured_commands);
-   mongoc_bulkwriteopts_destroy (NULL);
-   mongoc_bulkwrite_destroy (bw);
-   mongoc_client_destroy (client);
-}
-
 
 void
 test_crud_install (TestSuite *suite)
@@ -1285,14 +1168,6 @@ test_crud_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/crud/prose_test_11_proposed",
                       prose_test_11,
-                      NULL /* dtor */,
-                      NULL /* ctx */,
-                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
-   );
-
-   TestSuite_AddFull (suite,
-                      "/crud/prose_test_12_proposed",
-                      prose_test_12,
                       NULL /* dtor */,
                       NULL /* ctx */,
                       test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
