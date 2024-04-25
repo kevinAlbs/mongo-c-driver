@@ -11,7 +11,7 @@ Synopsis
   void
   mongoc_client_set_sockettimeoutms (mongoc_client_t *client, const uint32_t timeoutms);
 
-Change the sockettimeoutms of the mongoc_cluster_t object associated with the given mongoc_client_t object.
+Change the ``sockettimeoutms`` of the :symbol:`mongoc_client_t`.
 
 Parameters
 ----------
