@@ -1554,22 +1554,15 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
    int32_t maxMessageSizeBytes = mongoc_server_stream_max_msg_size (ss);
    size_t writeBatchSize_offset = 0;
    size_t payload_offset = 0;
-   // Calculate overhead of OP_MSG data. See OP_MSG spec for description of fields.
+   // Calculate overhead of OP_MSG and the `bulkWrite` command. See bulk write specification for explanation.
    size_t opmsg_overhead = 0;
    {
-      opmsg_overhead += 16;                           // OP_MSG.MsgHeader
-      opmsg_overhead += 4;                            // OP_MSG.flagBits
-      opmsg_overhead += 1;                            // OP_MSG.Section[0].payloadType (0)
-      opmsg_overhead += parts.assembled.command->len; // OP_MSG.Section[0].payload.document
-      opmsg_overhead += 1;                            // OP_MSG.Section[1].payloadType (1)
-      opmsg_overhead += 4;                            // OP_MSG.Section[1].payload.size
-      opmsg_overhead += strlen ("ops") + 1;           // OP_MSG.Section[1].payload.identifier
-      // OP_MSG.Section[1].payload.documents is omitted. Calculated below with remaining size.
-      opmsg_overhead += 1;                     // OP_MSG.Section[2].payloadType (1)
-      opmsg_overhead += 4;                     // OP_MSG.Section[2].payload.size
-      opmsg_overhead += strlen ("nsInfo") + 1; // OP_MSG.Section[2].payload.identifier
-      // OP_MSG.Section[2].payload.documents is omitted. Calculated below with remaining size.
+      opmsg_overhead += 1000;
+      // Add size of `bulkWrite` command. Exclude command-agnostic fields added in `mongoc_cmd_parts_assemble` (e.g.
+      // `txnNumber` and `lsid`).
+      opmsg_overhead += cmd.len;
    }
+
    while (true) {
       bool has_write_errors = false;
       bool batch_ok = false;
