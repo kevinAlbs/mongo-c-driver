@@ -1132,13 +1132,6 @@ mongoc_client_set_sockettimeoutms (mongoc_client_t *client, const uint32_t timeo
    mongoc_cluster_set_sockettimeoutms (&client->cluster, timeoutms);
 }
 
-void
-mongoc_client_reset_sockettimeoutms (mongoc_client_t *client)
-{
-   BSON_ASSERT_PARAM (client);
-   mongoc_cluster_reset_sockettimeoutms (&client->cluster);
-}
-
 /*
  *--------------------------------------------------------------------------
  *
