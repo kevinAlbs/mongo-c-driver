@@ -25,6 +25,8 @@
 #include <mongoc-util-private.h>   // _mongoc_iter_document_as_bson
 #include <common-macros-private.h> // MC_ENABLE_CONVERSION_WARNING_BEGIN
 
+#include <uthash.h>
+
 MC_ENABLE_CONVERSION_WARNING_BEGIN
 
 typedef struct {
