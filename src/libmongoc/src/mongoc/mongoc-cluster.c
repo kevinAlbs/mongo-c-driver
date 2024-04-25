@@ -2559,14 +2559,15 @@ mongoc_cluster_destroy (mongoc_cluster_t *cluster) /* INOUT */
    EXIT;
 }
 
-void mongoc_cluster_update_sockettimeoutms (mongoc_cluster_t *cluster,
-                                            const uint32_t timeoutms)
+void
+mongoc_cluster_set_sockettimeoutms (mongoc_cluster_t *cluster, const uint32_t timeoutms)
 {
    BSON_ASSERT_PARAM (cluster);
    cluster->sockettimeoutms = timeoutms;
 }
 
-void mongoc_cluster_reset_sockettimeoutms (mongoc_cluster_t *cluster)
+void
+mongoc_cluster_reset_sockettimeoutms (mongoc_cluster_t *cluster)
 {
    BSON_ASSERT_PARAM (cluster);
    cluster->sockettimeoutms =

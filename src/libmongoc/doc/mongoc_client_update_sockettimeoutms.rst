@@ -1,7 +1,7 @@
-:man_page: mongoc_client_update_sockettimeoutms
+:man_page: mongoc_client_set_sockettimeoutms
 
-mongoc_client_update_sockettimeoutms()
-=======================
+mongoc_client_set_sockettimeoutms()
+===================================
 
 Synopsis
 --------
@@ -9,7 +9,7 @@ Synopsis
 .. code-block:: c
 
   void
-  mongoc_client_update_sockettimeoutms (mongoc_client_t *client, const uint32_t timeoutms);
+  mongoc_client_set_sockettimeoutms (mongoc_client_t *client, const uint32_t timeoutms);
 
 Change the sockettimeoutms of the mongoc_cluster_t object associated with the given mongoc_client_t object.
 

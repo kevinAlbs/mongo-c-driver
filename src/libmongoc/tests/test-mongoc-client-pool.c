@@ -465,7 +465,7 @@ test_client_pool_can_override_sockettimeoutms (void)
    {
       mongoc_client_t *client = mongoc_client_pool_pop (pool);
       ASSERT_CMPINT32 (client->cluster.sockettimeoutms, ==, 1000);
-      mongoc_client_update_sockettimeoutms (client, 2000);
+      mongoc_client_set_sockettimeoutms (client, 2000);
       ASSERT_CMPINT32 (client->cluster.sockettimeoutms, ==, 2000);
       mongoc_client_pool_push (pool, client);
    }

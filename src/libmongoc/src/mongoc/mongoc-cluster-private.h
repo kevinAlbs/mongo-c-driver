@@ -73,8 +73,7 @@ void
 mongoc_cluster_destroy (mongoc_cluster_t *cluster);
 
 void
-mongoc_cluster_update_sockettimeoutms (mongoc_cluster_t *cluster,
-                                       const uint32_t sockettimeoutms);
+mongoc_cluster_set_sockettimeoutms (mongoc_cluster_t *cluster, const uint32_t sockettimeoutms);
 
 void
 mongoc_cluster_reset_sockettimeoutms (mongoc_cluster_t *cluster);
