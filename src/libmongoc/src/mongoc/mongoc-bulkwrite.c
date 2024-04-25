@@ -1405,7 +1405,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
    bson_error_t error = {0};
    mongoc_server_stream_t *ss = NULL;
    bson_t cmd = BSON_INITIALIZER;
-   mongoc_cmd_parts_t parts = {0};
+   mongoc_cmd_parts_t parts = {{0}};
    mongoc_bulkwriteopts_t defaults = {0};
 
    typedef struct {
