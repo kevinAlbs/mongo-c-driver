@@ -2560,7 +2560,7 @@ mongoc_cluster_destroy (mongoc_cluster_t *cluster) /* INOUT */
 }
 
 void
-mongoc_cluster_set_sockettimeoutms (mongoc_cluster_t *cluster, const uint32_t timeoutms)
+mongoc_cluster_set_sockettimeoutms (mongoc_cluster_t *cluster, int32_t timeoutms)
 {
    BSON_ASSERT_PARAM (cluster);
    cluster->sockettimeoutms = timeoutms;

@@ -9,7 +9,7 @@ Synopsis
 .. code-block:: c
 
   void
-  mongoc_client_set_sockettimeoutms (mongoc_client_t *client, const uint32_t timeoutms);
+  mongoc_client_set_sockettimeoutms (mongoc_client_t *client, int32_t timeoutms);
 
 Change the ``sockettimeoutms`` of the :symbol:`mongoc_client_t`.
 
