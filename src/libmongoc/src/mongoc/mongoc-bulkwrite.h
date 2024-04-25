@@ -137,10 +137,10 @@ BSON_EXPORT (mongoc_insertoneopts_t *)
 mongoc_insertoneopts_new (void);
 BSON_EXPORT (void)
 mongoc_insertoneopts_destroy (mongoc_insertoneopts_t *self);
+
 BSON_EXPORT (bool)
 mongoc_bulkwrite_append_insertone (mongoc_bulkwrite_t *self,
                                    const char *ns,
-                                   int ns_len,
                                    const bson_t *document,
                                    mongoc_insertoneopts_t *opts /* May be NULL */,
                                    bson_error_t *error);
@@ -161,7 +161,6 @@ mongoc_updateoneopts_destroy (mongoc_updateoneopts_t *self);
 BSON_EXPORT (bool)
 mongoc_bulkwrite_append_updateone (mongoc_bulkwrite_t *self,
                                    const char *ns,
-                                   int ns_len,
                                    const bson_t *filter,
                                    const bson_t *update,
                                    mongoc_updateoneopts_t *opts /* May be NULL */,
@@ -183,7 +182,6 @@ mongoc_updatemanyopts_destroy (mongoc_updatemanyopts_t *self);
 BSON_EXPORT (bool)
 mongoc_bulkwrite_append_updatemany (mongoc_bulkwrite_t *self,
                                     const char *ns,
-                                    int ns_len,
                                     const bson_t *filter,
                                     const bson_t *update,
                                     mongoc_updatemanyopts_t *opts /* May be NULL */,
@@ -205,7 +203,6 @@ mongoc_replaceoneopts_destroy (mongoc_replaceoneopts_t *self);
 BSON_EXPORT (bool)
 mongoc_bulkwrite_append_replaceone (mongoc_bulkwrite_t *self,
                                     const char *ns,
-                                    int ns_len,
                                     const bson_t *filter,
                                     const bson_t *replacement,
                                     mongoc_replaceoneopts_t *opts /* May be NULL */,
@@ -223,7 +220,6 @@ mongoc_deleteoneopts_destroy (mongoc_deleteoneopts_t *self);
 BSON_EXPORT (bool)
 mongoc_bulkwrite_append_deleteone (mongoc_bulkwrite_t *self,
                                    const char *ns,
-                                   int ns_len,
                                    const bson_t *filter,
                                    mongoc_deleteoneopts_t *opts /* May be NULL */,
                                    bson_error_t *error);
@@ -240,7 +236,6 @@ mongoc_deletemanyopts_destroy (mongoc_deletemanyopts_t *self);
 BSON_EXPORT (bool)
 mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
                                     const char *ns,
-                                    int ns_len,
                                     const bson_t *filter,
                                     mongoc_deletemanyopts_t *opts /* May be NULL */,
                                     bson_error_t *error);

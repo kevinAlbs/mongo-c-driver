@@ -154,7 +154,6 @@ typedef struct {
    model_op_t op;
    bson_iter_t id_iter;
    char *ns;
-   int ns_len;
 } model_data_t;
 
 struct _mongoc_bulkwrite_t {
@@ -232,7 +231,6 @@ mongoc_insertoneopts_destroy (mongoc_insertoneopts_t *self)
 bool
 mongoc_bulkwrite_append_insertone (mongoc_bulkwrite_t *self,
                                    const char *ns,
-                                   int ns_len,
                                    const bson_t *document,
                                    mongoc_insertoneopts_t *opts, // may be NULL
                                    bson_error_t *error)
@@ -281,7 +279,7 @@ mongoc_bulkwrite_append_insertone (mongoc_bulkwrite_t *self,
    }
 
    self->n_ops++;
-   model_data_t md = {.op = MODEL_OP_INSERT, .id_iter = id_iter, .ns = bson_strdup (ns), .ns_len = -1};
+   model_data_t md = {.op = MODEL_OP_INSERT, .id_iter = id_iter, .ns = bson_strdup (ns)};
    _mongoc_array_append_val (&self->model_entries, md);
    bson_destroy (&op);
    return true;
@@ -374,7 +372,6 @@ mongoc_updateoneopts_destroy (mongoc_updateoneopts_t *self)
 bool
 mongoc_bulkwrite_append_updateone (mongoc_bulkwrite_t *self,
                                    const char *ns,
-                                   int ns_len,
                                    const bson_t *filter,
                                    const bson_t *update,
                                    mongoc_updateoneopts_t *opts /* May be NULL */,
@@ -430,7 +427,7 @@ mongoc_bulkwrite_append_updateone (mongoc_bulkwrite_t *self,
    BSON_ASSERT (_mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
 
    self->n_ops++;
-   model_data_t md = {.op = MODEL_OP_UPDATE, .ns = bson_strdup (ns), .ns_len = -1};
+   model_data_t md = {.op = MODEL_OP_UPDATE, .ns = bson_strdup (ns)};
    _mongoc_array_append_val (&self->model_entries, md);
    bson_destroy (&op);
    return true;
@@ -519,7 +516,6 @@ validate_replace (const bson_t *doc, bson_error_t *error)
 bool
 mongoc_bulkwrite_append_replaceone (mongoc_bulkwrite_t *self,
                                     const char *ns,
-                                    int ns_len,
                                     const bson_t *filter,
                                     const bson_t *replacement,
                                     mongoc_replaceoneopts_t *opts /* May be NULL */,
@@ -572,7 +568,7 @@ mongoc_bulkwrite_append_replaceone (mongoc_bulkwrite_t *self,
 
    self->n_ops++;
    self->max_insert_len = BSON_MAX (self->max_insert_len, replacement->len);
-   model_data_t md = {.op = MODEL_OP_UPDATE, .ns = bson_strdup (ns), .ns_len = -1};
+   model_data_t md = {.op = MODEL_OP_UPDATE, .ns = bson_strdup (ns)};
    _mongoc_array_append_val (&self->model_entries, md);
    bson_destroy (&op);
    return true;
@@ -632,7 +628,6 @@ mongoc_updatemanyopts_destroy (mongoc_updatemanyopts_t *self)
 bool
 mongoc_bulkwrite_append_updatemany (mongoc_bulkwrite_t *self,
                                     const char *ns,
-                                    int ns_len,
                                     const bson_t *filter,
                                     const bson_t *update,
                                     mongoc_updatemanyopts_t *opts /* May be NULL */,
@@ -689,7 +684,7 @@ mongoc_bulkwrite_append_updatemany (mongoc_bulkwrite_t *self,
 
    self->has_multi_write = true;
    self->n_ops++;
-   model_data_t md = {.op = MODEL_OP_UPDATE, .ns = bson_strdup (ns), .ns_len = -1};
+   model_data_t md = {.op = MODEL_OP_UPDATE, .ns = bson_strdup (ns)};
    _mongoc_array_append_val (&self->model_entries, md);
    bson_destroy (&op);
    return true;
@@ -733,7 +728,6 @@ mongoc_deleteoneopts_destroy (mongoc_deleteoneopts_t *self)
 bool
 mongoc_bulkwrite_append_deleteone (mongoc_bulkwrite_t *self,
                                    const char *ns,
-                                   int ns_len,
                                    const bson_t *filter,
                                    mongoc_deleteoneopts_t *opts /* May be NULL */,
                                    bson_error_t *error)
@@ -770,7 +764,7 @@ mongoc_bulkwrite_append_deleteone (mongoc_bulkwrite_t *self,
    BSON_ASSERT (_mongoc_buffer_append (&self->ops, bson_get_data (&op), op.len));
 
    self->n_ops++;
-   model_data_t md = {.op = MODEL_OP_DELETE, .ns = bson_strdup (ns), .ns_len = -1};
+   model_data_t md = {.op = MODEL_OP_DELETE, .ns = bson_strdup (ns)};
    _mongoc_array_append_val (&self->model_entries, md);
    bson_destroy (&op);
    return true;
@@ -812,7 +806,6 @@ mongoc_deletemanyopts_destroy (mongoc_deletemanyopts_t *self)
 bool
 mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
                                     const char *ns,
-                                    int ns_len,
                                     const bson_t *filter,
                                     mongoc_deletemanyopts_t *opts /* May be NULL */,
                                     bson_error_t *error)
@@ -850,7 +843,7 @@ mongoc_bulkwrite_append_deletemany (mongoc_bulkwrite_t *self,
 
    self->has_multi_write = true;
    self->n_ops++;
-   model_data_t md = {.op = MODEL_OP_DELETE, .ns = bson_strdup (ns), .ns_len = -1};
+   model_data_t md = {.op = MODEL_OP_DELETE, .ns = bson_strdup (ns)};
    _mongoc_array_append_val (&self->model_entries, md);
    bson_destroy (&op);
    return true;
@@ -1337,7 +1330,7 @@ nsinfo_list_destroy (nsinfo_list_t *self)
 // `*ns_index` is set to the resulting index in the list.
 // Returns -1 on error.
 static int32_t
-nsinfo_list_append (nsinfo_list_t *self, const char *ns, int ns_len, bson_error_t *error)
+nsinfo_list_append (nsinfo_list_t *self, const char *ns, bson_error_t *error)
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (ns);
@@ -1353,21 +1346,20 @@ nsinfo_list_append (nsinfo_list_t *self, const char *ns, int ns_len, bson_error_
       return -1;
    }
    self->count++;
-   BSON_ASSERT (bson_append_int32 (&self->ns_to_index, ns, ns_len, ns_index));
+   BSON_ASSERT (bson_append_int32 (&self->ns_to_index, ns, -1, ns_index));
    // Append to buffer.
    bson_t nsinfo_bson = BSON_INITIALIZER;
-   BSON_ASSERT (bson_append_utf8 (&nsinfo_bson, "ns", 2, ns, ns_len));
+   BSON_ASSERT (bson_append_utf8 (&nsinfo_bson, "ns", 2, ns, -1));
    BSON_ASSERT (_mongoc_buffer_append (&self->payload, bson_get_data (&nsinfo_bson), nsinfo_bson.len));
    bson_destroy (&nsinfo_bson);
    return ns_index;
 }
 
 static int32_t
-nsinfo_list_find (nsinfo_list_t *self, const char *ns, int ns_len)
+nsinfo_list_find (nsinfo_list_t *self, const char *ns)
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (ns);
-   BSON_UNUSED (ns_len);
 
    bson_iter_t iter;
    if (bson_iter_init_find (&iter, &self->ns_to_index, ns)) {
@@ -1377,13 +1369,13 @@ nsinfo_list_find (nsinfo_list_t *self, const char *ns, int ns_len)
 }
 
 static uint32_t
-nsinfo_list_get_bson_size (nsinfo_list_t *self, const char *ns, int ns_len)
+nsinfo_list_get_bson_size (nsinfo_list_t *self, const char *ns)
 {
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (ns);
    // Calculate overhead of the BSON document { "ns": "<ns>" }. See BSON specification.
    bson_t as_bson = BSON_INITIALIZER;
-   BSON_ASSERT (bson_append_utf8 (&as_bson, "ns", 2, ns, ns_len));
+   BSON_ASSERT (bson_append_utf8 (&as_bson, "ns", 2, ns, -1));
    uint32_t size = as_bson.len;
    bson_destroy (&as_bson);
    return size;
@@ -1603,10 +1595,10 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
          size_t models_idx = payload_writeBatchSize + writeBatchSize_offset;
          model_data_t *md = &_mongoc_array_index (&self->model_entries, model_data_t, models_idx);
          uint32_t nsinfo_bson_size = 0;
-         int32_t ns_index = nsinfo_list_find (nl, md->ns, md->ns_len);
+         int32_t ns_index = nsinfo_list_find (nl, md->ns);
          if (ns_index == -1) {
             // Need to append `nsInfo` entry. Append after checking that both the document and the `nsInfo` entry fit.
-            nsinfo_bson_size = nsinfo_list_get_bson_size (nl, md->ns, md->ns_len);
+            nsinfo_bson_size = nsinfo_list_get_bson_size (nl, md->ns);
          }
 
          if (opmsg_overhead + payload_len + ulen + nsinfo_bson_size > maxMessageSizeBytes) {
@@ -1627,7 +1619,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
 
          // Check if a new `nsInfo` entry is needed.
          if (ns_index == -1) {
-            ns_index = nsinfo_list_append (nl, md->ns, md->ns_len, &error);
+            ns_index = nsinfo_list_append (nl, md->ns, &error);
             if (ns_index == -1) {
                _bulkwriteexception_set_error (ret.exc, &error);
                goto batch_fail;

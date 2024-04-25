@@ -762,7 +762,7 @@ retryable_writes_original_error_bulkwrite (void *ctx)
    const uint32_t server_id = set_up_original_error_test (callbacks, &apm_ctx, "bulkWrite", client);
 
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
-   bool ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+   bool ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error);
    ASSERT_OR_PRINT (ok, error);
 
    mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, NULL);
@@ -1037,7 +1037,7 @@ static bool
 cmd_bulkWrite (mongoc_client_t *client, bson_error_t *error)
 {
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
-   bool ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, error);
+   bool ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, error);
    ASSERT_OR_PRINT (ok, (*error));
    mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, NULL);
    if (bwr.exc) {

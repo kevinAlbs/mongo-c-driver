@@ -263,7 +263,7 @@ append_client_bulkwritemodel (mongoc_bulkwrite_t *bw, bson_t *model_wrapper, bso
          goto done;
       }
 
-      if (!mongoc_bulkwrite_append_insertone (bw, namespace, -1, document, NULL, error)) {
+      if (!mongoc_bulkwrite_append_insertone (bw, namespace, document, NULL, error)) {
          goto done;
       }
    } else if (0 == strcmp ("updateOne", model_name)) {
@@ -289,7 +289,7 @@ append_client_bulkwritemodel (mongoc_bulkwrite_t *bw, bson_t *model_wrapper, bso
          mongoc_updateoneopts_set_upsert (opts, *upsert);
       }
 
-      if (!mongoc_bulkwrite_append_updateone (bw, namespace, -1, filter, update, opts, error)) {
+      if (!mongoc_bulkwrite_append_updateone (bw, namespace, filter, update, opts, error)) {
          mongoc_updateoneopts_destroy (opts);
          goto done;
       }
@@ -317,7 +317,7 @@ append_client_bulkwritemodel (mongoc_bulkwrite_t *bw, bson_t *model_wrapper, bso
          mongoc_updatemanyopts_set_upsert (opts, *upsert);
       }
 
-      if (!mongoc_bulkwrite_append_updatemany (bw, namespace, -1, filter, update, opts, error)) {
+      if (!mongoc_bulkwrite_append_updatemany (bw, namespace, filter, update, opts, error)) {
          mongoc_updatemanyopts_destroy (opts);
          goto done;
       }
@@ -338,7 +338,7 @@ append_client_bulkwritemodel (mongoc_bulkwrite_t *bw, bson_t *model_wrapper, bso
          mongoc_deleteoneopts_set_hint (opts, bson_val_to_value (hint));
       }
 
-      if (!mongoc_bulkwrite_append_deleteone (bw, namespace, -1, filter, opts, error)) {
+      if (!mongoc_bulkwrite_append_deleteone (bw, namespace, filter, opts, error)) {
          mongoc_deleteoneopts_destroy (opts);
          goto done;
       }
@@ -359,7 +359,7 @@ append_client_bulkwritemodel (mongoc_bulkwrite_t *bw, bson_t *model_wrapper, bso
          mongoc_deletemanyopts_set_hint (opts, bson_val_to_value (hint));
       }
 
-      if (!mongoc_bulkwrite_append_deletemany (bw, namespace, -1, filter, opts, error)) {
+      if (!mongoc_bulkwrite_append_deletemany (bw, namespace, filter, opts, error)) {
          mongoc_deletemanyopts_destroy (opts);
          goto done;
       }
@@ -386,7 +386,7 @@ append_client_bulkwritemodel (mongoc_bulkwrite_t *bw, bson_t *model_wrapper, bso
          mongoc_replaceoneopts_set_upsert (opts, *upsert);
       }
 
-      if (!mongoc_bulkwrite_append_replaceone (bw, namespace, -1, filter, replacement, opts, error)) {
+      if (!mongoc_bulkwrite_append_replaceone (bw, namespace, filter, replacement, opts, error)) {
          mongoc_replaceoneopts_destroy (opts);
          goto done;
       }

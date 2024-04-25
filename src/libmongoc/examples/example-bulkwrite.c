@@ -26,7 +26,7 @@ main (int argc, char *argv[])
    // Insert a document to `db.coll1`
    {
       bson_t *doc = BCON_NEW ("foo", "bar");
-      if (!mongoc_bulkwrite_append_insertone (bw, "db.coll1", -1, doc, NULL, &error)) {
+      if (!mongoc_bulkwrite_append_insertone (bw, "db.coll1", doc, NULL, &error)) {
          HANDLE_ERROR ("Error appending insert one: %s", error.message);
       }
       bson_destroy (doc);
@@ -34,7 +34,7 @@ main (int argc, char *argv[])
    // Insert a document to `db.coll2`
    {
       bson_t *doc = BCON_NEW ("foo", "baz");
-      if (!mongoc_bulkwrite_append_insertone (bw, "db.coll2", -1, doc, NULL, &error)) {
+      if (!mongoc_bulkwrite_append_insertone (bw, "db.coll2", doc, NULL, &error)) {
          HANDLE_ERROR ("Error appending insert one: %s", error.message);
       }
       bson_destroy (doc);

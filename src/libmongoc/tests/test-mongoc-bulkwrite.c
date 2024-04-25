@@ -38,9 +38,9 @@ test_bulkwrite_insert (void *unused)
 
    // Insert two documents with verbose results.
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
-   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{'_id': 123}"), NULL /* opts */, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{'_id': 123}"), NULL /* opts */, &error);
    ASSERT_OR_PRINT (ok, error);
-   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{'_id': 456}"), NULL /* opts */, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{'_id': 456}"), NULL /* opts */, &error);
    ASSERT_OR_PRINT (ok, error);
 
    // Do the bulk write.
@@ -83,9 +83,9 @@ test_bulkwrite_writeError (void *unused)
 
    // Insert two documents with verbose results.
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
-   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{'_id': 123}"), NULL /* opts */, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{'_id': 123}"), NULL /* opts */, &error);
    ASSERT_OR_PRINT (ok, error);
-   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{'_id': 123}"), NULL /* opts */, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{'_id': 123}"), NULL /* opts */, &error);
    ASSERT_OR_PRINT (ok, error);
 
    // Do the bulk write.
@@ -133,7 +133,7 @@ test_bulkwrite_unacknowledged (void *ctx)
    mongoc_bulkwriteopts_t *opts = mongoc_bulkwriteopts_new ();
    mongoc_bulkwriteopts_set_writeconcern (opts, wc);
 
-   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error);
    ASSERT_OR_PRINT (ok, error);
    mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
    // Expect no result.
@@ -167,7 +167,7 @@ test_bulkwrite_session_with_unacknowledged (void *ctx)
    mongoc_bulkwriteopts_set_writeconcern (opts, wc);
    mongoc_bulkwriteopts_set_session (opts, session);
 
-   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error);
    ASSERT_OR_PRINT (ok, error);
    mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
    // Expect no result.
@@ -197,7 +197,7 @@ test_bulkwrite_double_execute (void *ctx)
 
    client = test_framework_new_default_client ();
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
-   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error);
    ASSERT_OR_PRINT (ok, error);
    // Execute.
    {
@@ -208,27 +208,27 @@ test_bulkwrite_double_execute (void *ctx)
    }
 
    // Expect an error on reuse.
-   ASSERT (!mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error));
+   ASSERT (!mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
    memset (&error, 0, sizeof (error));
 
-   ASSERT (!mongoc_bulkwrite_append_updateone (bw, "db.coll", -1, tmp_bson ("{}"), tmp_bson ("{}"), NULL, &error));
+   ASSERT (!mongoc_bulkwrite_append_updateone (bw, "db.coll", tmp_bson ("{}"), tmp_bson ("{}"), NULL, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
    memset (&error, 0, sizeof (error));
 
-   ASSERT (!mongoc_bulkwrite_append_updatemany (bw, "db.coll", -1, tmp_bson ("{}"), tmp_bson ("{}"), NULL, &error));
+   ASSERT (!mongoc_bulkwrite_append_updatemany (bw, "db.coll", tmp_bson ("{}"), tmp_bson ("{}"), NULL, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
    memset (&error, 0, sizeof (error));
 
-   ASSERT (!mongoc_bulkwrite_append_replaceone (bw, "db.coll", -1, tmp_bson ("{}"), tmp_bson ("{}"), NULL, &error));
+   ASSERT (!mongoc_bulkwrite_append_replaceone (bw, "db.coll", tmp_bson ("{}"), tmp_bson ("{}"), NULL, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
    memset (&error, 0, sizeof (error));
 
-   ASSERT (!mongoc_bulkwrite_append_deleteone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error));
+   ASSERT (!mongoc_bulkwrite_append_deleteone (bw, "db.coll", tmp_bson ("{}"), NULL, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
    memset (&error, 0, sizeof (error));
 
-   ASSERT (!mongoc_bulkwrite_append_deletemany (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error));
+   ASSERT (!mongoc_bulkwrite_append_deletemany (bw, "db.coll", tmp_bson ("{}"), NULL, &error));
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "bulk write already executed");
    memset (&error, 0, sizeof (error));
 
@@ -288,7 +288,7 @@ test_bulkwrite_serverid (void *ctx)
    mongoc_bulkwriteopts_t *bwo = mongoc_bulkwriteopts_new ();
    mongoc_bulkwriteopts_set_serverid (bwo, selected_serverid);
 
-   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+   ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error);
    ASSERT_OR_PRINT (ok, error);
    // Execute.
    {
@@ -341,7 +341,7 @@ test_bulkwrite_extra (void *ctx)
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
    // Create bulk write.
    {
-      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error);
       ASSERT_OR_PRINT (ok, error);
    }
 
@@ -382,14 +382,14 @@ test_bulkwrite_no_verbose_results (void *ctx)
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
    // Create bulk write.
    {
-      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error);
       ASSERT_OR_PRINT (ok, error);
 
       ok = mongoc_bulkwrite_append_updateone (
-         bw, "db.coll", -1, tmp_bson ("{}"), tmp_bson ("{'$set': {'x': 1}}"), NULL, &error);
+         bw, "db.coll", tmp_bson ("{}"), tmp_bson ("{'$set': {'x': 1}}"), NULL, &error);
       ASSERT_OR_PRINT (ok, error);
 
-      ok = mongoc_bulkwrite_append_deleteone (bw, "db.coll", -1, tmp_bson ("{}"), NULL, &error);
+      ok = mongoc_bulkwrite_append_deleteone (bw, "db.coll", tmp_bson ("{}"), NULL, &error);
       ASSERT_OR_PRINT (ok, error);
    }
 
@@ -457,12 +457,12 @@ test_bulkwrite_splits_nsinfo (void *ctx)
    {
       // First batch only references db.coll1.
       for (int32_t i = 0; i < maxWriteBatchSize; i++) {
-         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll1", -1, tmp_bson ("{}"), NULL, &error);
+         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll1", tmp_bson ("{}"), NULL, &error);
          ASSERT_OR_PRINT (ok, error);
       }
       // Second batch only references db.coll2.
       for (int32_t i = 0; i < 1; i++) {
-         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll2", -1, tmp_bson ("{}"), NULL, &error);
+         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll2", tmp_bson ("{}"), NULL, &error);
          ASSERT_OR_PRINT (ok, error);
       }
    }
@@ -541,7 +541,7 @@ test_bulkwrite_many_namespaces (void *ctx)
    {
       for (int32_t i = 0; i < maxWriteBatchSize + 1; i++) {
          char *ns = bson_strdup_printf ("db.coll%" PRId32, i);
-         ok = mongoc_bulkwrite_append_deleteone (bw, ns, -1, tmp_bson ("{}"), NULL, &error);
+         ok = mongoc_bulkwrite_append_deleteone (bw, ns, tmp_bson ("{}"), NULL, &error);
          ASSERT_OR_PRINT (ok, error);
          bson_free (ns);
       }

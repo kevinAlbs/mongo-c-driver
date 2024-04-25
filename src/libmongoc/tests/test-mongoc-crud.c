@@ -227,7 +227,7 @@ prose_test_3 (void *ctx)
    bson_t *doc = tmp_bson ("{'a': 'b'}");
    mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
    for (int32_t i = 0; i < maxWriteBatchSize + 1; i++) {
-      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, doc, NULL, &error);
+      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", doc, NULL, &error);
       ASSERT_OR_PRINT (ok, error);
    }
 
@@ -307,7 +307,7 @@ prose_test_4 (void *ctx)
    int32_t numModels = (maxMessageSizeBytes / maxBsonObjectSize) + 1;
 
    for (int32_t i = 0; i < numModels; i++) {
-      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, &doc, NULL, &error);
+      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", &doc, NULL, &error);
       ASSERT_OR_PRINT (ok, error);
    }
 
@@ -414,7 +414,7 @@ prose_test_5 (void *ctx)
       bson_t doc = BSON_INITIALIZER;
       BSON_APPEND_UTF8 (&doc, "a", "b");
       for (int32_t i = 0; i < maxWriteBatchSize + 1; i++) {
-         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, &doc, NULL, &error);
+         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", &doc, NULL, &error);
          ASSERT_OR_PRINT (ok, error);
       }
    }
@@ -499,7 +499,7 @@ prose_test_6 (void *ctx)
       mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
 
       for (int32_t i = 0; i < maxWriteBatchSize + 1; i++) {
-         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, &document, NULL, &error);
+         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", &document, NULL, &error);
          ASSERT_OR_PRINT (ok, error);
       }
 
@@ -546,7 +546,7 @@ prose_test_6 (void *ctx)
       mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
 
       for (int32_t i = 0; i < maxWriteBatchSize + 1; i++) {
-         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, &document, NULL, &error);
+         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", &document, NULL, &error);
          ASSERT_OR_PRINT (ok, error);
       }
 
@@ -641,7 +641,7 @@ prose_test_7 (void *ctx)
       bson_free (large_str);
    }
 
-   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", -1, &d1, update, uo, &error);
+   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", &d1, update, uo, &error);
    ASSERT_OR_PRINT (ok, error);
    numModels++;
 
@@ -653,7 +653,7 @@ prose_test_7 (void *ctx)
       bson_free (large_str);
    }
 
-   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", -1, &d2, update, uo, &error);
+   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", &d2, update, uo, &error);
    ASSERT_OR_PRINT (ok, error);
    numModels++;
 
@@ -746,7 +746,7 @@ prose_test_8 (void *ctx)
       bson_free (large_str);
    }
 
-   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", -1, &d1, update, uo, &error);
+   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", &d1, update, uo, &error);
    ASSERT_OR_PRINT (ok, error);
    numModels++;
 
@@ -758,7 +758,7 @@ prose_test_8 (void *ctx)
       bson_free (large_str);
    }
 
-   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", -1, &d2, update, uo, &error);
+   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", &d2, update, uo, &error);
    ASSERT_OR_PRINT (ok, error);
    numModels++;
 
@@ -868,7 +868,7 @@ prose_test_9 (void *ctx)
       bson_free (large_str);
    }
 
-   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", -1, &d1, update, uo, &error);
+   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", &d1, update, uo, &error);
    ASSERT_OR_PRINT (ok, error);
    numModels++;
 
@@ -880,7 +880,7 @@ prose_test_9 (void *ctx)
       bson_free (large_str);
    }
 
-   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", -1, &d2, update, uo, &error);
+   ok = mongoc_bulkwrite_append_updateone (bw, "db.coll", &d2, update, uo, &error);
    ASSERT_OR_PRINT (ok, error);
    numModels++;
 
@@ -966,7 +966,7 @@ prose_test_10 (void *ctx)
    // Test a large insert.
    {
       mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
-      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, &doc, NULL, &error);
+      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", &doc, NULL, &error);
       ASSERT_OR_PRINT (ok, error);
 
       mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
@@ -984,7 +984,7 @@ prose_test_10 (void *ctx)
    // Test a large replace.
    {
       mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
-      ok = mongoc_bulkwrite_append_replaceone (bw, "db.coll", -1, tmp_bson ("{}"), &doc, NULL, &error);
+      ok = mongoc_bulkwrite_append_replaceone (bw, "db.coll", tmp_bson ("{}"), &doc, NULL, &error);
       ASSERT_OR_PRINT (ok, error);
 
       mongoc_bulkwritereturn_t ret = mongoc_bulkwrite_execute (bw, opts);
@@ -1069,12 +1069,12 @@ prose_test_11 (void *ctx)
    {
       // First batch only references db.coll.
       for (int32_t i = 0; i < maxWriteBatchSize; i++) {
-         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, tmp_bson ("{'a': 'b'}"), NULL, &error);
+         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{'a': 'b'}"), NULL, &error);
          ASSERT_OR_PRINT (ok, error);
       }
       // Second batch only references db.coll1.
       for (int32_t i = 0; i < 1; i++) {
-         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll1", -1, tmp_bson ("{'a': 'b'}"), NULL, &error);
+         ok = mongoc_bulkwrite_append_insertone (bw, "db.coll1", tmp_bson ("{'a': 'b'}"), NULL, &error);
          ASSERT_OR_PRINT (ok, error);
       }
    }
@@ -1146,7 +1146,7 @@ prose_test_12 (void *ctx)
 
    // Create bulk write.
    {
-      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", -1, large_doc, NULL, &error);
+      ok = mongoc_bulkwrite_append_insertone (bw, "db.coll", large_doc, NULL, &error);
       ASSERT_OR_PRINT (ok, error);
    }
 
