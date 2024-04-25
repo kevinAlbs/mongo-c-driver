@@ -555,6 +555,7 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster, mongoc_cmd_t *c
                                          bson_get_monotonic_time () - started,
                                          cmd->is_acknowledged ? reply : &fake_reply,
                                          cmd->command_name,
+                                         cmd->db_name,
                                          request_id,
                                          cmd->operation_id,
                                          &server_stream->sd->host,
@@ -572,6 +573,7 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster, mongoc_cmd_t *c
       mongoc_apm_command_failed_init (&failed_event,
                                       bson_get_monotonic_time () - started,
                                       cmd->command_name,
+                                      cmd->db_name,
                                       error,
                                       reply,
                                       request_id,
@@ -3225,45 +3227,28 @@ _mongoc_cluster_run_opmsg_send (
       message_length += mcd_rpc_header_set_response_to (rpc, 0);
       message_length += mcd_rpc_header_set_op_code (rpc, MONGOC_OP_CODE_MSG);
 
-      size_t section_count = 1u;
-      if (cmd->payload) {
-         section_count++;
-      }
-      if (cmd->payload2) {
-         section_count++;
-      }
-      mcd_rpc_op_msg_set_sections_count (rpc, section_count);
+      BSON_ASSERT (cmd->payloads_count <= MONGOC_CMD_PAYLOADS_COUNT_MAX);
+      // Reserve one section for the body (kind 0) and any needed sections for document sequences (kind 1)
+      mcd_rpc_op_msg_set_sections_count (rpc, 1u + cmd->payloads_count);
 
       message_length += mcd_rpc_op_msg_set_flag_bits (rpc, flags);
       message_length += mcd_rpc_op_msg_section_set_kind (rpc, 0u, 0);
       message_length += mcd_rpc_op_msg_section_set_body (rpc, 0u, bson_get_data (cmd->command));
 
-      if (cmd->payload) {
-         BSON_ASSERT (bson_in_range_signed (size_t, cmd->payload_size));
+      for (size_t i = 0; i < cmd->payloads_count; i++) {
+         const mongoc_cmd_payload_t payload = cmd->payloads[i];
 
-         const size_t section_length =
-            sizeof (int32_t) + strlen (cmd->payload_identifier) + 1u + (size_t) cmd->payload_size;
+         BSON_ASSERT (bson_in_range_signed (size_t, payload.size));
+
+         const size_t section_length = sizeof (int32_t) + strlen (payload.identifier) + 1u + (size_t) payload.size;
          BSON_ASSERT (bson_in_range_unsigned (int32_t, section_length));
 
-         message_length += mcd_rpc_op_msg_section_set_kind (rpc, 1u, 1);
-         message_length += mcd_rpc_op_msg_section_set_length (rpc, 1u, (int32_t) section_length);
-         message_length += mcd_rpc_op_msg_section_set_identifier (rpc, 1u, cmd->payload_identifier);
+         size_t section_idx = 1u + i;
+         message_length += mcd_rpc_op_msg_section_set_kind (rpc, section_idx, 1);
+         message_length += mcd_rpc_op_msg_section_set_length (rpc, section_idx, (int32_t) section_length);
+         message_length += mcd_rpc_op_msg_section_set_identifier (rpc, section_idx, payload.identifier);
          message_length +=
-            mcd_rpc_op_msg_section_set_document_sequence (rpc, 1u, cmd->payload, (size_t) cmd->payload_size);
-      }
-
-      if (cmd->payload2) {
-         BSON_ASSERT (bson_in_range_signed (size_t, cmd->payload2_size));
-
-         const size_t section_length =
-            sizeof (int32_t) + strlen (cmd->payload2_identifier) + 1u + (size_t) cmd->payload2_size;
-         BSON_ASSERT (bson_in_range_unsigned (int32_t, section_length));
-
-         message_length += mcd_rpc_op_msg_section_set_kind (rpc, 2u, 1);
-         message_length += mcd_rpc_op_msg_section_set_length (rpc, 2u, (int32_t) section_length);
-         message_length += mcd_rpc_op_msg_section_set_identifier (rpc, 2u, cmd->payload2_identifier);
-         message_length +=
-            mcd_rpc_op_msg_section_set_document_sequence (rpc, 2u, cmd->payload2, (size_t) cmd->payload2_size);
+            mcd_rpc_op_msg_section_set_document_sequence (rpc, section_idx, payload.documents, (size_t) payload.size);
       }
 
       mcd_rpc_message_set_length (rpc, message_length);
@@ -3666,12 +3651,17 @@ mongoc_cluster_run_retryable_write (mongoc_cluster_t *cluster,
                                     bson_t *reply,
                                     bson_error_t *error)
 {
+   BSON_ASSERT_PARAM (cluster);
+   BSON_ASSERT_PARAM (cmd);
+   BSON_ASSERT_PARAM (retry_server_stream);
+   BSON_ASSERT_PARAM (reply);
+   BSON_ASSERT (error || true);
+
    bool ret;
    // `can_retry` is set to false on retry. A retry may only happen once.
    bool can_retry = is_retryable_write;
 
-   /* increment the transaction number for the first attempt of each retryable
-    * write command */
+   // Increment the transaction number for the first attempt of each retryable write command.
    if (is_retryable_write) {
       bson_iter_t txn_number_iter;
       BSON_ASSERT (bson_iter_init_find (&txn_number_iter, cmd->command, "txnNumber"));
@@ -3685,6 +3675,9 @@ mongoc_cluster_run_retryable_write (mongoc_cluster_t *cluster,
       bool set;
    } original_error = {.reply = {0}, .error = {0}, .set = false};
 
+   // Ensure `*retry_server_stream` is always valid or null.
+   *retry_server_stream = NULL;
+
 retry:
    ret = mongoc_cluster_run_command_monitored (cluster, cmd, reply, error);
 
@@ -3693,20 +3686,19 @@ retry:
       _mongoc_write_error_update_if_unsupported_storage_engine (ret, error, reply);
    }
 
-   /* If a retryable error is encountered and the write is retryable, select
-    * a new writable stream and retry. If server selection fails or the selected
-    * server does not support retryable writes, fall through and allow the
-    * original error to be reported. */
+   // If a retryable error is encountered and the write is retryable, select a new writable stream and retry. If server
+   // selection fails or the selected server does not support retryable writes, fall through and allow the original
+   // error to be reported.
    if (can_retry && _mongoc_write_error_get_type (reply) == MONGOC_WRITE_ERR_RETRY) {
       bson_error_t ignored_error;
 
-      /* each write command may be retried at most once */
-      can_retry = false;
+      can_retry = false; // Only retry once.
 
-      // If talking to a sharded cluster, deprioritize the just-used mongos to prefer a new mongos for the retry.
+      // Select a server.
       {
          mongoc_deprioritized_servers_t *const ds = mongoc_deprioritized_servers_new ();
 
+         // If talking to a sharded cluster, deprioritize the just-used mongos to prefer a new mongos for the retry.
          mongoc_deprioritized_servers_add_if_sharded (ds, cmd->server_stream->topology_type, cmd->server_stream->sd);
 
          *retry_server_stream =
@@ -3716,7 +3708,7 @@ retry:
       }
 
       if (*retry_server_stream) {
-         cmd->server_stream = *retry_server_stream;
+         cmd->server_stream = *retry_server_stream; // Non-owning.
          {
             // Store the original error and reply before retry.
             BSON_ASSERT (!original_error.set); // Retry only happens once.
@@ -3731,8 +3723,7 @@ retry:
       }
    }
 
-   // If a retry attempt fails with an error labeled NoWritesPerformed,
-   // drivers MUST return the original error.
+   // If a retry attempt fails with an error labeled NoWritesPerformed, drivers MUST return the original error.
    if (original_error.set && mongoc_error_has_label (reply, "NoWritesPerformed")) {
       if (error) {
          *error = original_error.error;
