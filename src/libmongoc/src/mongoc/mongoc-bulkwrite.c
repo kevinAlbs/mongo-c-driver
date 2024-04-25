@@ -1406,7 +1406,7 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
    mongoc_server_stream_t *ss = NULL;
    bson_t cmd = BSON_INITIALIZER;
    mongoc_cmd_parts_t parts = {{0}};
-   mongoc_bulkwriteopts_t defaults = {0};
+   mongoc_bulkwriteopts_t defaults = {{0}};
 
    typedef struct {
       bson_t *bson; // Use a pointer since `bson_t` is not trivially relocatable.
