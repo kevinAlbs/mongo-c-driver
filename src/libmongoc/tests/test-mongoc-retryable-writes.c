@@ -911,7 +911,7 @@ typedef bool (*cmd_fn) (mongoc_client_t *client, bson_error_t *error);
 // Test that in a sharded cluster writes are retried on a different mongos when
 // one is available.
 static void
-retryable_writes_sharded_on_other_mongos_impl (const char *cmd_name, cmd_fn cmd_fn)
+retryable_writes_sharded_on_other_mongos_impl (const char *cmd_name, cmd_fn cmd_func)
 {
    bson_error_t error = {0};
 
@@ -977,7 +977,7 @@ retryable_writes_sharded_on_other_mongos_impl (const char *cmd_name, cmd_fn cmd_
 
          // Execute the target command with `client`. Assert that the command
          // failed.
-         ASSERT_WITH_MSG (!cmd_fn (client, &error), "expected command '%s' to fail", cmd_name);
+         ASSERT_WITH_MSG (!cmd_func (client, &error), "expected command '%s' to fail", cmd_name);
 
          // Assert that two failed command events occurred.
          ASSERT_WITH_MSG (ctx.count == 2,
