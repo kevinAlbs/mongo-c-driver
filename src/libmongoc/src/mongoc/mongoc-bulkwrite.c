@@ -1659,22 +1659,29 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
 
       // Send batch.
       {
-         // Create the nsInfo payload 1.
+         parts.assembled.payloads_count = 2;
+
+         // Create the `nsInfo` payload.
          {
+            mongoc_cmd_payload_t *payload = &parts.assembled.payloads[0];
             const mongoc_buffer_t *nsinfo_docseq = nsinfo_list_as_document_sequence (nl);
-            parts.assembled.payload2 = nsinfo_docseq->data;
+            payload->documents = nsinfo_docseq->data;
             BSON_ASSERT (bson_in_range_int32_t_unsigned (nsinfo_docseq->len));
-            parts.assembled.payload2_size = (int32_t) nsinfo_docseq->len;
-            parts.assembled.payload2_identifier = "nsInfo";
+            payload->size = (int32_t) nsinfo_docseq->len;
+            payload->identifier = "nsInfo";
          }
 
-         // Create the payload 1 and send.
+         // Create the `ops` payload.
          {
-            parts.assembled.payload_identifier = "ops";
-            parts.assembled.payload = self->ops.data + payload_offset;
+            mongoc_cmd_payload_t *payload = &parts.assembled.payloads[1];
+            payload->identifier = "ops";
+            payload->documents = self->ops.data + payload_offset;
             BSON_ASSERT (bson_in_range_int32_t_unsigned (payload_len));
-            parts.assembled.payload_size = (int32_t) payload_len;
+            payload->size = (int32_t) payload_len;
+         }
 
+         // Send command.
+         {
             mongoc_server_stream_t *new_ss = NULL;
             bool ok = mongoc_cluster_run_retryable_write (
                &self->client->cluster, &parts.assembled, parts.is_retryable_write, &new_ss, &cmd_reply, &error);
