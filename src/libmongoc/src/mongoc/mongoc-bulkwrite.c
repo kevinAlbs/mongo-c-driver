@@ -1929,6 +1929,9 @@ mongoc_bulkwrite_execute (mongoc_bulkwrite_t *self, mongoc_bulkwriteopts_t *opts
                         }
                         break;
                      }
+                     default:
+                        // Add an unreachable default case to silence `switch-default` warnings.
+                        BSON_UNREACHABLE ("unexpected default");
                      }
                   }
                }
