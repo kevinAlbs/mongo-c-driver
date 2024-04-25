@@ -21,6 +21,15 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+// libmongoc specific code ... begin
+// clang-format off
+#include <mongoc-prelude.h>
+#include <bson/bson.h>
+// Use libbson's malloc/free functions in uthash.
+#define uthash_malloc(sz) bson_malloc (sz)
+#define uthash_free(ptr, sz) bson_free (ptr)
+// libmongoc specific code ... end
+
 #ifndef UTHASH_H
 #define UTHASH_H
 
