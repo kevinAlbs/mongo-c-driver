@@ -497,12 +497,6 @@ test_bulkwrite_splits_nsinfo (void *ctx)
    mongoc_client_destroy (client);
 }
 
-static int
-skip_because_slow (void)
-{
-   printf ("Skipping test due to being slow\n");
-   return 0;
-}
 
 static void
 test_bulkwrite_many_namespaces (void *ctx)
@@ -665,6 +659,6 @@ test_bulkwrite_install (TestSuite *suite)
                       test_bulkwrite_many_namespaces,
                       NULL /* dtor */,
                       NULL /* ctx */,
-                      test_framework_skip_if_max_wire_version_less_than_25, // require server 8.0
-                      skip_because_slow);
+                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
 }

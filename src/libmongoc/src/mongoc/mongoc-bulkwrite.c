@@ -24,8 +24,7 @@
 #include <mongoc-error-private.h>  // _mongoc_write_error_handle_labels
 #include <mongoc-util-private.h>   // _mongoc_iter_document_as_bson
 #include <common-macros-private.h> // MC_ENABLE_CONVERSION_WARNING_BEGIN
-
-#include <uthash.h>
+#include <mongoc/uthash.h>
 
 MC_ENABLE_CONVERSION_WARNING_BEGIN
 
@@ -1301,7 +1300,13 @@ lookup_string (
 }
 
 typedef struct {
-   bson_t ns_to_index; // TODO: replace with a hash map with faster look-up.
+   char *ns; // Hash key.
+   int32_t index;
+   UT_hash_handle hh;
+} ns_to_index_t;
+
+typedef struct {
+   ns_to_index_t *n2i;
    int32_t count;
    mongoc_buffer_t payload;
 } nsinfo_list_t;
@@ -1310,7 +1315,6 @@ static nsinfo_list_t *
 nsinfo_list_new (void)
 {
    nsinfo_list_t *self = bson_malloc0 (sizeof (*self));
-   bson_init (&self->ns_to_index);
    _mongoc_buffer_init (&self->payload, NULL, 0, NULL, NULL);
    return self;
 }
@@ -1321,7 +1325,14 @@ nsinfo_list_destroy (nsinfo_list_t *self)
    if (!self) {
       return;
    }
-   bson_destroy (&self->ns_to_index);
+   // Delete hash table.
+   ns_to_index_t *entry, *tmp;
+   HASH_ITER (hh, self->n2i, entry, tmp)
+   {
+      HASH_DEL (self->n2i, entry);
+      bson_free (entry->ns);
+      bson_free (entry);
+   }
    _mongoc_buffer_destroy (&self->payload);
    bson_free (self);
 }
@@ -1346,7 +1357,13 @@ nsinfo_list_append (nsinfo_list_t *self, const char *ns, bson_error_t *error)
       return -1;
    }
    self->count++;
-   BSON_ASSERT (bson_append_int32 (&self->ns_to_index, ns, -1, ns_index));
+
+   // Add to hash table.
+   ns_to_index_t *entry = bson_malloc0 (sizeof (*entry));
+   entry->index = ns_index;
+   entry->ns = bson_strdup (ns);
+   HASH_ADD_KEYPTR (hh, self->n2i, ns, strlen (ns), entry);
+
    // Append to buffer.
    bson_t nsinfo_bson = BSON_INITIALIZER;
    BSON_ASSERT (bson_append_utf8 (&nsinfo_bson, "ns", 2, ns, -1));
@@ -1361,11 +1378,13 @@ nsinfo_list_find (nsinfo_list_t *self, const char *ns)
    BSON_ASSERT_PARAM (self);
    BSON_ASSERT_PARAM (ns);
 
-   bson_iter_t iter;
-   if (bson_iter_init_find (&iter, &self->ns_to_index, ns)) {
-      return bson_iter_int32 (&iter);
+   ns_to_index_t *found;
+   HASH_FIND_STR (self->n2i, ns, found);
+   if (found == NULL) {
+      return -1;
    }
-   return -1;
+
+   return found->index;
 }
 
 static uint32_t
