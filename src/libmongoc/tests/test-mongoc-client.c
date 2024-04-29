@@ -3903,6 +3903,30 @@ test_failure_to_auth (void)
    mongoc_client_destroy (client);
    mongoc_uri_destroy (uri);
 }
+
+// test_client_with_empty_password is a regression test for the crash reported in CDRIVER-5550
+static void
+test_client_with_empty_password (void *ctx)
+{
+   BSON_UNUSED (ctx);
+   char *user = test_framework_get_admin_user ();
+   char *uri_str = test_framework_get_uri_str_no_auth ("admin");
+   mongoc_uri_t *uri = mongoc_uri_new (uri_str);
+   mongoc_uri_set_username (uri, user);
+   mongoc_uri_set_password (uri, "");
+   mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+   bson_error_t error;
+   bool ok = mongoc_client_command_simple (
+      client, "admin", tmp_bson ("{'ping': 1}"), NULL /* read prefs */, NULL /* reply */, &error);
+   // Expect an auth failure (but no crash)
+   ASSERT (!ok);
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "Authentication failed");
+   mongoc_client_destroy (client);
+   mongoc_uri_destroy (uri);
+   bson_free (uri_str);
+   bson_free (user);
+}
+
 void
 test_client_install (TestSuite *suite)
 {
@@ -4087,4 +4111,11 @@ test_client_install (TestSuite *suite)
    TestSuite_AddMockServerTest (
       suite, "/Client/resends_handshake_on_network_error", test_mongoc_client_resends_handshake_on_network_error);
    TestSuite_Add (suite, "/Client/failure_to_auth", test_failure_to_auth);
+   TestSuite_AddFull (suite,
+                      "/Client/with_empty_password",
+                      test_client_with_empty_password,
+                      NULL,
+                      NULL,
+                      TestSuite_CheckLive,
+                      test_framework_skip_if_no_auth);
 }
