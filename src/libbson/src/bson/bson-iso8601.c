@@ -133,7 +133,7 @@ _bson_iso8601_date_parse (const char *str, int32_t len, int64_t *out, bson_error
 
 #define DEFAULT_DATE_PARSE_ERR                                                 \
    DATE_PARSE_ERR ("use ISO8601 format yyyy-mm-ddThh:mm plus timezone, either" \
-                   " \"Z\" or like \"+0500\"")
+                   " \"Z\" or like \"+0500\" or like \"+05:00\"")
 
    ptr = str;
 
