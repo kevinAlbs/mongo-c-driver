@@ -214,6 +214,7 @@ _bson_iso8601_date_parse (const char *str, int32_t len, int64_t *out, bson_error
          int32_t tz_hour;
          int32_t tz_min;
 
+         // Check for non-standard hhmm or hh:mm
          if ((tz_len != 5 || !digits_only (tz_ptr + 1, 4)) &&
              (tz_len != 6 || !digits_only (tz_ptr + 1, 2) || tz_ptr[3] != ':' || !digits_only (tz_ptr + 4, 2))) {
             DATE_PARSE_ERR ("could not parse timezone");
