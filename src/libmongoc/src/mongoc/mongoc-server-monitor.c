@@ -1074,11 +1074,18 @@ _server_monitor_check_server (
       GOTO (exit);
    }
 
+   bool uri_poll = (0 == bson_strcasecmp ("poll",
+                                          mongoc_uri_get_option_as_utf8 (
+                                             server_monitor->topology->uri,
+                                             MONGOC_URI_SERVERMONITORINGMODE,
+                                             "auto")));
+
    if (!bson_empty (&previous_description->topology_version) &&
-       _mongoc_handshake_get ()->env == MONGOC_HANDSHAKE_ENV_NONE) {
-       // Use stream monitoring if:
-       // - Server supports stream monitoring (indicated by `topologyVersion`).
-       // - Application is not in an FaaS environment (e.g. AWS Lambda).
+       _mongoc_handshake_get ()->env == MONGOC_HANDSHAKE_ENV_NONE &&
+       !uri_poll) {
+      // Use stream monitoring if:
+      // - Server supports stream monitoring (indicated by `topologyVersion`).
+      // - Application is not in an FaaS environment (e.g. AWS Lambda).
       awaited = true;
       _server_monitor_heartbeat_started (server_monitor, awaited);
       MONITOR_LOG (server_monitor, "awaitable hello");

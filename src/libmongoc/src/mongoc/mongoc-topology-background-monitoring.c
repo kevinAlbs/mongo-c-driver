@@ -104,8 +104,14 @@ _background_monitor_reconcile_server_monitor (mongoc_topology_t *topology,
       mongoc_set_add (server_monitors, sd->id, server_monitor);
    }
 
+   bool uri_poll =
+      (0 == bson_strcasecmp (
+               "poll",
+               mongoc_uri_get_option_as_utf8 (
+                  topology->uri, MONGOC_URI_SERVERMONITORINGMODE, "auto")));
+
    /* Check if an RTT monitor is needed. */
-   if (!bson_empty (&sd->topology_version)) {
+   if (!bson_empty (&sd->topology_version) && !uri_poll) {
       mongoc_set_t *rtt_monitors;
       mongoc_server_monitor_t *rtt_monitor;
 

@@ -57,6 +57,7 @@
 #define MONGOC_URI_RETRYREADS "retryreads"
 #define MONGOC_URI_RETRYWRITES "retrywrites"
 #define MONGOC_URI_SAFE "safe"
+#define MONGOC_URI_SERVERMONITORINGMODE "servermonitoringmode"
 #define MONGOC_URI_SERVERSELECTIONTIMEOUTMS "serverselectiontimeoutms"
 #define MONGOC_URI_SERVERSELECTIONTRYONCE "serverselectiontryonce"
 #define MONGOC_URI_SLAVEOK "slaveok"
