@@ -1059,12 +1059,11 @@ _mock_rr_resolver_prose_test_12 (const char *service,
    BSON_ASSERT_PARAM (error);
 
    if (rr_type == MONGOC_RR_SRV) {
-      const size_t count = _mongoc_host_list_length (rr_data->hosts);
-      BSON_ASSERT (bson_in_range_unsigned (uint32_t, count));
-
       rr_data->hosts = MAKE_HOSTS ("localhost.test.build.10gen.cc:27017",
                                    "localhost.test.build.10gen.cc:27019",
                                    "localhost.test.build.10gen.cc:27020");
+      const size_t count = _mongoc_host_list_length (rr_data->hosts);
+      BSON_ASSERT (bson_in_range_unsigned (uint32_t, count));
       rr_data->count = (uint32_t) count;
       rr_data->min_ttl = 0u;
       rr_data->txt_record_opts = NULL;
@@ -1187,13 +1186,12 @@ prose_test_12_pooled (void *unused)
 
 typedef struct {
    bson_mutex_t lock;
-   const char *host1;
-   const char *host2;
+   mongoc_host_list_t *hosts;
 } rr_override_t;
 
 rr_override_t rr_override;
 
-// `_mock_rr_resolver_with_override` allows setting a custom list of hosts with the global override
+// `_mock_rr_resolver_with_override` allows setting a custom list of hosts with the global override.
 static bool
 _mock_rr_resolver_with_override (const char *service,
                                  mongoc_rr_type_t rr_type,
@@ -1209,26 +1207,13 @@ _mock_rr_resolver_with_override (const char *service,
 
    if (rr_type == MONGOC_RR_SRV) {
       bson_mutex_lock (&rr_override.lock);
-
-      if (rr_override.host1) {
-         mongoc_host_list_t host;
-         _mongoc_host_list_from_string (&host, rr_override.host1);
-         _mongoc_host_list_upsert (&rr_data->hosts, &host);
-      }
-
-      if (rr_override.host2) {
-         mongoc_host_list_t host;
-         _mongoc_host_list_from_string (&host, rr_override.host2);
-         _mongoc_host_list_upsert (&rr_data->hosts, &host);
-      }
-
-      const size_t count = _mongoc_host_list_length (rr_data->hosts);
+      const size_t count = _mongoc_host_list_length (rr_override.hosts);
       BSON_ASSERT (bson_in_range_unsigned (uint32_t, count));
+      rr_data->hosts = _mongoc_host_list_copy_all (rr_override.hosts);
       rr_data->count = (uint32_t) count;
       rr_data->txt_record_opts = NULL;
       bson_mutex_unlock (&rr_override.lock);
    }
-
 
    error->code = 0u;
 
@@ -1264,41 +1249,34 @@ get_connection_count (const char *uristr)
    return conns;
 }
 
+// Test that after a server is removed from SRV records, all connections are closed.
 static void
-test_stops_monitoring_removed_servers (void *unused)
+test_removing_servers_closes_connections (void *unused)
 {
    BSON_UNUSED (unused);
-
-   /*
-   Create a client pool to `test1.test.build.10gen.cc` (resolves to two localhost:27017 and localhost:27018).
-   Measure number of connections to each host.
-   Wait until the expected number of connections is created to each host.
-   Mock removal of port 27018. Expect connections to 27018 to drop to the started value.
-   */
 
    // Create a client pool to mongodb+srv://test1.test.build.10gen.cc. The URI resolves to two SRV records:
    // - localhost.test.build.10gen.cc:27017
    // - localhost.test.build.10gen.cc:27018
-   mongoc_uri_t *uri = mongoc_uri_new ("mongodb+srv://test1.test.build.10gen.cc");
-   // Set a short heartbeat so server monitors get monitoring responses quickly.
-   mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, RESCAN_INTERVAL_MS);
-   mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
-   bson_mutex_init (&rr_override.lock);
-
+   mongoc_client_pool_t *pool;
    {
-      mongoc_topology_t *topology = _mongoc_client_pool_get_topology (pool);
-      rr_override.host1 = "localhost.test.build.10gen.cc:27017";
-      rr_override.host2 = "localhost.test.build.10gen.cc:27018";
-      _mongoc_topology_set_rr_resolver (topology, _mock_rr_resolver_with_override);
-      // Set a short rescan interval.
-      _mongoc_topology_set_srv_polling_rescan_interval_ms (topology, RESCAN_INTERVAL_MS);
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb+srv://test1.test.build.10gen.cc");
+      // Set a short heartbeat so server monitors get quick responses.
+      mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, RESCAN_INTERVAL_MS);
+      pool = mongoc_client_pool_new (uri);
 #if defined(MONGOC_ENABLE_SSL)
-      {
-         mongoc_ssl_opt_t ssl_opts = *test_framework_get_ssl_opts ();
-         ssl_opts.allow_invalid_hostname = true;
-         mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
-      }
+      mongoc_ssl_opt_t ssl_opts = *test_framework_get_ssl_opts ();
+      ssl_opts.allow_invalid_hostname = true;
+      mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
 #endif /* defined(MONGOC_ENABLE_SSL) */
+      // Override the SRV polling callback:
+      mongoc_topology_t *topology = _mongoc_client_pool_get_topology (pool);
+      bson_mutex_init (&rr_override.lock);
+      rr_override.hosts = MAKE_HOSTS ("localhost.test.build.10gen.cc:27017", "localhost.test.build.10gen.cc:27018");
+      _mongoc_topology_set_rr_resolver (topology, _mock_rr_resolver_with_override);
+      // Set a shorter SRV rescan interval.
+      _mongoc_topology_set_srv_polling_rescan_interval_ms (topology, RESCAN_INTERVAL_MS);
+      mongoc_uri_destroy (uri);
    }
 
    // Count connections to both servers.
@@ -1371,8 +1349,8 @@ test_stops_monitoring_removed_servers (void *unused)
    // Mock removal of port 27018. Expect connections to 27018 to drop to the started value.
    {
       bson_mutex_lock (&rr_override.lock);
-      rr_override.host1 = "localhost.test.build.10gen.cc:27017";
-      rr_override.host2 = NULL;
+      _mongoc_host_list_destroy_all (rr_override.hosts);
+      rr_override.hosts = MAKE_HOSTS ("localhost.test.build.10gen.cc:27017");
       bson_mutex_unlock (&rr_override.lock);
 
       mongoc_client_t *client = mongoc_client_pool_pop (pool);
@@ -1406,7 +1384,6 @@ test_stops_monitoring_removed_servers (void *unused)
    }
 
    mongoc_client_pool_destroy (pool);
-   mongoc_uri_destroy (uri);
    bson_mutex_destroy (&rr_override.lock);
 }
 
@@ -1485,8 +1462,8 @@ test_dns_install (TestSuite *suite)
 
    TestSuite_AddFull (
       suite,
-      "/initial_dns_seedlist_discovery/srv_polling/stops_monitoring_removed_servers",
-      test_stops_monitoring_removed_servers,
+      "/initial_dns_seedlist_discovery/srv_polling/removing_servers_closes_connections",
+      test_removing_servers_closes_connections,
       NULL,
       NULL,
       test_dns_check_srv_polling,
