@@ -1185,6 +1185,231 @@ prose_test_12_pooled (void *unused)
    _prose_test_12 (&_prose_test_pooled_fns);
 }
 
+typedef struct {
+   bson_mutex_t lock;
+   const char *host1;
+   const char *host2;
+} rr_override_t;
+
+rr_override_t rr_override;
+
+// `_mock_rr_resolver_with_override` allows setting a custom list of hosts with the global override
+static bool
+_mock_rr_resolver_with_override (const char *service,
+                                 mongoc_rr_type_t rr_type,
+                                 mongoc_rr_data_t *rr_data,
+                                 size_t initial_buffer_size,
+                                 bson_error_t *error)
+{
+   BSON_UNUSED (initial_buffer_size);
+
+   BSON_ASSERT_PARAM (service);
+   BSON_ASSERT_PARAM (rr_data);
+   BSON_ASSERT_PARAM (error);
+
+   if (rr_type == MONGOC_RR_SRV) {
+      bson_mutex_lock (&rr_override.lock);
+
+      if (rr_override.host1) {
+         mongoc_host_list_t host;
+         _mongoc_host_list_from_string (&host, rr_override.host1);
+         _mongoc_host_list_upsert (&rr_data->hosts, &host);
+      }
+
+      if (rr_override.host2) {
+         mongoc_host_list_t host;
+         _mongoc_host_list_from_string (&host, rr_override.host2);
+         _mongoc_host_list_upsert (&rr_data->hosts, &host);
+      }
+
+      const size_t count = _mongoc_host_list_length (rr_data->hosts);
+      BSON_ASSERT (bson_in_range_unsigned (uint32_t, count));
+      rr_data->count = (uint32_t) count;
+      rr_data->txt_record_opts = NULL;
+      bson_mutex_unlock (&rr_override.lock);
+   }
+
+
+   error->code = 0u;
+
+   return true;
+}
+
+
+// `get_connection_count` returns the server reported connection count.
+static int32_t
+get_connection_count (const char *uristr)
+{
+   mongoc_client_t *client = mongoc_client_new (uristr);
+   bson_t *cmd = BCON_NEW ("serverStatus", BCON_INT32 (1));
+   bson_t reply;
+   bson_error_t error;
+   bool ok = mongoc_client_command_simple (client, "admin", cmd, NULL, &reply, &error);
+   if (!ok) {
+      printf ("serverStatus failed: %s\n", error.message);
+      abort ();
+   }
+   int32_t conns;
+   // Get `connections.current` from the reply.
+   {
+      bson_iter_t iter;
+      BSON_ASSERT (bson_iter_init_find (&iter, &reply, "connections"));
+      BSON_ASSERT (bson_iter_recurse (&iter, &iter));
+      BSON_ASSERT (bson_iter_find (&iter, "current"));
+      conns = bson_iter_int32 (&iter);
+   }
+   bson_destroy (&reply);
+   bson_destroy (cmd);
+   mongoc_client_destroy (client);
+   return conns;
+}
+
+static void
+test_stops_monitoring_removed_servers (void *unused)
+{
+   BSON_UNUSED (unused);
+
+   /*
+   Create a client pool to `test1.test.build.10gen.cc` (resolves to two localhost:27017 and localhost:27018).
+   Measure number of connections to each host.
+   Wait until the expected number of connections is created to each host.
+   Mock removal of port 27018. Expect connections to 27018 to drop to the started value.
+   */
+
+   // Create a client pool to mongodb+srv://test1.test.build.10gen.cc. The URI resolves to two SRV records:
+   // - localhost.test.build.10gen.cc:27017
+   // - localhost.test.build.10gen.cc:27018
+   mongoc_uri_t *uri = mongoc_uri_new ("mongodb+srv://test1.test.build.10gen.cc");
+   // Set a short heartbeat so server monitors get monitoring responses quickly.
+   mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, RESCAN_INTERVAL_MS);
+   mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
+   bson_mutex_init (&rr_override.lock);
+
+   {
+      mongoc_topology_t *topology = _mongoc_client_pool_get_topology (pool);
+      rr_override.host1 = "localhost.test.build.10gen.cc:27017";
+      rr_override.host2 = "localhost.test.build.10gen.cc:27018";
+      _mongoc_topology_set_rr_resolver (topology, _mock_rr_resolver_with_override);
+      // Set a short rescan interval.
+      _mongoc_topology_set_srv_polling_rescan_interval_ms (topology, RESCAN_INTERVAL_MS);
+#if defined(MONGOC_ENABLE_SSL)
+      {
+         mongoc_ssl_opt_t ssl_opts = *test_framework_get_ssl_opts ();
+         ssl_opts.allow_invalid_hostname = true;
+         mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
+      }
+#endif /* defined(MONGOC_ENABLE_SSL) */
+   }
+
+   // Count connections to both servers.
+   int32_t conns_27017_before = get_connection_count ("mongodb://localhost:27017");
+   int32_t conns_27018_before = get_connection_count ("mongodb://localhost:27018");
+
+   // Pop (and push) a client to start background monitoring.
+   {
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      mongoc_client_pool_push (pool, client);
+   }
+
+   // Wait for monitoring connections to be created.
+   int64_t start = bson_get_monotonic_time ();
+   while (true) {
+      // Expect two monitoring connections per server.
+      int32_t conns_27017_expected = conns_27017_before + 2;
+      int32_t conns_27018_expected = conns_27018_before + 2;
+      int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
+      int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
+      if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
+         break;
+      }
+
+      int64_t now = bson_get_monotonic_time ();
+      if (now - start > 5 * 1000 * 1000 /* five seconds */) {
+         test_error ("Timed out waiting for expected connection count:\n"
+                     "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
+                     "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
+                     conns_27017_expected,
+                     conns_27017,
+                     conns_27018_expected,
+                     conns_27018);
+      }
+   }
+
+   // Send 'ping' commands on a client until operation connections are created to each server.
+   {
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
+      while (true) {
+         bson_error_t error;
+         bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
+         ASSERT_OR_PRINT (ok, error);
+
+         // Expect two monitoring connections per server and one monitoring connection for operations.
+         int32_t conns_27017_expected = conns_27017_before + 3;
+         int32_t conns_27018_expected = conns_27018_before + 3;
+         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
+         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
+         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
+            break;
+         }
+
+         int64_t now = bson_get_monotonic_time ();
+         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
+            test_error ("Timed out waiting for expected connection count:\n"
+                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
+                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
+                        conns_27017_expected,
+                        conns_27017,
+                        conns_27018_expected,
+                        conns_27018);
+         }
+      }
+      bson_destroy (ping);
+      mongoc_client_pool_push (pool, client);
+   }
+
+   // Mock removal of port 27018. Expect connections to 27018 to drop to the started value.
+   {
+      bson_mutex_lock (&rr_override.lock);
+      rr_override.host1 = "localhost.test.build.10gen.cc:27017";
+      rr_override.host2 = NULL;
+      bson_mutex_unlock (&rr_override.lock);
+
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
+      while (true) {
+         bson_error_t error;
+         bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
+         ASSERT_OR_PRINT (ok, error);
+
+         int32_t conns_27017_expected = conns_27017_before + 2 + 1; // Expect 2 for monitoring, one from client.
+         int32_t conns_27018_expected = conns_27018_before;         // Expect all connections to drop.
+         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
+         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
+         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
+            break;
+         }
+
+         int64_t now = bson_get_monotonic_time ();
+         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
+            test_error ("Timed out waiting for expected connection count:\n"
+                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
+                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
+                        conns_27017_expected,
+                        conns_27017,
+                        conns_27018_expected,
+                        conns_27018);
+         }
+      }
+      bson_destroy (ping);
+      mongoc_client_pool_push (pool, client);
+   }
+
+   mongoc_client_pool_destroy (pool);
+   mongoc_uri_destroy (uri);
+   bson_mutex_destroy (&rr_override.lock);
+}
+
 void
 test_dns_install (TestSuite *suite)
 {
@@ -1257,4 +1482,13 @@ test_dns_install (TestSuite *suite)
                       NULL,
                       NULL,
                       test_dns_check_srv_polling);
+
+   TestSuite_AddFull (
+      suite,
+      "/initial_dns_seedlist_discovery/srv_polling/stops_monitoring_removed_servers",
+      test_stops_monitoring_removed_servers,
+      NULL,
+      NULL,
+      test_dns_check_srv_polling,
+      test_framework_skip_if_max_wire_version_less_than_9 /* require server 4.4+ for streaming monitoring protocol */);
 }
