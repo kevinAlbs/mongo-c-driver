@@ -357,6 +357,28 @@ mongoc_client_pool_try_pop (mongoc_client_pool_t *pool)
    RETURN (client);
 }
 
+typedef struct {
+   const mongoc_topology_description_t *td;
+   mongoc_cluster_t *cluster;
+} check_if_removed_ctx;
+
+static bool
+check_if_removed (void *item, void *ctx_)
+{
+   mongoc_cluster_node_t *cn = (mongoc_cluster_node_t *) item;
+   check_if_removed_ctx *ctx = (check_if_removed_ctx *) ctx_;
+   uint32_t server_id = cn->handshake_sd->id;
+
+   const mongoc_server_description_t *sd =
+      mongoc_topology_description_server_by_id_const (ctx->td, server_id, NULL /* ignore error */);
+   if (!sd) {
+      printf ("Disconnecting node on client to server_id: %" PRIu32, server_id);
+      // Remove it.
+      mongoc_cluster_disconnect_node (ctx->cluster, server_id);
+   }
+   return true;
+}
+
 
 void
 mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
@@ -371,6 +393,20 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
 
    bson_mutex_lock (&pool->mutex);
    _mongoc_queue_push_head (&pool->queue, client);
+
+   // Close connections to servers removed from the topology in pooled clients.
+   {
+      mc_shared_tpld td = mc_tpld_take_ref (pool->topology);
+
+      mongoc_queue_item_t *ptr = pool->queue.head;
+      while (ptr != NULL) {
+         mongoc_client_t *client_ptr = (mongoc_client_t *) ptr->data;
+         mongoc_cluster_t *cluster = &client_ptr->cluster;
+         check_if_removed_ctx ctx = {.cluster = cluster, .td = td.ptr};
+         mongoc_set_for_each (cluster->nodes, check_if_removed, &ctx);
+         ptr = ptr->next;
+      }
+   }
 
    if (pool->min_pool_size && _mongoc_queue_get_length (&pool->queue) > pool->min_pool_size) {
       mongoc_client_t *old_client;
