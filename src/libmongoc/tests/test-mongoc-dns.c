@@ -1315,9 +1315,9 @@ test_removing_servers_closes_connections (void *unused)
 
    // Send 'ping' commands on a client until operation connections are created to each server.
    {
-      mongoc_client_t *client = mongoc_client_pool_pop (pool);
       bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
       while (true) {
+         mongoc_client_t *client = mongoc_client_pool_pop (pool);
          bson_error_t error;
          bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
          ASSERT_OR_PRINT (ok, error);
@@ -1328,6 +1328,7 @@ test_removing_servers_closes_connections (void *unused)
          int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
          int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
          if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
+            mongoc_client_pool_push (pool, client);
             break;
          }
 
@@ -1341,9 +1342,9 @@ test_removing_servers_closes_connections (void *unused)
                         conns_27018_expected,
                         conns_27018);
          }
+         mongoc_client_pool_push (pool, client);
       }
       bson_destroy (ping);
-      mongoc_client_pool_push (pool, client);
    }
 
    // Mock removal of port 27018. Expect connections to 27018 to drop to the started value.
@@ -1353,9 +1354,9 @@ test_removing_servers_closes_connections (void *unused)
       rr_override.hosts = MAKE_HOSTS ("localhost.test.build.10gen.cc:27017");
       bson_mutex_unlock (&rr_override.lock);
 
-      mongoc_client_t *client = mongoc_client_pool_pop (pool);
       bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
       while (true) {
+         mongoc_client_t *client = mongoc_client_pool_pop (pool);
          bson_error_t error;
          bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
          ASSERT_OR_PRINT (ok, error);
@@ -1365,6 +1366,7 @@ test_removing_servers_closes_connections (void *unused)
          int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
          int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
          if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
+            mongoc_client_pool_push (pool, client);
             break;
          }
 
@@ -1378,9 +1380,9 @@ test_removing_servers_closes_connections (void *unused)
                         conns_27018_expected,
                         conns_27018);
          }
+         mongoc_client_pool_push (pool, client);
       }
       bson_destroy (ping);
-      mongoc_client_pool_push (pool, client);
    }
 
    mongoc_client_pool_destroy (pool);
@@ -1445,9 +1447,9 @@ closes_connections_of_removed_servers (void *unused)
 
    // Send 'ping' commands on a client until operation connections are created to each server.
    {
-      mongoc_client_t *client = mongoc_client_pool_pop (pool);
       bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
       while (true) {
+         mongoc_client_t *client = mongoc_client_pool_pop (pool);
          bson_error_t error;
          bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
          ASSERT_OR_PRINT (ok, error);
@@ -1458,6 +1460,7 @@ closes_connections_of_removed_servers (void *unused)
          int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
          int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
          if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
+            mongoc_client_pool_push (pool, client);
             break;
          }
 
@@ -1471,9 +1474,9 @@ closes_connections_of_removed_servers (void *unused)
                         conns_27018_expected,
                         conns_27018);
          }
+         mongoc_client_pool_push (pool, client);
       }
       bson_destroy (ping);
-      mongoc_client_pool_push (pool, client);
    }
 
    // Mock removal of port 27018 from the topology.
@@ -1485,9 +1488,9 @@ closes_connections_of_removed_servers (void *unused)
          mc_tpld_modify_commit (tdmod);
       }
 
-      mongoc_client_t *client = mongoc_client_pool_pop (pool);
       bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
       while (true) {
+         mongoc_client_t *client = mongoc_client_pool_pop (pool);
          bson_error_t error;
          bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
          ASSERT_OR_PRINT (ok, error);
@@ -1497,6 +1500,7 @@ closes_connections_of_removed_servers (void *unused)
          int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
          int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
          if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
+            mongoc_client_pool_push (pool, client);
             break;
          }
 
@@ -1510,9 +1514,9 @@ closes_connections_of_removed_servers (void *unused)
                         conns_27018_expected,
                         conns_27018);
          }
+         mongoc_client_pool_push (pool, client);
       }
       bson_destroy (ping);
-      mongoc_client_pool_push (pool, client);
    }
 
    mongoc_client_pool_destroy (pool);
@@ -1577,10 +1581,10 @@ closes_connections_of_removed_servers_in_pool (void *unused)
 
    // Send 'ping' commands on two clients until operation connections are created to each server.
    {
-      mongoc_client_t *client1 = mongoc_client_pool_pop (pool);
-      mongoc_client_t *client2 = mongoc_client_pool_pop (pool);
       bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
       while (true) {
+         mongoc_client_t *client1 = mongoc_client_pool_pop (pool);
+         mongoc_client_t *client2 = mongoc_client_pool_pop (pool);
          bson_error_t error;
          bool ok;
 
@@ -1596,6 +1600,8 @@ closes_connections_of_removed_servers_in_pool (void *unused)
          int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
          int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
          if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
+            mongoc_client_pool_push (pool, client2);
+            mongoc_client_pool_push (pool, client1);
             break;
          }
 
@@ -1609,10 +1615,10 @@ closes_connections_of_removed_servers_in_pool (void *unused)
                         conns_27018_expected,
                         conns_27018);
          }
+         mongoc_client_pool_push (pool, client2);
+         mongoc_client_pool_push (pool, client1);
       }
       bson_destroy (ping);
-      mongoc_client_pool_push (pool, client1);
-      mongoc_client_pool_push (pool, client2);
    }
 
    // Mock removal of port 27018 from the topology.
@@ -1625,9 +1631,9 @@ closes_connections_of_removed_servers_in_pool (void *unused)
       }
 
       // Leave one client checked in to pool.
-      mongoc_client_t *client = mongoc_client_pool_pop (pool);
       bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
       while (true) {
+         mongoc_client_t *client = mongoc_client_pool_pop (pool);
          bson_error_t error;
          bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
          ASSERT_OR_PRINT (ok, error);
@@ -1637,6 +1643,7 @@ closes_connections_of_removed_servers_in_pool (void *unused)
          int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
          int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
          if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
+            mongoc_client_pool_push (pool, client);
             break;
          }
 
@@ -1650,9 +1657,9 @@ closes_connections_of_removed_servers_in_pool (void *unused)
                         conns_27018_expected,
                         conns_27018);
          }
+         mongoc_client_pool_push (pool, client);
       }
       bson_destroy (ping);
-      mongoc_client_pool_push (pool, client);
    }
 
    mongoc_client_pool_destroy (pool);
