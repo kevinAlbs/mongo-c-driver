@@ -406,6 +406,7 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
          mongoc_set_for_each (cluster->nodes, check_if_removed, &ctx);
          ptr = ptr->next;
       }
+      mc_tpld_drop_ref (&td);
    }
 
    if (pool->min_pool_size && _mongoc_queue_get_length (&pool->queue) > pool->min_pool_size) {
