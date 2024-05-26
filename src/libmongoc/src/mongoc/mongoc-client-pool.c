@@ -27,6 +27,7 @@
 #include "mongoc-topology-private.h"
 #include "mongoc-topology-background-monitoring-private.h"
 #include "mongoc-trace-private.h"
+#include "mongoc-util-private.h" // _mongoc_getenv
 
 #ifdef MONGOC_ENABLE_SSL
 #include "mongoc-ssl-private.h"
@@ -52,6 +53,7 @@ struct _mongoc_client_pool_t {
    bool error_api_set;
    mongoc_server_api_t *api;
    bool client_initialized;
+   bool do_simple_prune;
 };
 
 
@@ -103,6 +105,15 @@ mongoc_client_pool_new (const mongoc_uri_t *uri)
    if (!(pool = mongoc_client_pool_new_with_error (uri, &error))) {
       MONGOC_ERROR ("%s", error.message);
    }
+
+   // Check if pruning enabled.
+   {
+      char *MONGOC_DO_SIMPLE_PRUNE = _mongoc_getenv ("MONGOC_DO_SIMPLE_PRUNE");
+      printf ("MONGOC_DO_SIMPLE_PRUNE=%s\n", MONGOC_DO_SIMPLE_PRUNE ? MONGOC_DO_SIMPLE_PRUNE : "(null)");
+      pool->do_simple_prune = MONGOC_DO_SIMPLE_PRUNE && 0 == strcmp (MONGOC_DO_SIMPLE_PRUNE, "ON");
+      bson_free (MONGOC_DO_SIMPLE_PRUNE);
+   }
+
 
    return pool;
 }
@@ -394,8 +405,13 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
    bson_mutex_lock (&pool->mutex);
    _mongoc_queue_push_head (&pool->queue, client);
 
+   // TODO: consider alternative idea:
+   //  Store the last known set of server IDs from the topology description.
+   //  On push, check if the topology description server IDs has changed.
+   //  If no change, do not prune.
+
    // Close connections to servers removed from the topology in pooled clients.
-   {
+   if (pool->do_simple_prune) {
       mc_shared_tpld td = mc_tpld_take_ref (pool->topology);
 
       mongoc_queue_item_t *ptr = pool->queue.head;
