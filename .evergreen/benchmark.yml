@@ -139,6 +139,8 @@ functions:
         echo "Running Benchmark tests "
         start_time=$(date +%s)
         # rhel90 installs into lib64
+
+        echo "Testing baseline ... begin"
         LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/Threads:1
         LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/Threads:10
         LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/Threads:100
@@ -146,6 +148,17 @@ functions:
         LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/ShareClients/Threads:10
         LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/ShareClients/Threads:100
         LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/ShareClients/Threads:150
+        echo "Testing baseline ... end"
+
+        echo "Testing simple prune ... begin"
+        MONGOC_DO_SIMPLE_PRUNE="ON" LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/Threads:1
+        MONGOC_DO_SIMPLE_PRUNE="ON" LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/Threads:10
+        MONGOC_DO_SIMPLE_PRUNE="ON" LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/Threads:100
+        MONGOC_DO_SIMPLE_PRUNE="ON" LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/ShareClients/Threads:1
+        MONGOC_DO_SIMPLE_PRUNE="ON" LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/ShareClients/Threads:10
+        MONGOC_DO_SIMPLE_PRUNE="ON" LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/ShareClients/Threads:100
+        MONGOC_DO_SIMPLE_PRUNE="ON" LD_LIBRARY_PATH=`pwd`/mongoc/lib64:$LD_LIBRARY_PATH ./mongo-c-driver-performance/mongo-c-performance ./data Parallel/Pool/ShareClients/Threads:150
+        echo "Testing simple prune ... end"
 
         set +o errexit
         result=$?
