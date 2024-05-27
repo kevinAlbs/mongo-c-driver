@@ -445,8 +445,6 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
    mongoc_cluster_reset_sockettimeoutms (&client->cluster);
 
    bson_mutex_lock (&pool->mutex);
-   _mongoc_queue_push_head (&pool->queue, client);
-
    // Check if `last_known_server_ids` needs update.
    bool serverids_have_changed = false;
    {
@@ -479,6 +477,7 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
       mc_tpld_drop_ref (&td);
    }
 
+   // Check if pooled clients need to be pruned.
    if (serverids_have_changed) {
       // The set of last known server IDs has changed. Prune all clients in pool.
       mongoc_queue_item_t *ptr = pool->queue.head;
@@ -490,6 +489,9 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
 
    // Always prune incoming client. The topology may have changed while client was checked out.
    prune_client (client, &pool->last_known_serverids);
+
+   // Push client back into pool.
+   _mongoc_queue_push_head (&pool->queue, client);
 
    if (pool->min_pool_size && _mongoc_queue_get_length (&pool->queue) > pool->min_pool_size) {
       mongoc_client_t *old_client;
