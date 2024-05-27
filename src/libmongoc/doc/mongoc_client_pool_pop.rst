@@ -18,7 +18,7 @@ The returned :symbol:`mongoc_client_t` must be returned to the pool with :symbol
 
 .. note::
 
-   Return the returned :symbol:`mongoc_client_t` to the pool quickly to encourage reuse of clients among threads.
+   Return a checked out :symbol:`mongoc_client_t` to the pool with :symbol:`mongoc_client_pool_push` quickly to encourage reuse of clients among threads.
 
 Parameters
 ----------
