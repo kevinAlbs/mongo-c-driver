@@ -481,6 +481,224 @@ test_client_pool_can_override_sockettimeoutms (void)
    mongoc_uri_destroy (uri);
 }
 
+// `get_connection_count` returns the server reported connection count.
+static int32_t
+get_connection_count (const char *host_and_port)
+{
+   char *uri_str = bson_strdup_printf ("mongodb://%s\n", host_and_port);
+   mongoc_client_t *client = mongoc_client_new (uri_str);
+   bson_t *cmd = BCON_NEW ("serverStatus", BCON_INT32 (1));
+   bson_t reply;
+   bson_error_t error;
+   bool ok = mongoc_client_command_simple (client, "admin", cmd, NULL, &reply, &error);
+   if (!ok) {
+      printf ("serverStatus failed: %s\n", error.message);
+      abort ();
+   }
+   int32_t conns;
+   // Get `connections.current` from the reply.
+   {
+      bson_iter_t iter;
+      BSON_ASSERT (bson_iter_init_find (&iter, &reply, "connections"));
+      BSON_ASSERT (bson_iter_recurse (&iter, &iter));
+      BSON_ASSERT (bson_iter_find (&iter, "current"));
+      conns = bson_iter_int32 (&iter);
+   }
+   bson_destroy (&reply);
+   bson_destroy (cmd);
+   mongoc_client_destroy (client);
+   bson_free (uri_str);
+   return conns;
+}
+
+#define ASSERT_CONN_COUNT(host, expect)                           \
+   if (1) {                                                       \
+      int32_t _got = get_connection_count (host);                 \
+      if (_got != expect) {                                       \
+         test_error ("Got unexpected connection count to %s:\n"   \
+                     "  Expected %" PRId32 ", got %" PRId32 "\n", \
+                     host,                                        \
+                     expect,                                      \
+                     _got);                                       \
+      }                                                           \
+   } else                                                         \
+      (void) 0
+
+#define ASSERT_EVENTUAL_CONN_COUNT(host, expect)                                   \
+   if (1) {                                                                        \
+      int64_t _start = bson_get_monotonic_time ();                                 \
+      while (true) {                                                               \
+         int32_t _got = get_connection_count (host);                               \
+         if (_got == expect) {                                                     \
+            break;                                                                 \
+         }                                                                         \
+         int64_t _now = bson_get_monotonic_time ();                                \
+         if (_now - _start > 5 * 1000 * 1000 /* five seconds */) {                 \
+            test_error ("Timed out waiting for expected connection count to %s:\n" \
+                        "  Expected %" PRId32 ", got %" PRId32 "\n",               \
+                        host,                                                      \
+                        expect,                                                    \
+                        _got);                                                     \
+         }                                                                         \
+      }                                                                            \
+   } else                                                                          \
+      (void) 0
+
+
+// Test connections to removed servers are closed when a client is pushed back to the pool.
+static void
+disconnects_removed_servers_on_push (void *unused)
+{
+   BSON_UNUSED (unused);
+   bson_error_t error;
+   bool ok;
+   bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
+
+   // Create a client pool to two servers.
+   mongoc_client_pool_t *pool;
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017,localhost:27018");
+      // Set a short heartbeat so server monitors get quick responses.
+      mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, MONGOC_TOPOLOGY_MIN_HEARTBEAT_FREQUENCY_MS);
+      pool = mongoc_client_pool_new (uri);
+      test_framework_set_pool_ssl_opts (pool);
+      mongoc_uri_destroy (uri);
+   }
+
+   // Count connections to both servers.
+   int32_t conns_27017_before = get_connection_count ("localhost:27017");
+   int32_t conns_27018_before = get_connection_count ("localhost:27018");
+
+   // Pop (and push) a client to start background monitoring.
+   {
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      mongoc_client_pool_push (pool, client);
+      // Wait for monitoring connections to be created.
+      // Expect two monitoring connections per server to be created in background.
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27017", conns_27017_before + 2);
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27018", conns_27018_before + 2);
+   }
+
+   // Send 'ping' commands on a client to each server to create operation connections.
+   {
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      ok = mongoc_client_command_simple_with_server_id (client, "admin", ping, NULL, 1 /* server ID */, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+      ok = mongoc_client_command_simple_with_server_id (client, "admin", ping, NULL, 2 /* server ID */, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+      mongoc_client_pool_push (pool, client);
+      // Expect an operation connection is created.
+      ASSERT_CONN_COUNT ("localhost:27017", conns_27017_before + 2 + 1);
+      ASSERT_CONN_COUNT ("localhost:27018", conns_27018_before + 2 + 1);
+   }
+
+   // Mock removal of server 27018 from topology.
+   {
+      mongoc_topology_t *tp = _mongoc_client_pool_get_topology (pool);
+      mc_tpld_modification tdmod = mc_tpld_modify_begin (tp);
+      mongoc_set_rm (mc_tpld_servers (tdmod.new_td), 2 /* server ID */);
+      mc_tpld_modify_commit (tdmod);
+   }
+
+   // Expect connections are closed to removed server.
+   {
+      // Expect monitoring connections to be closed in background.
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27017", conns_27017_before + 2 + 1);
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27018", conns_27018_before + 1);
+
+      // Pop and push the client to "prune" the stale operation connections.
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      mongoc_client_pool_push (pool, client);
+      ASSERT_CONN_COUNT ("localhost:27017", conns_27017_before + 2 + 1);
+      ASSERT_CONN_COUNT ("localhost:27018", conns_27018_before);
+   }
+
+   mongoc_client_pool_destroy (pool);
+   bson_destroy (ping);
+}
+
+// Test that connections are closed to servers removed from the topology on clients checked into the pool.
+static void
+disconnects_removed_servers_in_pool (void *unused)
+{
+   BSON_UNUSED (unused);
+   bson_error_t error;
+   bool ok;
+   bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
+
+   // Create a client pool to two servers.
+   mongoc_client_pool_t *pool;
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017,localhost:27018");
+      // Set a short heartbeat so server monitors get quick responses.
+      mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, MONGOC_TOPOLOGY_MIN_HEARTBEAT_FREQUENCY_MS);
+      pool = mongoc_client_pool_new (uri);
+      test_framework_set_pool_ssl_opts (pool);
+      mongoc_uri_destroy (uri);
+   }
+
+   // Count connections to both servers.
+   int32_t conns_27017_before = get_connection_count ("localhost:27017");
+   int32_t conns_27018_before = get_connection_count ("localhost:27018");
+
+   // Pop (and push) a client to start background monitoring.
+   {
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      mongoc_client_pool_push (pool, client);
+      // Wait for monitoring connections to be created.
+      // Expect two monitoring connections per server to be created in background.
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27017", conns_27017_before + 2);
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27018", conns_27018_before + 2);
+   }
+
+   // Send 'ping' commands on two clients to each server to create operation connections.
+   {
+      mongoc_client_t *client1 = mongoc_client_pool_pop (pool);
+      mongoc_client_t *client2 = mongoc_client_pool_pop (pool);
+
+      ok = mongoc_client_command_simple_with_server_id (client1, "admin", ping, NULL, 1 /* server ID */, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+      ok = mongoc_client_command_simple_with_server_id (client1, "admin", ping, NULL, 2 /* server ID */, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+
+      ok = mongoc_client_command_simple_with_server_id (client2, "admin", ping, NULL, 1 /* server ID */, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+      ok = mongoc_client_command_simple_with_server_id (client2, "admin", ping, NULL, 2 /* server ID */, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+
+      mongoc_client_pool_push (pool, client2);
+      mongoc_client_pool_push (pool, client1);
+
+      // Expect an operation connection is created per client.
+      ASSERT_CONN_COUNT ("localhost:27017", conns_27017_before + 2 + 2);
+      ASSERT_CONN_COUNT ("localhost:27018", conns_27018_before + 2 + 2);
+   }
+
+   // Mock removal of server 27018 from topology.
+   {
+      mongoc_topology_t *tp = _mongoc_client_pool_get_topology (pool);
+      mc_tpld_modification tdmod = mc_tpld_modify_begin (tp);
+      mongoc_set_rm (mc_tpld_servers (tdmod.new_td), 2 /* server ID */);
+      mc_tpld_modify_commit (tdmod);
+   }
+
+   // Expect connections are closed to removed server.
+   {
+      // Expect monitoring connections to be closed in background.
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27017", conns_27017_before + 2 + 2);
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27018", conns_27018_before + 2);
+
+      // Pop and push one client to "prune" the stale operation connections for both clients.
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      mongoc_client_pool_push (pool, client);
+      ASSERT_CONN_COUNT ("localhost:27017", conns_27017_before + 2 + 2);
+      ASSERT_CONN_COUNT ("localhost:27018", conns_27018_before);
+   }
+
+   mongoc_client_pool_destroy (pool);
+   bson_destroy (ping);
+}
+
 void
 test_client_pool_install (TestSuite *suite)
 {
@@ -506,4 +724,22 @@ test_client_pool_install (TestSuite *suite)
    TestSuite_AddLive (suite, "/ClientPool/destroy_without_push", test_client_pool_destroy_without_pushing);
    TestSuite_AddLive (suite, "/ClientPool/max_pool_size_exceeded", test_client_pool_max_pool_size_exceeded);
    TestSuite_Add (suite, "/ClientPool/can_override_sockettimeoutms", test_client_pool_can_override_sockettimeoutms);
+
+   TestSuite_AddFull (
+      suite,
+      "/client_pool/disconnects_removed_servers/on_push",
+      disconnects_removed_servers_on_push,
+      NULL,
+      NULL,
+      test_framework_skip_if_not_mongos /* require mongos to ensure two servers available */,
+      test_framework_skip_if_max_wire_version_less_than_9 /* require server 4.4+ for streaming monitoring protocol */);
+
+   TestSuite_AddFull (
+      suite,
+      "/client_pool/disconnects_removed_servers/in_pool",
+      disconnects_removed_servers_in_pool,
+      NULL,
+      NULL,
+      test_framework_skip_if_not_mongos /* require mongos to ensure two servers available */,
+      test_framework_skip_if_max_wire_version_less_than_9 /* require server 4.4+ for streaming monitoring protocol */);
 }
