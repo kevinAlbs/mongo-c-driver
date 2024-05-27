@@ -3787,6 +3787,10 @@ maybe_prune (void *item, void *ctx_)
 void
 mongoc_cluster_prune (mongoc_cluster_t *cluster, mongoc_array_t *known_server_ids)
 {
+   BSON_ASSERT_PARAM (cluster);
+   BSON_ASSERT_PARAM (known_server_ids);
+   BSON_ASSERT (!cluster->client->topology->single_threaded);
+
    bool needs_prune = false;
    // Do a fast initial check to see if a prune is needed.
    size_t idx1 = 0;
