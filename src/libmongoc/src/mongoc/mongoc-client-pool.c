@@ -395,7 +395,7 @@ check_if_removed (void *item, void *ctx_)
    const mongoc_server_description_t *sd =
       mongoc_topology_description_server_by_id_const (ctx->td, server_id, NULL /* ignore error */);
    if (!sd) {
-      printf ("Disconnecting node on client to server_id: %" PRIu32, server_id);
+      printf ("Disconnecting node on client to server_id: %" PRIu32 "\n", server_id);
       // Remove it.
       mongoc_cluster_disconnect_node (ctx->cluster, server_id);
    }
