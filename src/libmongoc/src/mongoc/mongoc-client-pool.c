@@ -54,6 +54,8 @@ struct _mongoc_client_pool_t {
    mongoc_server_api_t *api;
    bool client_initialized;
    bool do_simple_prune;
+   bool only_prune_on_change;
+   mongoc_array_t last_known_serverids;
 };
 
 
@@ -113,7 +115,15 @@ mongoc_client_pool_new (const mongoc_uri_t *uri)
       pool->do_simple_prune = MONGOC_DO_SIMPLE_PRUNE && 0 == strcmp (MONGOC_DO_SIMPLE_PRUNE, "ON");
       bson_free (MONGOC_DO_SIMPLE_PRUNE);
    }
+   // Check if only should prune when the set of server IDs is detected to have changed.
+   {
+      char *MONGOC_ONLY_PRUNE_ON_CHANGE = _mongoc_getenv ("MONGOC_ONLY_PRUNE_ON_CHANGE");
+      printf ("MONGOC_ONLY_PRUNE_ON_CHANGE=%s\n", MONGOC_ONLY_PRUNE_ON_CHANGE ? MONGOC_ONLY_PRUNE_ON_CHANGE : "(null)");
+      pool->only_prune_on_change = MONGOC_ONLY_PRUNE_ON_CHANGE && 0 == strcmp (MONGOC_ONLY_PRUNE_ON_CHANGE, "ON");
+      bson_free (MONGOC_ONLY_PRUNE_ON_CHANGE);
+   }
 
+   _mongoc_array_init (&pool->last_known_serverids, sizeof (uint32_t));
 
    return pool;
 }
@@ -239,6 +249,8 @@ mongoc_client_pool_destroy (mongoc_client_pool_t *pool)
 #ifdef MONGOC_ENABLE_SSL
    _mongoc_ssl_opts_cleanup (&pool->ssl_opts, true);
 #endif
+
+   _mongoc_array_destroy (&pool->last_known_serverids);
 
    bson_free (pool);
 
@@ -422,6 +434,45 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
          mongoc_set_for_each (cluster->nodes, check_if_removed, &ctx);
          ptr = ptr->next;
       }
+      mc_tpld_drop_ref (&td);
+   } else if (pool->only_prune_on_change) {
+      mc_shared_tpld td = mc_tpld_take_ref (pool->topology);
+      const mongoc_set_t *servers = mc_tpld_servers_const (td.ptr);
+      bool has_changed = false;
+
+      if (pool->last_known_serverids.len != servers->items_len) {
+         has_changed = true;
+      } else {
+         // Check if any server IDs have changed.
+         for (size_t i = 0; i < servers->items_len; i++) {
+            // Check entries in order. The set is expected to have server IDs in sorted order.
+            uint32_t last_known = _mongoc_array_index (&pool->last_known_serverids, uint32_t, i);
+            uint32_t actual = servers->items[i].id;
+            if (last_known != actual) {
+               has_changed = true;
+               break;
+            }
+         }
+      }
+
+      if (has_changed) {
+         printf ("Change detected, pruning.\n");
+         mongoc_queue_item_t *ptr = pool->queue.head;
+         while (ptr != NULL) {
+            mongoc_client_t *client_ptr = (mongoc_client_t *) ptr->data;
+            mongoc_cluster_t *cluster = &client_ptr->cluster;
+            check_if_removed_ctx ctx = {.cluster = cluster, .td = td.ptr};
+            mongoc_set_for_each (cluster->nodes, check_if_removed, &ctx);
+            ptr = ptr->next;
+         }
+         // Store new set of IDs.
+         _mongoc_array_destroy (&pool->last_known_serverids);
+         _mongoc_array_init (&pool->last_known_serverids, sizeof (uint32_t));
+         for (size_t i = 0; i < servers->items_len; i++) {
+            _mongoc_array_append_val (&pool->last_known_serverids, servers->items[i].id);
+         }
+      }
+
       mc_tpld_drop_ref (&td);
    }
 
