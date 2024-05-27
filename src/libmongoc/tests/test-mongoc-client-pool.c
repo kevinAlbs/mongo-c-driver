@@ -481,70 +481,6 @@ test_client_pool_can_override_sockettimeoutms (void)
    mongoc_uri_destroy (uri);
 }
 
-// `get_connection_count` returns the server reported connection count.
-static int32_t
-get_connection_count (const char *host_and_port)
-{
-   char *uri_str = bson_strdup_printf ("mongodb://%s\n", host_and_port);
-   mongoc_client_t *client = mongoc_client_new (uri_str);
-   bson_t *cmd = BCON_NEW ("serverStatus", BCON_INT32 (1));
-   bson_t reply;
-   bson_error_t error;
-   bool ok = mongoc_client_command_simple (client, "admin", cmd, NULL, &reply, &error);
-   if (!ok) {
-      printf ("serverStatus failed: %s\n", error.message);
-      abort ();
-   }
-   int32_t conns;
-   // Get `connections.current` from the reply.
-   {
-      bson_iter_t iter;
-      BSON_ASSERT (bson_iter_init_find (&iter, &reply, "connections"));
-      BSON_ASSERT (bson_iter_recurse (&iter, &iter));
-      BSON_ASSERT (bson_iter_find (&iter, "current"));
-      conns = bson_iter_int32 (&iter);
-   }
-   bson_destroy (&reply);
-   bson_destroy (cmd);
-   mongoc_client_destroy (client);
-   bson_free (uri_str);
-   return conns;
-}
-
-#define ASSERT_CONN_COUNT(host, expect)                           \
-   if (1) {                                                       \
-      int32_t _got = get_connection_count (host);                 \
-      if (_got != expect) {                                       \
-         test_error ("Got unexpected connection count to %s:\n"   \
-                     "  Expected %" PRId32 ", got %" PRId32 "\n", \
-                     host,                                        \
-                     expect,                                      \
-                     _got);                                       \
-      }                                                           \
-   } else                                                         \
-      (void) 0
-
-#define ASSERT_EVENTUAL_CONN_COUNT(host, expect)                                   \
-   if (1) {                                                                        \
-      int64_t _start = bson_get_monotonic_time ();                                 \
-      while (true) {                                                               \
-         int32_t _got = get_connection_count (host);                               \
-         if (_got == expect) {                                                     \
-            break;                                                                 \
-         }                                                                         \
-         int64_t _now = bson_get_monotonic_time ();                                \
-         if (_now - _start > 5 * 1000 * 1000 /* five seconds */) {                 \
-            test_error ("Timed out waiting for expected connection count to %s:\n" \
-                        "  Expected %" PRId32 ", got %" PRId32 "\n",               \
-                        host,                                                      \
-                        expect,                                                    \
-                        _got);                                                     \
-         }                                                                         \
-      }                                                                            \
-   } else                                                                          \
-      (void) 0
-
-
 // Test connections to removed servers are closed when a client is pushed back to the pool.
 static void
 disconnects_removed_servers_on_push (void *unused)
@@ -566,8 +502,8 @@ disconnects_removed_servers_on_push (void *unused)
    }
 
    // Count connections to both servers.
-   int32_t conns_27017_before = get_connection_count ("localhost:27017");
-   int32_t conns_27018_before = get_connection_count ("localhost:27018");
+   int32_t conns_27017_before = get_current_connection_count ("localhost:27017");
+   int32_t conns_27018_before = get_current_connection_count ("localhost:27018");
 
    // Pop (and push) a client to start background monitoring.
    {
@@ -638,8 +574,8 @@ disconnects_removed_servers_in_pool (void *unused)
    }
 
    // Count connections to both servers.
-   int32_t conns_27017_before = get_connection_count ("localhost:27017");
-   int32_t conns_27018_before = get_connection_count ("localhost:27018");
+   int32_t conns_27017_before = get_current_connection_count ("localhost:27017");
+   int32_t conns_27018_before = get_current_connection_count ("localhost:27018");
 
    // Pop (and push) a client to start background monitoring.
    {

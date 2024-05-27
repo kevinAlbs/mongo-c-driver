@@ -1220,40 +1220,14 @@ _mock_rr_resolver_with_override (const char *service,
    return true;
 }
 
-
-// `get_connection_count` returns the server reported connection count.
-static int32_t
-get_connection_count (const char *uristr)
-{
-   mongoc_client_t *client = mongoc_client_new (uristr);
-   bson_t *cmd = BCON_NEW ("serverStatus", BCON_INT32 (1));
-   bson_t reply;
-   bson_error_t error;
-   bool ok = mongoc_client_command_simple (client, "admin", cmd, NULL, &reply, &error);
-   if (!ok) {
-      printf ("serverStatus failed: %s\n", error.message);
-      abort ();
-   }
-   int32_t conns;
-   // Get `connections.current` from the reply.
-   {
-      bson_iter_t iter;
-      BSON_ASSERT (bson_iter_init_find (&iter, &reply, "connections"));
-      BSON_ASSERT (bson_iter_recurse (&iter, &iter));
-      BSON_ASSERT (bson_iter_find (&iter, "current"));
-      conns = bson_iter_int32 (&iter);
-   }
-   bson_destroy (&reply);
-   bson_destroy (cmd);
-   mongoc_client_destroy (client);
-   return conns;
-}
-
 // Test that after a server is removed from SRV records, all connections are closed.
 static void
 test_removing_servers_closes_connections (void *unused)
 {
    BSON_UNUSED (unused);
+   bson_error_t error;
+   bool ok;
+   bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
 
    // Create a client pool to mongodb+srv://test1.test.build.10gen.cc. The URI resolves to two SRV records:
    // - localhost.test.build.10gen.cc:27017
@@ -1280,560 +1254,56 @@ test_removing_servers_closes_connections (void *unused)
    }
 
    // Count connections to both servers.
-   int32_t conns_27017_before = get_connection_count ("mongodb://localhost:27017");
-   int32_t conns_27018_before = get_connection_count ("mongodb://localhost:27018");
+   int32_t conns_27017_before = get_current_connection_count ("localhost:27017");
+   int32_t conns_27018_before = get_current_connection_count ("localhost:27018");
 
    // Pop (and push) a client to start background monitoring.
    {
       mongoc_client_t *client = mongoc_client_pool_pop (pool);
       mongoc_client_pool_push (pool, client);
+      // Wait for monitoring connections to be created.
+      // Expect two monitoring connections per server to be created in background.
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27017", conns_27017_before + 2);
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27018", conns_27018_before + 2);
    }
 
-   // Wait for monitoring connections to be created.
-   int64_t start = bson_get_monotonic_time ();
-   while (true) {
-      // Expect two monitoring connections per server.
-      int32_t conns_27017_expected = conns_27017_before + 2;
-      int32_t conns_27018_expected = conns_27018_before + 2;
-      int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-      int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-      if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-         break;
-      }
-
-      int64_t now = bson_get_monotonic_time ();
-      if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-         test_error ("Timed out waiting for expected connection count:\n"
-                     "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                     "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                     conns_27017_expected,
-                     conns_27017,
-                     conns_27018_expected,
-                     conns_27018);
-      }
-   }
-
-   // Send 'ping' commands on a client until operation connections are created to each server.
+   // Send 'ping' commands on a client to each server to create operation connections.
    {
-      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
-      while (true) {
-         mongoc_client_t *client = mongoc_client_pool_pop (pool);
-         bson_error_t error;
-         bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         // Expect two monitoring connections per server and one monitoring connection for operations.
-         int32_t conns_27017_expected = conns_27017_before + 3;
-         int32_t conns_27018_expected = conns_27018_before + 3;
-         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-            mongoc_client_pool_push (pool, client);
-            break;
-         }
-
-         int64_t now = bson_get_monotonic_time ();
-         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-            test_error ("Timed out waiting for expected connection count:\n"
-                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                        conns_27017_expected,
-                        conns_27017,
-                        conns_27018_expected,
-                        conns_27018);
-         }
-         mongoc_client_pool_push (pool, client);
-      }
-      bson_destroy (ping);
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      ok = mongoc_client_command_simple_with_server_id (client, "admin", ping, NULL, 1 /* server ID */, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+      ok = mongoc_client_command_simple_with_server_id (client, "admin", ping, NULL, 2 /* server ID */, NULL, &error);
+      ASSERT_OR_PRINT (ok, error);
+      mongoc_client_pool_push (pool, client);
+      // Expect an operation connection is created.
+      ASSERT_CONN_COUNT ("localhost:27017", conns_27017_before + 2 + 1);
+      ASSERT_CONN_COUNT ("localhost:27018", conns_27018_before + 2 + 1);
    }
 
-   // Mock removal of port 27018. Expect connections to 27018 to drop to the started value.
+   // Mock removal of localhost:27018.
    {
       bson_mutex_lock (&rr_override.lock);
       _mongoc_host_list_destroy_all (rr_override.hosts);
       rr_override.hosts = MAKE_HOSTS ("localhost.test.build.10gen.cc:27017");
       bson_mutex_unlock (&rr_override.lock);
-
-      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
-      while (true) {
-         mongoc_client_t *client = mongoc_client_pool_pop (pool);
-         bson_error_t error;
-         bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         int32_t conns_27017_expected = conns_27017_before + 2 + 1; // Expect 2 for monitoring, one from client.
-         int32_t conns_27018_expected = conns_27018_before;         // Expect all connections to drop.
-         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-            mongoc_client_pool_push (pool, client);
-            break;
-         }
-
-         int64_t now = bson_get_monotonic_time ();
-         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-            test_error ("Timed out waiting for expected connection count:\n"
-                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                        conns_27017_expected,
-                        conns_27017,
-                        conns_27018_expected,
-                        conns_27018);
-         }
-         mongoc_client_pool_push (pool, client);
-      }
-      bson_destroy (ping);
    }
 
-   mongoc_client_pool_destroy (pool);
-   bson_mutex_destroy (&rr_override.lock);
-}
-
-// Test that a server being removed from the topology description results in operation connections from being removed.
-// This can occur if the server is removed from a replica set.
-static void
-closes_connections_of_removed_servers (void *unused)
-{
-   BSON_UNUSED (unused);
-
-   // Create a client pool to two servers.
-   mongoc_client_pool_t *pool;
+   // Expect connections are closed to removed server.
    {
-      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017,localhost:27018");
-      // Set a short heartbeat so server monitors get quick responses.
-      mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, RESCAN_INTERVAL_MS);
-      pool = mongoc_client_pool_new (uri);
-#if defined(MONGOC_ENABLE_SSL)
-      mongoc_ssl_opt_t ssl_opts = *test_framework_get_ssl_opts ();
-      ssl_opts.allow_invalid_hostname = true;
-      mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
-#endif /* defined(MONGOC_ENABLE_SSL) */
-      mongoc_uri_destroy (uri);
-   }
+      // Expect monitoring connections to be closed in background.
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27017", conns_27017_before + 2 + 1);
+      ASSERT_EVENTUAL_CONN_COUNT ("localhost:27018", conns_27018_before + 1);
 
-   // Count connections to both servers.
-   int32_t conns_27017_before = get_connection_count ("mongodb://localhost:27017");
-   int32_t conns_27018_before = get_connection_count ("mongodb://localhost:27018");
-
-   // Pop (and push) a client to start background monitoring.
-   {
+      // Pop and push the client to "prune" the stale operation connections.
       mongoc_client_t *client = mongoc_client_pool_pop (pool);
       mongoc_client_pool_push (pool, client);
-   }
-
-   // Wait for monitoring connections to be created.
-   int64_t start = bson_get_monotonic_time ();
-   while (true) {
-      // Expect two monitoring connections per server.
-      int32_t conns_27017_expected = conns_27017_before + 2;
-      int32_t conns_27018_expected = conns_27018_before + 2;
-      int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-      int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-      if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-         break;
-      }
-
-      int64_t now = bson_get_monotonic_time ();
-      if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-         test_error ("Timed out waiting for expected connection count:\n"
-                     "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                     "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                     conns_27017_expected,
-                     conns_27017,
-                     conns_27018_expected,
-                     conns_27018);
-      }
-   }
-
-   // Send 'ping' commands on a client until operation connections are created to each server.
-   {
-      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
-      while (true) {
-         mongoc_client_t *client = mongoc_client_pool_pop (pool);
-         bson_error_t error;
-         bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         // Expect two monitoring connections per server and one monitoring connection for operations.
-         int32_t conns_27017_expected = conns_27017_before + 3;
-         int32_t conns_27018_expected = conns_27018_before + 3;
-         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-            mongoc_client_pool_push (pool, client);
-            break;
-         }
-
-         int64_t now = bson_get_monotonic_time ();
-         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-            test_error ("Timed out waiting for expected connection count:\n"
-                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                        conns_27017_expected,
-                        conns_27017,
-                        conns_27018_expected,
-                        conns_27018);
-         }
-         mongoc_client_pool_push (pool, client);
-      }
-      bson_destroy (ping);
-   }
-
-   // Mock removal of port 27018 from the topology.
-   {
-      mongoc_topology_t *tp = _mongoc_client_pool_get_topology (pool);
-      {
-         mc_tpld_modification tdmod = mc_tpld_modify_begin (tp);
-         mongoc_set_rm (mc_tpld_servers (tdmod.new_td), 2 /* ID of server 27018 */);
-         mc_tpld_modify_commit (tdmod);
-      }
-
-      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
-      while (true) {
-         mongoc_client_t *client = mongoc_client_pool_pop (pool);
-         bson_error_t error;
-         bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         int32_t conns_27017_expected = conns_27017_before + 2 + 1; // Expect 2 for monitoring, one from client.
-         int32_t conns_27018_expected = conns_27018_before;         // Expect all connections to drop.
-         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-            mongoc_client_pool_push (pool, client);
-            break;
-         }
-
-         int64_t now = bson_get_monotonic_time ();
-         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-            test_error ("Timed out waiting for expected connection count:\n"
-                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                        conns_27017_expected,
-                        conns_27017,
-                        conns_27018_expected,
-                        conns_27018);
-         }
-         mongoc_client_pool_push (pool, client);
-      }
-      bson_destroy (ping);
+      ASSERT_CONN_COUNT ("localhost:27017", conns_27017_before + 2 + 1);
+      ASSERT_CONN_COUNT ("localhost:27018", conns_27018_before);
    }
 
    mongoc_client_pool_destroy (pool);
    bson_mutex_destroy (&rr_override.lock);
-}
-
-// Test that a server being removed from the topology description results in operation connections from being removed
-// from clients that are checked in to the pool. This can occur if the server is removed from a replica set.
-static void
-closes_connections_of_removed_servers_in_pool (void *unused)
-{
-   BSON_UNUSED (unused);
-
-   // Create a client pool to two servers.
-   mongoc_client_pool_t *pool;
-   {
-      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017,localhost:27018");
-      // Set a short heartbeat so server monitors get quick responses.
-      mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, RESCAN_INTERVAL_MS);
-      pool = mongoc_client_pool_new (uri);
-#if defined(MONGOC_ENABLE_SSL)
-      mongoc_ssl_opt_t ssl_opts = *test_framework_get_ssl_opts ();
-      ssl_opts.allow_invalid_hostname = true;
-      mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
-#endif /* defined(MONGOC_ENABLE_SSL) */
-      mongoc_uri_destroy (uri);
-   }
-
-   // Count connections to both servers.
-   int32_t conns_27017_before = get_connection_count ("mongodb://localhost:27017");
-   int32_t conns_27018_before = get_connection_count ("mongodb://localhost:27018");
-
-   // Pop (and push) a client to start background monitoring.
-   {
-      mongoc_client_t *client = mongoc_client_pool_pop (pool);
-      mongoc_client_pool_push (pool, client);
-   }
-
-   // Wait for monitoring connections to be created.
-   int64_t start = bson_get_monotonic_time ();
-   while (true) {
-      // Expect two monitoring connections per server.
-      int32_t conns_27017_expected = conns_27017_before + 2;
-      int32_t conns_27018_expected = conns_27018_before + 2;
-      int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-      int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-      if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-         break;
-      }
-
-      int64_t now = bson_get_monotonic_time ();
-      if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-         test_error ("Timed out waiting for expected connection count:\n"
-                     "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                     "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                     conns_27017_expected,
-                     conns_27017,
-                     conns_27018_expected,
-                     conns_27018);
-      }
-   }
-
-   // Send 'ping' commands on two clients until operation connections are created to each server.
-   {
-      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
-      while (true) {
-         mongoc_client_t *client1 = mongoc_client_pool_pop (pool);
-         mongoc_client_t *client2 = mongoc_client_pool_pop (pool);
-         bson_error_t error;
-         bool ok;
-
-         ok = mongoc_client_command_simple (client1, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         ok = mongoc_client_command_simple (client2, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         // Expect two monitoring connections per server and two monitoring connections for operations.
-         int32_t conns_27017_expected = conns_27017_before + 4;
-         int32_t conns_27018_expected = conns_27018_before + 4;
-         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-            mongoc_client_pool_push (pool, client2);
-            mongoc_client_pool_push (pool, client1);
-            break;
-         }
-
-         int64_t now = bson_get_monotonic_time ();
-         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-            test_error ("Timed out waiting for expected connection count:\n"
-                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                        conns_27017_expected,
-                        conns_27017,
-                        conns_27018_expected,
-                        conns_27018);
-         }
-         mongoc_client_pool_push (pool, client2);
-         mongoc_client_pool_push (pool, client1);
-      }
-      bson_destroy (ping);
-   }
-
-   // Mock removal of port 27018 from the topology.
-   {
-      mongoc_topology_t *tp = _mongoc_client_pool_get_topology (pool);
-      {
-         mc_tpld_modification tdmod = mc_tpld_modify_begin (tp);
-         mongoc_set_rm (mc_tpld_servers (tdmod.new_td), 2 /* ID of server 27018 */);
-         mc_tpld_modify_commit (tdmod);
-      }
-
-      // Leave one client checked in to pool.
-      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
-      while (true) {
-         mongoc_client_t *client = mongoc_client_pool_pop (pool);
-         bson_error_t error;
-         bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         int32_t conns_27017_expected = conns_27017_before + 2 + 2; // Expect 2 for monitoring, two from clients.
-         int32_t conns_27018_expected = conns_27018_before;         // Expect all connections to drop.
-         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-            mongoc_client_pool_push (pool, client);
-            break;
-         }
-
-         int64_t now = bson_get_monotonic_time ();
-         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-            test_error ("Timed out waiting for expected connection count:\n"
-                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                        conns_27017_expected,
-                        conns_27017,
-                        conns_27018_expected,
-                        conns_27018);
-         }
-         mongoc_client_pool_push (pool, client);
-      }
-      bson_destroy (ping);
-   }
-
-   mongoc_client_pool_destroy (pool);
-   bson_mutex_destroy (&rr_override.lock);
-}
-
-// Test that a server being removed from the topology description results in operation connections from being removed
-// from clients that are checked out of the pool.
-static void
-test_prunes_checkedout_clients (void *unused)
-{
-   BSON_UNUSED (unused);
-
-   // Create a client pool to two servers.
-   mongoc_client_pool_t *pool;
-   {
-      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017,localhost:27018");
-      // Set a short heartbeat so server monitors get quick responses.
-      mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, RESCAN_INTERVAL_MS);
-      pool = mongoc_client_pool_new (uri);
-#if defined(MONGOC_ENABLE_SSL)
-      mongoc_ssl_opt_t ssl_opts = *test_framework_get_ssl_opts ();
-      ssl_opts.allow_invalid_hostname = true;
-      mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
-#endif /* defined(MONGOC_ENABLE_SSL) */
-      mongoc_uri_destroy (uri);
-   }
-
-   // Count connections to both servers.
-   int32_t conns_27017_before = get_connection_count ("mongodb://localhost:27017");
-   int32_t conns_27018_before = get_connection_count ("mongodb://localhost:27018");
-
-   // Pop (and push) a client to start background monitoring.
-   {
-      mongoc_client_t *client = mongoc_client_pool_pop (pool);
-      mongoc_client_pool_push (pool, client);
-   }
-
-   // Wait for monitoring connections to be created.
-   int64_t start = bson_get_monotonic_time ();
-   while (true) {
-      // Expect two monitoring connections per server.
-      int32_t conns_27017_expected = conns_27017_before + 2;
-      int32_t conns_27018_expected = conns_27018_before + 2;
-      int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-      int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-      if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-         break;
-      }
-
-      int64_t now = bson_get_monotonic_time ();
-      if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-         test_error ("Timed out waiting for expected connection count:\n"
-                     "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                     "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                     conns_27017_expected,
-                     conns_27017,
-                     conns_27018_expected,
-                     conns_27018);
-      }
-   }
-
-   // Send 'ping' commands on two clients until operation connections are created to each server.
-   {
-      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
-      while (true) {
-         mongoc_client_t *client1 = mongoc_client_pool_pop (pool);
-         mongoc_client_t *client2 = mongoc_client_pool_pop (pool);
-         bson_error_t error;
-         bool ok;
-
-         ok = mongoc_client_command_simple (client1, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         ok = mongoc_client_command_simple (client2, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         // Expect two monitoring connections per server and two monitoring connections for operations.
-         int32_t conns_27017_expected = conns_27017_before + 4;
-         int32_t conns_27018_expected = conns_27018_before + 4;
-         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-            mongoc_client_pool_push (pool, client2);
-            mongoc_client_pool_push (pool, client1);
-            break;
-         }
-
-         int64_t now = bson_get_monotonic_time ();
-         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-            test_error ("Timed out waiting for expected connection count:\n"
-                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                        conns_27017_expected,
-                        conns_27017,
-                        conns_27018_expected,
-                        conns_27018);
-         }
-         mongoc_client_pool_push (pool, client2);
-         mongoc_client_pool_push (pool, client1);
-      }
-      bson_destroy (ping);
-   }
-
-   mongoc_client_t *client_checkedout = mongoc_client_pool_pop (pool);
-   // Mock removal of port 27018 from the topology.
-   {
-      mongoc_topology_t *tp = _mongoc_client_pool_get_topology (pool);
-      {
-         mc_tpld_modification tdmod = mc_tpld_modify_begin (tp);
-         mongoc_set_rm (mc_tpld_servers (tdmod.new_td), 2 /* ID of server 27018 */);
-         mc_tpld_modify_commit (tdmod);
-      }
-
-      bson_t *ping = BCON_NEW ("ping", BCON_INT32 (1));
-      while (true) {
-         mongoc_client_t *client = mongoc_client_pool_pop (pool);
-         bson_error_t error;
-         bool ok = mongoc_client_command_simple (client, "admin", ping, NULL, NULL, &error);
-         ASSERT_OR_PRINT (ok, error);
-
-         int32_t conns_27017_expected = conns_27017_before + 2 + 2; // Expect 2 for monitoring, two from clients.
-         int32_t conns_27018_expected =
-            conns_27018_before + 0 +
-            1; // Expect monitoring connections to drop, but one connection to remain from checked out client.
-         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-            mongoc_client_pool_push (pool, client);
-            break;
-         }
-
-         int64_t now = bson_get_monotonic_time ();
-         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-            test_error ("Timed out waiting for expected connection count:\n"
-                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                        conns_27017_expected,
-                        conns_27017,
-                        conns_27018_expected,
-                        conns_27018);
-         }
-         mongoc_client_pool_push (pool, client);
-      }
-      bson_destroy (ping);
-   }
-
-   mongoc_client_pool_push (pool, client_checkedout);
-   {
-      while (true) {
-         int32_t conns_27017_expected = conns_27017_before + 2 + 2; // Expect 2 for monitoring, two from clients.
-         int32_t conns_27018_expected = conns_27018_before;         // Expect all connections closed.
-         int32_t conns_27017 = get_connection_count ("mongodb://localhost:27017");
-         int32_t conns_27018 = get_connection_count ("mongodb://localhost:27018");
-         if (conns_27017_expected == conns_27017 && conns_27018_expected == conns_27018) {
-            break;
-         }
-
-         int64_t now = bson_get_monotonic_time ();
-         if (now - start > 5 * 1000 * 1000 /* five seconds */) {
-            test_error ("Timed out waiting for expected connection count:\n"
-                        "  On port 27017: expected %" PRId32 ", got %" PRId32 "\n"
-                        "  On port 27018: expected %" PRId32 ", got %" PRId32 "\n",
-                        conns_27017_expected,
-                        conns_27017,
-                        conns_27018_expected,
-                        conns_27018);
-         }
-      }
-   }
-
-
-   mongoc_client_pool_destroy (pool);
-   bson_mutex_destroy (&rr_override.lock);
+   bson_destroy (ping);
 }
 
 void
@@ -1913,36 +1383,6 @@ test_dns_install (TestSuite *suite)
       suite,
       "/initial_dns_seedlist_discovery/srv_polling/removing_servers_closes_connections",
       test_removing_servers_closes_connections,
-      NULL,
-      NULL,
-      test_dns_check_srv_polling,
-      test_framework_skip_if_max_wire_version_less_than_9 /* require server 4.4+ for streaming monitoring protocol */);
-
-   // TODO: move to test-mongoc-client-pool.c
-   TestSuite_AddFull (
-      suite,
-      "/client_pool/closes_connections_of_removed_servers",
-      closes_connections_of_removed_servers,
-      NULL,
-      NULL,
-      test_dns_check_srv_polling,
-      test_framework_skip_if_max_wire_version_less_than_9 /* require server 4.4+ for streaming monitoring protocol */);
-
-   // TODO: move to test-mongoc-client-pool.c
-   TestSuite_AddFull (
-      suite,
-      "/client_pool/closes_connections_of_removed_servers_in_pool",
-      closes_connections_of_removed_servers_in_pool,
-      NULL,
-      NULL,
-      test_dns_check_srv_polling,
-      test_framework_skip_if_max_wire_version_less_than_9 /* require server 4.4+ for streaming monitoring protocol */);
-
-   // TODO: move to test-mongoc-client-pool.c
-   TestSuite_AddFull (
-      suite,
-      "/client_pool/prunes_checkedout_clients",
-      test_prunes_checkedout_clients,
       NULL,
       NULL,
       test_dns_check_srv_polling,
