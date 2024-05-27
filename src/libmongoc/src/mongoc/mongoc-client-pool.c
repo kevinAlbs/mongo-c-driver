@@ -27,7 +27,6 @@
 #include "mongoc-topology-private.h"
 #include "mongoc-topology-background-monitoring-private.h"
 #include "mongoc-trace-private.h"
-#include "mongoc-util-private.h" // _mongoc_getenv
 
 #ifdef MONGOC_ENABLE_SSL
 #include "mongoc-ssl-private.h"
@@ -53,8 +52,6 @@ struct _mongoc_client_pool_t {
    bool error_api_set;
    mongoc_server_api_t *api;
    bool client_initialized;
-   bool do_simple_prune;
-   bool only_prune_on_change;
    // `last_known_serverids` is a sorted array of uint32_t.
    mongoc_array_t last_known_serverids;
 };
@@ -151,6 +148,7 @@ mongoc_client_pool_new_with_error (const mongoc_uri_t *uri, bson_error_t *error)
    }
 
    pool = (mongoc_client_pool_t *) bson_malloc0 (sizeof *pool);
+   _mongoc_array_init (&pool->last_known_serverids, sizeof (uint32_t));
    bson_mutex_init (&pool->mutex);
    mongoc_cond_init (&pool->cond);
    _mongoc_queue_init (&pool->queue);
@@ -160,23 +158,6 @@ mongoc_client_pool_new_with_error (const mongoc_uri_t *uri, bson_error_t *error)
    pool->size = 0;
    pool->topology = topology;
    pool->error_api_version = MONGOC_ERROR_API_VERSION_LEGACY;
-
-   // Check if pruning enabled.
-   {
-      char *MONGOC_DO_SIMPLE_PRUNE = _mongoc_getenv ("MONGOC_DO_SIMPLE_PRUNE");
-      printf ("MONGOC_DO_SIMPLE_PRUNE=%s\n", MONGOC_DO_SIMPLE_PRUNE ? MONGOC_DO_SIMPLE_PRUNE : "(null)");
-      pool->do_simple_prune = MONGOC_DO_SIMPLE_PRUNE && 0 == strcmp (MONGOC_DO_SIMPLE_PRUNE, "ON");
-      bson_free (MONGOC_DO_SIMPLE_PRUNE);
-   }
-   // Check if only should prune when the set of server IDs is detected to have changed.
-   {
-      char *MONGOC_ONLY_PRUNE_ON_CHANGE = _mongoc_getenv ("MONGOC_ONLY_PRUNE_ON_CHANGE");
-      printf ("MONGOC_ONLY_PRUNE_ON_CHANGE=%s\n", MONGOC_ONLY_PRUNE_ON_CHANGE ? MONGOC_ONLY_PRUNE_ON_CHANGE : "(null)");
-      pool->only_prune_on_change = MONGOC_ONLY_PRUNE_ON_CHANGE && 0 == strcmp (MONGOC_ONLY_PRUNE_ON_CHANGE, "ON");
-      bson_free (MONGOC_ONLY_PRUNE_ON_CHANGE);
-   }
-
-   _mongoc_array_init (&pool->last_known_serverids, sizeof (uint32_t));
 
    b = mongoc_uri_get_options (pool->uri);
 
@@ -430,7 +411,6 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
 
    if (serverids_have_changed) {
       // The set of last known server IDs has changed. Prune all clients in pool.
-      printf ("Change detected, pruning.\n");
       mongoc_queue_item_t *ptr = pool->queue.head;
       while (ptr != NULL) {
          mongoc_client_t *client_ptr = (mongoc_client_t *) ptr->data;
