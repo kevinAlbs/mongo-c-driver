@@ -393,6 +393,7 @@ maybe_prune (void *item, void *ctx_)
    return true;
 }
 
+// `prune_client` closes connections from `client` to servers not contained in `known_server_ids`.
 static void
 prune_client (mongoc_client_t *client, mongoc_array_t *known_server_ids)
 {
