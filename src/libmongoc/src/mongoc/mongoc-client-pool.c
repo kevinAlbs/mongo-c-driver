@@ -55,6 +55,7 @@ struct _mongoc_client_pool_t {
    bool client_initialized;
    bool do_simple_prune;
    bool only_prune_on_change;
+   // `last_known_serverids` is a sorted array of uint32_t.
    mongoc_array_t last_known_serverids;
 };
 
@@ -380,28 +381,6 @@ mongoc_client_pool_try_pop (mongoc_client_pool_t *pool)
    RETURN (client);
 }
 
-typedef struct {
-   const mongoc_topology_description_t *td;
-   mongoc_cluster_t *cluster;
-} check_if_removed_ctx;
-
-static bool
-check_if_removed (void *item, void *ctx_)
-{
-   mongoc_cluster_node_t *cn = (mongoc_cluster_node_t *) item;
-   check_if_removed_ctx *ctx = (check_if_removed_ctx *) ctx_;
-   uint32_t server_id = cn->handshake_sd->id;
-
-   const mongoc_server_description_t *sd =
-      mongoc_topology_description_server_by_id_const (ctx->td, server_id, NULL /* ignore error */);
-   if (!sd) {
-      printf ("Disconnecting node on client to server_id: %" PRIu32 "\n", server_id);
-      // Remove it.
-      mongoc_cluster_disconnect_node (ctx->cluster, server_id);
-   }
-   return true;
-}
-
 
 void
 mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
@@ -417,94 +396,51 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
    bson_mutex_lock (&pool->mutex);
    _mongoc_queue_push_head (&pool->queue, client);
 
-   // TODO: consider alternative idea:
-   //  Store the last known set of server IDs from the topology description.
-   //  On push, check if the topology description server IDs has changed.
-   //  If no change, do not prune.
-
-   // Close connections to servers removed from the topology in pooled clients.
-   if (pool->do_simple_prune) {
-      mc_shared_tpld td = mc_tpld_take_ref (pool->topology);
-
-      mongoc_queue_item_t *ptr = pool->queue.head;
-      while (ptr != NULL) {
-         mongoc_client_t *client_ptr = (mongoc_client_t *) ptr->data;
-         mongoc_cluster_t *cluster = &client_ptr->cluster;
-         check_if_removed_ctx ctx = {.cluster = cluster, .td = td.ptr};
-         mongoc_set_for_each (cluster->nodes, check_if_removed, &ctx);
-         ptr = ptr->next;
-      }
-      mc_tpld_drop_ref (&td);
-   } else if (pool->only_prune_on_change) {
+   // Check if `last_known_server_ids` needs update.
+   bool serverids_have_changed = false;
+   {
       mc_shared_tpld td = mc_tpld_take_ref (pool->topology);
       const mongoc_set_t *servers = mc_tpld_servers_const (td.ptr);
-      bool has_changed = false;
 
       if (pool->last_known_serverids.len != servers->items_len) {
-         has_changed = true;
+         serverids_have_changed = true;
       } else {
          // Check if any server IDs have changed.
          for (size_t i = 0; i < servers->items_len; i++) {
-            // Check entries in order. The set is expected to have server IDs in sorted order.
+            // Compare in order. Both lists are sorted.
             uint32_t last_known = _mongoc_array_index (&pool->last_known_serverids, uint32_t, i);
             uint32_t actual = servers->items[i].id;
             if (last_known != actual) {
-               has_changed = true;
+               serverids_have_changed = true;
                break;
             }
          }
       }
 
-      if (has_changed) {
-         printf ("Change detected, pruning.\n");
-         mongoc_queue_item_t *ptr = pool->queue.head;
-         while (ptr != NULL) {
-            mongoc_client_t *client_ptr = (mongoc_client_t *) ptr->data;
-            mongoc_cluster_t *cluster = &client_ptr->cluster;
-            check_if_removed_ctx ctx = {.cluster = cluster, .td = td.ptr};
-            mongoc_set_for_each (cluster->nodes, check_if_removed, &ctx);
-            ptr = ptr->next;
-         }
-         // Store new set of IDs.
+      if (serverids_have_changed) {
+         // Store new set of server IDs.
          _mongoc_array_destroy (&pool->last_known_serverids);
          _mongoc_array_init (&pool->last_known_serverids, sizeof (uint32_t));
          for (size_t i = 0; i < servers->items_len; i++) {
             _mongoc_array_append_val (&pool->last_known_serverids, servers->items[i].id);
          }
       }
-
-      // Always prune incoming client.
-      {
-         mongoc_cluster_t *cluster = &client->cluster;
-         bool needs_prune = false;
-
-         size_t j = 0;
-         for (size_t i = 0; i < cluster->nodes->items_len; i++) {
-            mongoc_set_item_t *cn = &cluster->nodes->items[i];
-            bool found = false;
-            for (; j < pool->last_known_serverids.len; j++) {
-               uint32_t last_known = _mongoc_array_index (&pool->last_known_serverids, uint32_t, j);
-               if (cn->id == last_known) {
-                  found = true;
-                  break;
-               }
-            }
-            if (!found) {
-               // A server in the client's pool is not in the last known server ids. Prune it.
-               needs_prune = true;
-            }
-         }
-
-         if (needs_prune) {
-            printf ("Client being pushed needs to be pruned\n");
-            check_if_removed_ctx ctx = {.cluster = cluster, .td = td.ptr};
-            mongoc_set_for_each (cluster->nodes, check_if_removed, &ctx);
-            mc_tpld_drop_ref (&td);
-         }
-      }
-
       mc_tpld_drop_ref (&td);
    }
+
+   if (serverids_have_changed) {
+      // The set of last known server IDs has changed. Prune all clients in pool.
+      printf ("Change detected, pruning.\n");
+      mongoc_queue_item_t *ptr = pool->queue.head;
+      while (ptr != NULL) {
+         mongoc_client_t *client_ptr = (mongoc_client_t *) ptr->data;
+         mongoc_cluster_prune (&client_ptr->cluster, &pool->last_known_serverids);
+         ptr = ptr->next;
+      }
+   }
+
+   // Always prune incoming client. The topology may have changed while client was checked out.
+   mongoc_cluster_prune (&client->cluster, &pool->last_known_serverids);
 
    if (pool->min_pool_size && _mongoc_queue_get_length (&pool->queue) > pool->min_pool_size) {
       mongoc_client_t *old_client;

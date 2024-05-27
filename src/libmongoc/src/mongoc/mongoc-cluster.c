@@ -3752,3 +3752,66 @@ retry:
 
    RETURN (ret);
 }
+
+typedef struct {
+   mongoc_array_t *server_ids;
+   mongoc_cluster_t *cluster;
+} prune_ctx;
+
+static int
+server_id_cmp (const void *a_, const void *b_)
+{
+   uint32_t *a = (uint32_t *) a_;
+   uint32_t *b = (uint32_t *) b_;
+
+   if (*a == *b) {
+      return 0;
+   }
+
+   return a < b ? -1 : 1;
+}
+
+static bool
+maybe_prune (void *item, void *ctx_)
+{
+   mongoc_cluster_node_t *cn = (mongoc_cluster_node_t *) item;
+   prune_ctx *ctx = (prune_ctx *) ctx_;
+   uint32_t server_id = cn->handshake_sd->id;
+
+   if (!bsearch (&server_id, ctx->server_ids->data, ctx->server_ids->len, sizeof (uint32_t), server_id_cmp)) {
+      mongoc_cluster_disconnect_node (ctx->cluster, server_id);
+   }
+   return true;
+}
+
+void
+mongoc_cluster_prune (mongoc_cluster_t *cluster, mongoc_array_t *known_server_ids)
+{
+   bool needs_prune = false;
+   // Do a fast initial check to see if a prune is needed.
+   size_t idx1 = 0;
+   size_t idx2 = 0;
+   for (; idx1 < cluster->nodes->items_len; idx1++) {
+      // Compare both sorted lists in order. `cluster->nodes` may be a smaller list if not all servers were used.
+      mongoc_set_item_t *cn = &cluster->nodes->items[idx1];
+      bool found = false;
+      for (; idx2 < known_server_ids->len; idx2++) {
+         uint32_t last_known = _mongoc_array_index (known_server_ids, uint32_t, idx2);
+         if (cn->id == last_known) {
+            found = true;
+            break;
+         }
+      }
+      if (!found) {
+         // A server in the client's pool is not in the last known server ids. Prune it.
+         needs_prune = true;
+      }
+   }
+
+   if (!needs_prune) {
+      return;
+   }
+
+   prune_ctx ctx = {.cluster = cluster, .server_ids = known_server_ids};
+   mongoc_set_for_each (cluster->nodes, maybe_prune, &ctx);
+}
