@@ -473,6 +473,36 @@ mongoc_client_pool_push (mongoc_client_pool_t *pool, mongoc_client_t *client)
          }
       }
 
+      // Always prune incoming client.
+      {
+         mongoc_cluster_t *cluster = &client->cluster;
+         bool needs_prune = false;
+
+         size_t j = 0;
+         for (size_t i = 0; i < cluster->nodes->items_len; i++) {
+            mongoc_set_item_t *cn = &cluster->nodes->items[i];
+            bool found = false;
+            for (; j < pool->last_known_serverids.len; j++) {
+               uint32_t last_known = _mongoc_array_index (&pool->last_known_serverids, uint32_t, j);
+               if (cn->id == last_known) {
+                  found = true;
+                  break;
+               }
+            }
+            if (!found) {
+               // A server in the client's pool is not in the last known server ids. Prune it.
+               needs_prune = true;
+            }
+         }
+
+         if (needs_prune) {
+            printf ("Client being pushed needs to be pruned\n");
+            check_if_removed_ctx ctx = {.cluster = cluster, .td = td.ptr};
+            mongoc_set_for_each (cluster->nodes, check_if_removed, &ctx);
+            mc_tpld_drop_ref (&td);
+         }
+      }
+
       mc_tpld_drop_ref (&td);
    }
 
