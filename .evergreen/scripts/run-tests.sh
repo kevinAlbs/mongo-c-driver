@@ -247,6 +247,8 @@ if [[ "${ASAN}" == "on" ]]; then
   ld_preload="$(bypass_dlclose):${ld_preload}"
 fi
 
+export MONGOC_ONLY_PRUNE_ON_CHANGE=ON
+
 case "${OSTYPE}" in
 cygwin)
   export PATH

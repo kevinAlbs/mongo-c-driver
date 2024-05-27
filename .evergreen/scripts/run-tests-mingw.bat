@@ -14,4 +14,5 @@ md C:\mongo-c-driver\bin
 copy /Y libmongoc-1.0.dll C:\mongo-c-driver\bin
 copy /Y src\libbson\libbson-1.0.dll C:\mongo-c-driver\bin
 
+export MONGOC_ONLY_PRUNE_ON_CHANGE=ON
 .\src\libmongoc\test-libmongoc.exe --no-fork -d -F test-results.json --skip-tests .evergreen\etc\skip-tests.txt
