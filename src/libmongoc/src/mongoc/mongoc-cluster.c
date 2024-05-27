@@ -3803,8 +3803,9 @@ mongoc_cluster_prune (mongoc_cluster_t *cluster, mongoc_array_t *known_server_id
          }
       }
       if (!found) {
-         // A server in the client's pool is not in the last known server ids. Prune it.
+         // A server in the cluster is not in the last known server ids. Prune it.
          needs_prune = true;
+         break;
       }
    }
 
