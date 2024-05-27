@@ -1250,7 +1250,9 @@ int32_t
 get_current_connection_count (const char *host_and_port)
 {
    char *uri_str = bson_strdup_printf ("mongodb://%s\n", host_and_port);
-   mongoc_client_t *client = mongoc_client_new (uri_str);
+   char *uri_str_with_auth = test_framework_add_user_password_from_env (uri_str);
+   mongoc_client_t *client = mongoc_client_new (uri_str_with_auth);
+   test_framework_set_ssl_opts (client);
    bson_t *cmd = BCON_NEW ("serverStatus", BCON_INT32 (1));
    bson_t reply;
    bson_error_t error;
@@ -1271,6 +1273,7 @@ get_current_connection_count (const char *host_and_port)
    bson_destroy (&reply);
    bson_destroy (cmd);
    mongoc_client_destroy (client);
+   bson_free (uri_str_with_auth);
    bson_free (uri_str);
    return conns;
 }
