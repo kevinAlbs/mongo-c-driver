@@ -271,9 +271,6 @@ mcd_rpc_message_decompress (mcd_rpc_message *rpc, void **data, size_t *data_len)
 bool
 mcd_rpc_message_decompress_if_necessary (mcd_rpc_message *rpc, void **data, size_t *data_len);
 
-void
-mongoc_cluster_prune (mongoc_cluster_t *cluster, mongoc_array_t *known_server_ids);
-
 BSON_END_DECLS
 
 
