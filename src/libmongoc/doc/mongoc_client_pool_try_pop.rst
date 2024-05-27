@@ -14,6 +14,10 @@ Synopsis
 
 This function is identical to :symbol:`mongoc_client_pool_pop()` except it will return ``NULL`` instead of blocking for a client to become available.
 
+.. note::
+
+   Return the returned :symbol:`mongoc_client_t` to the pool quickly to encourage reuse of clients among threads.
+
 Parameters
 ----------
 
