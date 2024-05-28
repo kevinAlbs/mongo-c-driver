@@ -1059,11 +1059,12 @@ _mock_rr_resolver_prose_test_12 (const char *service,
    BSON_ASSERT_PARAM (error);
 
    if (rr_type == MONGOC_RR_SRV) {
+      const size_t count = _mongoc_host_list_length (rr_data->hosts);
+      BSON_ASSERT (bson_in_range_unsigned (uint32_t, count));
+
       rr_data->hosts = MAKE_HOSTS ("localhost.test.build.10gen.cc:27017",
                                    "localhost.test.build.10gen.cc:27019",
                                    "localhost.test.build.10gen.cc:27020");
-      const size_t count = _mongoc_host_list_length (rr_data->hosts);
-      BSON_ASSERT (bson_in_range_unsigned (uint32_t, count));
       rr_data->count = (uint32_t) count;
       rr_data->min_ttl = 0u;
       rr_data->txt_record_opts = NULL;
