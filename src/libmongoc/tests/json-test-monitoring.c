@@ -554,6 +554,10 @@ check_json_apm_events (json_test_ctx_t *ctx, const bson_t *expectations)
          apm_match_visitor_ctx_reset (&apm_match_visitor_ctx);
          bson_destroy (&actual);
 
+         if (skip_cse_list_collections (&actual)) {
+            continue;
+         }
+
          if (matched) {
             break;
          }
@@ -561,10 +565,6 @@ check_json_apm_events (json_test_ctx_t *ctx, const bson_t *expectations)
          if (allow_subset) {
             /* if we allow matching only a subset of actual events, skip
              * non-matching ones */
-            continue;
-         }
-
-         if (skip_cse_list_collections (&actual)) {
             continue;
          }
 
