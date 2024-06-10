@@ -74,6 +74,7 @@ _mongoc_hex_md5 (const char *input)
    mcommon_md5_finish (&md5, digest);
 
    for (i = 0; i < sizeof digest; i++) {
+      // Assert no truncation occurred. Destination is expected to fit all input.
       bson_snprintf (&digest_str[i * 2], 3, "%02x", digest[i]);
    }
    digest_str[sizeof digest_str - 1] = '\0';
@@ -1008,6 +1009,7 @@ bin_to_hex (const uint8_t *bin, uint32_t len)
    char *out = bson_malloc0 (2u * len + 1u);
 
    for (uint32_t i = 0u; i < len; i++) {
+      // Expect no truncation.
       bson_snprintf (out + (2u * i), 3, "%02x", bin[i]);
    }
 

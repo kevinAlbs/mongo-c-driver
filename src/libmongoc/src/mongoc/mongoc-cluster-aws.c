@@ -354,6 +354,7 @@ generate_AWS_ROLE_SESSION_NAME (bson_error_t *error)
 
    size_t i;
    for (i = 0; i < NUM_BYTES; i++) {
+      // Assert no truncation occurred. Destination is expected to fit all input.
       bson_snprintf (out + (2 * i), 3, "%02x", data[i]);
    }
    out[NUM_BYTES * 2] = '\0';

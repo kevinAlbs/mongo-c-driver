@@ -106,9 +106,11 @@ mongoc_gridfs_bucket_new (mongoc_database_t *db,
 
    bucket = (mongoc_gridfs_bucket_t *) bson_malloc0 (sizeof *bucket);
 
+   // Return error if truncation occured.
    bson_snprintf (buf, sizeof (buf), "%s.chunks", gridfs_opts.bucketName);
    bucket->chunks = mongoc_database_get_collection (db, buf);
 
+   // Return error if truncation occured.
    bson_snprintf (buf, sizeof (buf), "%s.files", gridfs_opts.bucketName);
    bucket->files = mongoc_database_get_collection (db, buf);
 

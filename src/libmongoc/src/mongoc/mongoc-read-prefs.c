@@ -85,6 +85,8 @@ mongoc_read_prefs_add_tag (mongoc_read_prefs_t *read_prefs, const bson_t *tag)
    BSON_ASSERT (read_prefs);
 
    key = bson_count_keys (&read_prefs->tags);
+   // Assert no truncation occurred.
+   // Truncation would be harmful (would not respect user input). Cannot return error.
    bson_snprintf (str, sizeof str, "%d", key);
 
    if (tag) {

@@ -116,9 +116,11 @@ _mongoc_gridfs_new (mongoc_client_t *client, const char *db, const char *prefix,
 
    gridfs->client = client;
 
+   // Return error if truncation occured.
    bson_snprintf (buf, sizeof (buf), "%s.chunks", prefix);
    gridfs->chunks = mongoc_client_get_collection (client, db, buf);
 
+   // Return error if truncation occured.
    bson_snprintf (buf, sizeof (buf), "%s.files", prefix);
    gridfs->files = mongoc_client_get_collection (client, db, buf);
 

@@ -269,6 +269,7 @@ bson_decimal128_to_string (const bson_decimal128_t *dec, /* IN  */
       }
       /* Exponent */
       *(str_out++) = 'E';
+      // Truncation is OK. Assert no error occurred.
       bson_snprintf (str_out, 6, "%+d", scientific_exponent);
    } else {
       /* Regular format with no decimal place */

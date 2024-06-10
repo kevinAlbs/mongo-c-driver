@@ -850,6 +850,8 @@ mongoc_topology_scanner_node_setup_tcp (mongoc_topology_scanner_node_t *node, bs
    }
 
    if (!node->dns_results) {
+      // Assert no truncation occurred.
+      // Expect UINT16 string to fit in 8 characters.
       bson_snprintf (portstr, sizeof portstr, "%hu", host->port);
 
       memset (&hints, 0, sizeof hints);
@@ -910,6 +912,7 @@ mongoc_topology_scanner_node_connect_unix (mongoc_topology_scanner_node_t *node,
 
    memset (&saddr, 0, sizeof saddr);
    saddr.sun_family = AF_UNIX;
+   // Return error if truncation occured.
    bson_snprintf (saddr.sun_path, sizeof saddr.sun_path - 1, "%s", host->host);
 
    sock = mongoc_socket_new (AF_UNIX, SOCK_STREAM, 0);

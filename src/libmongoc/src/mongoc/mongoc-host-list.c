@@ -43,6 +43,7 @@ _mongoc_host_list_push (const char *host, uint16_t port, int family, mongoc_host
    h = bson_malloc0 (sizeof (mongoc_host_list_t));
    bson_strncpy (h->host, host, sizeof h->host);
    h->port = port;
+   //  Move `_mongoc_host_list_push` to test file. `_mongoc_host_list_push` is only used by tests.
    bson_snprintf (h->host_and_port, sizeof h->host_and_port, "%s:%hu", host, port);
 
    h->family = family;

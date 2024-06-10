@@ -618,6 +618,8 @@ mongoc_client_connect_tcp (int32_t connecttimeoutms, const mongoc_host_list_t *h
    BSON_ASSERT (connecttimeoutms);
    BSON_ASSERT (host);
 
+   // Assert no truncation occurred.
+   // UINT16_MAX is representable in 5 characters. Add 1 for trailing NULL. `portstr` has capacity 8.
    bson_snprintf (portstr, sizeof portstr, "%hu", host->port);
 
    memset (&hints, 0, sizeof hints);
@@ -712,6 +714,7 @@ mongoc_client_connect_unix (const mongoc_host_list_t *host, bson_error_t *error)
 
    memset (&saddr, 0, sizeof saddr);
    saddr.sun_family = AF_UNIX;
+   // TODO: check return value and return error if truncation occurs.
    bson_snprintf (saddr.sun_path, sizeof saddr.sun_path - 1, "%s", host->host);
 
    sock = mongoc_socket_new (AF_UNIX, SOCK_STREAM, 0);
