@@ -1028,15 +1028,16 @@ test_gridfs_bucket_opts (void)
 
    /* check validation of long bucket names */
    bucket_name = bson_malloc0 (128);
-   memset (bucket_name, 'a', 128 - strlen ("chunks"));
+   memset (bucket_name, 'a', 128 - strlen (".chunks"));
    opts = BCON_NEW ("bucketName", bucket_name);
    gridfs = mongoc_gridfs_bucket_new (db, opts, NULL, &error);
+   ASSERT (!gridfs);
    ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "must have fewer");
    bson_destroy (opts);
    mongoc_gridfs_bucket_destroy (gridfs);
 
    /* one character shorter should be okay though. */
-   *(bucket_name + ((int) (128 - strlen ("chunks") - 1))) = '\0';
+   *(bucket_name + ((int) (128 - strlen (".chunks") - 1))) = '\0';
    opts = BCON_NEW ("bucketName", bucket_name);
    gridfs = mongoc_gridfs_bucket_new (db, opts, NULL, &error);
    ASSERT_OR_PRINT (gridfs, error);
