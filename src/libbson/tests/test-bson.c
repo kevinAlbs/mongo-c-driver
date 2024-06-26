@@ -3188,6 +3188,26 @@ test_bson_array_builder (void)
    }
 }
 
+static char *
+generate_payload (size_t size)
+{
+   char *payload = bson_malloc (size);
+   memset (payload, 's', size - 1);
+   payload[size - 1] = '\0';
+   return payload;
+}
+
+static void
+test_bson_large_append (void)
+{
+   char *payload = generate_payload ((size_t) UINT_MAX);
+   bson_t *b = bson_new ();
+   bool ok = BSON_APPEND_UTF8 (b, "iamkey", payload);
+   BSON_ASSERT (!ok);
+   bson_destroy (b);
+   bson_free (payload);
+}
+
 void
 test_bson_install (TestSuite *suite)
 {
@@ -3270,4 +3290,5 @@ test_bson_install (TestSuite *suite)
    TestSuite_Add (suite, "/bson/with_duplicate_keys", test_bson_with_duplicate_keys);
    TestSuite_Add (suite, "/bson/uint32_to_string", test_bson_uint32_to_string);
    TestSuite_Add (suite, "/bson/array_builder", test_bson_array_builder);
+   TestSuite_Add (suite, "/bson/large_append", test_bson_large_append);
 }
