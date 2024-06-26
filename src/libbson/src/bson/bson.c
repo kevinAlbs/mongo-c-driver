@@ -323,8 +323,13 @@ _bson_append_va (bson_t *bson,              /* IN */
    data_len = first_len;
 
    buf = _bson_data (bson) + bson->len - 1;
-
+   // Track running sum of bytes written in a uint64_t to prevent possible overflow.
+   uint64_t n_bytes_sum = 0;
    do {
+      n_bytes_sum += data_len;
+      if (BSON_UNLIKELY (bson_cmp_greater_uu (n_bytes_sum, n_bytes))) {
+         return false;
+      }
       n_pairs--;
       /* data may be NULL if data_len is 0. memcpy is not safe to call with
        * NULL. */
