@@ -932,6 +932,15 @@ _mongoc_topology_do_blocking_scan (mongoc_topology_t *topology, bson_error_t *er
    BSON_ASSERT (topology->single_threaded);
    _mongoc_handshake_freeze ();
 
+#ifdef MONGOC_ENABLE_SSL_OPENSSL
+   if (topology->scanner->ssl_opts) {
+      // SSL was configured. Create an OpenSSL context to share if not already created.
+      if (!topology->scanner->openssl_ctx) {
+         topology->scanner->openssl_ctx = _mongoc_openssl_ctx_new (topology->scanner->ssl_opts);
+      }
+   }
+#endif
+
    mongoc_topology_scan_once (topology, true /* obey cooldown */);
    mongoc_topology_scanner_get_error (topology->scanner, error);
 }
