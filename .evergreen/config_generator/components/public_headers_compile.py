@@ -75,13 +75,13 @@ def tasks():
         for std in stds:
             with_std = {'C_STD_VERSION': std}
 
-            task_name = f'public-headers-{std}-{distro_str}-compile'
+            task_name = f'public-headers-c{std}-{distro_str}-compile'
 
             res.append(
                 Task(
                     name=task_name,
                     run_on=distro.name,
-                    tags=tags + [f'public-headers{std}'],
+                    tags=tags + [f'public-headers-c{std}'],
                     commands=[
                         FindCMakeLatest.call(),
                         PublicHeadersCompile.call(vars=compile_vars | with_std)
