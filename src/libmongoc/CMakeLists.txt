@@ -1311,6 +1311,15 @@ set (MONGOC_HEADER_INSTALL_DIR
    "${CMAKE_INSTALL_INCLUDEDIR}/libmongoc-${MONGOC_API_VERSION}"
 )
 
+add_executable(test-public-headers EXCLUDE_FROM_ALL ${PROJECT_SOURCE_DIR}/tests/test-public-header-warnings.c)
+target_link_libraries(test-public-headers PRIVATE mongoc_static)
+target_compile_options(test-public-headers PRIVATE
+  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Werror=all>
+  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Werror=extra>
+  $<$<C_COMPILER_ID:MSVC>:/W3>
+  $<$<C_COMPILER_ID:MSVC>:/WX>
+)
+
 install (
    TARGETS ${TARGETS_TO_INSTALL}
    EXPORT mongoc-targets
