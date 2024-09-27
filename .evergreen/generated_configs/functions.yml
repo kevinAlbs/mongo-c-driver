@@ -313,6 +313,16 @@ functions:
                     echo "Cannot append kerberos.realm to /etc/krb5.conf; skipping." 1>&2
                 fi
             fi
+  public-headers-compile:
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: mongoc
+        add_expansions_to_env: true
+        args:
+          - -c
+          - .evergreen/scripts/compile-public-headers.sh
   restore-instance-profile:
     - command: subprocess.exec
       params:

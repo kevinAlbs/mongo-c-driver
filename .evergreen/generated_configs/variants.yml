@@ -116,6 +116,10 @@ buildvariants:
     display_name: openssl-static-matrix
     tasks:
       - name: .openssl-static-matrix
+  - name: public-headers-matrix
+    display_name: public-headers-matrix
+    tasks:
+      - name: .public-headers-matrix
   - name: sanitizers-matrix-asan
     display_name: sanitizers-matrix-asan
     expansions:

@@ -2966,6 +2966,143 @@ tasks:
       - func: openssl-static-compile
         vars:
           CC: gcc
+  - name: public-headers-11-debian10-clang-compile
+    run_on: debian10-large
+    tags: [public-headers-matrix, debian10, clang, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: clang
+          C_STD_VERSION: 11
+  - name: public-headers-11-debian10-gcc-compile
+    run_on: debian10-large
+    tags: [public-headers-matrix, debian10, gcc, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: gcc
+          C_STD_VERSION: 11
+  - name: public-headers-11-debian11-clang-compile
+    run_on: debian11-large
+    tags: [public-headers-matrix, debian11, clang, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: clang
+          C_STD_VERSION: 11
+  - name: public-headers-11-debian11-gcc-compile
+    run_on: debian11-large
+    tags: [public-headers-matrix, debian11, gcc, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: gcc
+          C_STD_VERSION: 11
+  - name: public-headers-11-debian92-clang-compile
+    run_on: debian92-large
+    tags: [public-headers-matrix, debian92, clang, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: clang
+          C_STD_VERSION: 11
+  - name: public-headers-11-ubuntu1604-clang-compile
+    run_on: ubuntu1604-large
+    tags: [public-headers-matrix, ubuntu1604, clang, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: clang
+          C_STD_VERSION: 11
+  - name: public-headers-11-ubuntu1604-clang-i686-compile
+    run_on: ubuntu1604-large
+    tags: [public-headers-matrix, ubuntu1604, clang, compile, i686, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: clang
+          C_STD_VERSION: 11
+          MARCH: i686
+  - name: public-headers-11-ubuntu1804-clang-i686-compile
+    run_on: ubuntu1804-large
+    tags: [public-headers-matrix, ubuntu1804, clang, compile, i686, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: clang
+          C_STD_VERSION: 11
+          MARCH: i686
+  - name: public-headers-11-ubuntu1804-gcc-compile
+    run_on: ubuntu1804-large
+    tags: [public-headers-matrix, ubuntu1804, gcc, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: gcc
+          C_STD_VERSION: 11
+  - name: public-headers-11-ubuntu2004-clang-compile
+    run_on: ubuntu2004-large
+    tags: [public-headers-matrix, ubuntu2004, clang, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: clang
+          C_STD_VERSION: 11
+  - name: public-headers-11-ubuntu2004-gcc-compile
+    run_on: ubuntu2004-large
+    tags: [public-headers-matrix, ubuntu2004, gcc, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: gcc
+          C_STD_VERSION: 11
+  - name: public-headers-11-windows-2019-vs2017-x64-compile
+    run_on: windows-vsCurrent-large
+    tags: [public-headers-matrix, windows-vsCurrent, vs2017x64, compile, public-headers11]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: Visual Studio 15 2017 Win64
+          C_STD_VERSION: 11
+  - name: public-headers-17-debian10-gcc-compile
+    run_on: debian10-large
+    tags: [public-headers-matrix, debian10, gcc, compile, public-headers17]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: gcc
+          C_STD_VERSION: 17
+  - name: public-headers-17-debian11-gcc-compile
+    run_on: debian11-large
+    tags: [public-headers-matrix, debian11, gcc, compile, public-headers17]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: gcc
+          C_STD_VERSION: 17
+  - name: public-headers-17-windows-2019-vs2017-x64-compile
+    run_on: windows-vsCurrent-large
+    tags: [public-headers-matrix, windows-vsCurrent, vs2017x64, compile, public-headers17]
+    commands:
+      - func: find-cmake-latest
+      - func: public-headers-compile
+        vars:
+          CC: Visual Studio 15 2017 Win64
+          C_STD_VERSION: 17
   - name: sasl-cyrus-darwinssl-macos-1100-arm64-clang-compile
     run_on: macos-1100-arm64
     tags: [sasl-matrix-darwinssl, compile, macos-1100-arm64, clang, sasl-cyrus]
