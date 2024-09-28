@@ -49,7 +49,7 @@ for item in "$@"; do
     ! [[ ${PRINT_DEBUG_LOGS:-} = 1 ]] || echo "Import: [$item]" 1>&2
     _err=0
     # Detect self-import:
-    if printf '%s\0' "${BASH_SOURCE[@]}" | grep -qFxZ -- "$file"; then
+    if printf '%s\0' "${BASH_SOURCE[@]}" | grep -qFx -- "$file"; then
         echo "File '$file' imports itself transitively" 1>&2
         _err=1
     fi
