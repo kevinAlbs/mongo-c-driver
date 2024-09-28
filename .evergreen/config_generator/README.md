@@ -3,8 +3,14 @@
 The scripts in this directory are used to generate the Evergreen configuration
 files stored in `.evergreen/generated_configs/`.
 
-The easiest way to execute these scripts is using the Poetry to install the
-dependencies and then run the scripts.
+The easiest way to execute these scripts is using Earthly to regenerate:
+
+```bash
+./tools/earthly.sh +regen-evg
+```
+Earthly isolates the install into a container.
+
+Alternatively, use Poetry to install the dependencies and then run the scripts.
 
 **Note**: These scripts require Python 3.10 or newer.
 
