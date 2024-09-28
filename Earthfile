@@ -537,3 +537,19 @@ UBUNTU_ENV:
     DO --pass-args tools+ADD_TLS
     DO --pass-args tools+ADD_C_COMPILER
     DO +PREP_CMAKE
+
+# regen-evg:
+#   Regenerate evergreen config.
+regen-evg:
+    FROM alpine:3.19
+    RUN apk add python3 bash
+    COPY .evergreen/config_generator /s/.evergreen/config_generator
+    COPY .evergreen/legacy_config_generator /s/.evergreen/legacy_config_generator
+    COPY .evergreen/generated_configs /s/.evergreen/generated_configs
+    COPY tools /s/tools
+    COPY pyproject.toml /s
+    COPY poetry.lock /s
+    WORKDIR /s
+    RUN ./tools/poetry.sh install --with=dev
+    RUN ./tools/poetry.sh run mc-evg-generate 
+    SAVE ARTIFACT /s/.evergreen/generated_configs AS LOCAL .evergreen/generated_configs
