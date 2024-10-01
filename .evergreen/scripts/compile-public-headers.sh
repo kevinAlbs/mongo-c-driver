@@ -2,6 +2,7 @@
 
 set -o errexit
 set -o pipefail
+set -o xtrace
 
 # shellcheck source=.evergreen/scripts/env-var-utils.sh
 . "$(dirname "${BASH_SOURCE[0]}")/env-var-utils.sh"
@@ -23,6 +24,48 @@ declare install_dir="${mongoc_dir}/install-dir"
 
 declare -a configure_flags
 
+DIR=$(dirname $0)
+. $DIR/find-cmake-latest.sh
+CMAKE=$(find_cmake_latest)
+. $DIR/check-symlink.sh
+
+# Get the kernel name, lowercased
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+echo "OS: $OS"
+
+if [ "$OS" = "darwin" ]; then
+  SO=dylib
+  LIB_SO=libmongoc-1.0.0.dylib
+  LDD="otool -L"
+else
+  SO=so
+  LIB_SO=libmongoc-1.0.so.0
+  LDD=ldd
+fi
+
+SRCROOT=$(pwd)
+SCRATCH_DIR=$(pwd)/.scratch
+rm -rf "$SCRATCH_DIR"
+mkdir -p "$SCRATCH_DIR"
+
+cp -r -- "$SRCROOT"/* "$SCRATCH_DIR"
+
+BUILD_DIR=$SCRATCH_DIR/build-dir
+rm -rf $BUILD_DIR
+mkdir $BUILD_DIR
+
+INSTALL_DIR=$SCRATCH_DIR/install-dir
+rm -rf $INSTALL_DIR
+mkdir -p $INSTALL_DIR
+
+cd $BUILD_DIR
+
+SNAPPY_CMAKE_OPTION="-DENABLE_SNAPPY=OFF"
+SSL_CMAKE_OPTION="-DENABLE_SSL:BOOL=OFF"
+STATIC_CMAKE_OPTION="-DENABLE_STATIC=OFF"
+TESTS_CMAKE_OPTION="-DENABLE_TESTS=OFF"
+ZSTD_CMAKE_OPTION="-DENABLE_ZSTD=AUTO"
+
 configure_flags_append() {
   configure_flags+=("${@:?}")
 }
@@ -35,8 +78,9 @@ configure_flags_append_if_not_null() {
   fi
 }
 
-configure_flags_append "-DCMAKE_PREFIX_PATH=${install_dir}"
-configure_flags_append "-DENABLE_MAINTAINER_FLAGS=ON"
+configure_flags_append "-DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}"
+configure_flags_append "-DCMAKE_PREFIX_PATH=${INSTALL_DIR}/lib/cmake"
+configure_flags_append "$SSL_CMAKE_OPTION" "$SNAPPY_CMAKE_OPTION" "$STATIC_CMAKE_OPTION" "$TESTS_CMAKE_OPTION" "$ZSTD_CMAKE_OPTION"
 
 configure_flags_append_if_not_null C_STD_VERSION "-DCMAKE_C_STANDARD=${C_STD_VERSION}"
 
@@ -45,8 +89,6 @@ if [[ "${OSTYPE}" == darwin* && "${HOSTTYPE}" == "arm64" ]]; then
 fi
 
 if [[ "${CC}" =~ ^"Visual Studio " ]]; then
-  # Avoid C standard conformance issues with Windows 10 SDK headers.
-  # See: https://developercommunity.visualstudio.com/t/stdc17-generates-warning-compiling-windowsh/1249671#T-N1257345
   configure_flags_append "-DCMAKE_SYSTEM_VERSION=10.0.20348.0"
 fi
 
@@ -73,7 +115,6 @@ if [[ ! "${CC}" =~ ^"Visual Studio " ]]; then
 fi
 
 if [[ "${CC}" =~ ^"Visual Studio " ]]; then
-  # Even with -DCMAKE_SYSTEM_VERSION=10.0.20348.0, winbase.h emits conformance warnings.
   flags+=('/wd5105')
 fi
 
@@ -126,5 +167,10 @@ echo "configure_flags: ${configure_flags[*]}"
 . "${script_dir:?}/find-ccache.sh"
 find_ccache_and_export_vars "$(pwd)" || true
 
-"${cmake_binary}" "${configure_flags[@]}" .
-"${cmake_binary}" --build . --target test-public-headers
+echo "installing..."
+"${cmake_binary}" "${configure_flags[@]}" "$SCRATCH_DIR"
+"${cmake_binary}" --build . --parallel
+"${cmake_binary}" --build . --parallel --target install
+
+echo "compiling..."
+"${cmake_binary}" --build . --target test-public-headers -- VERBOSE=1

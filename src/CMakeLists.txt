@@ -25,8 +25,8 @@ add_executable(test-public-headers EXCLUDE_FROM_ALL ${CMAKE_CURRENT_SOURCE_DIR}/
 
 # Include directories for the public headers of both libbson and libmongoc
 target_include_directories(test-public-headers PRIVATE
-    ${CMAKE_BINARY_DIR}/../.install/include/libbson-1.0
-    ${CMAKE_BINARY_DIR}/../.install/include/libmongoc-1.0
+    ${CMAKE_BINARY_DIR}/../install-dir/include/libbson-1.0
+    ${CMAKE_BINARY_DIR}/../install-dir/include/libmongoc-1.0
 )
 
 target_compile_options(test-public-headers PRIVATE
