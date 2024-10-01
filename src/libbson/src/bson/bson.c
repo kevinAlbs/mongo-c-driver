@@ -1191,7 +1191,6 @@ bool
 bson_append_iter (bson_t *bson, const char *key, int key_length, const bson_iter_t *iter)
 {
    bool ret = false;
-   bool unused;
 
    BSON_ASSERT (bson);
    BSON_ASSERT (iter);

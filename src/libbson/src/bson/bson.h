@@ -207,6 +207,10 @@ bson_init_static (bson_t *b, const uint8_t *data, size_t length);
 BSON_EXPORT (void)
 bson_init (bson_t *b);
 
+inline void
+example (int unused)
+{
+}
 
 /**
  * bson_reinit:
