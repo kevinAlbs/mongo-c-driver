@@ -34,7 +34,7 @@ typedef struct {
    bool disable_endpoint_check;
    /* If reaching out to an OCSP responder requires TLS,
     * use the same TLS options that the user provided. */
-   mongoc_ssl_opt_t ssl_opts;
+   mongoc_tls_opt_t ssl_opts;
 } mongoc_openssl_ocsp_opt_t;
 
 void
@@ -56,7 +56,7 @@ typedef struct {
 MONGOC_EXPORT (mongoc_stream_t *)
 mongoc_stream_tls_openssl_new_with_context (mongoc_stream_t *base_stream,
                                             const char *host,
-                                            mongoc_ssl_opt_t *opt,
+                                            mongoc_tls_opt_t *opt,
                                             int client,
                                             SSL_CTX *ssl_ctx) BSON_GNUC_WARN_UNUSED_RESULT;
 #endif

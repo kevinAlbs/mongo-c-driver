@@ -37,7 +37,7 @@ BSON_BEGIN_DECLS
 bool
 _mongoc_openssl_check_peer_hostname (SSL *ssl, const char *host, bool allow_invalid_hostname);
 SSL_CTX *
-_mongoc_openssl_ctx_new (mongoc_ssl_opt_t *opt);
+_mongoc_openssl_ctx_new (mongoc_tls_opt_t *opt);
 char *
 _mongoc_openssl_extract_subject (const char *filename, const char *passphrase);
 void

@@ -8,11 +8,11 @@ Synopsis
 
 .. code-block:: c
 
-  const mongoc_ssl_opt_t *
+  const mongoc_tls_opt_t *
   mongoc_ssl_opt_get_default (void);
 
 Returns
 -------
 
-Returns the default SSL options for the process. This should not be modified or freed.
+Returns the default TLS options for the process. This should not be modified or freed.
 

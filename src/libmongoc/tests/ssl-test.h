@@ -23,8 +23,8 @@ typedef struct ssl_test_result {
 } ssl_test_result_t;
 
 typedef struct ssl_test_data {
-   mongoc_ssl_opt_t *client;
-   mongoc_ssl_opt_t *server;
+   mongoc_tls_opt_t *client;
+   mongoc_tls_opt_t *server;
    ssl_test_behavior_t behavior;
    int64_t handshake_stall_ms;
    const char *host;
@@ -36,8 +36,8 @@ typedef struct ssl_test_data {
 } ssl_test_data_t;
 
 void
-ssl_test (mongoc_ssl_opt_t *client,
-          mongoc_ssl_opt_t *server,
+ssl_test (mongoc_tls_opt_t *client,
+          mongoc_tls_opt_t *server,
           const char *host,
           ssl_test_result_t *client_result,
           ssl_test_result_t *server_result);

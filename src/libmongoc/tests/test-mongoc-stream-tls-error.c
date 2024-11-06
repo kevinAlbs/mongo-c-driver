@@ -173,8 +173,8 @@ static BSON_THREAD_FUN (ssl_hangup_client, ptr)
 static void
 test_mongoc_tls_hangup (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
    ssl_test_data_t data = {0};
@@ -287,8 +287,8 @@ static BSON_THREAD_FUN (handshake_stall_client, ptr)
 static void
 test_mongoc_tls_handshake_stall (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
    ssl_test_data_t data = {0};
@@ -357,7 +357,7 @@ test_mongoc_tls_handshake_stall (void)
 static void
 test_mongoc_tls_load_files (void)
 {
-   mongoc_ssl_opt_t opt = {0};
+   mongoc_tls_opt_t opt = {0};
    mongoc_stream_t *base;
    mongoc_stream_t *tls_stream = NULL;
 

@@ -127,7 +127,7 @@ typedef struct mongoc_topology_scanner {
    bson_error_t error;
 
 #ifdef MONGOC_ENABLE_SSL
-   mongoc_ssl_opt_t *ssl_opts;
+   mongoc_tls_opt_t *ssl_opts;
 #endif
 
 #if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
@@ -204,7 +204,7 @@ mongoc_topology_scanner_get_node (mongoc_topology_scanner_t *ts, uint32_t id);
 void
 _mongoc_topology_scanner_add_speculative_authentication (bson_t *cmd,
                                                          const mongoc_uri_t *uri,
-                                                         const mongoc_ssl_opt_t *ssl_opts,
+                                                         const mongoc_tls_opt_t *ssl_opts,
                                                          mongoc_scram_t *scram /* OUT */);
 
 void
@@ -241,7 +241,7 @@ _mongoc_topology_scanner_set_dns_cache_timeout (mongoc_topology_scanner_t *ts, i
 
 #ifdef MONGOC_ENABLE_SSL
 void
-mongoc_topology_scanner_set_ssl_opts (mongoc_topology_scanner_t *ts, mongoc_ssl_opt_t *opts);
+mongoc_topology_scanner_set_ssl_opts (mongoc_topology_scanner_t *ts, mongoc_tls_opt_t *opts);
 #endif
 
 bool

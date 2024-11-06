@@ -140,7 +140,7 @@ _send_http_request (bool use_tls,
    mongoc_http_response_t res;
    const int socket_timeout_ms = 10000;
    bool ret;
-   mongoc_ssl_opt_t ssl_opt = {0};
+   mongoc_tls_opt_t ssl_opt = {0};
 
    *http_response_body = NULL;
    *http_response_headers = NULL;

@@ -45,14 +45,14 @@
 #define MONGOC_SSL_DEFAULT_TRUST_DIR NULL
 #endif
 
-static mongoc_ssl_opt_t gMongocSslOptDefault = {
+static mongoc_tls_opt_t gMongocSslOptDefault = {
    NULL,
    NULL,
    MONGOC_SSL_DEFAULT_TRUST_FILE,
    MONGOC_SSL_DEFAULT_TRUST_DIR,
 };
 
-const mongoc_ssl_opt_t *
+const mongoc_tls_opt_t *
 mongoc_ssl_opt_get_default (void)
 {
    return &gMongocSslOptDefault;
@@ -97,7 +97,7 @@ retval = _mongoc_secure_channel_extract_subject (filename, passphrase);
 }
 
 void
-_mongoc_ssl_opts_from_uri (mongoc_ssl_opt_t *ssl_opt, _mongoc_internal_tls_opts_t *internal, mongoc_uri_t *uri)
+_mongoc_ssl_opts_from_uri (mongoc_tls_opt_t *ssl_opt, _mongoc_internal_tls_opts_t *internal, mongoc_uri_t *uri)
 {
    bool insecure = mongoc_uri_get_option_as_bool (uri, MONGOC_URI_TLSINSECURE, false);
 
@@ -115,7 +115,7 @@ _mongoc_ssl_opts_from_uri (mongoc_ssl_opt_t *ssl_opt, _mongoc_internal_tls_opts_
 }
 
 void
-_mongoc_ssl_opts_copy_to (const mongoc_ssl_opt_t *src, mongoc_ssl_opt_t *dst, bool copy_internal)
+_mongoc_ssl_opts_copy_to (const mongoc_tls_opt_t *src, mongoc_tls_opt_t *dst, bool copy_internal)
 {
    BSON_ASSERT (src);
    BSON_ASSERT (dst);
@@ -137,7 +137,7 @@ _mongoc_ssl_opts_copy_to (const mongoc_ssl_opt_t *src, mongoc_ssl_opt_t *dst, bo
 }
 
 void
-_mongoc_ssl_opts_cleanup (mongoc_ssl_opt_t *opt, bool free_internal)
+_mongoc_ssl_opts_cleanup (mongoc_tls_opt_t *opt, bool free_internal)
 {
    bson_free ((char *) opt->pem_file);
    bson_free ((char *) opt->pem_pwd);
@@ -150,7 +150,7 @@ _mongoc_ssl_opts_cleanup (mongoc_ssl_opt_t *opt, bool free_internal)
 }
 
 bool
-_mongoc_ssl_opts_disable_certificate_revocation_check (const mongoc_ssl_opt_t *ssl_opt)
+_mongoc_ssl_opts_disable_certificate_revocation_check (const mongoc_tls_opt_t *ssl_opt)
 {
    if (!ssl_opt->internal) {
       return false;
@@ -159,7 +159,7 @@ _mongoc_ssl_opts_disable_certificate_revocation_check (const mongoc_ssl_opt_t *s
 }
 
 bool
-_mongoc_ssl_opts_disable_ocsp_endpoint_check (const mongoc_ssl_opt_t *ssl_opt)
+_mongoc_ssl_opts_disable_ocsp_endpoint_check (const mongoc_tls_opt_t *ssl_opt)
 {
    if (!ssl_opt->internal) {
       return false;
@@ -168,7 +168,7 @@ _mongoc_ssl_opts_disable_ocsp_endpoint_check (const mongoc_ssl_opt_t *ssl_opt)
 }
 
 bool
-_mongoc_ssl_opts_from_bson (mongoc_ssl_opt_t *ssl_opt, const bson_t *bson, mcommon_string_t *errmsg)
+_mongoc_ssl_opts_from_bson (mongoc_tls_opt_t *ssl_opt, const bson_t *bson, mcommon_string_t *errmsg)
 {
    bson_iter_t iter;
 

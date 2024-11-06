@@ -55,8 +55,8 @@ _test_topology_scanner (bool with_ssl)
    int finished = NSERVERS * 3;
 
 #ifdef MONGOC_ENABLE_SSL
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
 #endif
 
    topology_scanner = mongoc_topology_scanner_new (NULL, NULL, &test_topology_scanner_helper, &finished, TIMEOUT);

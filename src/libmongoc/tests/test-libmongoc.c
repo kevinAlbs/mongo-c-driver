@@ -59,7 +59,7 @@ static bson_mutex_t captured_logs_mutex;
 static mongoc_array_t captured_logs;
 static bool capturing_logs;
 #ifdef MONGOC_ENABLE_SSL
-static mongoc_ssl_opt_t gSSLOptions;
+static mongoc_tls_opt_t gSSLOptions;
 #endif
 
 
@@ -1582,7 +1582,7 @@ test_framework_client_new_from_uri (const mongoc_uri_t *uri, const mongoc_server
  *
  *--------------------------------------------------------------------------
  */
-const mongoc_ssl_opt_t *
+const mongoc_tls_opt_t *
 test_framework_get_ssl_opts (void)
 {
    return &gSSLOptions;

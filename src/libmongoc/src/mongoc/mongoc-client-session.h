@@ -41,7 +41,7 @@ typedef enum {
 } mongoc_transaction_state_t;
 
 /* these options types are named "opt_t" but their functions are named with
- * "opts", for consistency with the older mongoc_ssl_opt_t */
+ * "opts", for consistency with the older mongoc_tls_opt_t */
 MONGOC_EXPORT (mongoc_transaction_opt_t *)
 mongoc_transaction_opts_new (void) BSON_GNUC_WARN_UNUSED_RESULT;
 

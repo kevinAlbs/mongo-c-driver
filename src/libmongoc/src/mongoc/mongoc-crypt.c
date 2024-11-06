@@ -37,7 +37,7 @@
 #include <common-cmp-private.h>
 
 // `mcd_mapof_kmsid_to_tlsopts` maps a KMS ID (e.g. `aws` or `aws:myname`) to a
-// `mongoc_ssl_opt_t`. The acryonym TLS is preferred over SSL for
+// `mongoc_tls_opt_t`. The acryonym TLS is preferred over SSL for
 // consistency with the CSE and URI specifications.
 typedef struct {
    mongoc_array_t entries;
@@ -45,7 +45,7 @@ typedef struct {
 
 typedef struct {
    char *kmsid;
-   mongoc_ssl_opt_t tlsopts;
+   mongoc_tls_opt_t tlsopts;
 } mcd_mapof_kmsid_to_tlsopts_entry;
 
 mcd_mapof_kmsid_to_tlsopts *
@@ -75,7 +75,7 @@ mcd_mapof_kmsid_to_tlsopts_destroy (mcd_mapof_kmsid_to_tlsopts *k2t)
 // `kmsid` and `tlsopts` are copied.
 // No checking is done to prohibit duplicate entries.
 void
-mcd_mapof_kmsid_to_tlsopts_insert (mcd_mapof_kmsid_to_tlsopts *k2t, const char *kmsid, const mongoc_ssl_opt_t *tlsopts)
+mcd_mapof_kmsid_to_tlsopts_insert (mcd_mapof_kmsid_to_tlsopts *k2t, const char *kmsid, const mongoc_tls_opt_t *tlsopts)
 {
    BSON_ASSERT_PARAM (k2t);
    BSON_ASSERT_PARAM (kmsid);
@@ -88,7 +88,7 @@ mcd_mapof_kmsid_to_tlsopts_insert (mcd_mapof_kmsid_to_tlsopts *k2t, const char *
 
 // `mcd_mapof_kmsid_to_tlsopts_get` returns the TLS options for a KMS ID, or
 // NULL.
-const mongoc_ssl_opt_t *
+const mongoc_tls_opt_t *
 mcd_mapof_kmsid_to_tlsopts_get (const mcd_mapof_kmsid_to_tlsopts *k2t, const char *kmsid)
 {
    BSON_ASSERT_PARAM (k2t);
@@ -112,10 +112,10 @@ mcd_mapof_kmsid_to_tlsopts_has (const mcd_mapof_kmsid_to_tlsopts *k2t, const cha
 
 struct __mongoc_crypt_t {
    mongocrypt_t *handle;
-   mongoc_ssl_opt_t kmip_tls_opt;
-   mongoc_ssl_opt_t aws_tls_opt;
-   mongoc_ssl_opt_t azure_tls_opt;
-   mongoc_ssl_opt_t gcp_tls_opt;
+   mongoc_tls_opt_t kmip_tls_opt;
+   mongoc_tls_opt_t aws_tls_opt;
+   mongoc_tls_opt_t azure_tls_opt;
+   mongoc_tls_opt_t gcp_tls_opt;
    mcd_mapof_kmsid_to_tlsopts *kmsid_to_tlsopts;
 
    /// The kmsProviders that were provided by the user when encryption was
@@ -487,12 +487,12 @@ fail:
 }
 
 static mongoc_stream_t *
-_get_stream (const char *endpoint, int32_t connecttimeoutms, const mongoc_ssl_opt_t *ssl_opt, bson_error_t *error)
+_get_stream (const char *endpoint, int32_t connecttimeoutms, const mongoc_tls_opt_t *ssl_opt, bson_error_t *error)
 {
    mongoc_stream_t *base_stream = NULL;
    mongoc_stream_t *tls_stream = NULL;
    bool ret = false;
-   mongoc_ssl_opt_t ssl_opt_copy = {0};
+   mongoc_tls_opt_t ssl_opt_copy = {0};
    mongoc_host_list_t host;
 
    if (!_mongoc_host_list_from_string_with_err (&host, endpoint, error)) {
@@ -547,7 +547,7 @@ _state_need_kms (_state_machine_t *state_machine, bson_error_t *error)
 
    while ((kms_ctx = mongocrypt_ctx_next_kms_ctx (state_machine->ctx))) {
       mongoc_iovec_t iov;
-      const mongoc_ssl_opt_t *ssl_opt;
+      const mongoc_tls_opt_t *ssl_opt;
       const char *provider;
 
       provider = mongocrypt_kms_ctx_get_kms_provider (kms_ctx, NULL);
@@ -1132,7 +1132,7 @@ fail:
  * - @out_opt is always initialized.
  * Returns false and sets @error on error. */
 static bool
-_parse_one_tls_opts (bson_iter_t *iter, mongoc_ssl_opt_t *out_opt, bson_error_t *error)
+_parse_one_tls_opts (bson_iter_t *iter, mongoc_tls_opt_t *out_opt, bson_error_t *error)
 {
    bool ok = false;
    const char *kms_provider;
@@ -1144,7 +1144,7 @@ _parse_one_tls_opts (bson_iter_t *iter, mongoc_ssl_opt_t *out_opt, bson_error_t 
 
    errmsg = mcommon_string_new (NULL);
    kms_provider = bson_iter_key (iter);
-   memset (out_opt, 0, sizeof (mongoc_ssl_opt_t));
+   memset (out_opt, 0, sizeof (mongoc_tls_opt_t));
 
    if (!BSON_ITER_HOLDS_DOCUMENT (iter)) {
       bson_set_error (error,
@@ -1322,7 +1322,7 @@ _parse_all_tls_opts (_mongoc_crypt_t *crypt, const bson_t *tls_opts, bson_error_
             goto fail;
          }
 
-         mongoc_ssl_opt_t tlsopts = {0};
+         mongoc_tls_opt_t tlsopts = {0};
          if (!_parse_one_tls_opts (&iter, &tlsopts, error)) {
             _mongoc_ssl_opts_cleanup (&tlsopts, true /* free_internal */);
             goto fail;
@@ -1340,7 +1340,7 @@ _parse_all_tls_opts (_mongoc_crypt_t *crypt, const bson_t *tls_opts, bson_error_
       goto fail;
    }
 
-   /* Configure with default TLS options. The mongoc_ssl_opt_t returned by
+   /* Configure with default TLS options. The mongoc_tls_opt_t returned by
     * mongoc_ssl_opt_get_default may contain non-NULL fields if
     * MONGOC_SSL_DEFAULT_TRUST_FILE or MONGOC_SSL_DEFAULT_TRUST_DIR are defined.
     */

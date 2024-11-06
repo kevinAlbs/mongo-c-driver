@@ -101,7 +101,7 @@ bool
 _mongoc_http_send (const mongoc_http_request_t *req,
                    int timeout_ms,
                    bool use_tls,
-                   mongoc_ssl_opt_t *ssl_opts,
+                   mongoc_tls_opt_t *ssl_opts,
                    mongoc_http_response_t *res,
                    bson_error_t *error)
 {

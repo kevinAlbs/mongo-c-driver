@@ -233,7 +233,7 @@ _mongoc_cluster_create_server_stream (const mongoc_topology_description_t *td,
 
 bool
 _mongoc_cluster_get_auth_cmd_x509 (const mongoc_uri_t *uri,
-                                   const mongoc_ssl_opt_t *ssl_opts,
+                                   const mongoc_tls_opt_t *ssl_opts,
                                    bson_t *cmd /* OUT */,
                                    bson_error_t *error /* OUT */);
 

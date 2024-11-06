@@ -2478,7 +2478,7 @@ test_kms_tls_cert_valid (void *unused)
    bson_error_t error;
    mongoc_host_list_t host;
    mongoc_stream_t *base_stream;
-   mongoc_ssl_opt_t ssl_opts;
+   mongoc_tls_opt_t ssl_opts;
    mongoc_stream_t *tls_stream;
 
    char *tls_ca_file = test_framework_getenv_required ("MONGOC_TEST_CSFLE_TLS_CA_FILE");
@@ -3238,7 +3238,7 @@ static const char *failpoint_server_ip = "127.0.0.1";
 static const int failpoint_server_port = 9003;
 
 static void
-reset_failpoints (mongoc_ssl_opt_t *ssl_opts)
+reset_failpoints (mongoc_tls_opt_t *ssl_opts)
 {
    mongoc_http_request_t req;
    mongoc_http_response_t res;
@@ -3259,7 +3259,7 @@ reset_failpoints (mongoc_ssl_opt_t *ssl_opts)
 }
 
 static void
-set_retry_failpoint (mongoc_ssl_opt_t *ssl_opts, bool network, uint32_t count)
+set_retry_failpoint (mongoc_tls_opt_t *ssl_opts, bool network, uint32_t count)
 {
    mongoc_http_request_t req;
    mongoc_http_response_t res;
@@ -6302,7 +6302,7 @@ _test_retry_with_masterkey (const char *provider, bson_t *masterkey)
    mongoc_client_encryption_datakey_opts_t *dkopts;
    char *ca_file = test_framework_getenv_required ("MONGOC_TEST_CSFLE_TLS_CA_FILE");
    char *pem_file = test_framework_getenv_required ("MONGOC_TEST_CSFLE_TLS_CERTIFICATE_KEY_FILE");
-   mongoc_ssl_opt_t ssl_opts = {.ca_file = ca_file, .pem_file = pem_file};
+   mongoc_tls_opt_t ssl_opts = {.ca_file = ca_file, .pem_file = pem_file};
    bool res;
 
    bson_value_t to_encrypt = {.value_type = BSON_TYPE_INT32, .value.v_int32 = 123};

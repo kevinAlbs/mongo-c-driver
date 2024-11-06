@@ -42,7 +42,7 @@ struct _mongoc_stream_tls_t {
    mongoc_stream_t *base_stream; /* The underlying actual stream */
    void *ctx;                    /* TLS lib specific configuration or wrappers */
    int64_t timeout_msec;
-   mongoc_ssl_opt_t ssl_opts;
+   mongoc_tls_opt_t ssl_opts;
    bool (*handshake) (mongoc_stream_t *stream, const char *host, int *events /* OUT*/, bson_error_t *error);
 };
 
@@ -50,7 +50,7 @@ struct _mongoc_stream_tls_t {
 MONGOC_EXPORT (mongoc_stream_t *)
 mongoc_stream_tls_new_with_hostname_and_openssl_context (mongoc_stream_t *base_stream,
                                                          const char *host,
-                                                         mongoc_ssl_opt_t *opt,
+                                                         mongoc_tls_opt_t *opt,
                                                          int client,
                                                          SSL_CTX *ssl_ctx) BSON_GNUC_WARN_UNUSED_RESULT;
 #endif

@@ -188,7 +188,7 @@ mongoc_stream_tls_check_cert (mongoc_stream_t *stream, const char *host)
  */
 
 mongoc_stream_t *
-mongoc_stream_tls_new_with_hostname (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client)
+mongoc_stream_tls_new_with_hostname (mongoc_stream_t *base_stream, const char *host, mongoc_tls_opt_t *opt, int client)
 {
    BSON_ASSERT (base_stream);
 
@@ -249,7 +249,7 @@ mongoc_stream_tls_new_with_hostname (mongoc_stream_t *base_stream, const char *h
 
 mongoc_stream_t *
 mongoc_stream_tls_new_with_hostname_and_openssl_context (
-   mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, SSL_CTX *ssl_ctx)
+   mongoc_stream_t *base_stream, const char *host, mongoc_tls_opt_t *opt, int client, SSL_CTX *ssl_ctx)
 {
    BSON_ASSERT (base_stream);
 
@@ -271,7 +271,7 @@ mongoc_stream_tls_new_with_hostname_and_openssl_context (
 #endif
 
 mongoc_stream_t *
-mongoc_stream_tls_new (mongoc_stream_t *base_stream, mongoc_ssl_opt_t *opt, int client)
+mongoc_stream_tls_new (mongoc_stream_t *base_stream, mongoc_tls_opt_t *opt, int client)
 {
    return mongoc_stream_tls_new_with_hostname (base_stream, NULL, opt, client);
 }

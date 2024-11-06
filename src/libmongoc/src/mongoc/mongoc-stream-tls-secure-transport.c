@@ -611,7 +611,7 @@ _mongoc_stream_tls_secure_channel_should_retry (mongoc_stream_t *stream)
 mongoc_stream_t *
 mongoc_stream_tls_secure_transport_new (mongoc_stream_t *base_stream,
                                         const char *host,
-                                        mongoc_ssl_opt_t *opt,
+                                        mongoc_tls_opt_t *opt,
                                         int client)
 {
    mongoc_stream_tls_t *tls;
@@ -622,12 +622,12 @@ mongoc_stream_tls_secure_transport_new (mongoc_stream_t *base_stream,
    BSON_ASSERT (opt);
 
    if (opt->ca_dir) {
-      MONGOC_ERROR ("Setting mongoc_ssl_opt_t.ca_dir has no effect when built "
+      MONGOC_ERROR ("Setting mongoc_tls_opt_t.ca_dir has no effect when built "
                     "against Secure Transport");
       RETURN (NULL);
    }
    if (opt->crl_file) {
-      MONGOC_ERROR ("Setting mongoc_ssl_opt_t.crl_file has no effect when built "
+      MONGOC_ERROR ("Setting mongoc_tls_opt_t.crl_file has no effect when built "
                     "against Secure Transport");
       RETURN (NULL);
    }

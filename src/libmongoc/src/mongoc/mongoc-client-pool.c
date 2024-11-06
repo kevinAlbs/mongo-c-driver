@@ -48,7 +48,7 @@ struct _mongoc_client_pool_t {
    uint32_t size;
 #ifdef MONGOC_ENABLE_SSL
    bool ssl_opts_set;
-   mongoc_ssl_opt_t ssl_opts;
+   mongoc_tls_opt_t ssl_opts;
 #endif
    bool apm_callbacks_set;
    mongoc_apm_callbacks_t apm_callbacks;
@@ -64,7 +64,7 @@ struct _mongoc_client_pool_t {
 
 #ifdef MONGOC_ENABLE_SSL
 void
-mongoc_client_pool_set_ssl_opts (mongoc_client_pool_t *pool, const mongoc_ssl_opt_t *opts)
+mongoc_client_pool_set_ssl_opts (mongoc_client_pool_t *pool, const mongoc_tls_opt_t *opts)
 {
    BSON_ASSERT_PARAM (pool);
 
@@ -196,7 +196,7 @@ mongoc_client_pool_new_with_error (const mongoc_uri_t *uri, bson_error_t *error)
 
 #ifdef MONGOC_ENABLE_SSL
    if (mongoc_uri_get_tls (pool->uri)) {
-      mongoc_ssl_opt_t ssl_opt = {0};
+      mongoc_tls_opt_t ssl_opt = {0};
       _mongoc_internal_tls_opts_t internal_tls_opts = {0};
 
       _mongoc_ssl_opts_from_uri (&ssl_opt, &internal_tls_opts, pool->uri);

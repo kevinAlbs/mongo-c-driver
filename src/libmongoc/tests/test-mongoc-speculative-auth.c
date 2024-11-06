@@ -126,8 +126,8 @@ _test_mongoc_speculative_auth (bool pooled,
    mongoc_client_pool_t *pool = NULL;
    future_t *future;
 
-   mongoc_ssl_opt_t client_ssl_opts = {0};
-   mongoc_ssl_opt_t server_ssl_opts = {0};
+   mongoc_tls_opt_t client_ssl_opts = {0};
+   mongoc_tls_opt_t server_ssl_opts = {0};
    client_ssl_opts.ca_file = CERT_CA;
    client_ssl_opts.pem_file = CERT_CLIENT;
    server_ssl_opts.ca_file = CERT_CA;
@@ -368,7 +368,7 @@ test_mongoc_speculative_auth_request_x509_network_error (void)
    // Start mock server.
    mock_server_t *server;
    {
-      mongoc_ssl_opt_t server_ssl_opts = {0};
+      mongoc_tls_opt_t server_ssl_opts = {0};
       server_ssl_opts.ca_file = CERT_CA;
       server_ssl_opts.pem_file = CERT_SERVER;
       server = mock_server_new ();
@@ -387,7 +387,7 @@ test_mongoc_speculative_auth_request_x509_network_error (void)
    // Create single threaded client.
    mongoc_client_t *client;
    {
-      mongoc_ssl_opt_t client_ssl_opts = {0};
+      mongoc_tls_opt_t client_ssl_opts = {0};
       client_ssl_opts.ca_file = CERT_CA;
       client_ssl_opts.pem_file = CERT_CLIENT;
       client = test_framework_client_new_from_uri (uri, NULL);

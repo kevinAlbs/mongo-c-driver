@@ -60,7 +60,7 @@ struct _mock_server_t {
 
 #ifdef MONGOC_ENABLE_SSL
    bool ssl;
-   mongoc_ssl_opt_t ssl_opts;
+   mongoc_tls_opt_t ssl_opts;
 #endif
 
    mock_server_bind_opts_t bind_opts;
@@ -288,7 +288,7 @@ mock_server_down (void)
  *--------------------------------------------------------------------------
  */
 void
-mock_server_set_ssl_opts (mock_server_t *server, mongoc_ssl_opt_t *opts)
+mock_server_set_ssl_opts (mock_server_t *server, mongoc_tls_opt_t *opts)
 {
    bson_mutex_lock (&server->mutex);
    server->ssl = true;

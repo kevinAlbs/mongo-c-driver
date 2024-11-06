@@ -703,7 +703,7 @@ _mongoc_stream_tls_openssl_should_retry (mongoc_stream_t *stream)
 /* Creates a new mongoc_stream_tls_openssl_t with ssl_ctx. */
 static mongoc_stream_t *
 create_stream_with_ctx (
-   mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, SSL_CTX *ssl_ctx)
+   mongoc_stream_t *base_stream, const char *host, mongoc_tls_opt_t *opt, int client, SSL_CTX *ssl_ctx)
 {
    mongoc_stream_tls_t *tls;
    mongoc_stream_tls_openssl_t *openssl;
@@ -841,7 +841,7 @@ create_stream_with_ctx (
  */
 
 mongoc_stream_t *
-mongoc_stream_tls_openssl_new (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client)
+mongoc_stream_tls_openssl_new (mongoc_stream_t *base_stream, const char *host, mongoc_tls_opt_t *opt, int client)
 {
    SSL_CTX *ssl_ctx = _mongoc_openssl_ctx_new (opt);
 
@@ -883,7 +883,7 @@ mongoc_stream_tls_openssl_new (mongoc_stream_t *base_stream, const char *host, m
 
 mongoc_stream_t *
 mongoc_stream_tls_openssl_new_with_context (
-   mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, SSL_CTX *ssl_ctx)
+   mongoc_stream_t *base_stream, const char *host, mongoc_tls_opt_t *opt, int client, SSL_CTX *ssl_ctx)
 {
    // `ssl_ctx` may be NULL if creating the context failed. Return NULL to signal failure.
    if (!ssl_ctx) {

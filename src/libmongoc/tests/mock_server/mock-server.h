@@ -78,7 +78,7 @@ mock_server_auto_endsessions (mock_server_t *server);
 #ifdef MONGOC_ENABLE_SSL
 
 void
-mock_server_set_ssl_opts (mock_server_t *server, mongoc_ssl_opt_t *opts);
+mock_server_set_ssl_opts (mock_server_t *server, mongoc_tls_opt_t *opts);
 
 #endif
 

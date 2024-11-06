@@ -244,7 +244,7 @@ _test_dns_maybe_pooled (bson_t *test, bool pooled)
    mongoc_client_pool_t *pool = NULL;
    mongoc_client_t *client;
 #ifdef MONGOC_ENABLE_SSL
-   mongoc_ssl_opt_t ssl_opts;
+   mongoc_tls_opt_t ssl_opts;
 #endif
    bson_error_t error;
    bool r;
@@ -692,7 +692,7 @@ _prose_test_init_resource_single (const mongoc_uri_t *uri, _mongoc_rr_resolver_f
 
 #if defined(MONGOC_ENABLE_SSL)
    {
-      mongoc_ssl_opt_t ssl_opts = *test_framework_get_ssl_opts ();
+      mongoc_tls_opt_t ssl_opts = *test_framework_get_ssl_opts ();
       ssl_opts.allow_invalid_hostname = true;
       mongoc_client_set_ssl_opts (client, &ssl_opts);
    }
@@ -718,7 +718,7 @@ _prose_test_init_resource_pooled (const mongoc_uri_t *uri, _mongoc_rr_resolver_f
 
 #if defined(MONGOC_ENABLE_SSL)
    {
-      mongoc_ssl_opt_t ssl_opts = *test_framework_get_ssl_opts ();
+      mongoc_tls_opt_t ssl_opts = *test_framework_get_ssl_opts ();
       ssl_opts.allow_invalid_hostname = true;
       mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
    }
@@ -1281,7 +1281,7 @@ test_removing_servers_closes_connections (void *unused)
       mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, RESCAN_INTERVAL_MS);
       pool = mongoc_client_pool_new (uri);
 #if defined(MONGOC_ENABLE_SSL)
-      mongoc_ssl_opt_t ssl_opts = *test_framework_get_ssl_opts ();
+      mongoc_tls_opt_t ssl_opts = *test_framework_get_ssl_opts ();
       ssl_opts.allow_invalid_hostname = true;
       mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
 #endif /* defined(MONGOC_ENABLE_SSL) */

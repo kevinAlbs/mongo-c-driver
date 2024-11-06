@@ -797,10 +797,10 @@ mongoc_client_connect (bool buffered,
 
 #ifdef MONGOC_ENABLE_SSL
    if (base_stream) {
-      mongoc_ssl_opt_t *ssl_opts;
+      mongoc_tls_opt_t *ssl_opts;
       const char *mechanism;
 
-      ssl_opts = (mongoc_ssl_opt_t *) ssl_opts_void;
+      ssl_opts = (mongoc_tls_opt_t *) ssl_opts_void;
       mechanism = mongoc_uri_get_auth_mechanism (uri);
 
       if (use_ssl || (mechanism && (0 == strcmp (mechanism, "MONGODB-X509")))) {
@@ -990,7 +990,7 @@ _mongoc_client_set_internal_tls_opts (mongoc_client_t *client, _mongoc_internal_
 }
 
 void
-mongoc_client_set_ssl_opts (mongoc_client_t *client, const mongoc_ssl_opt_t *opts)
+mongoc_client_set_ssl_opts (mongoc_client_t *client, const mongoc_tls_opt_t *opts)
 {
    BSON_ASSERT_PARAM (client);
    BSON_ASSERT (opts);
@@ -1111,7 +1111,7 @@ _mongoc_client_new_from_topology (mongoc_topology_t *topology)
 #ifdef MONGOC_ENABLE_SSL
    client->use_ssl = false;
    if (mongoc_uri_get_tls (client->uri)) {
-      mongoc_ssl_opt_t ssl_opt = {0};
+      mongoc_tls_opt_t ssl_opt = {0};
       _mongoc_internal_tls_opts_t internal_tls_opts = {0};
 
       _mongoc_ssl_opts_from_uri (&ssl_opt, &internal_tls_opts, client->uri);

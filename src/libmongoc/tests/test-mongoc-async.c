@@ -93,8 +93,8 @@ test_hello_impl (bool with_ssl)
    char *reply;
 
 #ifdef MONGOC_ENABLE_SSL
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
 #endif
 
    if (!TestSuite_CheckMockServerAllowed ()) {
@@ -245,7 +245,7 @@ test_large_hello (void *ctx)
    mongoc_server_api_t *default_api = NULL;
 
 #ifdef MONGOC_ENABLE_SSL
-   mongoc_ssl_opt_t ssl_opts;
+   mongoc_tls_opt_t ssl_opts;
 #endif
 
    /* Inflate the size of the hello message to ~1MB. This tests that

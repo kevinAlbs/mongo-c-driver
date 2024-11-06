@@ -169,7 +169,7 @@ _mongoc_topology_scanner_get_speculative_auth_mechanism (const mongoc_uri_t *uri
 void
 _mongoc_topology_scanner_add_speculative_authentication (bson_t *cmd,
                                                          const mongoc_uri_t *uri,
-                                                         const mongoc_ssl_opt_t *ssl_opts,
+                                                         const mongoc_tls_opt_t *ssl_opts,
                                                          mongoc_scram_t *scram /* OUT */)
 {
    bson_t auth_cmd;
@@ -374,7 +374,7 @@ _begin_hello_cmd (mongoc_topology_scanner_node_t *node,
 
    if (node->ts->speculative_authentication && !node->has_auth && bson_empty (&node->speculative_auth_response) &&
        node->scram.step == 0) {
-      mongoc_ssl_opt_t *ssl_opts = NULL;
+      mongoc_tls_opt_t *ssl_opts = NULL;
 
 #ifdef MONGOC_ENABLE_SSL
       ssl_opts = ts->ssl_opts;
@@ -439,7 +439,7 @@ mongoc_topology_scanner_new (const mongoc_uri_t *uri,
 
 #ifdef MONGOC_ENABLE_SSL
 void
-mongoc_topology_scanner_set_ssl_opts (mongoc_topology_scanner_t *ts, mongoc_ssl_opt_t *opts)
+mongoc_topology_scanner_set_ssl_opts (mongoc_topology_scanner_t *ts, mongoc_tls_opt_t *opts)
 {
    ts->ssl_opts = opts;
    ts->setup = mongoc_async_cmd_tls_setup;

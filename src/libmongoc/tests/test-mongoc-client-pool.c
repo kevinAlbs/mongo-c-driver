@@ -642,7 +642,7 @@ static void
 test_mongoc_client_pool_change_openssl_ctx (void)
 {
    mongoc_client_pool_t *pool;
-   const mongoc_ssl_opt_t *ssl_opts;
+   const mongoc_tls_opt_t *ssl_opts;
 
    pool = test_framework_new_default_client_pool ();
 

@@ -311,7 +311,7 @@ _mongoc_secure_transport_extract_subject (const char *filename, const char *pass
 
 bool
 mongoc_secure_transport_setup_certificate (mongoc_stream_tls_secure_transport_t *secure_transport,
-                                           mongoc_ssl_opt_t *opt)
+                                           mongoc_tls_opt_t *opt)
 {
    bool success;
    CFArrayRef items;
@@ -374,7 +374,7 @@ mongoc_secure_transport_setup_certificate (mongoc_stream_tls_secure_transport_t 
 }
 
 bool
-mongoc_secure_transport_setup_ca (mongoc_stream_tls_secure_transport_t *secure_transport, mongoc_ssl_opt_t *opt)
+mongoc_secure_transport_setup_ca (mongoc_stream_tls_secure_transport_t *secure_transport, mongoc_tls_opt_t *opt)
 {
    CFArrayRef items;
    SecExternalItemType type = kSecItemTypeCertificate;

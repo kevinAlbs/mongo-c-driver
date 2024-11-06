@@ -631,7 +631,7 @@ _get_must_staple (X509 *cert)
 #define MONGOC_OCSP_REQUEST_TIMEOUT_MS 5000
 
 static OCSP_RESPONSE *
-_contact_ocsp_responder (OCSP_CERTID *id, X509 *peer, mongoc_ssl_opt_t *ssl_opts, int *ocsp_uri_count)
+_contact_ocsp_responder (OCSP_CERTID *id, X509 *peer, mongoc_tls_opt_t *ssl_opts, int *ocsp_uri_count)
 {
    STACK_OF (OPENSSL_STRING) *url_stack = NULL;
    OPENSSL_STRING url = NULL, host = NULL, path = NULL, port = NULL;
@@ -918,7 +918,7 @@ done:
  * context object (for storing and loading the associated pem file)
  */
 SSL_CTX *
-_mongoc_openssl_ctx_new (mongoc_ssl_opt_t *opt)
+_mongoc_openssl_ctx_new (mongoc_tls_opt_t *opt)
 {
    SSL_CTX *ctx = NULL;
    int ssl_ctx_options = 0;

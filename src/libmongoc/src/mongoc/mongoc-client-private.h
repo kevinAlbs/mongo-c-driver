@@ -99,7 +99,7 @@ struct _mongoc_client_t {
 
 #ifdef MONGOC_ENABLE_SSL
    bool use_ssl;
-   mongoc_ssl_opt_t ssl_opts;
+   mongoc_tls_opt_t ssl_opts;
 #endif
 
    mongoc_topology_t *topology;

@@ -272,8 +272,8 @@ static BSON_THREAD_FUN (ssl_test_client, ptr)
  * here is that any given configuration succeeds or fails as it should
  */
 void
-ssl_test (mongoc_ssl_opt_t *client,
-          mongoc_ssl_opt_t *server,
+ssl_test (mongoc_tls_opt_t *client,
+          mongoc_tls_opt_t *server,
           const char *host,
           ssl_test_result_t *client_result,
           ssl_test_result_t *server_result)

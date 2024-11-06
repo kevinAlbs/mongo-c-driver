@@ -75,7 +75,7 @@ struct _mongoc_server_monitor_t {
    int64_t connect_timeout_ms;
    bool use_tls;
 #ifdef MONGOC_ENABLE_SSL
-   mongoc_ssl_opt_t *ssl_opts;
+   mongoc_tls_opt_t *ssl_opts;
 #endif
    mongoc_uri_t *uri;
    /* A custom initiator may be set if a user provides overrides to create a
@@ -833,7 +833,7 @@ mongoc_server_monitor_new (mongoc_topology_t *topology,
  * should be stored somewhere else. */
 #ifdef MONGOC_ENABLE_SSL
    if (topology->scanner->ssl_opts) {
-      server_monitor->ssl_opts = bson_malloc0 (sizeof (mongoc_ssl_opt_t));
+      server_monitor->ssl_opts = bson_malloc0 (sizeof (mongoc_tls_opt_t));
 
       _mongoc_ssl_opts_copy_to (topology->scanner->ssl_opts, server_monitor->ssl_opts, true);
    }

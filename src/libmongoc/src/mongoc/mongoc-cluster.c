@@ -771,7 +771,7 @@ _stream_run_hello (mongoc_cluster_t *cluster,
    _mongoc_topology_dup_handshake_cmd (cluster->client->topology, &handshake_command);
 
    if (cluster->requires_auth && speculative_auth_response) {
-      mongoc_ssl_opt_t *ssl_opts = NULL;
+      mongoc_tls_opt_t *ssl_opts = NULL;
 #ifdef MONGOC_ENABLE_SSL
       ssl_opts = &cluster->client->ssl_opts;
 #endif
@@ -1191,7 +1191,7 @@ _mongoc_cluster_auth_node_plain (mongoc_cluster_t *cluster,
 
 bool
 _mongoc_cluster_get_auth_cmd_x509 (const mongoc_uri_t *uri,
-                                   const mongoc_ssl_opt_t *ssl_opts,
+                                   const mongoc_tls_opt_t *ssl_opts,
                                    bson_t *cmd /* OUT */,
                                    bson_error_t *error /* OUT */)
 {

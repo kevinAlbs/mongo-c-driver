@@ -100,7 +100,7 @@ size_t
 test_framework_server_count (void);
 
 #ifdef MONGOC_ENABLE_SSL
-const mongoc_ssl_opt_t *
+const mongoc_tls_opt_t *
 test_framework_get_ssl_opts (void);
 #endif
 void

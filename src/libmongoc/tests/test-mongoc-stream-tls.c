@@ -15,8 +15,8 @@
 static void
 test_mongoc_tls_no_certs (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -33,8 +33,8 @@ test_mongoc_tls_no_certs (void)
 static void
 test_mongoc_tls_password (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -54,8 +54,8 @@ test_mongoc_tls_password (void)
 static void
 test_mongoc_tls_bad_password (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -87,8 +87,8 @@ test_mongoc_tls_bad_password (void)
 static void
 test_mongoc_tls_no_verify (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -110,8 +110,8 @@ test_mongoc_tls_no_verify (void)
 static void
 test_mongoc_tls_allow_invalid_hostname (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -133,8 +133,8 @@ test_mongoc_tls_allow_invalid_hostname (void)
 static void
 test_mongoc_tls_bad_verify (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -162,8 +162,8 @@ test_mongoc_tls_bad_verify (void)
 static void
 test_mongoc_tls_basic (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -184,8 +184,8 @@ test_mongoc_tls_basic (void)
 static void
 test_mongoc_tls_weak_cert_validation (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -216,8 +216,8 @@ test_mongoc_tls_weak_cert_validation (void)
 static void
 test_mongoc_tls_crl (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -251,8 +251,8 @@ test_mongoc_tls_crl (void)
 static void
 test_mongoc_tls_expired (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -280,8 +280,8 @@ test_mongoc_tls_expired (void)
 static void
 test_mongoc_tls_common_name (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -303,8 +303,8 @@ test_mongoc_tls_common_name (void)
 static void
 test_mongoc_tls_altname (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -325,8 +325,8 @@ test_mongoc_tls_altname (void)
 static void
 test_mongoc_tls_wild (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -347,8 +347,8 @@ test_mongoc_tls_wild (void)
 static void
 test_mongoc_tls_ip (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 
@@ -370,8 +370,8 @@ test_mongoc_tls_ip (void)
 static void
 test_mongoc_tls_trust_dir (void)
 {
-   mongoc_ssl_opt_t sopt = {0};
-   mongoc_ssl_opt_t copt = {0};
+   mongoc_tls_opt_t sopt = {0};
+   mongoc_tls_opt_t copt = {0};
    ssl_test_result_t sr;
    ssl_test_result_t cr;
 

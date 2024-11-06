@@ -235,7 +235,7 @@ fail:
 }
 
 PCCERT_CONTEXT
-mongoc_secure_channel_setup_certificate (mongoc_stream_tls_secure_channel_t *secure_channel, mongoc_ssl_opt_t *opt)
+mongoc_secure_channel_setup_certificate (mongoc_stream_tls_secure_channel_t *secure_channel, mongoc_tls_opt_t *opt)
 {
    return mongoc_secure_channel_setup_certificate_from_file (opt->pem_file);
 }
@@ -278,7 +278,7 @@ _mongoc_secure_channel_extract_subject (const char *filename, const char *passph
 }
 
 bool
-mongoc_secure_channel_setup_ca (mongoc_stream_tls_secure_channel_t *secure_channel, mongoc_ssl_opt_t *opt)
+mongoc_secure_channel_setup_ca (mongoc_stream_tls_secure_channel_t *secure_channel, mongoc_tls_opt_t *opt)
 {
    FILE *file;
    long length;
@@ -356,7 +356,7 @@ mongoc_secure_channel_setup_ca (mongoc_stream_tls_secure_channel_t *secure_chann
 }
 
 bool
-mongoc_secure_channel_setup_crl (mongoc_stream_tls_secure_channel_t *secure_channel, mongoc_ssl_opt_t *opt)
+mongoc_secure_channel_setup_crl (mongoc_stream_tls_secure_channel_t *secure_channel, mongoc_tls_opt_t *opt)
 {
    HCERTSTORE cert_store = NULL;
    PCCERT_CONTEXT cert = NULL;

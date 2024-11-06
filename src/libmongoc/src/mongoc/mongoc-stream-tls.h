@@ -45,10 +45,10 @@ MONGOC_EXPORT (bool)
 mongoc_stream_tls_check_cert (mongoc_stream_t *stream, const char *host)
    BSON_GNUC_DEPRECATED_FOR (mongoc_stream_tls_handshake);
 MONGOC_EXPORT (mongoc_stream_t *)
-mongoc_stream_tls_new_with_hostname (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client)
+mongoc_stream_tls_new_with_hostname (mongoc_stream_t *base_stream, const char *host, mongoc_tls_opt_t *opt, int client)
    BSON_GNUC_WARN_UNUSED_RESULT;
 MONGOC_EXPORT (mongoc_stream_t *)
-mongoc_stream_tls_new (mongoc_stream_t *base_stream, mongoc_ssl_opt_t *opt, int client) BSON_GNUC_WARN_UNUSED_RESULT
+mongoc_stream_tls_new (mongoc_stream_t *base_stream, mongoc_tls_opt_t *opt, int client) BSON_GNUC_WARN_UNUSED_RESULT
    BSON_GNUC_DEPRECATED_FOR (mongoc_stream_tls_new_with_hostname);
 
 

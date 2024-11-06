@@ -429,7 +429,7 @@ _mongoc_stream_tls_libressl_should_retry (mongoc_stream_t *stream)
 }
 
 mongoc_stream_t *
-mongoc_stream_tls_libressl_new (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client)
+mongoc_stream_tls_libressl_new (mongoc_stream_t *base_stream, const char *host, mongoc_tls_opt_t *opt, int client)
 {
    mongoc_stream_tls_t *tls;
    mongoc_stream_tls_libressl_t *libressl;
@@ -440,7 +440,7 @@ mongoc_stream_tls_libressl_new (mongoc_stream_t *base_stream, const char *host, 
 
 
    if (opt->crl_file) {
-      MONGOC_ERROR ("Setting mongoc_ssl_opt_t.crl_file has no effect when built "
+      MONGOC_ERROR ("Setting mongoc_tls_opt_t.crl_file has no effect when built "
                     "against libtls");
       RETURN (false);
    }
