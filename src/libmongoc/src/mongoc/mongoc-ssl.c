@@ -58,6 +58,12 @@ mongoc_ssl_opt_get_default (void)
    return &gMongocSslOptDefault;
 }
 
+const mongoc_tls_opt_t *
+mongoc_tls_opt_get_default (void)
+{
+   return &gMongocSslOptDefault;
+}
+
 char *
 mongoc_ssl_extract_subject (const char *filename, const char *passphrase)
 {
