@@ -38,5 +38,5 @@ Parameters
 Availability
 ------------
 
-This feature requires that the MongoDB C driver was compiled with ``-DENABLE_SSL``.
+This feature requires that the MongoDB C driver was compiled with ``-DENABLE_TLS``.
 
