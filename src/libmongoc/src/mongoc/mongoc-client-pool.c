@@ -64,7 +64,7 @@ struct _mongoc_client_pool_t {
 
 #ifdef MONGOC_ENABLE_SSL
 void
-mongoc_client_pool_set_ssl_opts (mongoc_client_pool_t *pool, const mongoc_tls_opt_t *opts)
+mongoc_client_pool_set_tls_opts (mongoc_client_pool_t *pool, const mongoc_tls_opt_t *opts)
 {
    BSON_ASSERT_PARAM (pool);
 
@@ -89,6 +89,12 @@ mongoc_client_pool_set_ssl_opts (mongoc_client_pool_t *pool, const mongoc_tls_op
    mongoc_topology_scanner_set_ssl_opts (pool->topology->scanner, &pool->ssl_opts);
 
    bson_mutex_unlock (&pool->mutex);
+}
+
+void
+mongoc_client_pool_set_ssl_opts (mongoc_client_pool_t *pool, const mongoc_tls_opt_t *opts)
+{
+   mongoc_client_pool_set_tls_opts (pool, opts);
 }
 
 void
