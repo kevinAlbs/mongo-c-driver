@@ -3,22 +3,16 @@
 mongoc_ssl_opt_t
 ================
 
+.. deprecated:: 1.30.0
+
+   Use :symbol:`mongoc_tls_opt_t` instead.
+
 Synopsis
 --------
 
 .. code-block:: c
 
-  typedef struct {
-     const char *pem_file;
-     const char *pem_pwd;
-     const char *ca_file;
-     const char *ca_dir;
-     const char *crl_file;
-     bool weak_cert_validation;
-     bool allow_invalid_hostname;
-     void *internal;
-     void *padding[6];
-  } mongoc_ssl_opt_t;
+  typedef struct mongoc_tls_opt_t mongoc_ssl_opt_t;
 
 Description
 -----------
