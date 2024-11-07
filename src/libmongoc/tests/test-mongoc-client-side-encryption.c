@@ -2486,7 +2486,7 @@ test_kms_tls_cert_valid (void *unused)
 
    BSON_UNUSED (unused);
 
-#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#if defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL)
    /* Certificate verification fails with Secure Channel given
     * "127.0.0.1:8999" with error: "hostname doesn't match certificate". */
    ASSERT_OR_PRINT (_mongoc_host_list_from_string_with_err (&host, "localhost:8999", &error), error);
@@ -2539,13 +2539,13 @@ test_kms_tls_cert_expired (void *unused)
 
    BSON_ASSERT (!ret);
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
    ASSERT_CONTAINS (error.message, "certificate has expired");
-#elif defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
    ASSERT_CONTAINS (error.message, "CSSMERR_TP_CERT_EXPIRED");
-#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL)
    ASSERT_CONTAINS (error.message, "certificate has expired");
-#elif defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#elif defined(MONGOC_ENABLE_TLS_LIBRESSL)
    ASSERT_CONTAINS (error.message, "certificate has expired");
 #endif
 
@@ -2583,13 +2583,13 @@ test_kms_tls_cert_wrong_host (void *unused)
 
    BSON_ASSERT (!ret);
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
    ASSERT_CONTAINS (error.message, "IP address mismatch");
-#elif defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
    ASSERT_CONTAINS (error.message, "Host name mismatch");
-#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL)
    ASSERT_CONTAINS (error.message, "hostname doesn't match certificate");
-#elif defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#elif defined(MONGOC_ENABLE_TLS_LIBRESSL)
    ASSERT_CONTAINS (error.message, "not present in server certificate");
 #endif
 
@@ -2816,25 +2816,25 @@ _tls_test_make_client_encryption (mongoc_client_t *keyvault_client, tls_test_ce_
    return client_encryption;
 }
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
 #define ASSERT_EXPIRED(error) ASSERT_CONTAINS (error.message, "certificate has expired")
-#elif defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 #define ASSERT_EXPIRED(error) ASSERT_CONTAINS (error.message, "CSSMERR_TP_CERT_EXPIRED")
-#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL)
 #define ASSERT_EXPIRED(error) ASSERT_CONTAINS (error.message, "certificate has expired")
-#elif defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#elif defined(MONGOC_ENABLE_TLS_LIBRESSL)
 #define ASSERT_EXPIRED(error) ASSERT_CONTAINS (error.message, "certificate has expired")
 #else
 #define ASSERT_EXPIRED(error)
 #endif
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
 #define ASSERT_INVALID_HOSTNAME(error) ASSERT_CONTAINS (error.message, "IP address mismatch")
-#elif defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 #define ASSERT_INVALID_HOSTNAME(error) ASSERT_CONTAINS (error.message, "Host name mismatch")
-#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL)
 #define ASSERT_INVALID_HOSTNAME(error) ASSERT_CONTAINS (error.message, "hostname doesn't match certificate")
-#elif defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#elif defined(MONGOC_ENABLE_TLS_LIBRESSL)
 #define ASSERT_INVALID_HOSTNAME(error) ASSERT_CONTAINS (error.message, "not present in server certificate")
 #else
 #define ASSERT_INVALID_HOSTNAME(error)

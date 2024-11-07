@@ -30,7 +30,7 @@
 #include "mongoc-log.h"
 #include "utlist.h"
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc-stream-tls.h"
 #endif
 
@@ -60,7 +60,7 @@ static const _mongoc_async_cmd_phase_t gMongocCMDPhases[] = {
    NULL, /* no callback for MONGOC_ASYNC_CMD_CANCELED_STATE */
 };
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 int
 mongoc_async_cmd_tls_setup (mongoc_stream_t *stream, int *events, void *ctx, int32_t timeout_msec, bson_error_t *error)
 {
@@ -73,7 +73,7 @@ mongoc_async_cmd_tls_setup (mongoc_stream_t *stream, int *events, void *ctx, int
         tls_stream = mongoc_stream_get_base_stream (tls_stream)) {
    }
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) || defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) || defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL)
    /* pass 0 for the timeout to begin / continue non-blocking handshake */
    timeout_msec = 0;
 #endif

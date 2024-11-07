@@ -19,7 +19,7 @@
 #include "test-conveniences.h"
 #include <common-string-private.h>
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc-ssl-private.h"
 
 typedef struct {
@@ -210,14 +210,14 @@ test_non_existant_cafile (void)
    mongoc_client_destroy (client);
 }
 
-#endif /* MONGOC_ENABLE_SSL */
+#endif /* MONGOC_ENABLE_TLS */
 
 void
 test_ssl_install (TestSuite *suite)
 {
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    TestSuite_Add (suite, "/ssl_opt/from_bson", test_mongoc_ssl_opts_from_bson);
    TestSuite_Add (suite, "/ssl_opt/cleanup", test_mongoc_ssl_opts_cleanup_zero);
    TestSuite_Add (suite, "/ssl_opt/non-existant-cafile", test_non_existant_cafile);
-#endif /* MONGOC_ENABLE_SSL */
+#endif /* MONGOC_ENABLE_TLS */
 }

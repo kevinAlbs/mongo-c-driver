@@ -58,14 +58,14 @@
 #include "mongoc-client-session-private.h"
 #include "mongoc-cursor-private.h"
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc-stream-tls.h"
 #include "mongoc-ssl-private.h"
 #include "mongoc-cmd-private.h"
 #include "mongoc-opts-private.h"
 #endif
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
 #include "mongoc-openssl-private.h"
 #include "mongoc-stream-tls-private.h"
 #endif
@@ -762,7 +762,7 @@ mongoc_client_connect (bool buffered,
    BSON_ASSERT (uri);
    BSON_ASSERT (host);
 
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
    if (ssl_opts_void || mongoc_uri_get_tls (uri)) {
       bson_set_error (error,
                       MONGOC_ERROR_CLIENT,
@@ -795,7 +795,7 @@ mongoc_client_connect (bool buffered,
       break;
    }
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (base_stream) {
       mongoc_tls_opt_t *ssl_opts;
       const char *mechanism;
@@ -806,7 +806,7 @@ mongoc_client_connect (bool buffered,
       if (use_ssl || (mechanism && (0 == strcmp (mechanism, "MONGODB-X509")))) {
          mongoc_stream_t *original = base_stream;
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
          // Use shared OpenSSL context.
          base_stream = mongoc_stream_tls_new_with_hostname_and_openssl_context (
             base_stream, host->host, ssl_opts, true, (SSL_CTX *) openssl_ctx_void);
@@ -867,7 +867,7 @@ mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
 {
    void *ssl_opts_void = NULL;
    bool use_ssl = false;
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    mongoc_client_t *client = (mongoc_client_t *) user_data;
 
    use_ssl = client->use_ssl;
@@ -875,7 +875,7 @@ mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
 
 #endif
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
    SSL_CTX *ssl_ctx = client->topology->scanner->openssl_ctx;
    return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, (void *) ssl_ctx, error);
 #else
@@ -976,7 +976,7 @@ mongoc_client_new (const char *uri_string)
  *--------------------------------------------------------------------------
  */
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 /* Only called internally. Caller must ensure opts->internal is valid. */
 void
 _mongoc_client_set_internal_tls_opts (mongoc_client_t *client, _mongoc_internal_tls_opts_t *internal)
@@ -1005,7 +1005,7 @@ mongoc_client_set_tls_opts (mongoc_client_t *client, const mongoc_tls_opt_t *opt
 
 /* Update the OpenSSL context associated with this client to match new ssl opts. */
 /* Active connections previously made by client can still access original OpenSSL context. */
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
       SSL_CTX_free (client->topology->scanner->openssl_ctx);
       client->topology->scanner->openssl_ctx = _mongoc_openssl_ctx_new (&client->ssl_opts);
 #endif
@@ -1045,7 +1045,7 @@ mongoc_client_new_from_uri_with_error (const mongoc_uri_t *uri, bson_error_t *er
 
    BSON_ASSERT (uri);
 
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
    if (mongoc_uri_get_tls (uri)) {
       bson_set_error (error,
                       MONGOC_ERROR_COMMAND,
@@ -1114,7 +1114,7 @@ _mongoc_client_new_from_topology (mongoc_topology_t *topology)
 
    mongoc_cluster_init (&client->cluster, client->uri, client);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    client->use_ssl = false;
    if (mongoc_uri_get_tls (client->uri)) {
       mongoc_tls_opt_t ssl_opt = {0};
@@ -1167,7 +1167,7 @@ mongoc_client_destroy (mongoc_client_t *client)
       mongoc_set_destroy (client->client_sessions);
       mongoc_server_api_destroy (client->api);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       _mongoc_ssl_opts_cleanup (&client->ssl_opts, true);
 #endif
 

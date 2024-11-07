@@ -25,9 +25,9 @@
 
 #include "mongoc-cluster-aws-private.h"
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include "mongoc-openssl-private.h"
-#elif defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#elif defined(MONGOC_ENABLE_TLS_LIBRESSL)
 #include "tls.h"
 #endif
 #include "mongoc-thread-private.h"
@@ -99,9 +99,9 @@ static BSON_ONCE_FUN (_mongoc_do_init)
 #ifdef MONGOC_ENABLE_SASL_CYRUS
    int status;
 #endif
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
    _mongoc_openssl_init ();
-#elif defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#elif defined(MONGOC_ENABLE_TLS_LIBRESSL)
    tls_init ();
 #endif
 
@@ -166,7 +166,7 @@ mongoc_init (void)
 
 static BSON_ONCE_FUN (_mongoc_do_cleanup)
 {
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
    _mongoc_openssl_cleanup ();
 #endif
 

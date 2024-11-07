@@ -2,7 +2,7 @@
 #include <errno.h>
 
 #include "mongoc/mongoc-config.h"
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #endif
@@ -78,7 +78,7 @@ static BSON_THREAD_FUN (ssl_test_server, ptr)
    BSON_ASSERT (sock_stream);
    ssl_stream = mongoc_stream_tls_new_with_hostname (sock_stream, NULL, data->server, 0);
    if (!ssl_stream) {
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
       unsigned long err = ERR_get_error ();
 #else
       unsigned long err = 42;
@@ -87,7 +87,7 @@ static BSON_THREAD_FUN (ssl_test_server, ptr)
 
       data->server_result->ssl_err = err;
       data->server_result->result = SSL_TEST_SSL_INIT;
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
       MONGOC_ERROR ("ERRORED (line: %d): %s\n", (int) (__LINE__), ERR_error_string (ERR_get_error (), NULL));
 #endif
       mongoc_stream_destroy (sock_stream);
@@ -103,7 +103,7 @@ static BSON_THREAD_FUN (ssl_test_server, ptr)
       unsigned long err = 43;
 
       MONGOC_ERROR ("ERRORED (line: %d): %s\n", (int) (__LINE__), error.message);
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
       MONGOC_ERROR ("msg: %s\n", ERR_error_string (ERR_get_error (), NULL));
 #endif
       data->server_result->ssl_err = err;
@@ -198,7 +198,7 @@ static BSON_THREAD_FUN (ssl_test_client, ptr)
    BSON_ASSERT (sock_stream);
    ssl_stream = mongoc_stream_tls_new_with_hostname (sock_stream, data->host, data->client, 1);
    if (!ssl_stream) {
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
       unsigned long err = ERR_get_error ();
 #else
       unsigned long err = 44;

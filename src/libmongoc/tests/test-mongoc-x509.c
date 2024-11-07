@@ -1,14 +1,14 @@
 #include <mongoc/mongoc.h>
 #include "mongoc/mongoc-ssl-private.h"
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include "mongoc/mongoc-openssl-private.h"
 #endif
 
 #include "TestSuite.h"
 #include "test-libmongoc.h"
 
-#if defined(MONGOC_ENABLE_SSL) && !defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#if defined(MONGOC_ENABLE_TLS) && !defined(MONGOC_ENABLE_TLS_LIBRESSL)
 static void
 test_extract_subject (void)
 {
@@ -86,7 +86,7 @@ test_tlsfeature_parsing (void)
 void
 test_x509_install (TestSuite *suite)
 {
-#if defined(MONGOC_ENABLE_SSL) && !defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#if defined(MONGOC_ENABLE_TLS) && !defined(MONGOC_ENABLE_TLS_LIBRESSL)
    TestSuite_Add (suite, "/X509/extract_subject", test_extract_subject);
 #endif
 

@@ -1141,8 +1141,8 @@ test_handshake_platform_config (void)
    BSON_ASSERT (strncmp (config_str, "0x", 2) == 0);
 
 /* go through all flags. */
-#ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
-   BSON_ASSERT (_get_bit (config_str, MONGOC_ENABLE_SSL_SECURE_CHANNEL));
+#ifdef MONGOC_ENABLE_TLS_SECURE_CHANNEL
+   BSON_ASSERT (_get_bit (config_str, MONGOC_ENABLE_TLS_SECURE_CHANNEL));
 #endif
 
 #ifdef MONGOC_ENABLE_CRYPTO_CNG
@@ -1153,7 +1153,7 @@ test_handshake_platform_config (void)
    BSON_ASSERT (_get_bit (config_str, MONGOC_HAVE_BCRYPT_PBKDF2));
 #endif
 
-#ifdef MONGOC_ENABLE_SSL_SECURE_TRANSPORT
+#ifdef MONGOC_ENABLE_TLS_SECURE_TRANSPORT
    BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_ENABLE_SSL_SECURE_TRANSPORT));
 #endif
 
@@ -1161,7 +1161,7 @@ test_handshake_platform_config (void)
    BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_ENABLE_CRYPTO_COMMON_CRYPTO));
 #endif
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
    BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_ENABLE_SSL_OPENSSL));
 #endif
 
@@ -1169,7 +1169,7 @@ test_handshake_platform_config (void)
    BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_ENABLE_CRYPTO_LIBCRYPTO));
 #endif
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_ENABLE_SSL));
 #endif
 
@@ -1197,7 +1197,7 @@ test_handshake_platform_config (void)
    BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_EXPERIMENTAL_FEATURES));
 #endif
 
-#ifdef MONGOC_ENABLE_SSL_LIBRESSL
+#ifdef MONGOC_ENABLE_TLS_LIBRESSL
    BSON_ASSERT (_get_bit (config_str, MONGOC_MD_FLAG_ENABLE_SSL_LIBRESSL));
 #endif
 

@@ -22,7 +22,7 @@
 /* TODO: rename to TOPOLOGY scanner */
 
 #include <bson/bson.h>
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include <openssl/ssl.h>
 #endif
 #include "mongoc-async-private.h"
@@ -126,11 +126,11 @@ typedef struct mongoc_topology_scanner {
    void *initiator_context;
    bson_error_t error;
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    mongoc_tls_opt_t *ssl_opts;
 #endif
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
    SSL_CTX *openssl_ctx;
 #endif
 
@@ -239,7 +239,7 @@ _mongoc_topology_scanner_set_cluster_time (mongoc_topology_scanner_t *ts, const 
 void
 _mongoc_topology_scanner_set_dns_cache_timeout (mongoc_topology_scanner_t *ts, int64_t timeout_ms);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 void
 mongoc_topology_scanner_set_ssl_opts (mongoc_topology_scanner_t *ts, mongoc_tls_opt_t *opts);
 #endif

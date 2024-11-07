@@ -54,14 +54,14 @@ _test_topology_scanner (bool with_ssl)
    bson_t q = BSON_INITIALIZER;
    int finished = NSERVERS * 3;
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    mongoc_tls_opt_t sopt = {0};
    mongoc_tls_opt_t copt = {0};
 #endif
 
    topology_scanner = mongoc_topology_scanner_new (NULL, NULL, &test_topology_scanner_helper, &finished, TIMEOUT);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (with_ssl) {
       copt.ca_file = CERT_CA;
       copt.weak_cert_validation = 1;
@@ -75,7 +75,7 @@ _test_topology_scanner (bool with_ssl)
       servers[i] = mock_server_with_auto_hello (i + WIRE_VERSION_MIN);
       mock_server_set_rand_delay (servers[i], true);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       if (with_ssl) {
          sopt.ca_file = CERT_CA;
          sopt.pem_file = CERT_SERVER;
@@ -114,7 +114,7 @@ test_topology_scanner (void)
 }
 
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 void
 test_topology_scanner_ssl (void)
 {
@@ -680,7 +680,7 @@ void
 test_topology_scanner_install (TestSuite *suite)
 {
    TestSuite_AddMockServerTest (suite, "/TOPOLOGY/scanner", test_topology_scanner);
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
    TestSuite_AddMockServerTest (suite, "/TOPOLOGY/scanner_ssl", test_topology_scanner_ssl);
 #endif
    TestSuite_AddMockServerTest (suite, "/TOPOLOGY/scanner_discovery", test_topology_scanner_discovery);

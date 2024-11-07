@@ -135,7 +135,7 @@ _test_mongoc_speculative_auth (bool pooled,
 
    server = mock_server_new ();
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (use_ssl) {
       mock_server_set_ssl_opts (server, &server_ssl_opts);
    }
@@ -163,7 +163,7 @@ _test_mongoc_speculative_auth (bool pooled,
    if (pooled) {
       pool = test_framework_client_pool_new_from_uri (uri, NULL);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       if (use_ssl) {
          mongoc_client_pool_set_tls_opts (pool, &client_ssl_opts);
       }
@@ -176,7 +176,7 @@ _test_mongoc_speculative_auth (bool pooled,
    } else {
       client = test_framework_client_new_from_uri (uri, NULL);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       if (use_ssl) {
          mongoc_client_set_tls_opts (client, &client_ssl_opts);
       }
@@ -299,7 +299,7 @@ test_mongoc_speculative_auth_request_none_pool (void)
 }
 
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) || defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) || defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 static void
 _setup_speculative_auth_x_509 (mongoc_uri_t *uri)
 {
@@ -511,8 +511,8 @@ test_mongoc_speculative_auth_request_x509_network_error (void)
    mock_server_destroy (server);
 }
 
-#endif // defined(MONGOC_ENABLE_SSL_OPENSSL) ||
-       // defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#endif // defined(MONGOC_ENABLE_TLS_OPENSSL) ||
+       // defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 
 
 static void
@@ -564,13 +564,13 @@ test_speculative_auth_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite, "/speculative_auth/request_scram", test_mongoc_speculative_auth_request_scram);
    TestSuite_AddMockServerTest (
       suite, "/speculative_auth_pool/request_none", test_mongoc_speculative_auth_request_none_pool);
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) || defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) || defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
    TestSuite_AddMockServerTest (suite, "/speculative_auth/request_x509", test_mongoc_speculative_auth_request_x509);
    TestSuite_AddMockServerTest (
       suite, "/speculative_auth_pool/request_x509", test_mongoc_speculative_auth_request_x509_pool);
    TestSuite_AddMockServerTest (
       suite, "/speculative_auth/request_x509/network_error", test_mongoc_speculative_auth_request_x509_network_error);
-#endif /* MONGOC_ENABLE_SSL_* */
+#endif /* MONGOC_ENABLE_TLS_* */
    TestSuite_AddMockServerTest (
       suite, "/speculative_auth_pool/request_scram", test_mongoc_speculative_auth_request_scram_pool);
 #endif /* MONGOC_ENABLE_CRYPTO */

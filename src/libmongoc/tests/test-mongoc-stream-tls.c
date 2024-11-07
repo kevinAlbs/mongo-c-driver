@@ -1,7 +1,7 @@
 #include <mongoc/mongoc.h>
 
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include <openssl/err.h>
 #endif
 
@@ -10,7 +10,7 @@
 #include "test-libmongoc.h"
 #include "test-conveniences.h"
 
-#if !defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL) && !defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#if !defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL) && !defined(MONGOC_ENABLE_TLS_LIBRESSL)
 
 static void
 test_mongoc_tls_no_certs (void)
@@ -29,7 +29,7 @@ test_mongoc_tls_no_certs (void)
 }
 
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 static void
 test_mongoc_tls_password (void)
 {
@@ -180,7 +180,7 @@ test_mongoc_tls_basic (void)
 }
 
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 static void
 test_mongoc_tls_weak_cert_validation (void)
 {
@@ -276,7 +276,7 @@ test_mongoc_tls_expired (void)
 }
 
 
-#if !defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#if !defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 static void
 test_mongoc_tls_common_name (void)
 {
@@ -297,7 +297,7 @@ test_mongoc_tls_common_name (void)
    ASSERT_CMPINT (cr.result, ==, SSL_TEST_SUCCESS);
    ASSERT_CMPINT (sr.result, ==, SSL_TEST_SUCCESS);
 }
-#endif // !defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#endif // !defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 
 
 static void
@@ -343,7 +343,7 @@ test_mongoc_tls_wild (void)
 }
 
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 static void
 test_mongoc_tls_ip (void)
 {
@@ -365,7 +365,7 @@ test_mongoc_tls_ip (void)
 #endif
 
 
-#if !defined(__APPLE__) && !defined(_WIN32) && defined(MONGOC_ENABLE_SSL_OPENSSL) && \
+#if !defined(__APPLE__) && !defined(_WIN32) && defined(MONGOC_ENABLE_TLS_OPENSSL) && \
    OPENSSL_VERSION_NUMBER >= 0x10000000L
 static void
 test_mongoc_tls_trust_dir (void)
@@ -387,7 +387,7 @@ test_mongoc_tls_trust_dir (void)
 }
 #endif
 
-#endif /* !MONGOC_ENABLE_SSL_SECURE_CHANNEL && !MONGOC_ENABLE_SSL_LIBRESSL */
+#endif /* !MONGOC_ENABLE_TLS_SECURE_CHANNEL && !MONGOC_ENABLE_TLS_LIBRESSL */
 
 void
 test_mongoc_tls_insecure_nowarning (void)
@@ -413,10 +413,10 @@ test_mongoc_tls_insecure_nowarning (void)
 void
 test_stream_tls_install (TestSuite *suite)
 {
-#if !defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL) && !defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#if !defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL) && !defined(MONGOC_ENABLE_TLS_LIBRESSL)
 
    /* Disable /TLS/commonName on macOS due to CDRIVER-4256. */
-#if !defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#if !defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
    TestSuite_Add (suite, "/TLS/commonName", test_mongoc_tls_common_name);
 #endif
    TestSuite_Add (suite, "/TLS/altname", test_mongoc_tls_altname);
@@ -429,7 +429,7 @@ test_stream_tls_install (TestSuite *suite)
 
    TestSuite_Add (suite, "/TLS/expired", test_mongoc_tls_expired);
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
    TestSuite_Add (suite, "/TLS/ip", test_mongoc_tls_ip);
    TestSuite_Add (suite, "/TLS/password", test_mongoc_tls_password);
    TestSuite_Add (suite, "/TLS/bad_password", test_mongoc_tls_bad_password);
@@ -437,7 +437,7 @@ test_stream_tls_install (TestSuite *suite)
    TestSuite_Add (suite, "/TLS/crl", test_mongoc_tls_crl);
 #endif
 
-#if !defined(__APPLE__) && !defined(_WIN32) && defined(MONGOC_ENABLE_SSL_OPENSSL) && \
+#if !defined(__APPLE__) && !defined(_WIN32) && defined(MONGOC_ENABLE_TLS_OPENSSL) && \
    OPENSSL_VERSION_NUMBER >= 0x10000000L
    TestSuite_Add (suite, "/TLS/trust_dir", test_mongoc_tls_trust_dir);
 #endif

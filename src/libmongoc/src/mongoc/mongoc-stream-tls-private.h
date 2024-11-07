@@ -24,7 +24,7 @@
 #include "mongoc-ssl.h"
 #include "mongoc-stream.h"
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include <openssl/ssl.h>
 #endif
 
@@ -46,7 +46,7 @@ struct _mongoc_stream_tls_t {
    bool (*handshake) (mongoc_stream_t *stream, const char *host, int *events /* OUT*/, bson_error_t *error);
 };
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
 MONGOC_EXPORT (mongoc_stream_t *)
 mongoc_stream_tls_new_with_hostname_and_openssl_context (mongoc_stream_t *base_stream,
                                                          const char *host,

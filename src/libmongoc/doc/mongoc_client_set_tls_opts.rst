@@ -8,7 +8,7 @@ Synopsis
 
 .. code-block:: c
 
-  #ifdef MONGOC_ENABLE_SSL
+  #ifdef MONGOC_ENABLE_TLS
   void
   mongoc_client_set_tls_opts (mongoc_client_t *client,
                               const mongoc_tls_opt_t *opts);

@@ -16,7 +16,7 @@
 
 #include "mongoc-config.h"
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 
 #include <bson/bson.h>
 
@@ -909,4 +909,4 @@ mongoc_openssl_ocsp_opt_destroy (void *ocsp_opt)
    bson_free (ocsp_opt);
 }
 
-#endif /* MONGOC_ENABLE_SSL_OPENSSL */
+#endif /* MONGOC_ENABLE_TLS_OPENSSL */

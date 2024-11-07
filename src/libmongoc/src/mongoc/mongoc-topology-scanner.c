@@ -26,11 +26,11 @@
 #include "mongoc-handshake.h"
 #include "mongoc-handshake-private.h"
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc-stream-tls.h"
 #endif
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
 #include <openssl/ssl.h>
 #include "mongoc-stream-tls-private.h"
 #endif
@@ -376,7 +376,7 @@ _begin_hello_cmd (mongoc_topology_scanner_node_t *node,
        node->scram.step == 0) {
       mongoc_tls_opt_t *ssl_opts = NULL;
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       ssl_opts = ts->ssl_opts;
 #endif
 
@@ -437,7 +437,7 @@ mongoc_topology_scanner_new (const mongoc_uri_t *uri,
    return ts;
 }
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 void
 mongoc_topology_scanner_set_ssl_opts (mongoc_topology_scanner_t *ts, mongoc_tls_opt_t *opts)
 {
@@ -472,7 +472,7 @@ mongoc_topology_scanner_destroy (mongoc_topology_scanner_t *ts)
    mongoc_server_api_destroy (ts->api);
    bson_mutex_destroy (&ts->handshake_cmd_mtx);
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
    SSL_CTX_free (ts->openssl_ctx);
    ts->openssl_ctx = NULL;
 #endif
@@ -791,15 +791,15 @@ _async_handler (mongoc_async_cmd_t *acmd,
 mongoc_stream_t *
 _mongoc_topology_scanner_node_setup_stream_for_tls (mongoc_topology_scanner_node_t *node, mongoc_stream_t *stream)
 {
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    mongoc_stream_t *tls_stream;
 #endif
    if (!stream) {
       return NULL;
    }
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (node->ts->ssl_opts) {
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
       tls_stream = mongoc_stream_tls_new_with_hostname_and_openssl_context (
          stream, node->host.host, node->ts->ssl_opts, 1, node->ts->openssl_ctx);
 #else

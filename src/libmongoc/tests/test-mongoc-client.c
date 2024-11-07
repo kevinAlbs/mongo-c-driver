@@ -9,7 +9,7 @@
 #include "mongoc/mongoc-host-list-private.h"
 #include "mongoc/mongoc-read-concern-private.h"
 #include "mongoc/mongoc-set-private.h"
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc/mongoc-ssl.h"
 #include "mongoc/mongoc-ssl-private.h"
 #endif
@@ -1956,7 +1956,7 @@ _test_mongoc_client_ipv6 (bool pooled)
    mongoc_uri_t *uri;
    mongoc_client_pool_t *pool = NULL;
    mongoc_client_t *client;
-#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_SSL)
+#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_TLS)
    mongoc_tls_opt_t ssl_opts;
 #endif
    bson_error_t error;
@@ -1965,7 +1965,7 @@ _test_mongoc_client_ipv6 (bool pooled)
    uri = mongoc_uri_new (uri_str);
    BSON_ASSERT (uri);
 
-#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_SSL)
+#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_TLS)
    /* This is necessary because macOS & Windows seem to treat [::1] as not
     * matching the hostname "0:0:0:0:0:0:0:1", which results in a certificate
     * trust failure.  This behavior has been captured in CDRIVER-3765 (macOS)
@@ -1978,7 +1978,7 @@ _test_mongoc_client_ipv6 (bool pooled)
 
    if (pooled) {
       pool = test_framework_client_pool_new_from_uri (uri, NULL);
-#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_SSL)
+#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_TLS)
       mongoc_client_pool_set_tls_opts (pool, &ssl_opts);
 #else
       test_framework_set_pool_ssl_opts (pool);
@@ -1986,14 +1986,14 @@ _test_mongoc_client_ipv6 (bool pooled)
       client = mongoc_client_pool_pop (pool);
    } else {
       client = test_framework_client_new_from_uri (uri, NULL);
-#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_SSL)
+#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_TLS)
       mongoc_client_set_tls_opts (client, &ssl_opts);
 #else
       test_framework_set_ssl_opts (client);
 #endif
    }
 
-#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_SSL)
+#if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_TLS)
    BSON_ASSERT (client->ssl_opts.allow_invalid_hostname);
 #endif
 
@@ -2106,7 +2106,7 @@ test_mongoc_client_mismatched_me (void)
 }
 
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 static void
 _test_mongoc_client_ssl_opts (bool pooled)
 {
@@ -2220,7 +2220,7 @@ test_client_buildinfo_hang (void)
 }
 
 /* Test no memory leaks when changing ssl_opts from re-creating OpenSSL context. */
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
 
 static void
 test_mongoc_client_change_openssl_ctx_before_ops (void *unused)
@@ -2270,10 +2270,10 @@ test_mongoc_client_change_openssl_ctx_between_ops (void *unused)
    mongoc_client_destroy (client);
 }
 
-#endif /* MONGOC_ENABLE_SSL_OPENSSL */
+#endif /* MONGOC_ENABLE_TLS_OPENSSL */
 
 #else
-/* MONGOC_ENABLE_SSL is not defined */
+/* MONGOC_ENABLE_TLS is not defined */
 static void
 test_mongoc_client_ssl_disabled (void)
 {
@@ -2783,7 +2783,7 @@ test_mongoc_client_fetch_stream_retry_fail (void)
 }
 
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) || defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) || defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 static bool
 _cmd (mock_server_t *server, mongoc_client_t *client, bool server_replies, bson_error_t *error)
 {
@@ -3384,7 +3384,7 @@ test_null_error_pointer_pooled (void *ctx)
    _test_null_error_pointer (true);
 }
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 static void
 test_set_ssl_opts (void)
 {
@@ -3653,7 +3653,7 @@ test_invalid_server_id (void)
    mongoc_client_destroy (client);
 }
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 static void
 test_ssl_opts_override (void)
 {
@@ -4067,7 +4067,7 @@ test_client_install (TestSuite *suite)
    TestSuite_AddMockServerTest (suite, "/Client/appname_pooled_uri", test_client_appname_pooled_uri);
    TestSuite_AddMockServerTest (suite, "/Client/appname_pooled_no_uri", test_client_appname_pooled_no_uri);
    TestSuite_AddMockServerTest (suite, "/Client/wire_version", test_wire_version);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    TestSuite_AddLive (suite, "/Client/ssl_opts/single", test_ssl_single);
    TestSuite_AddLive (suite, "/Client/ssl_opts/pooled", test_ssl_pooled);
    TestSuite_Add (suite, "/Client/set_ssl_opts", test_set_ssl_opts);
@@ -4075,7 +4075,7 @@ test_client_install (TestSuite *suite)
    TestSuite_Add (suite, "/Client/ssl_opts_padding_not_null/single", test_ssl_opts_padding_not_null);
    TestSuite_AddLive (suite, "/Client/ssl_hang", test_client_buildinfo_hang);
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) || defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) || defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
    TestSuite_AddMockServerTest (suite, "/Client/ssl_opts/copies_single", test_ssl_client_single_copies_args);
    TestSuite_AddMockServerTest (suite, "/Client/ssl_opts/copies_pooled", test_ssl_client_pooled_copies_args);
    TestSuite_AddMockServerTest (suite, "/Client/ssl/reconnect/single", test_ssl_reconnect_single);
@@ -4136,7 +4136,7 @@ test_client_install (TestSuite *suite)
    TestSuite_AddMockServerTest (
       suite, "/Client/resends_handshake_on_network_error", test_mongoc_client_resends_handshake_on_network_error);
    TestSuite_Add (suite, "/Client/failure_to_auth", test_failure_to_auth);
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
    TestSuite_AddFull (suite,
                       "/Client/openssl/change_ssl_opts_before_ops",
                       test_mongoc_client_change_openssl_ctx_before_ops,

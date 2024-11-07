@@ -16,7 +16,7 @@
 
 #include "mongoc-config.h"
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 
 #include <errno.h>
 #include <string.h>
@@ -28,16 +28,16 @@
 
 #include "mongoc-stream-tls-private.h"
 #include "mongoc-stream-private.h"
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
 #include "mongoc-stream-tls-openssl.h"
 #include "mongoc-openssl-private.h"
-#elif defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#elif defined(MONGOC_ENABLE_TLS_LIBRESSL)
 #include "mongoc-libressl-private.h"
 #include "mongoc-stream-tls-libressl.h"
-#elif defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 #include "mongoc-secure-transport-private.h"
 #include "mongoc-stream-tls-secure-transport.h"
-#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL)
 #include "mongoc-secure-channel-private.h"
 #include "mongoc-stream-tls-secure-channel.h"
 #endif
@@ -205,22 +205,22 @@ mongoc_stream_tls_new_with_hostname (mongoc_stream_t *base_stream, const char *h
    }
 #endif
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
    return mongoc_stream_tls_openssl_new (base_stream, host, opt, client);
-#elif defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#elif defined(MONGOC_ENABLE_TLS_LIBRESSL)
    BEGIN_IGNORE_DEPRECATIONS
    return mongoc_stream_tls_libressl_new (base_stream, host, opt, client);
    END_IGNORE_DEPRECATIONS
-#elif defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
    return mongoc_stream_tls_secure_transport_new (base_stream, host, opt, client);
-#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#elif defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL)
    return mongoc_stream_tls_secure_channel_new (base_stream, host, opt, client);
 #else
 #error "Don't know how to create TLS stream"
 #endif
 }
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
 /*
  *--------------------------------------------------------------------------
  *

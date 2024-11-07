@@ -92,7 +92,7 @@ test_hello_impl (bool with_ssl)
    request_t *request;
    char *reply;
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    mongoc_tls_opt_t sopt = {0};
    mongoc_tls_opt_t copt = {0};
 #endif
@@ -106,7 +106,7 @@ test_hello_impl (bool with_ssl)
    for (i = 0; i < NSERVERS; i++) {
       servers[i] = mock_server_new ();
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       if (with_ssl) {
          sopt.weak_cert_validation = true;
          sopt.pem_file = CERT_SERVER;
@@ -124,7 +124,7 @@ test_hello_impl (bool with_ssl)
    for (i = 0; i < NSERVERS; i++) {
       sock_streams[i] = get_localhost_stream (ports[i]);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       if (with_ssl) {
          copt.ca_file = CERT_CA;
          copt.weak_cert_validation = 1;
@@ -203,7 +203,7 @@ test_hello (void)
 }
 
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
 static void
 test_hello_ssl (void)
 {
@@ -244,7 +244,7 @@ test_large_hello (void *ctx)
    char buf[1024 * 1024];
    mongoc_server_api_t *default_api = NULL;
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    mongoc_tls_opt_t ssl_opts;
 #endif
 
@@ -259,7 +259,7 @@ test_large_hello (void *ctx)
 
    sock_stream = get_localhost_stream (test_framework_get_port ());
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (test_framework_get_ssl ()) {
       ssl_opts = *test_framework_get_ssl_opts ();
       sock_stream = mongoc_stream_tls_new_with_hostname (sock_stream, NULL, &ssl_opts, 1);
@@ -279,7 +279,7 @@ test_large_hello (void *ctx)
                          NULL /* dns result, n/a. */,
                          NULL, /* initiator. */
                          0,    /* initiate delay. */
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
                          test_framework_get_ssl () ? mongoc_async_cmd_tls_setup : NULL,
 #else
                          NULL,
@@ -370,7 +370,7 @@ void
 test_async_install (TestSuite *suite)
 {
    TestSuite_AddMockServerTest (suite, "/Async/hello", test_hello);
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
    TestSuite_AddMockServerTest (suite, "/Async/hello_ssl", test_hello_ssl);
 #else
    /* Skip this test on OpenSSL since was having issues connecting. */

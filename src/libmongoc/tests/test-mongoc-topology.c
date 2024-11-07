@@ -159,7 +159,7 @@ test_topology_client_creation (void)
    BSON_ASSERT (client_a);
    BSON_ASSERT (client_b);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    test_framework_set_ssl_opts (client_a);
    test_framework_set_ssl_opts (client_b);
 #endif

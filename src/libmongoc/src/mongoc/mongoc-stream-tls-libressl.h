@@ -19,7 +19,7 @@
 #ifndef MONGOC_STREAM_TLS_LIBRESSL_H
 #define MONGOC_STREAM_TLS_LIBRESSL_H
 
-#ifdef MONGOC_ENABLE_SSL_LIBRESSL
+#ifdef MONGOC_ENABLE_TLS_LIBRESSL
 
 #include <bson/bson.h>
 
@@ -33,5 +33,5 @@ mongoc_stream_tls_libressl_new (mongoc_stream_t *base_stream, const char *host, 
 
 BSON_END_DECLS
 
-#endif /* MONGOC_ENABLE_SSL_LIBRESSL */
+#endif /* MONGOC_ENABLE_TLS_LIBRESSL */
 #endif /* MONGOC_STREAM_TLS_LIBRESSL_H */

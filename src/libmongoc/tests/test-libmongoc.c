@@ -46,7 +46,7 @@
 #pragma warning(pop)
 #endif
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include "mongoc/mongoc-openssl-private.h"
 #endif
 
@@ -58,7 +58,7 @@ typedef struct {
 static bson_mutex_t captured_logs_mutex;
 static mongoc_array_t captured_logs;
 static bool capturing_logs;
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 static mongoc_tls_opt_t gSSLOptions;
 #endif
 
@@ -869,7 +869,7 @@ call_hello_with_host_and_port (const char *host_and_port, bson_t *reply)
 
    client = test_framework_client_new_from_uri (uri, NULL);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    test_framework_set_ssl_opts (client);
 #endif
 
@@ -1385,7 +1385,7 @@ test_framework_set_ssl_opts (mongoc_client_t *client)
    ASSERT (client);
 
    if (test_framework_get_ssl ()) {
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
       test_error ("SSL test config variables are specified in the environment, but"
                   " SSL isn't enabled");
 #else
@@ -1565,7 +1565,7 @@ test_framework_client_new_from_uri (const mongoc_uri_t *uri, const mongoc_server
 }
 
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 /*
  *--------------------------------------------------------------------------
  *
@@ -1611,7 +1611,7 @@ test_framework_set_pool_ssl_opts (mongoc_client_pool_t *pool)
    BSON_ASSERT (pool);
 
    if (test_framework_get_ssl ()) {
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
       test_error ("SSL test config variables are specified in the environment, but"
                   " SSL isn't enabled");
 #else
@@ -1696,7 +1696,7 @@ test_framework_client_pool_new_from_uri (const mongoc_uri_t *uri, const mongoc_s
    return pool;
 }
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 static void
 test_framework_global_ssl_opts_init (void)
 {
@@ -1824,7 +1824,7 @@ test_framework_has_auth (void)
 {
    char *user;
 
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
    /* requires SSL for SCRAM implementation, can't test auth */
    return false;
 #endif
@@ -2550,7 +2550,7 @@ test_libmongoc_init (TestSuite *suite, BSON_MAYBE_UNUSED const char *name, int a
    _mongoc_array_init (&captured_logs, sizeof (log_entry_t *));
    mongoc_log_set_handler (log_handler, (void *) suite);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    test_framework_global_ssl_opts_init ();
    atexit (test_framework_global_ssl_opts_cleanup);
 #endif

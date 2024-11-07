@@ -3,7 +3,7 @@
 #include <mongoc/mongoc-util-private.h>
 #include <mongoc/mongoc-stream-tls.h>
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include <openssl/err.h>
 #endif
 
@@ -14,8 +14,8 @@
 
 #define TIMEOUT 10000 /* milliseconds */
 
-#if !defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL) && !defined(MONGOC_ENABLE_SSL_LIBRESSL) && \
-   !defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#if !defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL) && !defined(MONGOC_ENABLE_TLS_LIBRESSL) && \
+   !defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 /** run as a child thread by test_mongoc_tls_hangup
  *
  * It:
@@ -283,7 +283,7 @@ static BSON_THREAD_FUN (handshake_stall_client, ptr)
 
 
 /* CDRIVER-2222 this should be reenabled for Apple Secure Transport too */
-#if !defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#if !defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
 static void
 test_mongoc_tls_handshake_stall (void)
 {
@@ -330,8 +330,8 @@ test_mongoc_tls_handshake_stall (void)
    ASSERT (sr.result == SSL_TEST_SUCCESS);
 }
 
-#endif /* !MONGOC_ENABLE_SSL_SECURE_TRANSPORT */
-#endif /* !MONGOC_ENABLE_SSL_SECURE_CHANNEL && !MONGOC_ENABLE_SSL_LIBRESSL */
+#endif /* !MONGOC_ENABLE_TLS_SECURE_TRANSPORT */
+#endif /* !MONGOC_ENABLE_TLS_SECURE_CHANNEL && !MONGOC_ENABLE_TLS_LIBRESSL */
 
 /* TLS stream should be NULL and base stream should still be valid, and error
  * messages should be consistent across TLS libs. Until CDRIVER-2844, just
@@ -369,15 +369,15 @@ test_mongoc_tls_load_files (void)
 void
 test_stream_tls_error_install (TestSuite *suite)
 {
-#if !defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL) && !defined(MONGOC_ENABLE_SSL_LIBRESSL)
+#if !defined(MONGOC_ENABLE_TLS_SECURE_CHANNEL) && !defined(MONGOC_ENABLE_TLS_LIBRESSL)
 #if !defined(__APPLE__)
    TestSuite_Add (suite, "/TLS/hangup", test_mongoc_tls_hangup);
 #endif
 
 /* see CDRIVER-2222 this occasionally stalls for a few 100ms on Mac */
-#if !defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
+#if !defined(MONGOC_ENABLE_TLS_SECURE_TRANSPORT)
    TestSuite_Add (suite, "/TLS/handshake_stall", test_mongoc_tls_handshake_stall);
 #endif
-#endif /* !MONGOC_ENABLE_SSL_SECURE_CHANNEL && !MONGOC_ENABLE_SSL_LIBRESSL */
+#endif /* !MONGOC_ENABLE_TLS_SECURE_CHANNEL && !MONGOC_ENABLE_TLS_LIBRESSL */
    TestSuite_Add (suite, "/TLS/load_files", test_mongoc_tls_load_files);
 }

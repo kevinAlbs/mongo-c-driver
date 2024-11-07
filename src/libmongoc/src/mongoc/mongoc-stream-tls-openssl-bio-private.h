@@ -19,7 +19,7 @@
 #ifndef MONGOC_STREAM_TLS_OPENSSL_BIO_PRIVATE_H
 #define MONGOC_STREAM_TLS_OPENSSL_BIO_PRIVATE_H
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include <bson/bson.h>
 
 #include <openssl/bio.h>
@@ -57,5 +57,5 @@ mongoc_stream_tls_openssl_bio_puts (BIO *b, const char *str);
 
 BSON_END_DECLS
 
-#endif /* MONGOC_ENABLE_SSL_OPENSSL */
+#endif /* MONGOC_ENABLE_TLS_OPENSSL */
 #endif /* MONGOC_STREAM_TLS_OPENSSL_BIO_PRIVATE_H */

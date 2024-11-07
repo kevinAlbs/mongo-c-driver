@@ -74,7 +74,7 @@ struct _mongoc_server_monitor_t {
    int64_t min_heartbeat_frequency_ms;
    int64_t connect_timeout_ms;
    bool use_tls;
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    mongoc_tls_opt_t *ssl_opts;
 #endif
    mongoc_uri_t *uri;
@@ -831,7 +831,7 @@ mongoc_server_monitor_new (mongoc_topology_t *topology,
    server_monitor->uri = mongoc_uri_copy (topology->uri);
 /* TODO CDRIVER-3682: Do not retrieve ssl opts from topology scanner. They
  * should be stored somewhere else. */
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (topology->scanner->ssl_opts) {
       server_monitor->ssl_opts = bson_malloc0 (sizeof (mongoc_tls_opt_t));
 
@@ -880,11 +880,11 @@ _server_monitor_setup_connection (mongoc_server_monitor_t *server_monitor,
       void *ssl_opts_void = NULL;
       void *openssl_ctx_void = NULL;
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       ssl_opts_void = server_monitor->ssl_opts;
 #endif
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
       openssl_ctx_void = server_monitor->topology->scanner->openssl_ctx;
 #endif
 
@@ -1384,7 +1384,7 @@ mongoc_server_monitor_destroy (mongoc_server_monitor_t *server_monitor)
    mongoc_uri_destroy (server_monitor->uri);
    mongoc_cond_destroy (&server_monitor->shared.cond);
    bson_mutex_destroy (&server_monitor->shared.mutex);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (server_monitor->ssl_opts) {
       _mongoc_ssl_opts_cleanup (server_monitor->ssl_opts, true);
       bson_free (server_monitor->ssl_opts);

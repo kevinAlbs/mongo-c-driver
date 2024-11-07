@@ -29,11 +29,11 @@
 #include "mongoc-topology-background-monitoring-private.h"
 #include "mongoc-trace-private.h"
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc-ssl-private.h"
 #endif
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
 #include "mongoc-openssl-private.h"
 #endif
 
@@ -46,7 +46,7 @@ struct _mongoc_client_pool_t {
    uint32_t min_pool_size;
    uint32_t max_pool_size;
    uint32_t size;
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    bool ssl_opts_set;
    mongoc_tls_opt_t ssl_opts;
 #endif
@@ -62,7 +62,7 @@ struct _mongoc_client_pool_t {
 };
 
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 void
 mongoc_client_pool_set_tls_opts (mongoc_client_pool_t *pool, const mongoc_tls_opt_t *opts)
 {
@@ -80,7 +80,7 @@ mongoc_client_pool_set_tls_opts (mongoc_client_pool_t *pool, const mongoc_tls_op
 
       /* Update the OpenSSL context associated with this client pool to match new ssl opts. */
       /* All future clients popped from pool inherit this OpenSSL context. */
-#if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if defined(MONGOC_ENABLE_TLS_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
       SSL_CTX_free (pool->topology->scanner->openssl_ctx);
       pool->topology->scanner->openssl_ctx = _mongoc_openssl_ctx_new (&pool->ssl_opts);
 #endif
@@ -142,7 +142,7 @@ mongoc_client_pool_new_with_error (const mongoc_uri_t *uri, bson_error_t *error)
 
    BSON_ASSERT (uri);
 
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
    if (mongoc_uri_get_tls (uri)) {
       bson_set_error (error,
                       MONGOC_ERROR_COMMAND,
@@ -200,7 +200,7 @@ mongoc_client_pool_new_with_error (const mongoc_uri_t *uri, bson_error_t *error)
       BSON_ASSERT (mongoc_client_pool_set_appname (pool, appname));
    }
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (mongoc_uri_get_tls (pool->uri)) {
       mongoc_tls_opt_t ssl_opt = {0};
       _mongoc_internal_tls_opts_t internal_tls_opts = {0};
@@ -246,7 +246,7 @@ mongoc_client_pool_destroy (mongoc_client_pool_t *pool)
 
    mongoc_server_api_destroy (pool->api);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    _mongoc_ssl_opts_cleanup (&pool->ssl_opts, true);
 #endif
 
@@ -293,7 +293,7 @@ _initialize_new_client (mongoc_client_pool_t *pool, mongoc_client_t *client)
 
    client->api = mongoc_server_api_copy (pool->api);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (pool->ssl_opts_set) {
       mongoc_client_set_tls_opts (client, &pool->ssl_opts);
    }

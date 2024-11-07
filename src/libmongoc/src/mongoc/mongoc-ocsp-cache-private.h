@@ -20,7 +20,7 @@
 
 #include "mongoc-config.h"
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include "mongoc-openssl-private.h"
 
 #ifdef MONGOC_ENABLE_OCSP_OPENSSL
@@ -47,7 +47,7 @@ void
 _mongoc_ocsp_cache_cleanup (void);
 
 #endif /* MONGOC_ENABLE_OCSP_OPENSSL */
-#endif /* MONGOC_ENABLE_SSL_OPENSSL */
+#endif /* MONGOC_ENABLE_TLS_OPENSSL */
 
 /* ensure the translation unit is not empty */
 extern int no_mongoc_ocsp_cache;

@@ -16,7 +16,7 @@
 
 #include "mongoc-config.h"
 
-#ifdef MONGOC_ENABLE_SSL_LIBRESSL
+#ifdef MONGOC_ENABLE_TLS_LIBRESSL
 
 #include <bson/bson.h>
 

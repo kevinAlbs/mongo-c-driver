@@ -181,13 +181,13 @@ _test_server_selection_uds_auth_failure (bool pooled)
 
    if (pooled) {
       pool = test_framework_client_pool_new_from_uri (uri, NULL);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       test_framework_set_pool_ssl_opts (pool);
 #endif
       client = mongoc_client_pool_pop (pool);
    } else {
       client = test_framework_client_new_from_uri (uri, NULL);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       test_framework_set_ssl_opts (client);
 #endif
    }
@@ -243,18 +243,18 @@ _test_server_selection_uds_not_found (bool pooled)
 
    if (pooled) {
       pool = test_framework_client_pool_new_from_uri (uri, NULL);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       test_framework_set_pool_ssl_opts (pool);
 #endif
       client = mongoc_client_pool_pop (pool);
    } else {
       client = test_framework_client_new_from_uri (uri, NULL);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       test_framework_set_ssl_opts (client);
 #endif
    }
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    test_framework_set_ssl_opts (client);
 #endif
 

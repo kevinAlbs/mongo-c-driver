@@ -6,7 +6,7 @@
 #include "mongoc/mongoc-uri-private.h"
 #include "mongoc/utlist.h"
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc/mongoc-ssl.h"
 #include "mongoc/mongoc-ssl-private.h"
 #endif
@@ -243,7 +243,7 @@ _test_dns_maybe_pooled (bson_t *test, bool pooled)
    mongoc_apm_callbacks_t *callbacks;
    mongoc_client_pool_t *pool = NULL;
    mongoc_client_t *client;
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    mongoc_tls_opt_t ssl_opts;
 #endif
    bson_error_t error;
@@ -281,7 +281,7 @@ _test_dns_maybe_pooled (bson_t *test, bool pooled)
    /* suppress "cannot override URI option" messages */
    capture_logs (true);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    ssl_opts = *test_framework_get_ssl_opts ();
    ssl_opts.allow_invalid_hostname = true;
 #endif
@@ -302,7 +302,7 @@ _test_dns_maybe_pooled (bson_t *test, bool pooled)
        * assert that the URI has SSL on by default, and SSL off if "ssl=false"
        * is in the URI string */
       BSON_ASSERT (mongoc_uri_get_tls (_mongoc_client_pool_get_topology (pool)->uri) == expect_ssl);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       mongoc_client_pool_set_tls_opts (pool, &ssl_opts);
 #else
       test_framework_set_pool_ssl_opts (pool);
@@ -322,7 +322,7 @@ _test_dns_maybe_pooled (bson_t *test, bool pooled)
       }
 
       BSON_ASSERT (mongoc_uri_get_tls (client->uri) == expect_ssl);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       mongoc_client_set_tls_opts (client, &ssl_opts);
 #else
       test_framework_set_ssl_opts (client);
@@ -330,7 +330,7 @@ _test_dns_maybe_pooled (bson_t *test, bool pooled)
       mongoc_client_set_apm_callbacks (client, callbacks, &ctx);
    }
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    BSON_ASSERT (client->ssl_opts.allow_invalid_hostname);
 #endif
 
@@ -690,13 +690,13 @@ _prose_test_init_resource_single (const mongoc_uri_t *uri, _mongoc_rr_resolver_f
    _mongoc_topology_set_rr_resolver (topology, fn);
    _mongoc_topology_set_srv_polling_rescan_interval_ms (topology, RESCAN_INTERVAL_MS);
 
-#if defined(MONGOC_ENABLE_SSL)
+#if defined(MONGOC_ENABLE_TLS)
    {
       mongoc_tls_opt_t ssl_opts = *test_framework_get_ssl_opts ();
       ssl_opts.allow_invalid_hostname = true;
       mongoc_client_set_tls_opts (client, &ssl_opts);
    }
-#endif /* defined(MONGOC_ENABLE_SSL) */
+#endif /* defined(MONGOC_ENABLE_TLS) */
 
    return client;
 }
@@ -716,13 +716,13 @@ _prose_test_init_resource_pooled (const mongoc_uri_t *uri, _mongoc_rr_resolver_f
    _mongoc_topology_set_rr_resolver (topology, fn);
    _mongoc_topology_set_srv_polling_rescan_interval_ms (topology, RESCAN_INTERVAL_MS);
 
-#if defined(MONGOC_ENABLE_SSL)
+#if defined(MONGOC_ENABLE_TLS)
    {
       mongoc_tls_opt_t ssl_opts = *test_framework_get_ssl_opts ();
       ssl_opts.allow_invalid_hostname = true;
       mongoc_client_pool_set_tls_opts (pool, &ssl_opts);
    }
-#endif /* defined(MONGOC_ENABLE_SSL) */
+#endif /* defined(MONGOC_ENABLE_TLS) */
 
    return pool;
 }
@@ -1280,11 +1280,11 @@ test_removing_servers_closes_connections (void *unused)
       // Set a short heartbeat so server monitors get quick responses.
       mongoc_uri_set_option_as_int32 (uri, MONGOC_URI_HEARTBEATFREQUENCYMS, RESCAN_INTERVAL_MS);
       pool = mongoc_client_pool_new (uri);
-#if defined(MONGOC_ENABLE_SSL)
+#if defined(MONGOC_ENABLE_TLS)
       mongoc_tls_opt_t ssl_opts = *test_framework_get_ssl_opts ();
       ssl_opts.allow_invalid_hostname = true;
       mongoc_client_pool_set_tls_opts (pool, &ssl_opts);
-#endif /* defined(MONGOC_ENABLE_SSL) */
+#endif /* defined(MONGOC_ENABLE_TLS) */
       // Override the SRV polling callback:
       mongoc_topology_t *topology = _mongoc_client_pool_get_topology (pool);
       bson_mutex_init (&rr_override.lock);

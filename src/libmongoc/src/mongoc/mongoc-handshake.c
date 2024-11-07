@@ -69,8 +69,8 @@ _mongoc_handshake_get_config_hex_string (void)
    /* allocate enough bytes to fit all config bits. */
    uint8_t *const bf = (uint8_t *) bson_malloc0 (byte_count);
 
-#ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
-   _set_bit (bf, byte_count, MONGOC_ENABLE_SSL_SECURE_CHANNEL);
+#ifdef MONGOC_ENABLE_TLS_SECURE_CHANNEL
+   _set_bit (bf, byte_count, MONGOC_ENABLE_TLS_SECURE_CHANNEL);
 #endif
 
 #ifdef MONGOC_ENABLE_CRYPTO_CNG
@@ -81,7 +81,7 @@ _mongoc_handshake_get_config_hex_string (void)
    _set_bit (bf, byte_count, MONGOC_MD_FLAG_HAVE_BCRYPT_PBKDF2);
 #endif
 
-#ifdef MONGOC_ENABLE_SSL_SECURE_TRANSPORT
+#ifdef MONGOC_ENABLE_TLS_SECURE_TRANSPORT
    _set_bit (bf, byte_count, MONGOC_MD_FLAG_ENABLE_SSL_SECURE_TRANSPORT);
 #endif
 
@@ -89,7 +89,7 @@ _mongoc_handshake_get_config_hex_string (void)
    _set_bit (bf, byte_count, MONGOC_MD_FLAG_ENABLE_CRYPTO_COMMON_CRYPTO);
 #endif
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
    _set_bit (bf, byte_count, MONGOC_MD_FLAG_ENABLE_SSL_OPENSSL);
 #endif
 
@@ -97,7 +97,7 @@ _mongoc_handshake_get_config_hex_string (void)
    _set_bit (bf, byte_count, MONGOC_MD_FLAG_ENABLE_CRYPTO_LIBCRYPTO);
 #endif
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    _set_bit (bf, byte_count, MONGOC_MD_FLAG_ENABLE_SSL);
 #endif
 
@@ -125,7 +125,7 @@ _mongoc_handshake_get_config_hex_string (void)
    _set_bit (bf, byte_count, MONGOC_MD_FLAG_EXPERIMENTAL_FEATURES);
 #endif
 
-#ifdef MONGOC_ENABLE_SSL_LIBRESSL
+#ifdef MONGOC_ENABLE_TLS_LIBRESSL
    _set_bit (bf, byte_count, MONGOC_MD_FLAG_ENABLE_SSL_LIBRESSL);
 #endif
 

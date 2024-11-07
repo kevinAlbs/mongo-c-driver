@@ -135,7 +135,7 @@ _mongoc_http_send (const mongoc_http_request_t *req,
       goto fail;
    }
 
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
    if (use_tls) {
       bson_set_error (error,
                       MONGOC_ERROR_STREAM,

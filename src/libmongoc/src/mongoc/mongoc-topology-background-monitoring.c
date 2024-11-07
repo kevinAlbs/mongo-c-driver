@@ -19,7 +19,7 @@
 #include "mongoc-client-private.h"
 #include "mongoc-log-private.h"
 #include "mongoc-server-monitor-private.h"
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc-ssl-private.h"
 #endif
 #include "mongoc-stream-private.h"

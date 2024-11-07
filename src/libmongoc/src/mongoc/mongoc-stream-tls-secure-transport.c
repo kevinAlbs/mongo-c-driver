@@ -16,7 +16,7 @@
 
 #include "mongoc-config.h"
 
-#ifdef MONGOC_ENABLE_SSL_SECURE_TRANSPORT
+#ifdef MONGOC_ENABLE_TLS_SECURE_TRANSPORT
 
 #include <Security/Security.h>
 #include <Security/SecureTransport.h>
@@ -699,4 +699,4 @@ mongoc_stream_tls_secure_transport_new (mongoc_stream_t *base_stream,
    }
    RETURN ((mongoc_stream_t *) tls);
 }
-#endif /* MONGOC_ENABLE_SSL_SECURE_TRANSPORT */
+#endif /* MONGOC_ENABLE_TLS_SECURE_TRANSPORT */

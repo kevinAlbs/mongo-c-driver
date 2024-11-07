@@ -58,7 +58,7 @@ struct _mock_server_t {
    int last_autoresponder_id;
    int64_t start_time;
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    bool ssl;
    mongoc_tls_opt_t ssl_opts;
 #endif
@@ -271,7 +271,7 @@ mock_server_down (void)
 }
 
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 
 /*--------------------------------------------------------------------------
  *
@@ -1731,7 +1731,7 @@ static BSON_THREAD_FUN (main_thread, data)
 
          client_stream = mongoc_stream_socket_new (client_sock);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
          bson_mutex_lock (&server->mutex);
          if (server->ssl) {
             mongoc_stream_t *tls_stream;
@@ -1811,7 +1811,7 @@ static BSON_THREAD_FUN (worker_thread, data)
    autoresponder_handle_t handle;
    reply_t *reply;
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    bool ssl;
 #endif
 
@@ -1820,7 +1820,7 @@ static BSON_THREAD_FUN (worker_thread, data)
    /* queue of client replies sent over this worker's connection */
    replies = q_new ();
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    bson_mutex_lock (&server->mutex);
    ssl = server->ssl;
    bson_mutex_unlock (&server->mutex);

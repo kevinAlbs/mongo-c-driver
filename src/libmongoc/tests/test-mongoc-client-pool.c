@@ -243,7 +243,7 @@ test_mongoc_client_pool_set_min_size (void)
    mongoc_client_pool_destroy (pool);
 }
 
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
 static void
 test_mongoc_client_pool_ssl_disabled (void)
 {
@@ -637,7 +637,7 @@ disconnects_removed_servers_in_pool (void *unused)
 }
 
 /* Test no memory leaks when changing ssl_opts from re-creating OpenSSL context. */
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
 static void
 test_mongoc_client_pool_change_openssl_ctx (void)
 {
@@ -673,7 +673,7 @@ test_client_pool_install (TestSuite *suite)
                       NULL /* dtor */,
                       NULL /* ctx */,
                       test_framework_skip_if_no_sessions);
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
    TestSuite_Add (suite, "/ClientPool/ssl_disabled", test_mongoc_client_pool_ssl_disabled);
 #endif
    TestSuite_AddLive (suite, "/ClientPool/destroy_without_push", test_client_pool_destroy_without_pushing);
@@ -698,7 +698,7 @@ test_client_pool_install (TestSuite *suite)
       test_framework_skip_if_not_mongos /* require mongos to ensure two servers available */,
       test_framework_skip_if_max_wire_version_less_than_9 /* require server 4.4+ for streaming monitoring protocol */);
 
-#if defined(MONGOC_ENABLE_SSL_OPENSSL)
+#if defined(MONGOC_ENABLE_TLS_OPENSSL)
    TestSuite_Add (suite, "/ClientPool/openssl/change_ssl_opts", test_mongoc_client_pool_change_openssl_ctx);
 #endif
 }

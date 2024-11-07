@@ -10,7 +10,7 @@
 #include "test-conveniences.h"
 #include "test-libmongoc.h"
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 static void
 test_mongoc_scram_step_username_not_set (void)
 {
@@ -740,7 +740,7 @@ test_mongoc_scram_empty_password (void *ctx)
 void
 test_scram_install (TestSuite *suite)
 {
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    TestSuite_Add (suite, "/scram/username_not_set", test_mongoc_scram_step_username_not_set);
    TestSuite_Add (suite, "/scram/sasl_prep", test_mongoc_scram_sasl_prep);
    TestSuite_Add (suite, "/scram/iteration_count", test_mongoc_scram_iteration_count);

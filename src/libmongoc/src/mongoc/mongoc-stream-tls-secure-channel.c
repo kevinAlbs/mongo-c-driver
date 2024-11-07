@@ -51,7 +51,7 @@
 
 #include "mongoc-config.h"
 
-#ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+#ifdef MONGOC_ENABLE_TLS_SECURE_CHANNEL
 
 #include <bson/bson.h>
 
@@ -978,4 +978,4 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    mongoc_counter_streams_active_inc ();
    RETURN ((mongoc_stream_t *) tls);
 }
-#endif /* MONGOC_ENABLE_SSL_SECURE_CHANNEL */
+#endif /* MONGOC_ENABLE_TLS_SECURE_CHANNEL */

@@ -22,7 +22,7 @@
 #include "mongoc/mongoc-flags-private.h"
 #include "mongoc/mongoc-uri.h"
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc/mongoc-ssl.h"
 #endif
 
@@ -75,7 +75,7 @@ mock_server_auto_hello (mock_server_t *server, const char *response_json, ...);
 int
 mock_server_auto_endsessions (mock_server_t *server);
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 
 void
 mock_server_set_ssl_opts (mock_server_t *server, mongoc_tls_opt_t *opts);

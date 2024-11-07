@@ -19,7 +19,7 @@
 #ifndef MONGOC_STREAM_TLS_OPENSSL_H
 #define MONGOC_STREAM_TLS_OPENSSL_H
 
-#ifdef MONGOC_ENABLE_SSL_OPENSSL
+#ifdef MONGOC_ENABLE_TLS_OPENSSL
 #include <bson/bson.h>
 
 #include "mongoc-macros.h"
@@ -32,5 +32,5 @@ mongoc_stream_tls_openssl_new (mongoc_stream_t *base_stream, const char *host, m
 
 BSON_END_DECLS
 
-#endif /* MONGOC_ENABLE_SSL_OPENSSL */
+#endif /* MONGOC_ENABLE_TLS_OPENSSL */
 #endif /* MONGOC_STREAM_TLS_OPENSSL_H */

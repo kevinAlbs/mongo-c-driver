@@ -118,7 +118,7 @@ main (int argc, char *argv[])
    TEST_INSTALL (test_version_install);
    TEST_INSTALL (test_with_transaction_install);
    TEST_INSTALL (test_write_concern_install);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    TEST_INSTALL (test_stream_tls_install);
    TEST_INSTALL (test_x509_install);
    TEST_INSTALL (test_stream_tls_error_install);

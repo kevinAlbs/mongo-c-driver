@@ -30,7 +30,7 @@
 #include "mongoc-read-prefs.h"
 #include "mongoc-rpc-private.h"
 #include "mongoc-opcode.h"
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc-ssl.h"
 #endif
 
@@ -97,7 +97,7 @@ struct _mongoc_client_t {
    mongoc_stream_initiator_t initiator;
    void *initiator_data;
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    bool use_ssl;
    mongoc_tls_opt_t ssl_opts;
 #endif

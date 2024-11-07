@@ -290,7 +290,7 @@ test_counters_streams (void *ctx)
    buffered_stream_sock = mongoc_stream_buffered_new (stream_sock, 16);
    DIFF_AND_RESET (streams_active, ==, 1);
    DIFF_AND_RESET (streams_disposed, ==, 0);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    do {
       const mongoc_tls_opt_t *default_opts = mongoc_tls_opt_get_default ();
       mongoc_tls_opt_t opts = *default_opts;
@@ -1230,7 +1230,7 @@ test_counters_rpc_op_egress_mock_server_op_msg (void)
 }
 
 
-#if defined(MONGOC_ENABLE_SSL)
+#if defined(MONGOC_ENABLE_TLS)
 static void
 wait_for_background_threads (rpc_op_egress_counters expected)
 {
@@ -1529,7 +1529,7 @@ test_counters_install (TestSuite *suite)
    TestSuite_AddMockServerTest (
       suite, "/counters/rpc/op_egress/mock_server/op_msg", test_counters_rpc_op_egress_mock_server_op_msg);
 
-#if defined(MONGOC_ENABLE_SSL)
+#if defined(MONGOC_ENABLE_TLS)
    TestSuite_AddFull (suite,
                       "/counters/rpc/op_egress/auth/single/op_query",
                       test_counters_auth_single_op_query,
@@ -1560,6 +1560,6 @@ test_counters_install (TestSuite *suite)
                       test_framework_skip_if_no_auth,
                       test_framework_skip_if_max_wire_version_less_than_13,
                       test_framework_skip_if_not_replset);
-#endif // defined(MONGOC_ENABLE_SSL)
+#endif // defined(MONGOC_ENABLE_TLS)
 #endif
 }

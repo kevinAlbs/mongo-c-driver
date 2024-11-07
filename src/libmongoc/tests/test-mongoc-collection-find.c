@@ -39,10 +39,7 @@ typedef struct {
 } test_collection_find_t;
 
 
-#define TEST_COLLECTION_FIND_INIT \
-   {                              \
-      true, INT32_MAX             \
-   }
+#define TEST_COLLECTION_FIND_INIT {true, INT32_MAX}
 
 
 static void
@@ -1005,8 +1002,8 @@ test_tailable_timeout_single (void)
 }
 
 
-#ifndef MONGOC_ENABLE_SSL_SECURE_TRANSPORT
-#ifndef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+#ifndef MONGOC_ENABLE_TLS_SECURE_TRANSPORT
+#ifndef MONGOC_ENABLE_TLS_SECURE_CHANNEL
 static void
 test_tailable_timeout_pooled (void)
 {
@@ -1049,8 +1046,8 @@ test_collection_find_install (TestSuite *suite)
       suite, "/Collection/getmore/invalid_reply", test_getmore_invalid_reply, NULL, NULL, test_framework_skip_if_slow);
    TestSuite_AddMockServerTest (suite, "/Collection/getmore/await", test_getmore_await);
    TestSuite_AddLive (suite, "/Collection/tailable/timeout/single", test_tailable_timeout_single);
-#ifndef MONGOC_ENABLE_SSL_SECURE_TRANSPORT
-#ifndef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+#ifndef MONGOC_ENABLE_TLS_SECURE_TRANSPORT
+#ifndef MONGOC_ENABLE_TLS_SECURE_CHANNEL
    TestSuite_AddLive (suite, "/Collection/tailable/timeout/pooled", test_tailable_timeout_pooled);
 #endif
 #endif

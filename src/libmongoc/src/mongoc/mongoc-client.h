@@ -32,7 +32,7 @@
 #include "mongoc-macros.h"
 #include "mongoc-read-prefs.h"
 #include "mongoc-server-api.h"
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc-ssl.h"
 #endif
 #include "mongoc-stream.h"
@@ -222,7 +222,7 @@ MONGOC_EXPORT (const mongoc_read_prefs_t *)
 mongoc_client_get_read_prefs (const mongoc_client_t *client);
 MONGOC_EXPORT (void)
 mongoc_client_set_read_prefs (mongoc_client_t *client, const mongoc_read_prefs_t *read_prefs);
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 MONGOC_EXPORT (void)
 mongoc_client_set_ssl_opts (mongoc_client_t *client, const mongoc_tls_opt_t *opts)
    BSON_GNUC_DEPRECATED_FOR (mongoc_client_set_tls_opts);

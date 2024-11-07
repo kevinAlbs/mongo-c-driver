@@ -30,7 +30,7 @@
 #include "mongoc-host-list-private.h"
 #include "mongoc-log.h"
 #include "mongoc-cluster-sasl-private.h"
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
 #include "mongoc-ssl.h"
 #include "mongoc-ssl-private.h"
 #include "mongoc-stream-tls.h"
@@ -772,7 +772,7 @@ _stream_run_hello (mongoc_cluster_t *cluster,
 
    if (cluster->requires_auth && speculative_auth_response) {
       mongoc_tls_opt_t *ssl_opts = NULL;
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
       ssl_opts = &cluster->client->ssl_opts;
 #endif
 
@@ -1195,7 +1195,7 @@ _mongoc_cluster_get_auth_cmd_x509 (const mongoc_uri_t *uri,
                                    bson_t *cmd /* OUT */,
                                    bson_error_t *error /* OUT */)
 {
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
    bson_set_error (error,
                    MONGOC_ERROR_CLIENT,
                    MONGOC_ERROR_CLIENT_AUTHENTICATE,
@@ -1251,7 +1251,7 @@ _mongoc_cluster_auth_node_x509 (mongoc_cluster_t *cluster,
                                 mongoc_server_description_t *sd,
                                 bson_error_t *error)
 {
-#ifndef MONGOC_ENABLE_SSL
+#ifndef MONGOC_ENABLE_TLS
    bson_set_error (error,
                    MONGOC_ERROR_CLIENT,
                    MONGOC_ERROR_CLIENT_AUTHENTICATE,
@@ -1910,7 +1910,7 @@ _mongoc_cluster_finish_speculative_auth (mongoc_cluster_t *cluster,
       return false;
    }
 
-#ifdef MONGOC_ENABLE_SSL
+#ifdef MONGOC_ENABLE_TLS
    if (strcasecmp (mechanism, "MONGODB-X509") == 0) {
       /* For X509, a successful hello with speculativeAuthenticate field
        * indicates successful auth */
