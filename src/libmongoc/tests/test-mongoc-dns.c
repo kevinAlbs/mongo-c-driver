@@ -303,7 +303,7 @@ _test_dns_maybe_pooled (bson_t *test, bool pooled)
        * is in the URI string */
       BSON_ASSERT (mongoc_uri_get_tls (_mongoc_client_pool_get_topology (pool)->uri) == expect_ssl);
 #ifdef MONGOC_ENABLE_SSL
-      mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
+      mongoc_client_pool_set_tls_opts (pool, &ssl_opts);
 #else
       test_framework_set_pool_ssl_opts (pool);
 #endif
@@ -720,7 +720,7 @@ _prose_test_init_resource_pooled (const mongoc_uri_t *uri, _mongoc_rr_resolver_f
    {
       mongoc_tls_opt_t ssl_opts = *test_framework_get_ssl_opts ();
       ssl_opts.allow_invalid_hostname = true;
-      mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
+      mongoc_client_pool_set_tls_opts (pool, &ssl_opts);
    }
 #endif /* defined(MONGOC_ENABLE_SSL) */
 
@@ -1283,7 +1283,7 @@ test_removing_servers_closes_connections (void *unused)
 #if defined(MONGOC_ENABLE_SSL)
       mongoc_tls_opt_t ssl_opts = *test_framework_get_ssl_opts ();
       ssl_opts.allow_invalid_hostname = true;
-      mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
+      mongoc_client_pool_set_tls_opts (pool, &ssl_opts);
 #endif /* defined(MONGOC_ENABLE_SSL) */
       // Override the SRV polling callback:
       mongoc_topology_t *topology = _mongoc_client_pool_get_topology (pool);

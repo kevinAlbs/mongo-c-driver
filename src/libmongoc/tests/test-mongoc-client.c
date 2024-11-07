@@ -1979,7 +1979,7 @@ _test_mongoc_client_ipv6 (bool pooled)
    if (pooled) {
       pool = test_framework_client_pool_new_from_uri (uri, NULL);
 #if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_SSL)
-      mongoc_client_pool_set_ssl_opts (pool, &ssl_opts);
+      mongoc_client_pool_set_tls_opts (pool, &ssl_opts);
 #else
       test_framework_set_pool_ssl_opts (pool);
 #endif
@@ -2140,7 +2140,7 @@ _test_mongoc_client_ssl_opts (bool pooled)
 
       if (pooled) {
          pool = test_framework_client_pool_new_from_uri (uri, NULL);
-         mongoc_client_pool_set_ssl_opts (pool, ssl_opts);
+         mongoc_client_pool_set_tls_opts (pool, ssl_opts);
          client = mongoc_client_pool_pop (pool);
       } else {
          client = test_framework_client_new_from_uri (uri, NULL);
@@ -2836,7 +2836,7 @@ test_client_set_ssl_copies_args (bool pooled)
 
    if (pooled) {
       pool = test_framework_client_pool_new_from_uri (mock_server_get_uri (server), NULL);
-      mongoc_client_pool_set_ssl_opts (pool, &client_opts);
+      mongoc_client_pool_set_tls_opts (pool, &client_opts);
       client = mongoc_client_pool_pop (pool);
    } else {
       client = test_framework_client_new_from_uri (mock_server_get_uri (server), NULL);
@@ -2900,7 +2900,7 @@ _test_ssl_reconnect (bool pooled)
 
    if (pooled) {
       pool = test_framework_client_pool_new_from_uri (uri, NULL);
-      mongoc_client_pool_set_ssl_opts (pool, &client_opts);
+      mongoc_client_pool_set_tls_opts (pool, &client_opts);
       client = mongoc_client_pool_pop (pool);
    } else {
       client = test_framework_client_new_from_uri (uri, NULL);

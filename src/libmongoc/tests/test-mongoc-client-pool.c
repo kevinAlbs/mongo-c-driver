@@ -648,7 +648,7 @@ test_mongoc_client_pool_change_openssl_ctx (void)
 
    /* change ssl opts */
    ssl_opts = test_framework_get_ssl_opts ();
-   mongoc_client_pool_set_ssl_opts (pool, ssl_opts);
+   mongoc_client_pool_set_tls_opts (pool, ssl_opts);
 
    mongoc_client_pool_destroy (pool);
 }

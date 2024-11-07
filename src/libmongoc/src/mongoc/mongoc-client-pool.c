@@ -207,7 +207,7 @@ mongoc_client_pool_new_with_error (const mongoc_uri_t *uri, bson_error_t *error)
 
       _mongoc_ssl_opts_from_uri (&ssl_opt, &internal_tls_opts, pool->uri);
       /* sets use_ssl = true */
-      mongoc_client_pool_set_ssl_opts (pool, &ssl_opt);
+      mongoc_client_pool_set_tls_opts (pool, &ssl_opt);
       _mongoc_client_pool_set_internal_tls_opts (pool, &internal_tls_opts);
    }
 #endif

@@ -1615,7 +1615,7 @@ test_framework_set_pool_ssl_opts (mongoc_client_pool_t *pool)
       test_error ("SSL test config variables are specified in the environment, but"
                   " SSL isn't enabled");
 #else
-      mongoc_client_pool_set_ssl_opts (pool, &gSSLOptions);
+      mongoc_client_pool_set_tls_opts (pool, &gSSLOptions);
 #endif
    }
 }

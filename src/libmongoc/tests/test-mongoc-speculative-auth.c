@@ -165,7 +165,7 @@ _test_mongoc_speculative_auth (bool pooled,
 
 #ifdef MONGOC_ENABLE_SSL
       if (use_ssl) {
-         mongoc_client_pool_set_ssl_opts (pool, &client_ssl_opts);
+         mongoc_client_pool_set_tls_opts (pool, &client_ssl_opts);
       }
 #endif
 
