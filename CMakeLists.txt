@@ -111,19 +111,30 @@ mongo_setting(ENABLE_ZLIB "Enable zlib compression support"
 mongo_bool_setting(USE_BUNDLED_UTF8PROC "Enable building with utf8proc. Needed for SCRAM-SHA-256 authentication with non-ASCII passwords"
                    ADVANCED)
 mongo_setting(
-   ENABLE_SSL [[Enable TLS connection and SCRAM authentication.]]
+   ENABLE_TLS [[Enable TLS connection and SCRAM authentication.]]
    OPTIONS WINDOWS DARWIN OPENSSL LIBRESSL OFF AUTO
-   DEFAULT VALUE AUTO
+   DEFAULT EVAL [[
+      if(DEFINED ENABLE_SSL)
+         message(DEPRECATION "ENABLE_SSL is deprecated. Use ENABLE_TLS=${ENABLE_SSL} instead")
+         set (DEFAULT "${ENABLE_SSL}")
+      else ()
+         set(DEFAULT AUTO)
+      endif ()
+   ]]
    VALIDATE CODE [[
-      if(ENABLE_SSL STREQUAL "DARWIN" AND NOT APPLE)
-         message(WARNING "ENABLE_SSL=DARWIN is only supported on Apple platforms")
-      elseif(ENABLE_SSL STREQUAL "WINDOWS" AND NOT WIN32)
-         message(WARNING "ENABLE_SSL=WINDOWS is only supported on Windows platforms")
-      elseif (ENABLE_SSL STREQUAL "LIBRESSL")
-         message(DEPRECATION "ENABLE_SSL=LIBRESSL is deprecated and may be removed in a future major release")
+      if(ENABLE_TLS STREQUAL "DARWIN" AND NOT APPLE)
+         message(WARNING "ENABLE_TLS=DARWIN is only supported on Apple platforms")
+      elseif(ENABLE_TLS STREQUAL "WINDOWS" AND NOT WIN32)
+         message(WARNING "ENABLE_TLS=WINDOWS is only supported on Windows platforms")
+      elseif (ENABLE_TLS STREQUAL "LIBRESSL")
+         message(DEPRECATION "ENABLE_TLS=LIBRESSL is deprecated and may be removed in a future major release")
       endif()
    ]]
 )
+
+# For backwards compatibility, define ENABLE_SSL as an alias of ENABLE_TLS.
+set (ENABLE_SSL "${ENABLE_TLS}")
+
 mongo_bool_setting(
    ENABLE_SHM_COUNTERS "Enable memory performance counters"
    DEFAULT EVAL [[
