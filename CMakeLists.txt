@@ -188,8 +188,8 @@ mongo_setting(ENABLE_MONGODB_AWS_AUTH "Enable support for the MONGODB-AWS authen
                   endif()
                   if(MSVC AND MSVC_VERSION LESS 1900)
                      message(FATAL_ERROR "Visual Studio 2015 or newer is required for ENABLE_MONGODB_AWS_AUTH=ON")
-                  elseif(ENABLE_SSL STREQUAL "OFF")
-                     message(FATAL_ERROR "ENABLE_MONGODB_AWS_AUTH=ON requires that ENABLE_SSL not be 'OFF'")
+                  elseif(ENABLE_TLS STREQUAL "OFF")
+                     message(FATAL_ERROR "ENABLE_MONGODB_AWS_AUTH=ON requires that ENABLE_TLS not be 'OFF'")
                   endif()
               ]])
 
@@ -202,8 +202,8 @@ mongo_bool_setting(
    ENABLE_CRYPTO_SYSTEM_PROFILE "Use system crypto profile"
    DEFAULT VALUE OFF
    VALIDATE CODE [[
-      if(ENABLE_CRYPTO_SYSTEM_PROFILE AND NOT ENABLE_SSL STREQUAL "OPENSSL")
-         message(WARNING "ENABLE_CRYPTO_SYSTEM_PROFILE=TRUE is only applicable when ENABLE_SSL=OPENSSL")
+      if(ENABLE_CRYPTO_SYSTEM_PROFILE AND NOT ENABLE_TLS STREQUAL "OPENSSL")
+         message(WARNING "ENABLE_CRYPTO_SYSTEM_PROFILE=TRUE is only applicable when ENABLE_TLS=OPENSSL")
       endif()
    ]]
 )
@@ -485,9 +485,9 @@ if (ENABLE_MONGOC)
    if (ENABLE_MONGODB_AWS_AUTH STREQUAL "AUTO")
       if (MSVC AND MSVC_VERSION LESS 1900)
          message (WARNING "MS Visual Studio too old for ENABLE_MONGODB_AWS_AUTH")
-      elseif (NOT ENABLE_SSL)
+      elseif (NOT ENABLE_TLS)
             message (WARNING
-            "Option ENABLE_MONGODB_AWS_AUTH requires ENABLE_SSL not set to OFF"
+            "Option ENABLE_MONGODB_AWS_AUTH requires ENABLE_TLS not set to OFF"
          )
       else ()
          set (MONGOC_ENABLE_MONGODB_AWS_AUTH 1)
@@ -496,9 +496,9 @@ if (ENABLE_MONGOC)
       if (MSVC AND MSVC_VERSION LESS 1900)
          message (FATAL_ERROR "Use Visual Studio 2015 or higher for ENABLE_MONGODB_AWS_AUTH")
       endif ()
-      if (NOT ENABLE_SSL)
+      if (NOT ENABLE_TLS)
          message (FATAL_ERROR
-            "Option ENABLE_MONGODB_AWS_AUTH requires ENABLE_SSL not set to OFF"
+            "Option ENABLE_MONGODB_AWS_AUTH requires ENABLE_TLS not set to OFF"
          )
       endif ()
       set (MONGOC_ENABLE_MONGODB_AWS_AUTH 1)
