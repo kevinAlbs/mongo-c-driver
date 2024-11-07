@@ -57,6 +57,7 @@ API Reference
    mongoc_session_opt_t
    mongoc_socket_t
    mongoc_ssl_opt_t
+   mongoc_tls_opt_t
    mongoc_stream_buffered_t
    mongoc_stream_file_t
    mongoc_stream_socket_t

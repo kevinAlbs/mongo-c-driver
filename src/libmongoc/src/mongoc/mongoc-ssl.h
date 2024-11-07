@@ -26,6 +26,7 @@
 BSON_BEGIN_DECLS
 
 
+typedef struct _mongoc_ssl_opt_t mongoc_tls_opt_t;
 typedef struct _mongoc_ssl_opt_t mongoc_ssl_opt_t;
 
 
