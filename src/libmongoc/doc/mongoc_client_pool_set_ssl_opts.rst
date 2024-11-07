@@ -3,6 +3,10 @@
 mongoc_client_pool_set_ssl_opts()
 =================================
 
+.. deprecated:: 1.30.0
+
+   Use :symbol:`mongoc_client_pool_set_tls_opts` instead.
+
 Synopsis
 --------
 

@@ -55,7 +55,8 @@ MONGOC_EXPORT (void)
 mongoc_client_pool_min_size (mongoc_client_pool_t *pool, uint32_t min_pool_size) BSON_GNUC_DEPRECATED;
 #ifdef MONGOC_ENABLE_SSL
 MONGOC_EXPORT (void)
-mongoc_client_pool_set_ssl_opts (mongoc_client_pool_t *pool, const mongoc_tls_opt_t *opts);
+mongoc_client_pool_set_ssl_opts (mongoc_client_pool_t *pool, const mongoc_tls_opt_t *opts)
+   BSON_GNUC_DEPRECATED_FOR (mongoc_client_pool_set_tls_opts);
 MONGOC_EXPORT (void)
 mongoc_client_pool_set_tls_opts (mongoc_client_pool_t *pool, const mongoc_tls_opt_t *opts);
 #endif
