@@ -178,7 +178,7 @@ _test_mongoc_speculative_auth (bool pooled,
 
 #ifdef MONGOC_ENABLE_SSL
       if (use_ssl) {
-         mongoc_client_set_ssl_opts (client, &client_ssl_opts);
+         mongoc_client_set_tls_opts (client, &client_ssl_opts);
       }
 #endif
    }
@@ -392,7 +392,7 @@ test_mongoc_speculative_auth_request_x509_network_error (void)
       client_ssl_opts.pem_file = CERT_CLIENT;
       client = test_framework_client_new_from_uri (uri, NULL);
       ASSERT (client);
-      mongoc_client_set_ssl_opts (client, &client_ssl_opts);
+      mongoc_client_set_tls_opts (client, &client_ssl_opts);
    }
 
    // Send a ping, and receive a network error.

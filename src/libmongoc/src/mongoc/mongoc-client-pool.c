@@ -295,7 +295,7 @@ _initialize_new_client (mongoc_client_pool_t *pool, mongoc_client_t *client)
 
 #ifdef MONGOC_ENABLE_SSL
    if (pool->ssl_opts_set) {
-      mongoc_client_set_ssl_opts (client, &pool->ssl_opts);
+      mongoc_client_set_tls_opts (client, &pool->ssl_opts);
    }
 #endif
 }

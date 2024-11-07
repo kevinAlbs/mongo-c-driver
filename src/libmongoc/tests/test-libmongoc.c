@@ -1389,7 +1389,7 @@ test_framework_set_ssl_opts (mongoc_client_t *client)
       test_error ("SSL test config variables are specified in the environment, but"
                   " SSL isn't enabled");
 #else
-      mongoc_client_set_ssl_opts (client, &gSSLOptions);
+      mongoc_client_set_tls_opts (client, &gSSLOptions);
 #endif
    }
 }

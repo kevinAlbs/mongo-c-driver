@@ -323,7 +323,7 @@ _test_dns_maybe_pooled (bson_t *test, bool pooled)
 
       BSON_ASSERT (mongoc_uri_get_tls (client->uri) == expect_ssl);
 #ifdef MONGOC_ENABLE_SSL
-      mongoc_client_set_ssl_opts (client, &ssl_opts);
+      mongoc_client_set_tls_opts (client, &ssl_opts);
 #else
       test_framework_set_ssl_opts (client);
 #endif
@@ -694,7 +694,7 @@ _prose_test_init_resource_single (const mongoc_uri_t *uri, _mongoc_rr_resolver_f
    {
       mongoc_tls_opt_t ssl_opts = *test_framework_get_ssl_opts ();
       ssl_opts.allow_invalid_hostname = true;
-      mongoc_client_set_ssl_opts (client, &ssl_opts);
+      mongoc_client_set_tls_opts (client, &ssl_opts);
    }
 #endif /* defined(MONGOC_ENABLE_SSL) */
 

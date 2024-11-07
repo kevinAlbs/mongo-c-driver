@@ -1987,7 +1987,7 @@ _test_mongoc_client_ipv6 (bool pooled)
    } else {
       client = test_framework_client_new_from_uri (uri, NULL);
 #if (defined(__APPLE__) || defined(_WIN32)) && defined(MONGOC_ENABLE_SSL)
-      mongoc_client_set_ssl_opts (client, &ssl_opts);
+      mongoc_client_set_tls_opts (client, &ssl_opts);
 #else
       test_framework_set_ssl_opts (client);
 #endif
@@ -2144,7 +2144,7 @@ _test_mongoc_client_ssl_opts (bool pooled)
          client = mongoc_client_pool_pop (pool);
       } else {
          client = test_framework_client_new_from_uri (uri, NULL);
-         mongoc_client_set_ssl_opts (client, ssl_opts);
+         mongoc_client_set_tls_opts (client, ssl_opts);
       }
 
       /* any operation */
@@ -2235,7 +2235,7 @@ test_mongoc_client_change_openssl_ctx_before_ops (void *unused)
 
    /* change ssl opts before a connection is made */
    ssl_opts = test_framework_get_ssl_opts ();
-   mongoc_client_set_ssl_opts (client, ssl_opts);
+   mongoc_client_set_tls_opts (client, ssl_opts);
 
    /* any operation - ping the server */
    ret = mongoc_client_command_simple (client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
@@ -2261,7 +2261,7 @@ test_mongoc_client_change_openssl_ctx_between_ops (void *unused)
 
    /* change ssl opts before a second connection */
    ssl_opts = test_framework_get_ssl_opts ();
-   mongoc_client_set_ssl_opts (client, ssl_opts);
+   mongoc_client_set_tls_opts (client, ssl_opts);
 
    /* any operation - ping the server */
    ret = mongoc_client_command_simple (client, "admin", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
@@ -2840,7 +2840,7 @@ test_client_set_ssl_copies_args (bool pooled)
       client = mongoc_client_pool_pop (pool);
    } else {
       client = test_framework_client_new_from_uri (mock_server_get_uri (server), NULL);
-      mongoc_client_set_ssl_opts (client, &client_opts);
+      mongoc_client_set_tls_opts (client, &client_opts);
    }
 
    /* Now change the client ca string to be something else */
@@ -2904,7 +2904,7 @@ _test_ssl_reconnect (bool pooled)
       client = mongoc_client_pool_pop (pool);
    } else {
       client = test_framework_client_new_from_uri (uri, NULL);
-      mongoc_client_set_ssl_opts (client, &client_opts);
+      mongoc_client_set_tls_opts (client, &client_opts);
    }
 
    ASSERT_OR_PRINT (_cmd (server, client, true /* server replies */, &error), error);
@@ -3657,7 +3657,7 @@ test_invalid_server_id (void)
 static void
 test_ssl_opts_override (void)
 {
-   /* Test that mongoc_client_set_ssl_opts does not override the internal TLS
+   /* Test that mongoc_client_set_tls_opts does not override the internal TLS
     * options that can only be set through the URI. */
    mongoc_uri_t *uri;
    mongoc_client_t *client;
@@ -3666,7 +3666,7 @@ test_ssl_opts_override (void)
    uri = mongoc_uri_new ("mongodb://localhost:27017/?tls=true&tlsDisableOCSPEndpointCheck=true");
    client = test_framework_client_new_from_uri (uri, NULL);
    ssl_opts.allow_invalid_hostname = true;
-   mongoc_client_set_ssl_opts (client, &ssl_opts);
+   mongoc_client_set_tls_opts (client, &ssl_opts);
    BSON_ASSERT (client->ssl_opts.allow_invalid_hostname);
    BSON_ASSERT (((_mongoc_internal_tls_opts_t *) client->ssl_opts.internal)->tls_disable_ocsp_endpoint_check);
    mongoc_uri_destroy (uri);
@@ -3682,7 +3682,7 @@ test_ssl_opts_padding_not_null (void)
    ssl_opt.allow_invalid_hostname = true;
    ssl_opt.internal = (void *) 123;
    client = test_framework_client_new ("mongodb://localhost:27017", NULL);
-   mongoc_client_set_ssl_opts (client, &ssl_opt);
+   mongoc_client_set_tls_opts (client, &ssl_opt);
    BSON_ASSERT (client->ssl_opts.internal == NULL);
    mongoc_client_destroy (client);
 }

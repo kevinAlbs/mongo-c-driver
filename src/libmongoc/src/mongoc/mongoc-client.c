@@ -1123,7 +1123,7 @@ _mongoc_client_new_from_topology (mongoc_topology_t *topology)
       _mongoc_ssl_opts_from_uri (&ssl_opt, &internal_tls_opts, client->uri);
       /* sets use_ssl = true */
       /* this call creates an ssl ctx only if single-threaded, otherwise client inherits from pool */
-      mongoc_client_set_ssl_opts (client, &ssl_opt);
+      mongoc_client_set_tls_opts (client, &ssl_opt);
       _mongoc_client_set_internal_tls_opts (client, &internal_tls_opts);
    }
 #endif
