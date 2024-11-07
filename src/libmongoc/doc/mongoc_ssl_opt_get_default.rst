@@ -3,6 +3,10 @@
 mongoc_ssl_opt_get_default()
 ============================
 
+.. deprecated:: 1.30.0
+
+   Use :symbol:`mongoc_tls_opt_get_default` instead.
+
 Synopsis
 --------
 

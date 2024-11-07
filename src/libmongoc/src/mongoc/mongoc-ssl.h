@@ -42,13 +42,11 @@ struct _mongoc_ssl_opt_t {
    void *padding[6];
 };
 
-
-MONGOC_EXPORT (const mongoc_tls_opt_t *)
-mongoc_ssl_opt_get_default (void) BSON_GNUC_PURE;
-
 MONGOC_EXPORT (const mongoc_tls_opt_t *)
 mongoc_tls_opt_get_default (void) BSON_GNUC_PURE;
 
+MONGOC_EXPORT (const mongoc_tls_opt_t *)
+mongoc_ssl_opt_get_default (void) BSON_GNUC_PURE BSON_GNUC_DEPRECATED_FOR (mongoc_tls_opt_get_default);
 
 BSON_END_DECLS
 
