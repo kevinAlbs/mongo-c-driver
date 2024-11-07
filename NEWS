@@ -1,3 +1,23 @@
+libmongoc 1.30.0 (unreleased)
+=============================
+
+Entities referring to "SSL" are deprecated for "TLS" named equivalents:
+
+| Deprecated name                     |  New name                            |
+|-------------------------------------|--------------------------------------|
+|`mongoc_ssl_opt_t`                   | `mongoc_tls_opt_t`                   |
+|`mongoc_ssl_opt_get_default`         | `mongoc_tls_opt_get_default`         |
+|`mongoc_client_pool_set_ssl_opts`    | `mongoc_client_pool_set_tls_opts`    |
+|`mongoc_client_set_ssl_opts`         | `mongoc_client_set_tls_opts`         |
+|`ENABLE_SSL`                         | `ENABLE_TLS`                         |
+|`MONGOC_ENABLE_SSL_SECURE_CHANNEL`   | `MONGOC_ENABLE_TLS_SECURE_CHANNEL`   |
+|`MONGOC_ENABLE_SSL_SECURE_TRANSPORT` | `MONGOC_ENABLE_TLS_SECURE_TRANSPORT` |
+|`MONGOC_ENABLE_SSL_LIBRESSL`         | `MONGOC_ENABLE_TLS_LIBRESSL`         |
+|`MONGOC_ENABLE_SSL_OPENSSL`          | `MONGOC_ENABLE_TLS_OPENSSL`          |
+|`MONGOC_ENABLE_SSL`                  | `MONGOC_ENABLE_TLS`                  |
+|`MONGOC_SSL_DEFAULT_TRUST_FILE`      | `MONGOC_TLS_DEFAULT_TRUST_FILE`      |
+|`MONGOC_SSL_DEFAULT_TRUST_DIR`       | `MONGOC_TLS_DEFAULT_TRUST_DIR`       |
+
 libmongoc 1.29.0 (unreleased)
 =============================
 
