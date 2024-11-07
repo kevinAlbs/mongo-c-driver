@@ -38,18 +38,31 @@
 
 /* TODO: we could populate these from a config or something further down the
  * road for providing defaults */
-#ifndef MONGOC_SSL_DEFAULT_TRUST_FILE
-#define MONGOC_SSL_DEFAULT_TRUST_FILE NULL
+#if defined(MONGOC_TLS_DEFAULT_TRUST_FILE)
+// Do nothing.
+#elif defined(MONGOC_SSL_DEFAULT_TRUST_FILE)
+#pragma message( \
+   "Defining the macro MONGOC_SSL_DEFAULT_TRUST_FILE is deprecated. Use MONGOC_TLS_DEFAULT_TRUST_FILE instead.")
+#define MONGOC_TLS_DEFAULT_TRUST_FILE MONGOC_SSL_DEFAULT_TRUST_FILE
+#else
+#define MONGOC_TLS_DEFAULT_TRUST_FILE NULL
 #endif
-#ifndef MONGOC_SSL_DEFAULT_TRUST_DIR
-#define MONGOC_SSL_DEFAULT_TRUST_DIR NULL
+
+#if defined(MONGOC_TLS_DEFAULT_TRUST_DIR)
+// Do nothing.
+#elif defined(MONGOC_SSL_DEFAULT_TRUST_DIR)
+#pragma message( \
+   "Defining the macro MONGOC_SSL_DEFAULT_TRUST_DIR is deprecated. Use MONGOC_TLS_DEFAULT_TRUST_DIR instead.")
+#define MONGOC_TLS_DEFAULT_TRUST_DIR MONGOC_SSL_DEFAULT_TRUST_DIR
+#else
+#define MONGOC_TLS_DEFAULT_TRUST_DIR NULL
 #endif
 
 static mongoc_tls_opt_t gMongocSslOptDefault = {
    NULL,
    NULL,
-   MONGOC_SSL_DEFAULT_TRUST_FILE,
-   MONGOC_SSL_DEFAULT_TRUST_DIR,
+   MONGOC_TLS_DEFAULT_TRUST_FILE,
+   MONGOC_TLS_DEFAULT_TRUST_DIR,
 };
 
 const mongoc_tls_opt_t *
