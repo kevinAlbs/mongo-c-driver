@@ -225,6 +225,8 @@ mongoc_client_set_read_prefs (mongoc_client_t *client, const mongoc_read_prefs_t
 #ifdef MONGOC_ENABLE_SSL
 MONGOC_EXPORT (void)
 mongoc_client_set_ssl_opts (mongoc_client_t *client, const mongoc_tls_opt_t *opts);
+MONGOC_EXPORT (void)
+mongoc_client_set_tls_opts (mongoc_client_t *client, const mongoc_tls_opt_t *opts);
 #endif
 MONGOC_EXPORT (bool)
 mongoc_client_set_apm_callbacks (mongoc_client_t *client, mongoc_apm_callbacks_t *callbacks, void *context);

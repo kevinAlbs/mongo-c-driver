@@ -990,7 +990,7 @@ _mongoc_client_set_internal_tls_opts (mongoc_client_t *client, _mongoc_internal_
 }
 
 void
-mongoc_client_set_ssl_opts (mongoc_client_t *client, const mongoc_tls_opt_t *opts)
+mongoc_client_set_tls_opts (mongoc_client_t *client, const mongoc_tls_opt_t *opts)
 {
    BSON_ASSERT_PARAM (client);
    BSON_ASSERT (opts);
@@ -1010,6 +1010,12 @@ mongoc_client_set_ssl_opts (mongoc_client_t *client, const mongoc_tls_opt_t *opt
       client->topology->scanner->openssl_ctx = _mongoc_openssl_ctx_new (&client->ssl_opts);
 #endif
    }
+}
+
+void
+mongoc_client_set_ssl_opts (mongoc_client_t *client, const mongoc_tls_opt_t *opts)
+{
+   mongoc_client_set_tls_opts (client, opts);
 }
 #endif
 
