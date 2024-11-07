@@ -44,13 +44,13 @@
 #define MONGOC_CC "@MONGOC_CC@"
 
 /*
- * MONGOC_ENABLE_SSL_SECURE_CHANNEL is set from configure to determine if we are
- * compiled with Native SSL support on Windows
+ * MONGOC_ENABLE_TLS_SECURE_CHANNEL is set from configure to determine if we are
+ * compiled with Native TLS support on Windows
  */
-#define MONGOC_ENABLE_SSL_SECURE_CHANNEL @MONGOC_ENABLE_SSL_SECURE_CHANNEL@
+#define MONGOC_ENABLE_TLS_SECURE_CHANNEL @MONGOC_ENABLE_TLS_SECURE_CHANNEL@
 
-#if MONGOC_ENABLE_SSL_SECURE_CHANNEL != 1
-#  undef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+#if MONGOC_ENABLE_TLS_SECURE_CHANNEL != 1
+#  undef MONGOC_ENABLE_TLS_SECURE_CHANNEL
 #endif
 
 
@@ -75,15 +75,14 @@
 #endif
 
 /*
- * MONGOC_ENABLE_SSL_SECURE_TRANSPORT is set from configure to determine if we are
+ * MONGOC_ENABLE_TLS_SECURE_TRANSPORT is set from configure to determine if we are
  * compiled with Native SSL support on Darwin
  */
-#define MONGOC_ENABLE_SSL_SECURE_TRANSPORT @MONGOC_ENABLE_SSL_SECURE_TRANSPORT@
+#define MONGOC_ENABLE_TLS_SECURE_TRANSPORT @MONGOC_ENABLE_TLS_SECURE_TRANSPORT@
 
-#if MONGOC_ENABLE_SSL_SECURE_TRANSPORT != 1
-#  undef MONGOC_ENABLE_SSL_SECURE_TRANSPORT
+#if MONGOC_ENABLE_TLS_SECURE_TRANSPORT != 1
+#  undef MONGOC_ENABLE_TLS_SECURE_TRANSPORT
 #endif
-
 
 /*
  * MONGOC_ENABLE_CRYPTO_COMMON_CRYPTO is set from configure to determine if we are
@@ -97,24 +96,24 @@
 
 
 /*
- * MONGOC_ENABLE_SSL_LIBRESSL is set from configure to determine if we are
+ * MONGOC_ENABLE_TLS_LIBRESSL is set from configure to determine if we are
  * compiled with LibreSSL support.
  */
-#define MONGOC_ENABLE_SSL_LIBRESSL @MONGOC_ENABLE_SSL_LIBRESSL@
+#define MONGOC_ENABLE_TLS_LIBRESSL @MONGOC_ENABLE_TLS_LIBRESSL@
 
-#if MONGOC_ENABLE_SSL_LIBRESSL != 1
-#  undef MONGOC_ENABLE_SSL_LIBRESSL
+#if MONGOC_ENABLE_TLS_LIBRESSL != 1
+#  undef MONGOC_ENABLE_TLS_LIBRESSL
 #endif
 
 
 /*
- * MONGOC_ENABLE_SSL_OPENSSL is set from configure to determine if we are
+ * MONGOC_ENABLE_TLS_OPENSSL is set from configure to determine if we are
  * compiled with OpenSSL support.
  */
-#define MONGOC_ENABLE_SSL_OPENSSL @MONGOC_ENABLE_SSL_OPENSSL@
+#define MONGOC_ENABLE_TLS_OPENSSL @MONGOC_ENABLE_TLS_OPENSSL@
 
-#if MONGOC_ENABLE_SSL_OPENSSL != 1
-#  undef MONGOC_ENABLE_SSL_OPENSSL
+#if MONGOC_ENABLE_TLS_OPENSSL != 1
+#  undef MONGOC_ENABLE_TLS_OPENSSL
 #endif
 
 
@@ -130,13 +129,13 @@
 
 
 /*
- * MONGOC_ENABLE_SSL is set from configure to determine if we are
+ * MONGOC_ENABLE_TLS is set from configure to determine if we are
  * compiled with any SSL support.
  */
-#define MONGOC_ENABLE_SSL @MONGOC_ENABLE_SSL@
+#define MONGOC_ENABLE_TLS @MONGOC_ENABLE_TLS@
 
-#if MONGOC_ENABLE_SSL != 1
-#  undef MONGOC_ENABLE_SSL
+#if MONGOC_ENABLE_TLS != 1
+#  undef MONGOC_ENABLE_TLS
 #endif
 
 

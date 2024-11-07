@@ -264,18 +264,18 @@ set_package_properties(
    PURPOSE "Provides a cryptography and TLS backend"
 )
 
-mongo_bool01(MONGOC_ENABLE_SSL [[TLS_BACKEND]])
-mongo_bool01(MONGOC_ENABLE_SSL_SECURE_CHANNEL [[TLS_BACKEND STREQUAL "SecureChannel"]])
-mongo_bool01(MONGOC_ENABLE_SSL_SECURE_TRANSPORT [[TLS_BACKEND STREQUAL "SecureTransport"]])
-mongo_bool01(MONGOC_ENABLE_SSL_OPENSSL [[TLS_BACKEND STREQUAL "OpenSSL"]])
-mongo_bool01(MONGOC_ENABLE_SSL_LIBRESSL [[TLS_BACKEND STREQUAL "LibreSSL"]])
+mongo_bool01(MONGOC_ENABLE_TLS [[TLS_BACKEND]])
+mongo_bool01(MONGOC_ENABLE_TLS_SECURE_CHANNEL [[TLS_BACKEND STREQUAL "SecureChannel"]])
+mongo_bool01(MONGOC_ENABLE_TLS_SECURE_TRANSPORT [[TLS_BACKEND STREQUAL "SecureTransport"]])
+mongo_bool01(MONGOC_ENABLE_TLS_OPENSSL [[TLS_BACKEND STREQUAL "OpenSSL"]])
+mongo_bool01(MONGOC_ENABLE_TLS_LIBRESSL [[TLS_BACKEND STREQUAL "LibreSSL"]])
 
 mongo_bool01(MONGOC_ENABLE_CRYPTO [[TLS_BACKEND]])
-mongo_bool01(MONGOC_ENABLE_CRYPTO_LIBCRYPTO [[MONGOC_ENABLE_SSL_OPENSSL OR MONGOC_ENABLE_SSL_LIBRESSL]])
-mongo_bool01(MONGOC_ENABLE_CRYPTO_CNG [[MONGOC_ENABLE_SSL_SECURE_CHANNEL]])
-mongo_bool01(MONGOC_ENABLE_CRYPTO_COMMON_CRYPTO [[MONGOC_ENABLE_SSL_SECURE_TRANSPORT]])
+mongo_bool01(MONGOC_ENABLE_CRYPTO_LIBCRYPTO [[MONGOC_ENABLE_TLS_OPENSSL OR MONGOC_ENABLE_TLS_LIBRESSL]])
+mongo_bool01(MONGOC_ENABLE_CRYPTO_CNG [[MONGOC_ENABLE_TLS_SECURE_CHANNEL]])
+mongo_bool01(MONGOC_ENABLE_CRYPTO_COMMON_CRYPTO [[MONGOC_ENABLE_TLS_SECURE_TRANSPORT]])
 mongo_bool01(MONGOC_ENABLE_CRYPTO_SYSTEM_PROFILE [[ENABLE_CRYPTO_SYSTEM_PROFILE]])
-add_feature_info("TLS" "${MONGOC_ENABLE_SSL}" "for secure network communication (${TLS_BACKEND})")
+add_feature_info("TLS" "${MONGOC_ENABLE_TLS}" "for secure network communication (${TLS_BACKEND})")
 add_feature_info("Cryptography" "${MONGOC_ENABLE_CRYPTO}" "cryptographic primitives (${TLS_BACKEND})")
 
 include(CMakePushCheckState)
@@ -293,14 +293,14 @@ if(TLS_BACKEND STREQUAL "OpenSSL")
 endif()
 mongo_bool01(MONGOC_HAVE_ASN1_STRING_GET0_DATA [[HAVE_ASN1_STRING_GET0_DATA]])
 
-if(ENABLE_CRYPTO_SYSTEM_PROFILE AND NOT MONGOC_ENABLE_SSL_OPENSSL)
+if(ENABLE_CRYPTO_SYSTEM_PROFILE AND NOT MONGOC_ENABLE_TLS_OPENSSL)
    message (FATAL_ERROR "ENABLE_CRYPTO_SYSTEM_PROFILE is only available with OpenSSL")
 endif()
 
 set(_aws_feature_desc "authenticate with MongoDB servers using credentials from AWS instance metadata")
 if(ENABLE_MONGODB_AWS_AUTH)
    # We may want AWS auth
-   if(NOT MONGOC_ENABLE_SSL)
+   if(NOT MONGOC_ENABLE_TLS)
       # No TLS libs
       if(ENABLE_MONGODB_AWS_AUTH STREQUAL "AUTO")
          # Okay: Just turn it off
@@ -499,7 +499,7 @@ if (NOT ENABLE_CLIENT_SIDE_ENCRYPTION MATCHES "AUTO|ON|OFF")
    message (FATAL_ERROR, "ENABLE_CLIENT_SIDE_ENCRYPTION option must be AUTO, ON, or OFF")
 endif ()
 
-if (NOT MONGOC_ENABLE_SSL)
+if (NOT MONGOC_ENABLE_TLS)
    if (ENABLE_CLIENT_SIDE_ENCRYPTION STREQUAL ON)
       message (FATAL_ERROR "SSL disabled, but is required for In-Use Encryption support.")
    elseif (ENABLE_CLIENT_SIDE_ENCRYPTION STREQUAL AUTO)
@@ -1170,7 +1170,7 @@ set (test-libmongoc-sources
    ${PROJECT_SOURCE_DIR}/tests/unified/util.c
 )
 
-if (MONGOC_ENABLE_SSL)
+if (MONGOC_ENABLE_TLS)
    set (test-libmongoc-sources ${test-libmongoc-sources}
       ${PROJECT_SOURCE_DIR}/tests/ssl-test.c
       ${PROJECT_SOURCE_DIR}/tests/test-mongoc-client-side-encryption.c
@@ -1345,7 +1345,7 @@ if (ENABLE_EXAMPLES AND ENABLE_SHARED)
    )
 endif ()
 
-if (ENABLE_TESTS AND ENABLE_SHARED AND MONGOC_ENABLE_SSL AND NOT WIN32)
+if (ENABLE_TESTS AND ENABLE_SHARED AND MONGOC_ENABLE_TLS AND NOT WIN32)
    # Add benchmarks to measure opening many TLS connections.
    # Benchmarks require SSL, and do not build on Windows.
    add_executable (benchmark-tls-pooled ${PROJECT_SOURCE_DIR}/tests/benchmark-tls-pooled.c)
@@ -1419,7 +1419,7 @@ endif()
 set_property(TARGET ${TARGETS_TO_INSTALL} APPEND PROPERTY pkg_config_INCLUDE_DIRECTORIES "${MONGOC_HEADER_INSTALL_DIR}")
 
 # Deprecated alias for libmongoc-1.0.pc, see CDRIVER-2086.
-if (MONGOC_ENABLE_SSL)
+if (MONGOC_ENABLE_TLS)
    configure_file (
       ${CMAKE_CURRENT_SOURCE_DIR}/src/libmongoc-ssl-1.0.pc.in
       ${CMAKE_CURRENT_BINARY_DIR}/src/libmongoc-ssl-1.0.pc
