@@ -3388,7 +3388,7 @@ test_null_error_pointer_pooled (void *ctx)
 static void
 test_set_ssl_opts (void)
 {
-   const mongoc_tls_opt_t *opts = mongoc_ssl_opt_get_default ();
+   const mongoc_tls_opt_t *opts = mongoc_tls_opt_get_default ();
 
    ASSERT (opts->pem_file == NULL);
    ASSERT (opts->pem_pwd == NULL);

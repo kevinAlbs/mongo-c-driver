@@ -292,7 +292,7 @@ test_counters_streams (void *ctx)
    DIFF_AND_RESET (streams_disposed, ==, 0);
 #ifdef MONGOC_ENABLE_SSL
    do {
-      const mongoc_tls_opt_t *default_opts = mongoc_ssl_opt_get_default ();
+      const mongoc_tls_opt_t *default_opts = mongoc_tls_opt_get_default ();
       mongoc_tls_opt_t opts = *default_opts;
       mongoc_stream_t *ssl_buffered_stream_socket;
 

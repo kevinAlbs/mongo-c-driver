@@ -1700,7 +1700,7 @@ test_framework_client_pool_new_from_uri (const mongoc_uri_t *uri, const mongoc_s
 static void
 test_framework_global_ssl_opts_init (void)
 {
-   memcpy (&gSSLOptions, mongoc_ssl_opt_get_default (), sizeof gSSLOptions);
+   memcpy (&gSSLOptions, mongoc_tls_opt_get_default (), sizeof gSSLOptions);
 
    gSSLOptions.pem_file = test_framework_getenv ("MONGOC_TEST_SSL_PEM_FILE");
    gSSLOptions.pem_pwd = test_framework_getenv ("MONGOC_TEST_SSL_PEM_PWD");

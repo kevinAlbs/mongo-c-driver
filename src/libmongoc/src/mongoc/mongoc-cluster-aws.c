@@ -153,7 +153,7 @@ _send_http_request (bool use_tls,
    req.path = path;
    req.extra_headers = headers;
    if (use_tls) {
-      _mongoc_ssl_opts_copy_to (mongoc_ssl_opt_get_default (), &ssl_opt, true /* copy_internal */);
+      _mongoc_ssl_opts_copy_to (mongoc_tls_opt_get_default (), &ssl_opt, true /* copy_internal */);
    }
    ret = _mongoc_http_send (&req, socket_timeout_ms, use_tls /* use_tls */, use_tls ? &ssl_opt : NULL, &res, error);
 

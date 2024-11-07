@@ -563,7 +563,7 @@ _state_need_kms (_state_machine_t *state_machine, bson_error_t *error)
       } else if (mcd_mapof_kmsid_to_tlsopts_has (state_machine->crypt->kmsid_to_tlsopts, provider)) {
          ssl_opt = mcd_mapof_kmsid_to_tlsopts_get (state_machine->crypt->kmsid_to_tlsopts, provider);
       } else {
-         ssl_opt = mongoc_ssl_opt_get_default ();
+         ssl_opt = mongoc_tls_opt_get_default ();
       }
 
       mongocrypt_binary_destroy (http_req);
@@ -1214,7 +1214,7 @@ fail:
  * @tls_opts is the BSON document passed through
  * mongoc_client_encryption_opts_set_tls_opts or
  * mongoc_auto_encryption_opts_set_tls_opts.
- * Defaults to using mongoc_ssl_opt_get_default() if options are not passed for
+ * Defaults to using mongoc_tls_opt_get_default() if options are not passed for
  * a provider. Returns false and sets @error on error. */
 static bool
 _parse_all_tls_opts (_mongoc_crypt_t *crypt, const bson_t *tls_opts, bson_error_t *error)
@@ -1341,23 +1341,23 @@ _parse_all_tls_opts (_mongoc_crypt_t *crypt, const bson_t *tls_opts, bson_error_
    }
 
    /* Configure with default TLS options. The mongoc_tls_opt_t returned by
-    * mongoc_ssl_opt_get_default may contain non-NULL fields if
+    * mongoc_tls_opt_get_default may contain non-NULL fields if
     * MONGOC_SSL_DEFAULT_TRUST_FILE or MONGOC_SSL_DEFAULT_TRUST_DIR are defined.
     */
    if (!has_aws) {
-      _mongoc_ssl_opts_copy_to (mongoc_ssl_opt_get_default (), &crypt->aws_tls_opt, false /* copy internal */);
+      _mongoc_ssl_opts_copy_to (mongoc_tls_opt_get_default (), &crypt->aws_tls_opt, false /* copy internal */);
    }
 
    if (!has_azure) {
-      _mongoc_ssl_opts_copy_to (mongoc_ssl_opt_get_default (), &crypt->azure_tls_opt, false /* copy internal */);
+      _mongoc_ssl_opts_copy_to (mongoc_tls_opt_get_default (), &crypt->azure_tls_opt, false /* copy internal */);
    }
 
    if (!has_gcp) {
-      _mongoc_ssl_opts_copy_to (mongoc_ssl_opt_get_default (), &crypt->gcp_tls_opt, false /* copy internal */);
+      _mongoc_ssl_opts_copy_to (mongoc_tls_opt_get_default (), &crypt->gcp_tls_opt, false /* copy internal */);
    }
 
    if (!has_kmip) {
-      _mongoc_ssl_opts_copy_to (mongoc_ssl_opt_get_default (), &crypt->kmip_tls_opt, false /* copy internal */);
+      _mongoc_ssl_opts_copy_to (mongoc_tls_opt_get_default (), &crypt->kmip_tls_opt, false /* copy internal */);
    }
    ok = true;
 fail:
