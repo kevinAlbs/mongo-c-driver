@@ -503,8 +503,9 @@ mongoc_server_description_update_rtt (mongoc_server_description_t *server,
    if (server->round_trip_time_msec == MONGOC_RTT_UNSET) {
       server->round_trip_time_msec = rtt_msec;
    } else {
-      server->round_trip_time_msec = (int64_t) (
-         ALPHA * rtt_msec + (1 - ALPHA) * server->round_trip_time_msec);
+      server->round_trip_time_msec =
+         (int64_t) (ALPHA * rtt_msec +
+                    (1 - ALPHA) * server->round_trip_time_msec);
    }
 }
 
@@ -731,7 +732,7 @@ mongoc_server_description_handle_hello (mongoc_server_description_t *sd,
             sd, &incoming_topology_version);
          bson_destroy (&incoming_topology_version);
       } else if (strcmp ("serviceId", bson_iter_key (&iter)) == 0) {
-          if (!BSON_ITER_HOLDS_OID (&iter))
+         if (!BSON_ITER_HOLDS_OID (&iter))
             goto failure;
          bson_oid_copy_unsafe (bson_iter_oid (&iter), &sd->service_id);
       }
@@ -785,6 +786,13 @@ failure:
    EXIT;
 }
 
+static size_t mongoc_server_description_new_copy_callcount = 0;
+
+MONGOC_EXPORT (size_t)
+get_mongoc_server_description_new_copy_callcount (void)
+{
+   return mongoc_server_description_new_copy_callcount;
+}
 /*
  *-------------------------------------------------------------------------
  *
@@ -840,6 +848,8 @@ mongoc_server_description_new_copy (
    copy->generation = description->generation;
    copy->generation_map =
       mongoc_generation_map_copy (description->generation_map);
+
+   mongoc_server_description_new_copy_callcount++;
    return copy;
 }
 
@@ -1265,7 +1275,9 @@ mongoc_server_description_set_topology_version (mongoc_server_description_t *sd,
 }
 
 bool
-mongoc_server_description_has_service_id (const mongoc_server_description_t *description) {
+mongoc_server_description_has_service_id (
+   const mongoc_server_description_t *description)
+{
    if (0 == bson_oid_compare (&description->service_id, &kZeroServiceId)) {
       return false;
    }
