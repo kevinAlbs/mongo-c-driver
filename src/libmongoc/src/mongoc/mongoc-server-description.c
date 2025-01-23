@@ -789,6 +789,13 @@ failure:
    EXIT;
 }
 
+static size_t mongoc_server_description_new_copy_callcount = 0;
+
+MONGOC_EXPORT (size_t)
+get_mongoc_server_description_new_copy_callcount (void)
+{
+   return mongoc_server_description_new_copy_callcount;
+}
 /*
  *-------------------------------------------------------------------------
  *
@@ -846,6 +853,8 @@ mongoc_server_description_new_copy (
    copy->generation = description->generation;
    copy->_generation_map_ =
       mongoc_generation_map_copy (mc_tpl_sd_generation_map_const (description));
+
+   mongoc_server_description_new_copy_callcount++;
    return copy;
 }
 
