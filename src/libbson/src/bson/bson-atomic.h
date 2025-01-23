@@ -322,7 +322,8 @@ _bson_emul_atomic_int64_compare_exchange_weak (int64_t volatile *val,
 BSON_EXPORT (void)
 bson_thrd_yield (void);
 
-#if (defined(_MSC_VER) && !defined(_M_IX86)) || (defined(__LP64__) && __LP64__)
+#if defined(IS_NOT_DEFINED) && ((defined(_MSC_VER) && !defined(_M_IX86)) || \
+                                (defined(__LP64__) && __LP64__))
 /* (64-bit intrinsics are only available in x64) */
 #ifdef _MSC_VER
 DECL_ATOMIC_INTEGRAL (int64, __int64, 64)
