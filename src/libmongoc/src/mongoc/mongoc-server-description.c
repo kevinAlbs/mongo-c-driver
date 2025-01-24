@@ -501,14 +501,11 @@ mongoc_server_description_update_rtt (mongoc_server_description_t *server,
       return;
    }
    if (server->round_trip_time_msec == MONGOC_RTT_UNSET) {
-      bson_atomic_int64_exchange (
-         &server->round_trip_time_msec, rtt_msec, bson_memory_order_relaxed);
+      server->round_trip_time_msec = rtt_msec;
    } else {
-      bson_atomic_int64_exchange (
-         &server->round_trip_time_msec,
+      server->round_trip_time_msec =
          (int64_t) (ALPHA * rtt_msec +
-                    (1 - ALPHA) * server->round_trip_time_msec),
-         bson_memory_order_relaxed);
+                    (1 - ALPHA) * server->round_trip_time_msec);
    }
 }
 
@@ -859,12 +856,7 @@ mongoc_server_description_new_copy (
 
    COPY_FIELD (id);
    COPY_FIELD (host);
-   if (description->has_hello_response) {
-      copy->round_trip_time_msec = bson_atomic_int64_fetch (
-         &description->round_trip_time_msec, bson_memory_order_relaxed);
-   } else {
-      copy->round_trip_time_msec = MONGOC_RTT_UNSET;
-   }
+   COPY_FIELD (round_trip_time_msec);
    COPY_FIELD (last_update_time_usec);
    COPY_BSON_FIELD (last_hello_response);
    COPY_FIELD (has_hello_response);
