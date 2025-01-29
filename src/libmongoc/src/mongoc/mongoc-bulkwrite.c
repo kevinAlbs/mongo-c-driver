@@ -140,11 +140,8 @@ typedef enum { MODEL_OP_INSERT, MODEL_OP_UPDATE, MODEL_OP_DELETE } model_op_t;
 typedef struct {
    model_op_t op;
    // `id_loc` locates the "_id" field of an insert document.
-   struct {
-      size_t op_start;    // Offset in `mongoc_bulkwrite_t::ops` to the BSON for the insert op: { "document": ... }
-      size_t op_len;      // Length of insert op.
-      uint32_t id_offset; // Offset in the insert op to the "_id" field.
-   } id_loc;
+   size_t op_start; // Offset in `mongoc_bulkwrite_t::ops` to the BSON for the insert op: { "document": ... }
+   size_t op_len;   // Length of insert op.
    char *ns;
 } modeldata_t;
 
@@ -249,18 +246,6 @@ mongoc_bulkwrite_append_insertone (mongoc_bulkwrite_t *self,
    bson_t op = BSON_INITIALIZER;
    BSON_ASSERT (BSON_APPEND_INT32 (&op, "insert", -1)); // Append -1 as a placeholder. Will be overwritten later.
 
-   // `persisted_id_offset` is the byte offset the `_id` in `op`.
-   uint32_t persisted_id_offset = 0;
-   {
-      // Refer: bsonspec.org for BSON format.
-      persisted_id_offset += 4;                                   // Document length.
-      persisted_id_offset += 1;                                   // BSON type for int32.
-      persisted_id_offset += (uint32_t) strlen ("insert") + 1u;   // Key + 1 for NULL byte.
-      persisted_id_offset += 4;                                   // int32 value.
-      persisted_id_offset += 1;                                   // BSON type for document.
-      persisted_id_offset += (uint32_t) strlen ("document") + 1u; // Key + 1 for NULL byte.
-   }
-
    // If `document` does not contain `_id`, add one in the beginning.
    bson_iter_t existing_id_iter;
    if (!bson_iter_init_find (&existing_id_iter, document, "_id")) {
@@ -272,14 +257,9 @@ mongoc_bulkwrite_append_insertone (mongoc_bulkwrite_t *self,
       BSON_ASSERT (BSON_APPEND_DOCUMENT (&op, "document", &tmp));
       self->max_insert_len = BSON_MAX (self->max_insert_len, tmp.len);
       bson_destroy (&tmp);
-      persisted_id_offset += 4; // Document length.
    } else {
       BSON_ASSERT (BSON_APPEND_DOCUMENT (&op, "document", document));
       self->max_insert_len = BSON_MAX (self->max_insert_len, document->len);
-      // `existing_id_offset` is offset of `_id` in the input `document`.
-      const uint32_t existing_id_offset = bson_iter_offset (&existing_id_iter);
-      BSON_ASSERT (persisted_id_offset <= UINT32_MAX - existing_id_offset);
-      persisted_id_offset += existing_id_offset;
    }
 
    size_t op_start = self->ops.len; // Save location of `op` to retrieve `_id` later.
@@ -287,9 +267,7 @@ mongoc_bulkwrite_append_insertone (mongoc_bulkwrite_t *self,
    BSON_ASSERT (_mongoc_buffer_append (&self->ops, bson_get_data (&op), (size_t) op.len));
 
    self->n_ops++;
-   modeldata_t md = {.op = MODEL_OP_INSERT,
-                     .id_loc = {.op_start = op_start, .op_len = (size_t) op.len, .id_offset = persisted_id_offset},
-                     .ns = bson_strdup (ns)};
+   modeldata_t md = {.op = MODEL_OP_INSERT, .op_start = op_start, .op_len = (size_t) op.len, .ns = bson_strdup (ns)};
    _mongoc_array_append_val (&self->arrayof_modeldata, md);
    bson_destroy (&op);
    return true;
@@ -1460,8 +1438,11 @@ _bulkwritereturn_apply_result (mongoc_bulkwritereturn_t *self,
       }
       case MODEL_OP_INSERT: {
          bson_iter_t id_iter;
-         BSON_ASSERT (bson_iter_init_from_data_at_offset (
-            &id_iter, ops->data + md->id_loc.op_start, md->id_loc.op_len, md->id_loc.id_offset, strlen ("_id")));
+         bson_t op;
+         BSON_ASSERT (bson_init_static (&op, ops->data + md->op_start, md->op_len));
+         BSON_ASSERT (bson_iter_init_find (&id_iter, &op, "document"));
+         BSON_ASSERT (bson_iter_recurse (&id_iter, &id_iter));
+         BSON_ASSERT (bson_iter_find (&id_iter, "_id"));
          _bulkwriteresult_set_insertresult (self->res, &id_iter, models_idx);
          break;
       }
