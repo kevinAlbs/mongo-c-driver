@@ -1193,6 +1193,91 @@ test_serverMonitoringMode (void)
    printf ("'connect with serverMonitoringMode=poll' ... end\n");
 }
 
+static void
+on_topology_opening (const mongoc_apm_topology_opening_t *event)
+{
+   BSON_UNUSED (event);
+   printf ("topology opened\n");
+}
+
+static void
+on_topology_changed (const mongoc_apm_topology_changed_t *event)
+{
+   BSON_UNUSED (event);
+   const mongoc_topology_description_t *prev = mongoc_apm_topology_changed_get_previous_description (event);
+   const mongoc_topology_description_t *curr = mongoc_apm_topology_changed_get_new_description (event);
+
+   printf (
+      "topology changed: %s => %s\n", mongoc_topology_description_type (prev), mongoc_topology_description_type (curr));
+}
+
+static void
+on_topology_closed (const mongoc_apm_topology_closed_t *event)
+{
+   BSON_UNUSED (event);
+   printf ("topology closed\n");
+}
+
+
+static void
+on_server_opening (const mongoc_apm_server_opening_t *event)
+{
+   printf ("server opening: %s\n", mongoc_apm_server_opening_get_host (event)->host_and_port);
+}
+
+static void
+on_server_changed (const mongoc_apm_server_changed_t *event)
+{
+   const mongoc_server_description_t *prev = mongoc_apm_server_changed_get_previous_description (event);
+   const mongoc_server_description_t *curr = mongoc_apm_server_changed_get_new_description (event);
+   printf ("server changed: (%s) %s => %s\n",
+           mongoc_apm_server_changed_get_host (event)->host_and_port,
+           mongoc_server_description_type (prev),
+           mongoc_server_description_type (curr));
+}
+
+static void
+on_server_closed (const mongoc_apm_server_closed_t *event)
+{
+   printf ("server closed: %s\n", mongoc_apm_server_closed_get_host (event)->host_and_port);
+}
+
+
+static void
+on_command_started (const mongoc_apm_command_started_t *event)
+{
+   printf ("command started: %s\n", mongoc_apm_command_started_get_command_name (event));
+}
+
+
+static void
+set_callbacks (mongoc_client_t *client)
+{
+   mongoc_apm_callbacks_t *cbs = mongoc_apm_callbacks_new ();
+   mongoc_apm_set_command_started_cb (cbs, on_command_started);
+   mongoc_apm_set_topology_opening_cb (cbs, on_topology_opening);
+   mongoc_apm_set_topology_changed_cb (cbs, on_topology_changed);
+   mongoc_apm_set_topology_closed_cb (cbs, on_topology_closed);
+   mongoc_apm_set_server_opening_cb (cbs, on_server_opening);
+   mongoc_apm_set_server_changed_cb (cbs, on_server_changed);
+   mongoc_apm_set_server_closed_cb (cbs, on_server_closed);
+   ASSERT (mongoc_client_set_apm_callbacks (client, cbs, NULL));
+   mongoc_apm_callbacks_destroy (cbs);
+}
+
+static void
+test_sdam_open (void)
+{
+   mongoc_client_t *client = mongoc_client_new ("mongodb://localhost:27017");
+   // Send a command first.
+   ASSERT (mongoc_client_command_simple (client, "db", tmp_bson ("{'hello': 1}"), NULL, NULL, NULL));
+   // Now register callbacks. Expect opening events are missed.
+   set_callbacks (client);
+   ASSERT (mongoc_client_command_simple (client, "db", tmp_bson ("{'ping': 1}"), NULL, NULL, NULL));
+
+   mongoc_client_destroy (client);
+}
+
 void
 test_sdam_monitoring_install (TestSuite *suite)
 {
@@ -1223,4 +1308,6 @@ test_sdam_monitoring_install (TestSuite *suite)
       suite, "/server_discovery_and_monitoring/monitoring/no_duplicates", test_no_duplicates, NULL, NULL);
    TestSuite_AddLive (
       suite, "/server_discovery_and_monitoring/monitoring/serverMonitoringMode", test_serverMonitoringMode);
+
+   TestSuite_AddLive (suite, "/sdam/open", test_sdam_open);
 }
