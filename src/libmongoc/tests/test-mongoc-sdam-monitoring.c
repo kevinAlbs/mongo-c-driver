@@ -1193,6 +1193,41 @@ test_serverMonitoringMode (void)
    printf ("'connect with serverMonitoringMode=poll' ... end\n");
 }
 
+static void
+on_topology_opening (const mongoc_apm_topology_opening_t *event)
+{
+   BSON_UNUSED (event);
+   printf ("topology opened\n");
+}
+
+static void
+on_command_started (const mongoc_apm_command_started_t *event)
+{
+   printf ("command started: %s\n", mongoc_apm_command_started_get_command_name (event));
+}
+
+static void
+test_sdam_open (void)
+{
+   bson_error_t error;
+   mongoc_client_t *client = mongoc_client_new ("mongodb://localhost:27017");
+
+   ASSERT_OR_PRINT (mongoc_client_command_simple (client, "db", tmp_bson ("{'hello': 1}"), NULL, NULL, &error), error);
+
+   // Set callbacks to log "ping" command.
+   {
+      mongoc_apm_callbacks_t *cbs = mongoc_apm_callbacks_new ();
+      mongoc_apm_set_topology_opening_cb (cbs, on_topology_opening);
+      mongoc_apm_set_command_started_cb (cbs, on_command_started);
+      mongoc_client_set_apm_callbacks (client, cbs, NULL);
+      mongoc_apm_callbacks_destroy (cbs);
+   }
+
+   ASSERT (mongoc_client_command_simple (client, "db", tmp_bson ("{'ping': 1}"), NULL, NULL, NULL));
+
+   mongoc_client_destroy (client);
+}
+
 void
 test_sdam_monitoring_install (TestSuite *suite)
 {
@@ -1223,4 +1258,6 @@ test_sdam_monitoring_install (TestSuite *suite)
       suite, "/server_discovery_and_monitoring/monitoring/no_duplicates", test_no_duplicates, NULL, NULL);
    TestSuite_AddLive (
       suite, "/server_discovery_and_monitoring/monitoring/serverMonitoringMode", test_serverMonitoringMode);
+
+   TestSuite_AddLive (suite, "/sdam/open", test_sdam_open);
 }
