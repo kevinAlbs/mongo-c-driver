@@ -1367,7 +1367,7 @@ entity_collection_new (entity_map_t *entity_map, bson_t *bson, bson_error_t *err
          goto done;
       }
       if (coll_or_db_opts->encrypted_fields) {
-         opts = BCON_NEW (opts, "encryptedFields", BCON_DOCUMENT (coll_or_db_opts->encrypted_fields));
+         opts = BCON_NEW ("encryptedFields", BCON_DOCUMENT (coll_or_db_opts->encrypted_fields));
       }
    }
 
