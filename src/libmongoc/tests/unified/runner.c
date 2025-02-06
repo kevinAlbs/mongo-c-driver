@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "bson/bson.h"
 #include "bsonutil/bson-match.h"
 #include "bsonutil/bson-parser.h"
 #include "bsonutil/bson-val.h"
@@ -25,6 +26,7 @@
 #include "test-libmongoc.h"
 #include "test-diagnostics.h"
 #include <mongoc/utlist.h>
+#include <mongoc/mongoc-database-private.h>
 #include "util.h"
 #include <common-string-private.h>
 #include <common-cmp-private.h>
@@ -837,7 +839,7 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
       mongoc_write_concern_t *wc = NULL;
       bson_t *bulk_opts = NULL;
       bson_t *drop_opts = bson_new ();
-      bson_t *create_opts = bson_new ();
+      bson_t *create_opts = NULL;
       bool ret = false;
 
       bson_iter_bson (&initial_data_iter, &collection_data);
@@ -845,8 +847,13 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
       bson_parser_utf8 (parser, "databaseName", &database_name);
       bson_parser_utf8 (parser, "collectionName", &collection_name);
       bson_parser_array (parser, "documents", &documents);
+      bson_parser_doc_optional (parser, "createOptions", &create_opts);
       if (!bson_parser_parse (parser, &collection_data, error)) {
          goto loopexit;
+      }
+
+      if (create_opts == NULL) {
+         create_opts = bson_new ();
       }
 
       wc = mongoc_write_concern_new ();
@@ -869,6 +876,15 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
       }
 
       coll = mongoc_client_get_collection (test_runner->internal_client, database_name, collection_name);
+      bson_t existing_encryptedFields = BSON_INITIALIZER;
+      if (_mongoc_get_encryptedFields_from_server (
+             test_runner->internal_client, database_name, collection_name, &existing_encryptedFields, error)) {
+         if (!bson_empty (&existing_encryptedFields)) {
+            BSON_APPEND_DOCUMENT (drop_opts, "encryptedFields", &existing_encryptedFields);
+         }
+      } else {
+         goto loopexit;
+      }
       if (!mongoc_collection_drop_with_opts (coll, drop_opts, error)) {
          if (error->code != 26 && (NULL == strstr (error->message, "ns not found"))) {
             /* This is not a "ns not found" error. Fail the test. */
