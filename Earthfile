@@ -56,6 +56,45 @@ build:
     SAVE ARTIFACT /opt/mongoc/build/* /build-tree/
     SAVE ARTIFACT /opt/mongo-c-driver/* /root/
 
+# build-c23 is a target to test C23 build.
+build-c23:
+    FROM fedora:42
+    RUN yum -y install gcc cmake ninja-build ccache snappy-devel zlib-devel openssl-devel cyrus-sasl-devel
+    ARG install_prefix=/opt/mongo-c-driver
+    LET source_dir=/opt/mongoc/source
+    LET build_dir=/opt/mongoc/build
+    COPY --dir \
+        src/ \
+        build/ \
+        COPYING \
+        CMakeLists.txt \
+        README.rst \
+        THIRD_PARTY_NOTICES \
+        NEWS \
+        "$source_dir"
+    COPY +version-current/ $source_dir
+    ENV CCACHE_HOME=/root/.cache/ccache
+    RUN cmake -S "$source_dir" -B "$build_dir" -G "Ninja Multi-Config" \
+        -D ENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF \
+        -D ENABLE_MAINTAINER_FLAGS=ON \
+        -D ENABLE_SHM_COUNTERS=ON \
+        -D ENABLE_EXTRA_ALIGNMENT=OFF \
+        -D ENABLE_SASL=CYRUS \
+        -D ENABLE_SNAPPY=ON \
+        -D ENABLE_SRV=ON \
+        -D ENABLE_ZLIB=BUNDLED \
+        -D ENABLE_SSL=OPENSSL \
+        -D ENABLE_COVERAGE=ON \
+        -D ENABLE_DEBUG_ASSERTIONS=ON \
+        -D CMAKE_C_STANDARD=23 \
+        -Werror
+    RUN --mount=type=cache,target=$CCACHE_HOME \
+        env CCACHE_BASE="$source_dir" \
+            cmake --build $build_dir --config Release
+    RUN cmake --install $build_dir --prefix="$install_prefix" --config Release
+    SAVE ARTIFACT /opt/mongoc/build/* /build-tree/
+    SAVE ARTIFACT /opt/mongo-c-driver/* /root/
+
 # test-example will build one of the libmongoc example projects using the build
 # that comes from the +build target. Arguments for +build should also be provided
 test-example:
