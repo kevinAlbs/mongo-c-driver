@@ -1254,7 +1254,6 @@ coll_or_db_opts_parse (coll_or_db_opts_t *opts, bson_t *in, bson_error_t *error)
    bson_parser_read_concern_optional (parser, &opts->rc);
    bson_parser_read_prefs_optional (parser, &opts->rp);
    bson_parser_write_concern_optional (parser, &opts->wc);
-   bson_parser_doc_optional (parser, "encryptedFields", &opts->encrypted_fields);
    if (!bson_parser_parse (parser, in, error)) {
       goto done;
    }

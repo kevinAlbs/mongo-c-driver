@@ -1235,6 +1235,16 @@ test_count_matching_events_for_client (
 }
 
 static bool
+skip_cse_list_collections (const bson_t *event)
+{
+   const char *val = bson_lookup_utf8 (event, "commandName");
+   if (val && 0 == strcmp (val, "listCollections")) {
+      return true;
+   }
+   return false;
+}
+
+static bool
 test_check_expected_events_for_client (test_t *test, bson_t *expected_events_for_client, bson_error_t *error)
 {
    bool ret = false;
@@ -1276,8 +1286,18 @@ test_check_expected_events_for_client (test_t *test, bson_t *expected_events_for
       goto done;
    }
 
+   int listCollections_count = 0;
+   LL_FOREACH (entity->events, eiter)
+   {
+      if (skip_cse_list_collections (eiter->serialized)) {
+         listCollections_count++;
+      }
+   }
+   eiter = entity->events;
+
    expected_num_events = bson_count_keys (expected_events);
    LL_COUNT (entity->events, eiter, actual_num_events);
+   actual_num_events -= listCollections_count;
    if (expected_num_events != actual_num_events) {
       bool too_many_events = actual_num_events > expected_num_events;
       if (ignore_extra_events && *ignore_extra_events) {
@@ -1295,8 +1315,14 @@ test_check_expected_events_for_client (test_t *test, bson_t *expected_events_for
    eiter = entity->events;
    BSON_FOREACH (expected_events, iter)
    {
-      bson_t expected_event;
+      while (eiter && skip_cse_list_collections (eiter->serialized)) {
+         eiter = eiter->next;
+      }
+      if (!eiter) {
+         goto done;
+      }
 
+      bson_t expected_event;
       bson_iter_bson (&iter, &expected_event);
       if (!eiter) {
          test_set_error (error, "could not find event: %s", tmp_json (&expected_event));
