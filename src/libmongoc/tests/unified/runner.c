@@ -1315,24 +1315,34 @@ test_check_expected_events_for_client (test_t *test, bson_t *expected_events_for
    eiter = entity->events;
    BSON_FOREACH (expected_events, iter)
    {
-      while (eiter && skip_cse_list_collections (eiter->serialized)) {
-         eiter = eiter->next;
-      }
-      if (!eiter) {
-         goto done;
-      }
-
+      bool matched = false;
       bson_t expected_event;
       bson_iter_bson (&iter, &expected_event);
+      while (eiter) {
+         matched = test_check_event (test, &expected_event, eiter, error);
+         if (matched) {
+            break;
+         }
+
+         if (skip_cse_list_collections (eiter->serialized)) {
+            continue;
+         }
+         eiter = eiter->next;
+      }
+
       if (!eiter) {
          test_set_error (error, "could not find event: %s", tmp_json (&expected_event));
          goto done;
       }
-      if (!test_check_event (test, &expected_event, eiter, error)) {
-         test_diagnostics_error_info ("checking for expected event: %s", tmp_json (&expected_event));
-         goto done;
+
+      if (!matched) {
+         test_set_error (error,
+                         "could not match event\n"
+                         "\texpected: %s\n\n"
+                         "\tactual  : %s\n\n ",
+                         bson_as_canonical_extended_json (&expected_event, NULL),
+                         bson_as_canonical_extended_json (eiter->serialized, NULL));
       }
-      eiter = eiter->next;
    }
 
    ret = true;
