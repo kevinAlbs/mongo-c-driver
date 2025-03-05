@@ -1237,8 +1237,9 @@ test_count_matching_events_for_client (
 static bool
 skip_cse_list_collections (const bson_t *event)
 {
-   const char *val = bson_lookup_utf8 (event, "commandName");
-   if (val && 0 == strcmp (val, "listCollections")) {
+   const char *cmdname = bson_lookup_utf8 (event, "commandName");
+   const char *dbname = bson_lookup_utf8 (event, "databaseName");
+   if (cmdname && 0 == strcmp (cmdname, "listCollections") && dbname && 0 == strcmp (dbname, "keyvault")) {
       return true;
    }
    return false;
@@ -1286,18 +1287,18 @@ test_check_expected_events_for_client (test_t *test, bson_t *expected_events_for
       goto done;
    }
 
-   int listCollections_count = 0;
+   int actual_listCollections_count = 0;
    LL_FOREACH (entity->events, eiter)
    {
       if (skip_cse_list_collections (eiter->serialized)) {
-         listCollections_count++;
+         actual_listCollections_count++;
       }
    }
    eiter = entity->events;
 
    expected_num_events = bson_count_keys (expected_events);
    LL_COUNT (entity->events, eiter, actual_num_events);
-   actual_num_events -= listCollections_count;
+   actual_num_events -= actual_listCollections_count;
    if (expected_num_events != actual_num_events) {
       bool too_many_events = actual_num_events > expected_num_events;
       if (ignore_extra_events && *ignore_extra_events) {
