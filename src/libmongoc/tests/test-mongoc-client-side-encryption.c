@@ -6506,7 +6506,7 @@ test_client_side_encryption_install (TestSuite *suite)
                       NULL,
                       NULL,
                       test_framework_skip_if_no_client_side_encryption,
-                      test_framework_skip_if_max_wire_version_less_than_21,
+                      test_framework_skip_if_max_wire_version_less_than_25,
                       test_framework_skip_if_single);
    TestSuite_AddFull (suite,
                       "/client_side_encryption/views_are_prohibited",
