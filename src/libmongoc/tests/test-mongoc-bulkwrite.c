@@ -682,6 +682,118 @@ test_bulkwrite_two_large_inserts (void *unused)
    bson_free (large_string);
 }
 
+static void
+test_bulkwrite_w0_vs_error (void *unused)
+{
+   BSON_UNUSED (unused);
+
+   bson_error_t error;
+   mongoc_client_t *client = test_framework_new_default_client ();
+
+   mongoc_write_concern_t *w0 = mongoc_write_concern_new ();
+   mongoc_write_concern_set_w (w0, MONGOC_WRITE_CONCERN_W_UNACKNOWLEDGED);
+
+
+   // Drop prior collection:
+   {
+      mongoc_collection_t *coll = mongoc_client_get_collection (client, "db", "coll");
+      mongoc_collection_drop (coll, NULL);
+      // Insert a document to trigger duplicate key errors in later tests.
+      ASSERT_OR_PRINT (mongoc_collection_insert_one (coll, tmp_bson ("{'_id': 'dupe'}"), NULL, NULL, &error), error);
+      mongoc_collection_destroy (coll);
+   }
+
+   // Test a successful w:0 write:
+   {
+      mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+      ASSERT_OR_PRINT (mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error), error);
+      mongoc_bulkwriteopts_t *bw_opts = mongoc_bulkwriteopts_new ();
+      mongoc_bulkwriteopts_set_writeconcern (bw_opts, w0);
+      mongoc_bulkwriteopts_set_ordered (bw_opts, false); // w:0 requires unordered.
+      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, bw_opts);
+      ASSERT (!bwr.res); // NULL since w:0
+      ASSERT (!bwr.exc); // NULL since no error.
+      ASSERT_NO_BULKWRITEEXCEPTION (bwr);
+      mongoc_bulkwrite_destroy (bw);
+      mongoc_bulkwriteresult_destroy (bwr.res);
+      mongoc_bulkwriteexception_destroy (bwr.exc);
+      mongoc_bulkwriteopts_destroy (bw_opts);
+   }
+
+   // Test a failed w:0 write:
+   {
+      mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+      ASSERT_OR_PRINT (mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{}"), NULL, &error), error);
+      mongoc_bulkwriteopts_t *bw_opts = mongoc_bulkwriteopts_new ();
+      mongoc_bulkwriteopts_set_writeconcern (bw_opts, w0);
+      mongoc_bulkwriteopts_set_ordered (bw_opts, true); // Will cause client-side failure.
+      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, bw_opts);
+      ASSERT (!bwr.res); // NULL since w:0.
+      ASSERT (bwr.exc);  // Non-NULL since client-side error.
+      ASSERT (mongoc_bulkwriteexception_error (bwr.exc, &error));
+      ASSERT_ERROR_CONTAINS (error,
+                             MONGOC_ERROR_COMMAND,
+                             MONGOC_ERROR_COMMAND_INVALID_ARG,
+                             "Cannot request unacknowledged write concern and ordered writes.");
+      mongoc_bulkwrite_destroy (bw);
+      mongoc_bulkwriteresult_destroy (bwr.res);
+      mongoc_bulkwriteexception_destroy (bwr.exc);
+      mongoc_bulkwriteopts_destroy (bw_opts);
+   }
+
+   // Test a failed w:1 write with a successful delete.
+   {
+      mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+      // First operation is a delete matching no documents:
+      ASSERT_OR_PRINT (
+         mongoc_bulkwrite_append_deleteone (bw, "db.coll", tmp_bson ("{'_id': 'no-match'}"), NULL, &error), error);
+      // Second operation is an insert failing due to duplicate key:
+      ASSERT_OR_PRINT (mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{'_id': 'dupe'}"), NULL, &error),
+                       error);
+      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, NULL);
+      ASSERT (bwr.res); // Non-NULL since 'delete' succeeded.
+      ASSERT (bwr.exc); // Non-NULL since write errors.
+      const bson_t *ed = mongoc_bulkwriteexception_writeerrors (bwr.exc);
+      ASSERT_MATCH (
+         ed, BSON_STR ({
+            "1" : {
+               "code" : 11000,
+               "message" : "E11000 duplicate key error collection: db.coll index: _id_ dup key: { _id: \"dupe\" }",
+               "details" : {}
+            }
+         }));
+      mongoc_bulkwrite_destroy (bw);
+      mongoc_bulkwriteresult_destroy (bwr.res);
+      mongoc_bulkwriteexception_destroy (bwr.exc);
+   }
+
+   // Test a failed w:1 write with no successful operations.
+   {
+      mongoc_bulkwrite_t *bw = mongoc_client_bulkwrite_new (client);
+      // First operation is an insert failing due to duplicate key:
+      ASSERT_OR_PRINT (mongoc_bulkwrite_append_insertone (bw, "db.coll", tmp_bson ("{'_id': 'dupe'}"), NULL, &error),
+                       error);
+      mongoc_bulkwritereturn_t bwr = mongoc_bulkwrite_execute (bw, NULL);
+      ASSERT (!bwr.res); // NULL since no operations succeeded.
+      ASSERT (bwr.exc);  // Non-NULL since write errors.
+      const bson_t *ed = mongoc_bulkwriteexception_writeerrors (bwr.exc);
+      ASSERT_MATCH (
+         ed, BSON_STR ({
+            "1" : {
+               "code" : 11000,
+               "message" : "E11000 duplicate key error collection: db.coll index: _id_ dup key: { _id: \"dupe\" }",
+               "details" : {}
+            }
+         }));
+      mongoc_bulkwrite_destroy (bw);
+      mongoc_bulkwriteresult_destroy (bwr.res);
+      mongoc_bulkwriteexception_destroy (bwr.exc);
+   }
+
+   mongoc_write_concern_destroy (w0);
+   mongoc_client_destroy (client);
+}
+
 void
 test_bulkwrite_install (TestSuite *suite)
 {
@@ -779,6 +891,15 @@ test_bulkwrite_install (TestSuite *suite)
    TestSuite_AddFull (suite,
                       "/bulkwrite/two_large_inserts",
                       test_bulkwrite_two_large_inserts,
+                      NULL /* dtor */,
+                      NULL /* ctx */,
+                      test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
+   );
+
+
+   TestSuite_AddFull (suite,
+                      "/bulkwrite/w0_vs_error",
+                      test_bulkwrite_w0_vs_error,
                       NULL /* dtor */,
                       NULL /* ctx */,
                       test_framework_skip_if_max_wire_version_less_than_25 // require server 8.0
