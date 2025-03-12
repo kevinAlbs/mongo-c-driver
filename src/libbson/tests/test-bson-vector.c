@@ -1545,6 +1545,37 @@ test_bson_vector_edge_cases_packed_bit (void)
 #endif // BSON_WORD_SIZE > 32
 }
 
+static void
+test_onebit (void)
+{
+   bson_t doc = BSON_INITIALIZER;
+
+   // Build: { "vector": <binary vector of one 1 bit> }
+   {
+      bson_vector_packed_bit_view_t view;
+      const size_t bitlength = 1;
+      ASSERT (BSON_APPEND_VECTOR_PACKED_BIT_UNINIT (&doc, "vector", bitlength, &view));
+      bool one = true;
+      bson_vector_packed_bit_view_pack_bool (view, &one, 1, 0); // Pack one 1 bit.
+   }
+
+   // Lookup the BSON binary value.
+   const uint8_t *encoded;
+   {
+      bson_iter_t iter;
+      ASSERT (bson_iter_init_find (&iter, &doc, "vector"));
+      bson_subtype_t subtype;
+      uint32_t binary_len;
+      bson_iter_binary (&iter, &subtype, &binary_len, &encoded);
+      ASSERT_CMPUINT32 (binary_len, ==, 3); // Encoded in three bytes.
+      ASSERT_MEMCMP (encoded,
+                     "\x10"  // Header: PACKED_BIT
+                     "\x07"  // Padding: 7 bits
+                     "\x80", // Data: 10000000 (last 7 unused)
+                     3);
+   }
+}
+
 void
 test_bson_vector_install (TestSuite *suite)
 {
@@ -1569,4 +1600,5 @@ test_bson_vector_install (TestSuite *suite)
    TestSuite_Add (suite, "/bson_binary_vector/edge_cases/int8", test_bson_vector_edge_cases_int8);
    TestSuite_Add (suite, "/bson_binary_vector/edge_cases/float32", test_bson_vector_edge_cases_float32);
    TestSuite_Add (suite, "/bson_binary_vector/edge_cases/packed_bit", test_bson_vector_edge_cases_packed_bit);
+   TestSuite_Add (suite, "/onebit", test_onebit);
 }
