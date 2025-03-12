@@ -506,7 +506,9 @@ test_bson_size_limits_and_batch_splitting (bool with_qe)
       mongoc_database_t *db = mongoc_client_get_database (client, "db");
       (void) mongoc_collection_drop (coll, NULL);
       // Create a newly named collection to avoid cached previous JSON Schema.
-      ASSERT_OR_PRINT (mongoc_database_create_collection (db, "coll2", coll_opts, &error), error);
+      mongoc_collection_t *coll2 = mongoc_database_create_collection (db, "coll2", coll_opts, &error);
+      ASSERT_OR_PRINT (coll2, error);
+      mongoc_collection_destroy(coll2);
 
       /* Insert two documents that each exceed 2MiB but no encryption occurs.
        * Expect two separate bulkWrite commands.
