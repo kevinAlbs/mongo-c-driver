@@ -734,6 +734,7 @@ done:
    mongoc_server_api_destroy (api);
    mongoc_structured_log_opts_destroy (log_opts);
    bson_destroy (uri_options);
+   bson_destroy (auto_encryption_opts);
    if (!ret) {
       entity_destroy (entity);
       return NULL;
