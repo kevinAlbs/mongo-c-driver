@@ -840,6 +840,7 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
       bson_t *bulk_opts = NULL;
       bson_t *drop_opts = bson_new ();
       bson_t *create_opts = NULL;
+      bson_t existing_encryptedFields = BSON_INITIALIZER;
       bool ret = false;
 
       bson_iter_bson (&initial_data_iter, &collection_data);
@@ -876,7 +877,6 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
       }
 
       coll = mongoc_client_get_collection (test_runner->internal_client, database_name, collection_name);
-      bson_t existing_encryptedFields = BSON_INITIALIZER;
       if (_mongoc_get_encryptedFields_from_server (
              test_runner->internal_client, database_name, collection_name, &existing_encryptedFields, error)) {
          if (!bson_empty (&existing_encryptedFields)) {
@@ -934,6 +934,7 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
       bson_destroy (bulk_opts);
       bson_destroy (drop_opts);
       bson_destroy (create_opts);
+      bson_destroy (&existing_encryptedFields);
       bson_destroy (documents);
       mongoc_write_concern_destroy (wc);
       mongoc_collection_destroy (coll);
