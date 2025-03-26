@@ -48,6 +48,7 @@ Unreleased (2.0.0)
   * `mongoc_bulk_operation_get_hint` is removed. Use `mongoc_bulk_operation_get_server_id` instead.
   * `mongoc_bulk_operation_set_hint` is removed. Use `mongoc_bulk_operation_set_server_id` instead.
 * Deprecated `mongoc_apm_command_*_get_server_connection_id` functions are removed. Use `mongoc_apm_command_*_get_server_connection_id_int64` instead.
+* `mongoc_collection_find` is removed. Use `mongoc_collection_find_with_opts` instead.
 
 ### Forwarding headers (`#include <bson.h>` and `#include <mongoc.h>`)
 
