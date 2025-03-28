@@ -1152,6 +1152,7 @@ if (ENABLE_TESTS)
       # Remove once support for VS 2013 is dropped.
       target_compile_options(test-libmongoc-lib PRIVATE /wd4756)
    endif ()
+   target_compile_options(test-libmongoc-lib PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/Gv>")
    target_link_libraries (test-libmongoc-lib PUBLIC mongoc_static)
    # We have tests that test our deprecated api.
    target_compile_options (test-libmongoc-lib
