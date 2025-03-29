@@ -155,7 +155,7 @@ debug_stream_new (mongoc_stream_t *stream, debug_stream_stats_t *stats)
 }
 
 
-mongoc_stream_t *
+mongoc_stream_t * BSON_CALL
 debug_stream_initiator (const mongoc_uri_t *uri, const mongoc_host_list_t *host, void *user_data, bson_error_t *error)
 {
    debug_stream_stats_t *stats;

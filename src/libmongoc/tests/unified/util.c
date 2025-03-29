@@ -21,7 +21,7 @@
 #include <mlib/cmp.h>
 #include <mlib/loop.h>
 
-static int
+static int BSON_CALL
 cmp_key (const void *a, const void *b)
 {
    return strcmp (*(const char **) a, *(const char **) b);

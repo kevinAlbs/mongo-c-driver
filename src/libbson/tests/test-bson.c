@@ -1265,7 +1265,7 @@ test_bson_init_static (void)
    bson_destroy (&b);
 }
 
-static void *
+static void * BSON_CALL
 realloc_func_never_called (void *mem, size_t num_bytes, void *ctx)
 {
    // Reallocate function for tests that should never reallocate
@@ -2095,7 +2095,7 @@ test_next_power_of_two (void)
 }
 
 
-void
+void BSON_CALL
 visit_corrupt (const bson_iter_t *iter, void *data)
 {
    BSON_UNUSED (iter);
@@ -2129,7 +2129,7 @@ typedef struct {
 } unsupported_type_test_data_t;
 
 
-void
+void BSON_CALL
 visit_unsupported_type (const bson_iter_t *iter, const char *key, uint32_t type_code, void *data)
 {
    unsupported_type_test_data_t *context;

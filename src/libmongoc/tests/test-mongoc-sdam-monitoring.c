@@ -154,7 +154,7 @@ td_to_bson (const mongoc_topology_description_t *td, bson_t *bson)
    bson_destroy (&servers);
 }
 
-static void
+static void BSON_CALL
 server_changed (const mongoc_apm_server_changed_t *event)
 {
    context_t *ctx;
@@ -190,7 +190,7 @@ server_changed (const mongoc_apm_server_changed_t *event)
    bson_destroy (&new_sd);
 }
 
-static void
+static void BSON_CALL
 server_opening (const mongoc_apm_server_opening_t *event)
 {
    context_t *ctx;
@@ -209,7 +209,7 @@ server_opening (const mongoc_apm_server_opening_t *event)
          "server_opening_event", "{", "address", BCON_UTF8 (host_and_port), "topologyId", BCON_UTF8 ("42"), "}"));
 }
 
-static void
+static void BSON_CALL
 server_closed (const mongoc_apm_server_closed_t *event)
 {
    context_t *ctx;
@@ -227,7 +227,7 @@ server_closed (const mongoc_apm_server_closed_t *event)
       BCON_NEW ("server_closed_event", "{", "address", BCON_UTF8 (host_and_port), "topologyId", BCON_UTF8 ("42"), "}"));
 }
 
-static void
+static void BSON_CALL
 topology_changed (const mongoc_apm_topology_changed_t *event)
 {
    context_t *ctx;
@@ -258,7 +258,7 @@ topology_changed (const mongoc_apm_topology_changed_t *event)
    bson_destroy (&new_td);
 }
 
-static void
+static void BSON_CALL
 topology_opening (const mongoc_apm_topology_opening_t *event)
 {
    context_t *ctx;
@@ -273,7 +273,7 @@ topology_opening (const mongoc_apm_topology_opening_t *event)
    context_append (ctx, BCON_NEW ("topology_opening_event", "{", "topologyId", BCON_UTF8 ("42"), "}"));
 }
 
-static void
+static void BSON_CALL
 topology_closed (const mongoc_apm_topology_closed_t *event)
 {
    context_t *ctx;
@@ -286,7 +286,7 @@ topology_closed (const mongoc_apm_topology_closed_t *event)
 }
 
 /* no standard tests in the specs repo for heartbeat events, so invent some */
-static void
+static void BSON_CALL
 server_heartbeat_started (const mongoc_apm_server_heartbeat_started_t *event)
 {
    context_t *ctx;
@@ -304,7 +304,7 @@ server_heartbeat_started (const mongoc_apm_server_heartbeat_started_t *event)
                              "}"));
 }
 
-static void
+static void BSON_CALL
 server_heartbeat_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
 {
    context_t *ctx;
@@ -326,7 +326,7 @@ server_heartbeat_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event
    _mongoc_array_append_val (&ctx->heartbeat_succeeded_durations, duration);
 }
 
-static void
+static void BSON_CALL
 server_heartbeat_failed (const mongoc_apm_server_heartbeat_failed_t *event)
 {
    context_t *ctx;

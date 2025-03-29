@@ -190,7 +190,7 @@ get_future_timeout_ms (void)
    return test_framework_getenv_int64 ("MONGOC_TEST_FUTURE_TIMEOUT_MS", DEFAULT_FUTURE_TIMEOUT_MS);
 }
 
-static void
+static void BSON_CALL
 log_handler (mongoc_log_level_t log_level, const char *log_domain, const char *message, void *user_data)
 {
    TestSuite *suite;

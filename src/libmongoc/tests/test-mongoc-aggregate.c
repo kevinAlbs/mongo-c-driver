@@ -96,7 +96,7 @@ typedef struct {
    bson_mutex_t lock;
 } last_captured_t;
 
-static void
+static void BSON_CALL
 command_started (const mongoc_apm_command_started_t *event)
 {
    const bson_t *cmd = mongoc_apm_command_started_get_command (event);

@@ -135,13 +135,13 @@ test_reader_from_data_document_length_too_small (void)
    bson_reader_destroy (reader);
 }
 
-static ssize_t
+static ssize_t BSON_CALL
 test_reader_from_handle_read (void *handle, void *buf, size_t len)
 {
    return bson_read (*(int *) handle, buf, len);
 }
 
-static void
+static void BSON_CALL
 test_reader_from_handle_destroy (void *handle)
 {
    bson_close (*(int *) handle);

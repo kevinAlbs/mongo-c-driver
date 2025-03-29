@@ -3173,7 +3173,7 @@ typedef struct {
    bson_t *ops;
 } txn_ctx_t;
 
-static bool
+static bool BSON_CALL
 with_transaction_cb (mongoc_client_session_t *session, void *ctx, bson_t **reply, bson_error_t *error)
 {
    bool ret = false;

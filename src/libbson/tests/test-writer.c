@@ -20,7 +20,7 @@
 #include "TestSuite.h"
 
 
-static void *
+static void * BSON_CALL
 test_bson_writer_custom_realloc_helper (void *mem, size_t num_bytes, void *ctx)
 {
    int *x = (int *) ctx;

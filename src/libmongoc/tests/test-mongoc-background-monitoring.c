@@ -108,7 +108,7 @@ void BSON_GNUC_PRINTF (2, 3) tf_log (test_fixture_t *tf, const char *format, ...
 
 #define TF_LOG(_tf, ...) tf_log (_tf, __VA_ARGS__)
 
-static void
+static void BSON_CALL
 _heartbeat_started (const mongoc_apm_server_heartbeat_started_t *event)
 {
    test_fixture_t *tf;
@@ -122,7 +122,7 @@ _heartbeat_started (const mongoc_apm_server_heartbeat_started_t *event)
    bson_mutex_unlock (&tf->mutex);
 }
 
-static void
+static void BSON_CALL
 _heartbeat_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
 {
    test_fixture_t *tf;
@@ -136,7 +136,7 @@ _heartbeat_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
    bson_mutex_unlock (&tf->mutex);
 }
 
-static void
+static void BSON_CALL
 _heartbeat_failed (const mongoc_apm_server_heartbeat_failed_t *event)
 {
    test_fixture_t *tf;

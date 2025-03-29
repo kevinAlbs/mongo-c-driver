@@ -573,7 +573,7 @@ typedef struct {
    mongoc_client_t *client;
 } endsessions_test_t;
 
-static void
+static void BSON_CALL
 endsessions_started_cb (const mongoc_apm_command_started_t *event)
 {
    endsessions_test_t *test;
@@ -589,7 +589,7 @@ endsessions_started_cb (const mongoc_apm_command_started_t *event)
    _mongoc_array_append_vals (&test->cmds, &cmd, 1);
 }
 
-static void
+static void BSON_CALL
 endsessions_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 {
    endsessions_test_t *test;
@@ -981,7 +981,7 @@ typedef struct {
 } session_test_t;
 
 
-static void
+static void BSON_CALL
 started (const mongoc_apm_command_started_t *event)
 {
    match_ctx_t ctx = {{0}};
@@ -1057,7 +1057,7 @@ started (const mongoc_apm_command_started_t *event)
 }
 
 
-static void
+static void BSON_CALL
 succeeded (const mongoc_apm_command_succeeded_t *event)
 {
    bson_iter_t iter;
@@ -1096,7 +1096,7 @@ succeeded (const mongoc_apm_command_succeeded_t *event)
 }
 
 
-static void
+static void BSON_CALL
 failed (const mongoc_apm_command_failed_t *event)
 {
    const char *cmd_name;
@@ -2403,6 +2403,11 @@ test_unacknowledged_explicit_cs_explicit_wc (void *ctx)
    _test_unacknowledged (((session_test_helper_t *) ctx)->test_fn, false, false);
 }
 
+// `bson_free_dtor` is not marked with `BSON_CALL` to support building tests with non-cdecl calling convention.
+static void bson_free_dtor (void * mem) {
+   bson_free (mem);
+}
+
 
 #define add_session_test(_suite, _name, _test_fn, _allow_read_concern)                      \
    if (1) {                                                                                 \
@@ -2411,7 +2416,7 @@ test_unacknowledged_explicit_cs_explicit_wc (void *ctx)
       TestSuite_AddFull (_suite,                                                            \
                          _name,                                                             \
                          (_allow_read_concern) ? run_session_test : run_session_test_no_rc, \
-                         &bson_free,                                                        \
+                         bson_free_dtor,                                                    \
                          helper,                                                            \
                          test_framework_skip_if_no_cluster_time,                            \
                          test_framework_skip_if_no_crypto);                                 \
@@ -2425,7 +2430,7 @@ test_unacknowledged_explicit_cs_explicit_wc (void *ctx)
       TestSuite_AddFull (_suite,                                                            \
                          _name,                                                             \
                          (_allow_read_concern) ? run_session_test : run_session_test_no_rc, \
-                         &bson_free,                                                        \
+                         bson_free_dtor,                                                    \
                          helper,                                                            \
                          test_framework_skip_if_no_cluster_time,                            \
                          test_framework_skip_if_no_crypto,                                  \
@@ -2443,7 +2448,7 @@ test_unacknowledged_explicit_cs_explicit_wc (void *ctx)
                                                        : test_unacknowledged_implicit_cs_explicit_wc)  \
                                         : (_inherit_wc ? test_unacknowledged_implicit_cs_inherit_wc    \
                                                        : test_unacknowledged_explicit_cs_explicit_wc), \
-                         &bson_free,                                                                   \
+                         bson_free_dtor,                                                               \
                          helper,                                                                       \
                          test_framework_skip_if_no_cluster_time,                                       \
                          test_framework_skip_if_no_crypto);                                            \

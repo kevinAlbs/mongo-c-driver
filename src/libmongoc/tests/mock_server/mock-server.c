@@ -591,6 +591,11 @@ mock_server_auto_hello_callback (mock_server_t *server,
    return mock_server_autoresponds (server, auto_hello, (void *) callback, hello_callback_free);
 }
 
+// `bson_free_dtor` is not marked with `BSON_CALL` to support building tests with non-cdecl calling convention.
+static void bson_free_dtor (void * mem) {
+   bson_free (mem);
+}
+
 /*--------------------------------------------------------------------------
  *
  * mock_server_auto_hello --
@@ -618,7 +623,7 @@ mock_server_auto_hello (mock_server_t *server, const char *response_json, ...)
    va_end (args);
 
    return mock_server_auto_hello_callback (
-      server, auto_hello_generate_response, (void *) formatted_response_json, bson_free);
+      server, auto_hello_generate_response, (void *) formatted_response_json, bson_free_dtor);
 }
 
 

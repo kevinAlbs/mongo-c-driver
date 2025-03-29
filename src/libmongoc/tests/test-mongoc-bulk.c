@@ -15,15 +15,15 @@
 #include <mlib/cmp.h>
 
 
-typedef void (*update_fn) (mongoc_bulk_operation_t *bulk, const bson_t *selector, const bson_t *document, bool upsert);
+typedef void (*BSON_CALL update_fn) (mongoc_bulk_operation_t *bulk, const bson_t *selector, const bson_t *document, bool upsert);
 
-typedef bool (*update_with_opts_fn) (mongoc_bulk_operation_t *bulk,
+typedef bool (BSON_CALL *update_with_opts_fn) (mongoc_bulk_operation_t *bulk,
                                      const bson_t *selector,
                                      const bson_t *document,
                                      const bson_t *opts,
                                      bson_error_t *error);
 
-typedef bool (*remove_with_opts_fn) (mongoc_bulk_operation_t *bulk,
+typedef bool (BSON_CALL *remove_with_opts_fn) (mongoc_bulk_operation_t *bulk,
                                      const bson_t *selector,
                                      const bson_t *opts,
                                      bson_error_t *error);

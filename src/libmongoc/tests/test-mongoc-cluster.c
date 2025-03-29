@@ -403,7 +403,7 @@ typedef struct {
 } cluster_time_test_t;
 
 
-static void
+static void BSON_CALL
 test_cluster_time_cmd_started_cb (const mongoc_apm_command_started_t *event)
 {
    const bson_t *cmd;
@@ -448,7 +448,7 @@ test_cluster_time_cmd_started_cb (const mongoc_apm_command_started_t *event)
 }
 
 
-static void
+static void BSON_CALL
 test_cluster_time_cmd_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 {
    const bson_t *reply;

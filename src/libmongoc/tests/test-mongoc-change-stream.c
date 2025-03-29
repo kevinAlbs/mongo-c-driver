@@ -252,7 +252,7 @@ typedef struct _test_resume_token_ctx_t {
    const bson_t *expected_resume_token_bson;
 } test_resume_token_ctx_t;
 
-static void
+static void BSON_CALL
 test_resume_token_command_start (const mongoc_apm_command_started_t *event)
 {
    const bson_t *cmd = mongoc_apm_command_started_get_command (event);
@@ -1059,7 +1059,7 @@ typedef struct {
    int agg_count;
 } array_started_ctx_t;
 
-static void
+static void BSON_CALL
 _accepts_array_started (const mongoc_apm_command_started_t *event)
 {
    const bson_t *cmd = mongoc_apm_command_started_get_command (event);
@@ -1174,7 +1174,7 @@ typedef struct {
       false, false, BSON_INITIALIZER \
    }
 
-static void
+static void BSON_CALL
 _resume_at_optime_started (const mongoc_apm_command_started_t *event)
 {
    resume_ctx_t *ctx;
@@ -1255,7 +1255,7 @@ test_change_stream_resume_at_optime (void *test_ctx)
    mongoc_client_destroy (client);
 }
 
-static void
+static void BSON_CALL
 _resume_with_post_batch_resume_token_started (const mongoc_apm_command_started_t *event)
 {
    resume_ctx_t *ctx;
@@ -2131,7 +2131,7 @@ typedef struct {
    size_t replies_len;
 } test_events_t;
 
-static void
+static void BSON_CALL
 test_events_started_cb (const mongoc_apm_command_started_t *e)
 {
    test_events_t *te = mongoc_apm_command_started_get_context (e);
@@ -2139,7 +2139,7 @@ test_events_started_cb (const mongoc_apm_command_started_t *e)
    te->commands[te->commands_len++] = bson_copy (mongoc_apm_command_started_get_command (e));
 }
 
-static void
+static void BSON_CALL
 test_events_succeeded_cb (const mongoc_apm_command_succeeded_t *e)
 {
    test_events_t *te = mongoc_apm_command_succeeded_get_context (e);

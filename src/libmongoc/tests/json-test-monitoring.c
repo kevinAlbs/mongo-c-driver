@@ -76,7 +76,7 @@ assert_host_in_uri (const mongoc_host_list_t *host, const mongoc_uri_t *uri)
 }
 
 
-static void
+static void BSON_CALL
 started_cb (const mongoc_apm_command_started_t *event)
 {
    json_test_ctx_t *ctx = (json_test_ctx_t *) mongoc_apm_command_started_get_context (event);
@@ -134,7 +134,7 @@ started_cb (const mongoc_apm_command_started_t *event)
 }
 
 
-static void
+static void BSON_CALL
 succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 {
    json_test_ctx_t *ctx = (json_test_ctx_t *) mongoc_apm_command_succeeded_get_context (event);
@@ -178,7 +178,7 @@ succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 }
 
 
-static void
+static void BSON_CALL
 failed_cb (const mongoc_apm_command_failed_t *event)
 {
    json_test_ctx_t *ctx = (json_test_ctx_t *) mongoc_apm_command_failed_get_context (event);

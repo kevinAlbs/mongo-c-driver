@@ -61,7 +61,7 @@ test_conveniences_init (void)
 }
 
 
-void
+void BSON_CALL
 test_conveniences_cleanup (void)
 {
    bson_t *doc;

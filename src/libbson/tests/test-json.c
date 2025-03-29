@@ -14,7 +14,7 @@
 #include <bson/bson-iso8601-private.h>
 #include <bson/bson-json-private.h>
 
-static ssize_t
+static ssize_t BSON_CALL
 test_bson_json_read_cb_helper (void *string, uint8_t *buf, size_t len)
 {
    size_t str_size = strlen ((char *) string);
@@ -1264,7 +1264,7 @@ test_bson_json_read_invalid_json (void)
    BSON_ASSERT (!b);
 }
 
-static ssize_t
+static ssize_t BSON_CALL
 test_bson_json_read_bad_cb_helper (void *_ctx, uint8_t *buf, size_t len)
 {
    BSON_UNUSED (_ctx);
@@ -1294,7 +1294,7 @@ test_bson_json_read_bad_cb (void)
    bson_destroy (&bson);
 }
 
-static ssize_t
+static ssize_t BSON_CALL
 test_bson_json_read_invalid_helper (void *ctx, uint8_t *buf, size_t len)
 {
    BSON_UNUSED (ctx);

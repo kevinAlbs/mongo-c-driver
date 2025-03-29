@@ -245,7 +245,7 @@ test_client_pool_destroy_without_pushing (void)
    bson_destroy (cmd);
 }
 
-static void
+static void BSON_CALL
 command_started_cb (const mongoc_apm_command_started_t *event)
 {
    if (strcmp (mongoc_apm_command_started_get_command_name (event), "endSessions") != 0) {
