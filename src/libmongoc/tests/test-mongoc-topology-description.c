@@ -151,7 +151,7 @@ test_get_servers (void)
 #define TV_1 "{ 'processId': { '$oid': 'AABBAABBAABBAABBAABBAABB' }, 'counter': 1 }"
 #define TV_2 "{ 'processId': { '$oid': 'AABBAABBAABBAABBAABBAABB' }, 'counter': 2 }"
 
-void
+void BSON_CALL
 _topology_changed (const mongoc_apm_topology_changed_t *event)
 {
    int *num_calls;

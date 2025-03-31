@@ -85,7 +85,7 @@ test_diagnostics_error_string (bson_error_t *error)
    return mcommon_string_from_append_destroy_with_steal (&str);
 }
 
-static void
+static void BSON_CALL
 handle_abort (int signo)
 {
    BSON_UNUSED (signo);

@@ -8,7 +8,7 @@
 /* Note, the with_transaction spec tests are in test-mongoc-transactions.c,
  * since it shares the same test runner with the transactions test runner. */
 
-static bool
+static bool BSON_CALL
 with_transaction_fail_transient_txn (mongoc_client_session_t *session, void *ctx, bson_t **reply, bson_error_t *error)
 {
    bson_array_builder_t *labels;
@@ -26,7 +26,7 @@ with_transaction_fail_transient_txn (mongoc_client_session_t *session, void *ctx
    return false;
 }
 
-static bool
+static bool BSON_CALL
 with_transaction_do_nothing (mongoc_client_session_t *session, void *ctx, bson_t **reply, bson_error_t *error)
 {
    BSON_UNUSED (session);

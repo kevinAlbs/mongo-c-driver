@@ -27,7 +27,7 @@ typedef struct log_assumption {
    int calls;
 } log_assumption;
 
-static void
+static void BSON_CALL
 structured_log_func (const mongoc_structured_log_entry_t *entry, void *user_data)
 {
    struct log_assumption *assumption = (struct log_assumption *) user_data;

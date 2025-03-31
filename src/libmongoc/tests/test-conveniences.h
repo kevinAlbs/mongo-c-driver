@@ -38,7 +38,7 @@ test_conveniences_init (void);
  * Safe to call repeatedly.
  * Called automatically at process exit.
  */
-void
+void BSON_CALL
 test_conveniences_cleanup (void);
 
 /* Return a bson_t representation from a single-quoted JSON string, with

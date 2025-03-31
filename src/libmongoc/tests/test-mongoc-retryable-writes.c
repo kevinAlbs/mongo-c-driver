@@ -545,7 +545,7 @@ typedef struct {
    char *failCommand;
 } prose_test_3_apm_ctx_t;
 
-static void
+static void BSON_CALL
 prose_test_3_on_command_success (const mongoc_apm_command_succeeded_t *event)
 {
    bson_iter_t iter;
@@ -811,7 +811,7 @@ typedef struct {
    int num_updates;
 } _tracks_new_server_counters_t;
 
-static void
+static void BSON_CALL
 _tracks_new_server_cb (const mongoc_apm_command_started_t *event)
 {
    const char *cmd_name;
@@ -893,7 +893,7 @@ typedef struct _test_retry_writes_sharded_on_other_mongos_ctx {
    uint16_t ports[2];
 } test_retry_writes_sharded_on_other_mongos_ctx;
 
-static void
+static void BSON_CALL
 _test_retry_writes_sharded_on_other_mongos_cb (const mongoc_apm_command_failed_t *event)
 {
    BSON_ASSERT_PARAM (event);
@@ -1101,13 +1101,13 @@ _test_retry_writes_sharded_on_same_mongos_cb (test_retry_writes_sharded_on_same_
    }
 }
 
-static void
+static void BSON_CALL
 _test_retry_writes_sharded_on_same_mongos_failed_cb (const mongoc_apm_command_failed_t *event)
 {
    _test_retry_writes_sharded_on_same_mongos_cb (mongoc_apm_command_failed_get_context (event), event, NULL);
 }
 
-static void
+static void BSON_CALL
 _test_retry_writes_sharded_on_same_mongos_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 {
    _test_retry_writes_sharded_on_same_mongos_cb (mongoc_apm_command_succeeded_get_context (event), NULL, event);

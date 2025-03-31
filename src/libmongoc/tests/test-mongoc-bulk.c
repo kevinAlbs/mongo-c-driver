@@ -15,7 +15,7 @@
 #include <mlib/cmp.h>
 
 
-typedef void (*BSON_CALL update_fn) (mongoc_bulk_operation_t *bulk, const bson_t *selector, const bson_t *document, bool upsert);
+typedef void (BSON_CALL *update_fn) (mongoc_bulk_operation_t *bulk, const bson_t *selector, const bson_t *document, bool upsert);
 
 typedef bool (BSON_CALL *update_with_opts_fn) (mongoc_bulk_operation_t *bulk,
                                      const bson_t *selector,
@@ -1929,7 +1929,7 @@ test_insert_with_opts_validate (void)
 }
 
 
-typedef void (*remove_fn) (mongoc_bulk_operation_t *bulk, const bson_t *selector);
+typedef void (BSON_CALL *remove_fn) (mongoc_bulk_operation_t *bulk, const bson_t *selector);
 
 typedef struct {
    remove_fn remove;
@@ -3482,7 +3482,7 @@ typedef struct {
 } stats_t;
 
 
-void
+void BSON_CALL
 command_succeeded (const mongoc_apm_command_succeeded_t *event)
 {
    const char *cmd_name = mongoc_apm_command_succeeded_get_command_name (event);

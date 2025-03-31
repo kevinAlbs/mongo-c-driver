@@ -7,7 +7,7 @@
 #include "test-libmongoc.h"
 
 
-static mongoc_stream_t *
+static mongoc_stream_t * BSON_CALL
 cannot_resolve (const mongoc_uri_t *uri, const mongoc_host_list_t *host, void *user_data, bson_error_t *error)
 {
    BSON_UNUSED (uri);

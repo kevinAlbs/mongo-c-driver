@@ -317,7 +317,7 @@ typedef struct {
 } reconcile_test_data_t;
 
 
-static void
+static void BSON_CALL
 server_opening (const mongoc_apm_server_opening_t *event)
 {
    reconcile_test_data_t *data = (reconcile_test_data_t *) event->context;

@@ -150,7 +150,7 @@ _heartbeat_failed (const mongoc_apm_server_heartbeat_failed_t *event)
    bson_mutex_unlock (&tf->mutex);
 }
 
-static void
+static void BSON_CALL
 _server_changed (const mongoc_apm_server_changed_t *event)
 {
    test_fixture_t *tf;

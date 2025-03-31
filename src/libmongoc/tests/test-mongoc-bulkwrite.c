@@ -263,7 +263,7 @@ test_bulkwrite_double_execute (void *ctx)
    mongoc_client_destroy (client);
 }
 
-static void
+static void BSON_CALL
 capture_last_bulkWrite_serverid (const mongoc_apm_command_started_t *event)
 {
    if (0 == strcmp (mongoc_apm_command_started_get_command_name (event), "bulkWrite")) {
@@ -397,7 +397,7 @@ test_bulkwrite_serverid_on_retry (void *ctx)
    mongoc_client_destroy (client);
 }
 
-static void
+static void BSON_CALL
 capture_last_bulkWrite_command (const mongoc_apm_command_started_t *event)
 {
    if (0 == strcmp (mongoc_apm_command_started_get_command_name (event), "bulkWrite")) {
@@ -499,7 +499,7 @@ test_bulkwrite_no_verbose_results (void *ctx)
    mongoc_client_destroy (client);
 }
 
-static void
+static void BSON_CALL
 capture_all_bulkWrite_commands (const mongoc_apm_command_started_t *event)
 {
    if (0 == strcmp (mongoc_apm_command_started_get_command_name (event), "bulkWrite")) {

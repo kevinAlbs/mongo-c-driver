@@ -859,7 +859,7 @@ typedef struct {
    uint32_t num_topology_description_changed_events;
 } duplicates_counter_t;
 
-void
+void BSON_CALL
 duplicates_server_changed (const mongoc_apm_server_changed_t *event)
 {
    duplicates_counter_t *counters;
@@ -868,7 +868,7 @@ duplicates_server_changed (const mongoc_apm_server_changed_t *event)
    counters->num_server_description_changed_events++;
 }
 
-void
+void BSON_CALL
 duplicates_topology_changed (const mongoc_apm_topology_changed_t *event)
 {
    duplicates_counter_t *counters;
@@ -994,7 +994,7 @@ handle_heartbeat_event (smm_t *t, bool awaited, const char *event_type)
    bson_mutex_unlock (&t->lock);
 }
 
-static void
+static void BSON_CALL
 heartbeat_started (const mongoc_apm_server_heartbeat_started_t *event)
 {
    smm_t *t = mongoc_apm_server_heartbeat_started_get_context (event);
@@ -1002,7 +1002,7 @@ heartbeat_started (const mongoc_apm_server_heartbeat_started_t *event)
    handle_heartbeat_event (t, awaited, SERVER_HEARTBEAT_STARTED);
 }
 
-static void
+static void BSON_CALL
 heartbeat_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
 {
    smm_t *t = mongoc_apm_server_heartbeat_succeeded_get_context (event);
@@ -1010,7 +1010,7 @@ heartbeat_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
    handle_heartbeat_event (t, awaited, SERVER_HEARTBEAT_SUCCEEDED);
 }
 
-static void
+static void BSON_CALL
 heartbeat_failed (const mongoc_apm_server_heartbeat_failed_t *event)
 {
    smm_t *t = mongoc_apm_server_heartbeat_failed_get_context (event);

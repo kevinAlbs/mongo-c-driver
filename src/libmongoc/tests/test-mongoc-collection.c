@@ -4353,7 +4353,7 @@ typedef struct {
 } test_crud_ctx_t;
 
 /* Tests that commands match the `expected_command` in the update ctx */
-void
+void BSON_CALL
 _test_crud_command_start (const mongoc_apm_command_started_t *event)
 {
    const bson_t *cmd = mongoc_apm_command_started_get_command (event);
@@ -4479,7 +4479,7 @@ test_insert_one (void)
    mongoc_client_destroy (client);
 }
 
-typedef bool (*update_fn_t) (
+typedef bool (BSON_CALL *update_fn_t) (
    mongoc_collection_t *, const bson_t *, const bson_t *, const bson_t *, bson_t *, bson_error_t *);
 
 /* Tests `update_one`, `update_many`, and `replace_one` */
@@ -4846,7 +4846,7 @@ test_update_many_validate (void)
 }
 
 
-typedef bool (*delete_fn_t) (mongoc_collection_t *, const bson_t *, const bson_t *, bson_t *, bson_error_t *);
+typedef bool (BSON_CALL *delete_fn_t) (mongoc_collection_t *, const bson_t *, const bson_t *, bson_t *, bson_error_t *);
 
 static void
 _test_delete_one_or_many (bool is_multi)

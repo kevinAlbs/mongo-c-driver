@@ -1460,7 +1460,7 @@ _responder (request_t *req, void *data)
    return true;
 }
 
-static mongoc_stream_t *
+static mongoc_stream_t * BSON_CALL
 _initiator_fn (const mongoc_uri_t *uri, const mongoc_host_list_t *host, void *user_data, bson_error_t *error)
 {
    mongoc_client_pool_t *pool;

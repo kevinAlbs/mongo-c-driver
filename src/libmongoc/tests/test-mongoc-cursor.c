@@ -209,7 +209,7 @@ typedef struct {
 } test_common_server_hint_ctx_t;
 
 
-static void
+static void BSON_CALL
 _test_common_server_hint_command_started (const mongoc_apm_command_started_t *event)
 {
    const mongoc_host_list_t *host = mongoc_apm_command_started_get_host (event);
@@ -414,11 +414,16 @@ _make_array_cursor (mongoc_collection_t *coll)
    return mongoc_client_find_databases_with_opts (coll->client, NULL);
 }
 
+// `bson_free_dtor` is not marked with `BSON_CALL` to support building tests with non-cdecl calling convention.
+static void bson_free_dtor (void * mem) {
+   bson_free (mem);
+}
+
 #define TEST_CURSOR_FIND(prefix, fn)                                                          \
    if (1) {                                                                                   \
       make_cursor_helper_t *const helper = bson_malloc (sizeof (*helper));                    \
       *helper = (make_cursor_helper_t){.ctor = _make_find_cursor};                            \
-      TestSuite_AddFull (suite, prefix "/find", fn, &bson_free, helper, TestSuite_CheckLive); \
+      TestSuite_AddFull (suite, prefix "/find", fn, bson_free_dtor, helper, TestSuite_CheckLive); \
    } else                                                                                     \
       ((void) 0)
 
@@ -426,7 +431,7 @@ _make_array_cursor (mongoc_collection_t *coll)
    if (1) {                                                                                  \
       make_cursor_helper_t *const helper = bson_malloc (sizeof (*helper));                   \
       *helper = (make_cursor_helper_t){.ctor = _make_cmd_cursor};                            \
-      TestSuite_AddFull (suite, prefix "/cmd", fn, &bson_free, helper, TestSuite_CheckLive); \
+      TestSuite_AddFull (suite, prefix "/cmd", fn, bson_free_dtor, helper, TestSuite_CheckLive); \
    } else                                                                                    \
       ((void) 0)
 
@@ -435,7 +440,7 @@ _make_array_cursor (mongoc_collection_t *coll)
    if (1) {                                                                                    \
       make_cursor_helper_t *const helper = bson_malloc (sizeof (*helper));                     \
       *helper = (make_cursor_helper_t){.ctor = _make_array_cursor};                            \
-      TestSuite_AddFull (suite, prefix "/array", fn, &bson_free, helper, TestSuite_CheckLive); \
+      TestSuite_AddFull (suite, prefix "/array", fn, bson_free_dtor, helper, TestSuite_CheckLive); \
    } else                                                                                      \
       ((void) 0)
 
@@ -443,7 +448,7 @@ _make_array_cursor (mongoc_collection_t *coll)
    if (1) {                                                                                  \
       make_cursor_helper_t *const helper = bson_malloc (sizeof (*helper));                   \
       *helper = (make_cursor_helper_t){.ctor = _make_cmd_cursor_from_agg};                   \
-      TestSuite_AddFull (suite, prefix "/agg", fn, &bson_free, helper, TestSuite_CheckLive); \
+      TestSuite_AddFull (suite, prefix "/agg", fn, bson_free_dtor, helper, TestSuite_CheckLive); \
    } else                                                                                    \
       ((void) 0)
 
@@ -557,7 +562,7 @@ typedef struct {
 } killcursors_test_t;
 
 
-static void
+static void BSON_CALL
 killcursors_succeeded (const mongoc_apm_command_succeeded_t *event)
 {
    killcursors_test_t *ctx;
@@ -2113,7 +2118,7 @@ typedef struct _started_event_t {
    bson_t *command;
 } started_event_t;
 
-static void
+static void BSON_CALL
 command_started (const mongoc_apm_command_started_t *event)
 {
    mongoc_array_t *events = (mongoc_array_t *) mongoc_apm_command_started_get_context (event);
@@ -2124,7 +2129,7 @@ command_started (const mongoc_apm_command_started_t *event)
    _mongoc_array_append_val (events, started_event);
 }
 
-static void
+static void BSON_CALL
 clear_started_events (mongoc_array_t *events)
 {
    for (size_t i = 0; i < events->len; i++) {

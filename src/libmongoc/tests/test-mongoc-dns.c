@@ -105,7 +105,7 @@ _mongoc_host_list_push (const char *host, uint16_t port, int family, mongoc_host
    return h;
 }
 
-static void
+static void BSON_CALL
 topology_changed (const mongoc_apm_topology_changed_t *event)
 {
    context_t *ctx;

@@ -2758,7 +2758,7 @@ test_session_install (TestSuite *suite)
       TestSuite_AddFull (suite,
                          "/Session/count",
                          run_count_test,
-                         bson_free,
+                         bson_free_dtor,
                          helper,
                          test_framework_skip_if_no_cluster_time,
                          test_framework_skip_if_no_crypto);
@@ -2794,7 +2794,7 @@ test_session_install (TestSuite *suite)
       TestSuite_AddFull (suite,
                          "/Session/bulk_set_session",
                          run_session_test_bulk_operation,
-                         &bson_free,
+                         bson_free_dtor,
                          helper,
                          test_framework_skip_if_no_cluster_time,
                          test_framework_skip_if_no_crypto);
@@ -2805,7 +2805,7 @@ test_session_install (TestSuite *suite)
       TestSuite_AddFull (suite,
                          "/Session/bulk_set_client",
                          run_session_test_bulk_operation,
-                         &bson_free,
+                         bson_free_dtor,
                          helper,
                          test_framework_skip_if_no_cluster_time,
                          test_framework_skip_if_no_crypto);

@@ -87,7 +87,7 @@ typedef struct {
    bson_t reply;
 } prose_test_2_apm_ctx_t;
 
-static void
+static void BSON_CALL
 prose_test_2_command_succeeded (const mongoc_apm_command_succeeded_t *event)
 {
    if (!strcmp (mongoc_apm_command_succeeded_get_command_name (event), "insert")) {
@@ -166,7 +166,7 @@ typedef struct {
 // `bulkWrite_cb` records the number of `ops` in each sent `bulkWrite` to a BSON
 // document of this form:
 // { "0": <int64>, "1": <int64> ... }
-static void
+static void BSON_CALL
 bulkWrite_cb (const mongoc_apm_command_started_t *event)
 {
    bulkWrite_ctx *ctx = mongoc_apm_command_started_get_context (event);
@@ -947,7 +947,7 @@ prose_test_10 (void *ctx)
    mongoc_client_destroy (client);
 }
 
-static void
+static void BSON_CALL
 capture_all_bulkWrite_commands (const mongoc_apm_command_started_t *event)
 {
    if (0 == strcmp (mongoc_apm_command_started_get_command_name (event), "bulkWrite")) {

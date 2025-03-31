@@ -33,7 +33,7 @@ typedef struct {
    int topology_closed_events;
 } stats_t;
 
-static void
+static void BSON_CALL
 server_changed (const mongoc_apm_server_changed_t *event)
 {
    stats_t *context;
@@ -43,7 +43,7 @@ server_changed (const mongoc_apm_server_changed_t *event)
 }
 
 
-static void
+static void BSON_CALL
 server_opening (const mongoc_apm_server_opening_t *event)
 {
    stats_t *context;
@@ -53,7 +53,7 @@ server_opening (const mongoc_apm_server_opening_t *event)
 }
 
 
-static void
+static void BSON_CALL
 server_closed (const mongoc_apm_server_closed_t *event)
 {
    stats_t *context;
@@ -63,7 +63,7 @@ server_closed (const mongoc_apm_server_closed_t *event)
 }
 
 
-static void
+static void BSON_CALL
 topology_changed (const mongoc_apm_topology_changed_t *event)
 {
    stats_t *context;
@@ -73,7 +73,7 @@ topology_changed (const mongoc_apm_topology_changed_t *event)
 }
 
 
-static void
+static void BSON_CALL
 topology_opening (const mongoc_apm_topology_opening_t *event)
 {
    stats_t *context;
@@ -83,7 +83,7 @@ topology_opening (const mongoc_apm_topology_opening_t *event)
 }
 
 
-static void
+static void BSON_CALL
 topology_closed (const mongoc_apm_topology_closed_t *event)
 {
    stats_t *context;
@@ -750,7 +750,7 @@ skip_if_not_loadbalanced (void)
    return test_framework_is_loadbalanced () ? 1 : 0;
 }
 
-static void
+static void BSON_CALL
 store_last_command_started_callback (const mongoc_apm_command_started_t *event)
 {
    bson_t **last_command = mongoc_apm_command_started_get_context (event);

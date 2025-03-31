@@ -21,7 +21,7 @@ test_mongoc_usleep_basic (void)
    ASSERT_CMPTIME ((int) duration, 200 * 1000);
 }
 
-static void
+static void BSON_CALL
 custom_usleep_impl (int64_t usec, void *user_data)
 {
    if (user_data) {

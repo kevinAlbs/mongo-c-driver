@@ -340,7 +340,7 @@ typedef struct {
 } initiator_data_t;
 
 
-static mongoc_stream_t *
+static mongoc_stream_t * BSON_CALL
 slow_initiator (const mongoc_uri_t *uri, const mongoc_host_list_t *host, void *user_data, bson_error_t *err)
 {
    initiator_data_t *data;
@@ -609,7 +609,7 @@ test_topology_retired_fails_to_initiate (void)
    mongoc_log_and_monitor_instance_destroy_contents (&log_and_monitor);
 }
 
-static void
+static void BSON_CALL
 heartbeat_failed (const mongoc_apm_server_heartbeat_failed_t *event)
 {
    bson_error_t error;

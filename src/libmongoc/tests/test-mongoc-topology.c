@@ -71,7 +71,7 @@ checks_cmp (checks_t *checks, const char *metric, char cmp, size_t expected)
    return false;
 }
 
-static void
+static void BSON_CALL
 check_started (const mongoc_apm_server_heartbeat_started_t *event)
 {
    checks_t *c;
@@ -83,7 +83,7 @@ check_started (const mongoc_apm_server_heartbeat_started_t *event)
 }
 
 
-static void
+static void BSON_CALL
 check_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
 {
    checks_t *c;
@@ -95,7 +95,7 @@ check_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
 }
 
 
-static void
+static void BSON_CALL
 check_failed (const mongoc_apm_server_heartbeat_failed_t *event)
 {
    checks_t *c;
@@ -106,7 +106,7 @@ check_failed (const mongoc_apm_server_heartbeat_failed_t *event)
    bson_mutex_unlock (&c->mutex);
 }
 
-static void
+static void BSON_CALL
 server_changed_callback (const mongoc_apm_server_changed_t *event)
 {
    checks_t *c;
@@ -2417,7 +2417,7 @@ test_hello_ok_pooled (void)
 }
 
 // initiator_fail is a stream initiator that always fails.
-static mongoc_stream_t *
+static mongoc_stream_t * BSON_CALL
 initiator_fail (const mongoc_uri_t *uri, const mongoc_host_list_t *host, void *user_data, bson_error_t *error)
 {
    BSON_UNUSED (uri);

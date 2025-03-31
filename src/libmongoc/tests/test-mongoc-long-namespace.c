@@ -37,7 +37,7 @@ typedef struct {
 
 /* Ensure that the command started callback reports the correct database name.
  */
-static void
+static void BSON_CALL
 command_started (const mongoc_apm_command_started_t *event)
 {
    test_fixture_t *test_fixture;
@@ -443,11 +443,16 @@ unsupported_long_db (void)
    bson_free (long_db);
 }
 
+// `bson_free_dtor` is not marked with `BSON_CALL` to support building tests with non-cdecl calling convention.
+static void bson_free_dtor (void * mem) {
+   bson_free (mem);
+}
+
 #define add_long_namespace_test(_name, _test_fn, ...)                              \
    if (1) {                                                                        \
       run_test_helper_t *const helper = bson_malloc (sizeof (*helper));            \
       *helper = (run_test_helper_t){.test_fn = (_test_fn)};                        \
-      TestSuite_AddFull (suite, _name, run_test, &bson_free, helper, __VA_ARGS__); \
+      TestSuite_AddFull (suite, _name, run_test, bson_free_dtor, helper, __VA_ARGS__); \
    } else                                                                          \
       ((void) 0)
 

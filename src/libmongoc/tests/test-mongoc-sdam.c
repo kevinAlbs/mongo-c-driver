@@ -722,7 +722,7 @@ typedef struct {
    uint32_t n_heartbeat_succeeded;
 } prose_test_ctx_t;
 
-static void
+static void BSON_CALL
 heartbeat_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *event)
 {
    prose_test_ctx_t *ctx;
@@ -919,7 +919,7 @@ static BSON_THREAD_FUN (prose_heartbeat_thread, generic_context)
    BSON_THREAD_RETURN;
 }
 
-static void
+static void BSON_CALL
 prose_heartbeat_event_started (const mongoc_apm_server_heartbeat_started_t *event)
 {
    prose_heartbeat_context_t *context =
@@ -927,7 +927,7 @@ prose_heartbeat_event_started (const mongoc_apm_server_heartbeat_started_t *even
    prose_heartbeat_context_append_event (context, PROSE_HEARTBEAT_EVENT_SERVER_HEARTBEAT_STARTED);
 }
 
-static void
+static void BSON_CALL
 prose_heartbeat_event_failed (const mongoc_apm_server_heartbeat_failed_t *event)
 {
    prose_heartbeat_context_t *context =

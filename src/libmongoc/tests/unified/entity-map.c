@@ -307,7 +307,7 @@ entity_new (entity_map_t *em, const char *type)
    return entity;
 }
 
-static void
+static void BSON_CALL
 structured_log_cb (const mongoc_structured_log_entry_t *entry, void *user_data)
 {
    BSON_ASSERT_PARAM (entry);
@@ -411,7 +411,7 @@ event_store_or_destroy (entity_t *entity, event_t *event)
    }
 }
 
-static void
+static void BSON_CALL
 command_started (const mongoc_apm_command_started_t *started)
 {
    entity_t *entity = (entity_t *) mongoc_apm_command_started_get_context (started);
@@ -434,7 +434,7 @@ command_started (const mongoc_apm_command_started_t *started)
    event_store_or_destroy (entity, event_new ("commandStartedEvent", "command", serialized, is_sensitive));
 }
 
-static void
+static void BSON_CALL
 command_failed (const mongoc_apm_command_failed_t *failed)
 {
    entity_t *entity = (entity_t *) mongoc_apm_command_failed_get_context (failed);
@@ -460,7 +460,7 @@ command_failed (const mongoc_apm_command_failed_t *failed)
    event_store_or_destroy (entity, event_new ("commandFailedEvent", "command", serialized, is_sensitive));
 }
 
-static void
+static void BSON_CALL
 command_succeeded (const mongoc_apm_command_succeeded_t *succeeded)
 {
    entity_t *entity = (entity_t *) mongoc_apm_command_succeeded_get_context (succeeded);
@@ -484,7 +484,7 @@ command_succeeded (const mongoc_apm_command_succeeded_t *succeeded)
    event_store_or_destroy (entity, event_new ("commandSucceededEvent", "command", serialized, is_sensitive));
 }
 
-static void
+static void BSON_CALL
 server_changed (const mongoc_apm_server_changed_t *changed)
 {
    entity_t *entity = (entity_t *) mongoc_apm_server_changed_get_context (changed);
@@ -508,7 +508,7 @@ server_changed (const mongoc_apm_server_changed_t *changed)
    event_store_or_destroy (entity, event_new ("serverDescriptionChangedEvent", "sdam", serialized, false));
 }
 
-static void
+static void BSON_CALL
 topology_changed (const mongoc_apm_topology_changed_t *changed)
 {
    entity_t *entity = (entity_t *) mongoc_apm_topology_changed_get_context (changed);
@@ -535,7 +535,7 @@ topology_changed (const mongoc_apm_topology_changed_t *changed)
    event_store_or_destroy (entity, event_new ("topologyDescriptionChangedEvent", "sdam", serialized, false));
 }
 
-static void
+static void BSON_CALL
 topology_opening (const mongoc_apm_topology_opening_t *opening)
 {
    entity_t *entity = (entity_t *) mongoc_apm_topology_opening_get_context (opening);
@@ -548,7 +548,7 @@ topology_opening (const mongoc_apm_topology_opening_t *opening)
    event_store_or_destroy (entity, event_new ("topologyOpeningEvent", "sdam", serialized, false));
 }
 
-static void
+static void BSON_CALL
 topology_closed (const mongoc_apm_topology_closed_t *closed)
 {
    entity_t *entity = (entity_t *) mongoc_apm_topology_closed_get_context (closed);
@@ -561,7 +561,7 @@ topology_closed (const mongoc_apm_topology_closed_t *closed)
    event_store_or_destroy (entity, event_new ("topologyClosedEvent", "sdam", serialized, false));
 }
 
-static void
+static void BSON_CALL
 server_heartbeat_started (const mongoc_apm_server_heartbeat_started_t *started)
 {
    entity_t *entity = (entity_t *) mongoc_apm_server_heartbeat_started_get_context (started);
@@ -572,7 +572,7 @@ server_heartbeat_started (const mongoc_apm_server_heartbeat_started_t *started)
    event_store_or_destroy (entity, event_new ("serverHeartbeatStartedEvent", "sdam", serialized, false));
 }
 
-static void
+static void BSON_CALL
 server_heartbeat_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *succeeded)
 {
    entity_t *entity = (entity_t *) mongoc_apm_server_heartbeat_succeeded_get_context (succeeded);
@@ -584,7 +584,7 @@ server_heartbeat_succeeded (const mongoc_apm_server_heartbeat_succeeded_t *succe
    event_store_or_destroy (entity, event_new ("serverHeartbeatSucceededEvent", "sdam", serialized, false));
 }
 
-static void
+static void BSON_CALL
 server_heartbeat_failed (const mongoc_apm_server_heartbeat_failed_t *failed)
 {
    entity_t *entity = (entity_t *) mongoc_apm_server_heartbeat_failed_get_context (failed);

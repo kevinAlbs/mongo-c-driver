@@ -247,7 +247,7 @@ test_bypass_validation (void *context)
    mongoc_client_destroy (client);
 }
 
-static void
+static void BSON_CALL
 test_bypass_command_started (const mongoc_apm_command_started_t *event)
 {
    ASSERT_HAS_NOT_FIELD (mongoc_apm_command_started_get_command (event), "bypassDocumentValidation");

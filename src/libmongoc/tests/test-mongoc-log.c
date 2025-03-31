@@ -56,7 +56,7 @@ struct log_func_data {
 };
 
 
-void
+void BSON_CALL
 log_func (mongoc_log_level_t log_level, const char *log_domain, const char *message, void *user_data)
 {
    struct log_func_data *data = (struct log_func_data *) user_data;

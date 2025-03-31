@@ -229,7 +229,7 @@ typedef struct _test_retry_reads_sharded_on_other_mongos_ctx {
    uint16_t ports[2];
 } test_retry_reads_sharded_on_other_mongos_ctx;
 
-static void
+static void BSON_CALL
 _test_retry_reads_sharded_on_other_mongos_cb (const mongoc_apm_command_failed_t *event)
 {
    BSON_ASSERT_PARAM (event);
@@ -401,13 +401,13 @@ _test_retry_reads_sharded_on_same_mongos_cb (test_retry_reads_sharded_on_same_mo
    }
 }
 
-static void
+static void BSON_CALL
 _test_retry_reads_sharded_on_same_mongos_failed_cb (const mongoc_apm_command_failed_t *event)
 {
    _test_retry_reads_sharded_on_same_mongos_cb (mongoc_apm_command_failed_get_context (event), event, NULL);
 }
 
-static void
+static void BSON_CALL
 _test_retry_reads_sharded_on_same_mongos_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 {
    _test_retry_reads_sharded_on_same_mongos_cb (mongoc_apm_command_succeeded_get_context (event), NULL, event);

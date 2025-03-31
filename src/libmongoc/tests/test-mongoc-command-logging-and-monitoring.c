@@ -6,7 +6,7 @@
 #include "TestSuite.h"
 #include <mlib/loop.h>
 
-static void
+static void BSON_CALL
 stored_log_handler (const mongoc_structured_log_entry_t *entry, void *user_data)
 {
    mongoc_array_t *log_array = (mongoc_array_t *) user_data;

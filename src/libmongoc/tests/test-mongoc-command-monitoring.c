@@ -103,7 +103,7 @@ test_all_spec_tests (TestSuite *suite)
 }
 
 
-static void
+static void BSON_CALL
 test_get_error_failed_cb (const mongoc_apm_command_failed_t *event)
 {
    bson_error_t *error;
@@ -162,7 +162,7 @@ insert_200_docs (mongoc_collection_t *collection)
 }
 
 
-static void
+static void BSON_CALL
 increment (const mongoc_apm_command_started_t *event)
 {
    int *i = (int *) mongoc_apm_command_started_get_context (event);
@@ -183,7 +183,7 @@ increment_callbacks (void)
 }
 
 
-static void
+static void BSON_CALL
 decrement (const mongoc_apm_command_started_t *event)
 {
    int *i = (int *) mongoc_apm_command_started_get_context (event);
@@ -312,7 +312,7 @@ test_reset_callbacks (void)
 }
 
 
-static void
+static void BSON_CALL
 test_set_callbacks_cb (const mongoc_apm_command_started_t *event)
 {
    int *n_calls = (int *) mongoc_apm_command_started_get_context (event);
@@ -440,7 +440,7 @@ op_id_test_cleanup (op_id_test_t *test)
 }
 
 
-static void
+static void BSON_CALL
 test_op_id_started_cb (const mongoc_apm_command_started_t *event)
 {
    op_id_test_t *test;
@@ -456,7 +456,7 @@ test_op_id_started_cb (const mongoc_apm_command_started_t *event)
 }
 
 
-static void
+static void BSON_CALL
 test_op_id_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 {
    op_id_test_t *test;
@@ -472,7 +472,7 @@ test_op_id_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 }
 
 
-static void
+static void BSON_CALL
 test_op_id_failed_cb (const mongoc_apm_command_failed_t *event)
 {
    op_id_test_t *test;
@@ -749,7 +749,7 @@ cmd_test_cleanup (cmd_test_t *test)
 }
 
 
-static void
+static void BSON_CALL
 cmd_started_cb (const mongoc_apm_command_started_t *event)
 {
    cmd_test_t *test;
@@ -768,7 +768,7 @@ cmd_started_cb (const mongoc_apm_command_started_t *event)
 }
 
 
-static void
+static void BSON_CALL
 cmd_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 {
    cmd_test_t *test;
@@ -788,7 +788,7 @@ cmd_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 }
 
 
-static void
+static void BSON_CALL
 cmd_failed_cb (const mongoc_apm_command_failed_t *event)
 {
    cmd_test_t *test;
@@ -935,7 +935,7 @@ cmd_failed_reply_test_cleanup (cmd_failed_reply_test_t *test)
 }
 
 
-static void
+static void BSON_CALL
 command_failed_reply_command_failed_cb (const mongoc_apm_command_failed_t *event)
 {
    cmd_failed_reply_test_t *test;
@@ -1083,7 +1083,7 @@ assert_service_id (service_id_test_t *test, const bson_oid_t *actual_service_id)
 }
 
 
-static void
+static void BSON_CALL
 service_id_cmd_started_cb (const mongoc_apm_command_started_t *event)
 {
    service_id_test_t *test = mongoc_apm_command_started_get_context (event);
@@ -1093,7 +1093,7 @@ service_id_cmd_started_cb (const mongoc_apm_command_started_t *event)
 }
 
 
-static void
+static void BSON_CALL
 service_id_cmd_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 {
    service_id_test_t *test = mongoc_apm_command_succeeded_get_context (event);
@@ -1103,7 +1103,7 @@ service_id_cmd_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 }
 
 
-static void
+static void BSON_CALL
 service_id_cmd_failed_cb (const mongoc_apm_command_failed_t *event)
 {
    service_id_test_t *test = mongoc_apm_command_failed_get_context (event);

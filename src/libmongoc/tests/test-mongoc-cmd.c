@@ -66,7 +66,7 @@ test_client_cmd_options (void)
    mock_server_destroy (server);
 }
 
-static void
+static void BSON_CALL
 capture_last_command (const mongoc_apm_command_started_t *event)
 {
    bson_t *last_captured = mongoc_apm_command_started_get_context (event);

@@ -268,7 +268,7 @@ is_topology_type_compatible (const char *test_topology_type, const char *server_
  * The set of server IDs is used when sending a command to each individual
  * server.
  */
-static void
+static void BSON_CALL
 on_topology_changed (const mongoc_apm_topology_changed_t *event)
 {
    test_runner_t *test_runner = NULL;

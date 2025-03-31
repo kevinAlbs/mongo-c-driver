@@ -65,7 +65,7 @@ cursor_in_killed_array (bson_t *cursors_killed, int64_t cursor_id)
 }
 
 
-static void
+static void BSON_CALL
 cmd_started_cb (const mongoc_apm_command_started_t *event)
 {
    const uint8_t *array_data;
@@ -125,7 +125,7 @@ cmd_started_cb (const mongoc_apm_command_started_t *event)
    bson_destroy (cursors_killed);
 }
 
-static void
+static void BSON_CALL
 cmd_succeeded_cb (const mongoc_apm_command_succeeded_t *event)
 {
    const uint8_t *array_data;

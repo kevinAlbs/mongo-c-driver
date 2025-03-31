@@ -3893,7 +3893,7 @@ get_client_for_version_api_example (void)
    return client;
 }
 
-static bool
+static bool BSON_CALL
 callback (mongoc_client_session_t *session, void *ctx, bson_t **reply, bson_error_t *error);
 
 /* See additional usage of mongoc_client_session_with_transaction at
@@ -3979,7 +3979,7 @@ fail:
 
 /* Define the callback that specifies the sequence of operations to perform
  * inside the transactions. */
-static bool
+static bool BSON_CALL
 callback (mongoc_client_session_t *session, void *ctx, bson_t **reply, bson_error_t *error)
 {
    mongoc_client_t *client = NULL;

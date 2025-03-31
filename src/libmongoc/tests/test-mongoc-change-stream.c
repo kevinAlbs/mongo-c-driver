@@ -379,7 +379,7 @@ typedef struct _test_batch_size_ctx {
    uint32_t expected_agg_batch_size;
 } test_batch_size_ctx_t;
 
-static void
+static void BSON_CALL
 test_batch_size_command_succeeded (const mongoc_apm_command_succeeded_t *event)
 {
    const bson_t *reply = mongoc_apm_command_succeeded_get_reply (event);
@@ -1209,7 +1209,7 @@ _resume_at_optime_started (const mongoc_apm_command_started_t *event)
    }
 }
 
-static void
+static void BSON_CALL
 _resume_at_optime_succeeded (const mongoc_apm_command_succeeded_t *event)
 {
    resume_ctx_t *ctx;
@@ -1290,7 +1290,7 @@ _resume_with_post_batch_resume_token_started (const mongoc_apm_command_started_t
    }
 }
 
-static void
+static void BSON_CALL
 _resume_with_post_batch_resume_token_succeeded (const mongoc_apm_command_succeeded_t *event)
 {
    resume_ctx_t *ctx;
@@ -1886,7 +1886,7 @@ prose_test_13 (void *ctx)
    mongoc_collection_destroy (coll);
 }
 
-static void
+static void BSON_CALL
 _save_operation_time_from_agg (const mongoc_apm_command_succeeded_t *event)
 {
    if (0 == strcmp ("aggregate", mongoc_apm_command_succeeded_get_command_name (event))) {

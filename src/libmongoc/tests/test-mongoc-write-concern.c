@@ -489,7 +489,7 @@ test_write_concern_wtimeout_preserved (void)
 }
 
 /* callback that records write concern for commands */
-static void
+static void BSON_CALL
 write_concern_count (const mongoc_apm_command_started_t *event)
 {
    const bson_t *command = mongoc_apm_command_started_get_command (event);

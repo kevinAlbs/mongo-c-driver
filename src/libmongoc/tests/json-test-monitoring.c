@@ -220,7 +220,7 @@ failed_cb (const mongoc_apm_command_failed_t *event)
    bson_mutex_unlock (&ctx->mutex);
 }
 
-static void
+static void BSON_CALL
 server_changed_cb (const mongoc_apm_server_changed_t *event)
 {
    json_test_ctx_t *ctx;
