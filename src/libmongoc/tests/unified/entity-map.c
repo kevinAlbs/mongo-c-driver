@@ -869,8 +869,6 @@ _parse_kms_provider_aws_temp (
    bson_t *kms_providers, bson_t *tls_opts, const char *provider, bson_t *kms_doc, bson_error_t *error)
 {
    bson_t child;
-   bson_iter_t iter;
-
    BSON_UNUSED (tls_opts);
 
    BSON_ASSERT (BSON_APPEND_DOCUMENT_BEGIN (kms_providers, provider, &child));
