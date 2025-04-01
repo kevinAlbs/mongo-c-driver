@@ -865,6 +865,26 @@ _parse_kms_provider_aws (
 }
 
 static bool
+_parse_kms_provider_aws_temp (
+   bson_t *kms_providers, bson_t *tls_opts, const char *provider, bson_t *kms_doc, bson_error_t *error)
+{
+   bson_t child;
+   bson_iter_t iter;
+
+   BSON_UNUSED (tls_opts);
+
+   BSON_ASSERT (BSON_APPEND_DOCUMENT_BEGIN (kms_providers, provider, &child));
+   _append_kms_provider_value_or_getenv (&child, "secretAccessKey", NULL, "MONGOC_TEST_AWS_TEMP_SECRET_ACCESS_KEY", error);
+   _append_kms_provider_value_or_getenv (&child, "accessKeyId", NULL, "MONGOC_TEST_AWS_TEMP_ACCESS_KEY_ID", error);
+   if (strcmp(provider, "awsTemporaryNoSessionToken") != 0) {
+      _append_kms_provider_value_or_getenv (&child, "sessionToken", NULL, "MONGOC_TEST_AWS_TEMP_SESSION_TOKEN", error);
+   }
+   BSON_ASSERT (bson_append_document_end (kms_providers, &child));
+
+   return true;
+}
+
+static bool
 _parse_kms_provider_azure (
    bson_t *kms_providers, bson_t *tls_opts, const char *provider, bson_t *kms_doc, bson_error_t *error)
 {
@@ -1058,6 +1078,8 @@ _parse_and_set_kms_providers (mongoc_client_encryption_opts_t *ce_opts, bson_t *
    const prov_map_t prov_map[] = {{.provider = "aws", .parse = _parse_kms_provider_aws},
                                   {.provider = "aws:name1", .parse = _parse_kms_provider_aws},
                                   {.provider = "aws:name2", .parse = _parse_kms_provider_aws},
+                                  {.provider = "awsTemporary", .parse = _parse_kms_provider_aws_temp},
+                                  {.provider = "awsTemporaryNoSessionToken", .parse = _parse_kms_provider_aws_temp},
                                   {.provider = "azure", .parse = _parse_kms_provider_azure},
                                   {.provider = "azure:name1", .parse = _parse_kms_provider_azure},
                                   {.provider = "gcp", .parse = _parse_kms_provider_gcp},
