@@ -93,6 +93,11 @@
           ]
         }
       }
+    },
+    {
+      "databaseName": "keyvault",
+      "collectionName": "datakeys",
+      "documents": []
     }
   ],
   "tests": [
