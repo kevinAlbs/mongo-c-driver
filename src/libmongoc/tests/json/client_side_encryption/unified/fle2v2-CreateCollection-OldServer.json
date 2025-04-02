@@ -90,34 +90,34 @@
         },
         {
           "name": "assertCollectionNotExists",
-          "object": "coll",
+          "object": "testRunner",
           "arguments": {
-            "database": "default",
-            "collection": "enxcol_.encryptedCollection.esc"
+            "databaseName": "default",
+            "collectionName": "enxcol_.encryptedCollection.esc"
           }
         },
         {
           "name": "assertCollectionNotExists",
-          "object": "coll",
+          "object": "testRunner",
           "arguments": {
-            "database": "default",
-            "collection": "enxcol_.encryptedCollection.ecc"
+            "databaseName": "default",
+            "collectionName": "enxcol_.encryptedCollection.ecc"
           }
         },
         {
           "name": "assertCollectionNotExists",
-          "object": "coll",
+          "object": "testRunner",
           "arguments": {
-            "database": "default",
-            "collection": "enxcol_.encryptedCollection.ecoc"
+            "databaseName": "default",
+            "collectionName": "enxcol_.encryptedCollection.ecoc"
           }
         },
         {
           "name": "assertCollectionNotExists",
-          "object": "coll",
+          "object": "testRunner",
           "arguments": {
-            "database": "default",
-            "collection": "encryptedCollection"
+            "databaseName": "default",
+            "collectionName": "encryptedCollection"
           }
         }
       ]
