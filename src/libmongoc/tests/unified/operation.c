@@ -1095,6 +1095,11 @@ operation_create_collection (test_t *test, operation_t *op, result_t *result, bs
       }
    }
 
+   mongoc_write_concern_t *wc = mongoc_write_concern_new();
+   mongoc_write_concern_set_wmajority(wc, 10000);
+   ASSERT(mongoc_write_concern_append(wc, opts));
+   mongoc_write_concern_destroy(wc);
+
    coll = mongoc_database_create_collection (db, collection, opts, &op_error);
 
    result_from_val_and_reply (result, NULL, NULL, &op_error);
@@ -1131,6 +1136,11 @@ operation_drop_collection (test_t *test, operation_t *op, result_t *result, bson
          goto done;
       }
    }
+   
+   mongoc_write_concern_t *wc = mongoc_write_concern_new();
+   mongoc_write_concern_set_wmajority(wc, 10000);
+   ASSERT(mongoc_write_concern_append(wc, opts));
+   mongoc_write_concern_destroy(wc);
 
    db = entity_map_get_database (test->entity_map, op->object, error);
    if (!db) {
