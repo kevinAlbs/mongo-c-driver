@@ -845,7 +845,6 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
       bson_t *bulk_opts = NULL;
       bson_t *drop_opts = bson_new ();
       bson_t *create_opts = NULL;
-      bson_t existing_encryptedFields = BSON_INITIALIZER;
       bool ret = false;
 
       bson_iter_bson (&initial_data_iter, &collection_data);
@@ -882,14 +881,7 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
       }
 
       coll = mongoc_client_get_collection (test_runner->internal_client, database_name, collection_name);
-      if (_mongoc_get_encryptedFields_from_server (
-             test_runner->internal_client, database_name, collection_name, &existing_encryptedFields, error)) {
-         if (!bson_empty (&existing_encryptedFields)) {
-            BSON_APPEND_DOCUMENT (drop_opts, "encryptedFields", &existing_encryptedFields);
-         }
-      } else {
-         goto loopexit;
-      }
+
       if (!mongoc_collection_drop_with_opts (coll, drop_opts, error)) {
          if (error->code != 26 && (NULL == strstr (error->message, "ns not found"))) {
             /* This is not a "ns not found" error. Fail the test. */
@@ -898,6 +890,40 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
          /* Clear an "ns not found" error. */
          memset (error, 0, sizeof (bson_error_t));
       }
+
+      // Also drop `enxcol_.<coll>.esc` and `enxcol_.<coll>.ecoc` in case the collection will be used for QE.
+      {
+         char *collection_name_esc = bson_strdup_printf ("enxcol_.%s.esc", collection_name);
+         mongoc_collection_t *coll_esc =
+            mongoc_client_get_collection (test_runner->internal_client, database_name, collection_name_esc);
+         if (!mongoc_collection_drop_with_opts (coll_esc, drop_opts, error)) {
+            if (error->code != 26 && (NULL == strstr (error->message, "ns not found"))) {
+               /* This is not a "ns not found" error. Fail the test. */
+               goto loopexit;
+            }
+            /* Clear an "ns not found" error. */
+            memset (error, 0, sizeof (bson_error_t));
+         }
+         mongoc_collection_destroy (coll_esc);
+         bson_free (collection_name_esc);
+      }
+
+      {
+         char *collection_name_ecoc = bson_strdup_printf ("enxcol_.%s.ecoc", collection_name);
+         mongoc_collection_t *coll_ecoc =
+            mongoc_client_get_collection (test_runner->internal_client, database_name, collection_name_ecoc);
+         if (!mongoc_collection_drop_with_opts (coll_ecoc, drop_opts, error)) {
+            if (error->code != 26 && (NULL == strstr (error->message, "ns not found"))) {
+               /* This is not a "ns not found" error. Fail the test. */
+               goto loopexit;
+            }
+            /* Clear an "ns not found" error. */
+            memset (error, 0, sizeof (bson_error_t));
+         }
+         mongoc_collection_destroy (coll_ecoc);
+         bson_free (collection_name_ecoc);
+      }
+
 
       mongoc_collection_t *new_coll = NULL;
       db = mongoc_client_get_database (test_runner->internal_client, database_name);
@@ -938,7 +964,6 @@ test_setup_initial_data (test_t *test, bson_error_t *error)
       bson_destroy (bulk_opts);
       bson_destroy (drop_opts);
       bson_destroy (create_opts);
-      bson_destroy (&existing_encryptedFields);
       bson_destroy (documents);
       mongoc_write_concern_destroy (wc);
       mongoc_collection_destroy (coll);
