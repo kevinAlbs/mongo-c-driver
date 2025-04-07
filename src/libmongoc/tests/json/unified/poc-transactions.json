@@ -11,7 +11,7 @@
     {
       "minServerVersion": "4.1.8",
       "topologies": [
-        "sharded-replicaset"
+        "sharded"
       ]
     }
   ],
@@ -93,7 +93,7 @@
           "minServerVersion": "4.3.4",
           "topologies": [
             "replicaset",
-            "sharded-replicaset"
+            "sharded"
           ]
         }
       ],
@@ -145,10 +145,7 @@
             {
               "commandStartedEvent": {
                 "command": {
-                  "drop": "test",
-                  "writeConcern": {
-                    "$$exists": false
-                  }
+                  "drop": "test"
                 },
                 "commandName": "drop",
                 "databaseName": "transaction-tests"
@@ -203,7 +200,7 @@
           "minServerVersion": "4.3.4",
           "topologies": [
             "replicaset",
-            "sharded-replicaset"
+            "sharded"
           ]
         }
       ],
@@ -260,10 +257,7 @@
             {
               "commandStartedEvent": {
                 "command": {
-                  "drop": "test",
-                  "writeConcern": {
-                    "$$exists": false
-                  }
+                  "drop": "test"
                 },
                 "commandName": "drop",
                 "databaseName": "transaction-tests"
