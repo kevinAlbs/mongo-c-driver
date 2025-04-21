@@ -249,6 +249,10 @@ _bson_append_szoid (mcommon_string_append_t *retval, PCCERT_CONTEXT cert, const 
       char *tmp = bson_malloc0 (oid_len);
 
       CertGetNameString (cert, CERT_NAME_ATTR_TYPE, 0, oid, tmp, oid_len);
+      // If return string is non-empty, first add a comma.
+      if (0 != mcommon_strlen_from_append (retval)) {
+         mcommon_string_append (retval, ",");
+      }
       mcommon_string_append_printf (retval, "%s%s", label, tmp);
       bson_free (tmp);
    }
@@ -267,12 +271,12 @@ _mongoc_secure_channel_extract_subject (const char *filename, const char *passph
    mcommon_string_new_as_append (&retval);
 
    _bson_append_szoid (&retval, cert, "C=", szOID_COUNTRY_NAME);
-   _bson_append_szoid (&retval, cert, ",ST=", szOID_STATE_OR_PROVINCE_NAME);
-   _bson_append_szoid (&retval, cert, ",L=", szOID_LOCALITY_NAME);
-   _bson_append_szoid (&retval, cert, ",O=", szOID_ORGANIZATION_NAME);
-   _bson_append_szoid (&retval, cert, ",OU=", szOID_ORGANIZATIONAL_UNIT_NAME);
-   _bson_append_szoid (&retval, cert, ",CN=", szOID_COMMON_NAME);
-   _bson_append_szoid (&retval, cert, ",STREET=", szOID_STREET_ADDRESS);
+   _bson_append_szoid (&retval, cert, "ST=", szOID_STATE_OR_PROVINCE_NAME);
+   _bson_append_szoid (&retval, cert, "L=", szOID_LOCALITY_NAME);
+   _bson_append_szoid (&retval, cert, "O=", szOID_ORGANIZATION_NAME);
+   _bson_append_szoid (&retval, cert, "OU=", szOID_ORGANIZATIONAL_UNIT_NAME);
+   _bson_append_szoid (&retval, cert, "CN=", szOID_COMMON_NAME);
+   _bson_append_szoid (&retval, cert, "STREET=", szOID_STREET_ADDRESS);
 
    return mcommon_string_from_append_destroy_with_steal (&retval);
 }
