@@ -93,6 +93,10 @@ _bson_append_cftyperef (mcommon_string_append_t *retval, const char *label, CFTy
       cs = _mongoc_cfstringref_to_cstring (str);
 
       if (cs) {
+         // If return string is non-empty, first add a comma.
+         if (0 != mcommon_strlen_from_append (retval)) {
+            mcommon_string_append (retval, ",");
+         }
          mcommon_string_append_printf (retval, "%s%s", label, cs);
          bson_free (cs);
       } else {
@@ -156,39 +160,39 @@ _mongoc_secure_transport_RFC2253_from_cert (SecCertificateRef cert)
    _bson_append_cftyperef (&retval, "C=", value);
 
    value = _mongoc_secure_transport_dict_get (subject_name, kSecOIDStateProvinceName);
-   _bson_append_cftyperef (&retval, ",ST=", value);
+   _bson_append_cftyperef (&retval, "ST=", value);
 
    value = _mongoc_secure_transport_dict_get (subject_name, kSecOIDLocalityName);
-   _bson_append_cftyperef (&retval, ",L=", value);
+   _bson_append_cftyperef (&retval, "L=", value);
 
    value = _mongoc_secure_transport_dict_get (subject_name, kSecOIDOrganizationName);
-   _bson_append_cftyperef (&retval, ",O=", value);
+   _bson_append_cftyperef (&retval, "O=", value);
 
    value = _mongoc_secure_transport_dict_get (subject_name, kSecOIDOrganizationalUnitName);
    if (value) {
       /* Can be either one unit name, or array of unit names */
       if (CFGetTypeID (value) == CFStringGetTypeID ()) {
-         _bson_append_cftyperef (&retval, ",OU=", value);
+         _bson_append_cftyperef (&retval, "OU=", value);
       } else if (CFGetTypeID (value) == CFArrayGetTypeID ()) {
          CFIndex len = CFArrayGetCount (value);
 
          if (len > 0) {
-            _bson_append_cftyperef (&retval, ",OU=", CFArrayGetValueAtIndex (value, 0));
+            _bson_append_cftyperef (&retval, "OU=", CFArrayGetValueAtIndex (value, 0));
          }
          if (len > 1) {
-            _bson_append_cftyperef (&retval, ",", CFArrayGetValueAtIndex (value, 1));
+            _bson_append_cftyperef (&retval, "", CFArrayGetValueAtIndex (value, 1));
          }
          if (len > 2) {
-            _bson_append_cftyperef (&retval, ",", CFArrayGetValueAtIndex (value, 2));
+            _bson_append_cftyperef (&retval, "", CFArrayGetValueAtIndex (value, 2));
          }
       }
    }
 
    value = _mongoc_secure_transport_dict_get (subject_name, kSecOIDCommonName);
-   _bson_append_cftyperef (&retval, ",CN=", value);
+   _bson_append_cftyperef (&retval, "CN=", value);
 
    value = _mongoc_secure_transport_dict_get (subject_name, kSecOIDStreetAddress);
-   _bson_append_cftyperef (&retval, ",STREET", value);
+   _bson_append_cftyperef (&retval, "STREET", value);
 
    CFRelease (cert_dict);
    return mcommon_string_from_append_destroy_with_steal (&retval);
