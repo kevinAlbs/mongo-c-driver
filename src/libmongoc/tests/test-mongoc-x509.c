@@ -21,6 +21,10 @@ test_extract_subject (void)
    subject = mongoc_ssl_extract_subject (CERT_CLIENT, NULL);
    ASSERT_CMPSTR (subject, "C=US,ST=New York,L=New York City,O=MDB,OU=Drivers,CN=client");
    bson_free (subject);
+
+   subject = mongoc_ssl_extract_subject (CERT_TEST_DIR "/cn-only.pem", NULL);
+   ASSERT_CMPSTR (subject, "CN=test-common-name");
+   bson_free (subject);
 }
 #endif
 
