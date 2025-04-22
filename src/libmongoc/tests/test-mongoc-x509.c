@@ -26,6 +26,13 @@ test_extract_subject (void)
    ASSERT_CMPSTR (subject, "CN=test-common-name");
    bson_free (subject);
 
+   // Try to extract subject from client certificate without a private key.
+   capture_logs (true);
+   subject = mongoc_ssl_extract_subject (CERT_TEST_DIR "/client-public.pem", NULL);
+   ASSERT (!subject);
+   ASSERT_CAPTURED_LOG ("X509", MONGOC_LOG_LEVEL_ERROR, "Cannot import certificate");
+   bson_free (subject);
+
    subject = mongoc_ssl_extract_subject (CERT_TEST_DIR "/client-cn-last.pem", NULL);
    ASSERT_CMPSTR (subject,
                   "CN=Chris,OU=TestClientCertificateOrgUnit,O=EducationClientCertificate,L="

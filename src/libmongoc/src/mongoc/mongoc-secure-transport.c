@@ -281,6 +281,9 @@ done:
    return r;
 }
 
+static const char *
+SecExternalItemType_to_string (SecExternalItemType value);
+
 char *
 _mongoc_secure_transport_extract_subject (const char *filename, const char *passphrase)
 {
@@ -296,17 +299,23 @@ _mongoc_secure_transport_extract_subject (const char *filename, const char *pass
       return NULL;
    }
 
-   if (type == kSecItemTypeAggregate) {
-      for (CFIndex i = 0; i < CFArrayGetCount (items); ++i) {
-         CFTypeID item_id = CFGetTypeID (CFArrayGetValueAtIndex (items, i));
+   if (type != kSecItemTypeAggregate) {
+      MONGOC_ERROR ("Cannot import certificate from file (%s). Type %s (%" PRIu32
+                    ") is not supported. Certificate and private key must be in the same file",
+                    filename,
+                    SecExternalItemType_to_string (type),
+                    type);
+      CFRelease (items);
+      return NULL;
+   }
 
-         if (item_id == SecCertificateGetTypeID ()) {
-            retval = _mongoc_secure_transport_RFC2253_from_cert ((SecCertificateRef) CFArrayGetValueAtIndex (items, i));
-            break;
-         }
+   for (CFIndex i = 0; i < CFArrayGetCount (items); ++i) {
+      CFTypeID item_id = CFGetTypeID (CFArrayGetValueAtIndex (items, i));
+
+      if (item_id == SecCertificateGetTypeID ()) {
+         retval = _mongoc_secure_transport_RFC2253_from_cert ((SecCertificateRef) CFArrayGetValueAtIndex (items, i));
+         break;
       }
-   } else if (type == kSecItemTypeCertificate) {
-      retval = _mongoc_secure_transport_RFC2253_from_cert ((SecCertificateRef) items);
    }
 
    if (items) {
@@ -360,11 +369,13 @@ mongoc_secure_transport_setup_certificate (mongoc_stream_tls_secure_transport_t 
    }
 
    if (type != kSecItemTypeAggregate) {
-      MONGOC_ERROR ("Cannot work with keys of type %s (%" PRIu32 "). Type is not supported",
+      MONGOC_ERROR ("Cannot import certificate from file (%s). Type %s (%" PRIu32
+                    ") is not supported. Certificate and private key must be in the same file",
+                    opt->pem_file,
                     SecExternalItemType_to_string (type),
                     type);
       CFRelease (items);
-      return false;
+      return NULL;
    }
 
    for (CFIndex i = 0; i < CFArrayGetCount (items); ++i) {
