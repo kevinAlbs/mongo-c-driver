@@ -258,6 +258,58 @@ _bson_append_szoid (mcommon_string_append_t *retval, PCCERT_CONTEXT cert, const 
    }
 }
 
+static void
+log_error (DWORD errcode, const char *prefix)
+{
+   BSON_ASSERT_PARAM (prefix);
+
+   LPTSTR msg = NULL;
+   FormatMessage (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
+                  NULL,
+                  errcode,
+                  LANG_NEUTRAL,
+                  (LPTSTR) &msg,
+                  0,
+                  NULL);
+   MONGOC_ERROR ("%s. %s (0x%.8X)", prefix, msg, (unsigned int) errcode);
+   LocalFree (msg);
+}
+
+// Caller must call `bson_free` on `out_data`.
+static bool
+decode_object (const char *struct_type, const BYTE *in_data, DWORD in_len, void **out_data)
+{
+   BSON_ASSERT_PARAM (struct_type);
+   BSON_ASSERT_PARAM (in_data);
+   BSON_ASSERT_PARAM (out_data);
+
+   *out_data = NULL;
+
+   DWORD decode_len = 0;
+   // Call first to determine decode length:
+   if (!CryptDecodeObjectEx (
+          X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, struct_type, in_data, in_len, 0, NULL, NULL, &decode_len)) {
+      DWORD errcode = GetLastError ();
+      if (errcode != ERROR_MORE_DATA) {
+         log_error (errcode, "CryptDecodeObjectEx failed to get size of object");
+         return false;
+      }
+   }
+
+   *out_data = bson_malloc (decode_len);
+
+   // Call again to decode:
+   if (!CryptDecodeObjectEx (
+          X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, struct_type, in_data, in_len, 0, NULL, *out_data, &decode_len)) {
+      DWORD errcode = GetLastError ();
+      log_error (errcode, "CryptDecodeObjectEx failed to read object");
+      return false;
+   }
+
+   return true;
+}
+
+
 char *
 _mongoc_secure_channel_extract_subject (const char *filename, const char *passphrase)
 {
@@ -267,17 +319,81 @@ _mongoc_secure_channel_extract_subject (const char *filename, const char *passph
       return NULL;
    }
 
+   void *name_data;
+   CERT_NAME_BLOB cert_name_blob = cert->pCertInfo->Subject;
+
+   // Get a list of the RDNs.
+   if (!decode_object (X509_NAME, cert_name_blob.pbData, cert_name_blob.cbData, &name_data)) {
+      bson_free (name_data);
+      return NULL;
+   }
+
+   PCERT_NAME_INFO nameInfo = (PCERT_NAME_INFO) name_data;
+
+   bool ok = false;
    mcommon_string_append_t retval;
    mcommon_string_new_as_append (&retval);
 
-   _bson_append_szoid (&retval, cert, "C=", szOID_COUNTRY_NAME);
-   _bson_append_szoid (&retval, cert, "ST=", szOID_STATE_OR_PROVINCE_NAME);
-   _bson_append_szoid (&retval, cert, "L=", szOID_LOCALITY_NAME);
-   _bson_append_szoid (&retval, cert, "O=", szOID_ORGANIZATION_NAME);
-   _bson_append_szoid (&retval, cert, "OU=", szOID_ORGANIZATIONAL_UNIT_NAME);
-   _bson_append_szoid (&retval, cert, "CN=", szOID_COMMON_NAME);
-   _bson_append_szoid (&retval, cert, "STREET=", szOID_STREET_ADDRESS);
+   // Iterate RDNs in reverse order:
+   DWORD rdn_iter = nameInfo->cRDN;
+   while (true) {
+      if (rdn_iter == 0) {
+         break;
+      }
+      rdn_iter--;
 
+      // Iterate RDN attributes in reverse order:
+      DWORD rdn_attr_iter = nameInfo->rgRDN[rdn_iter].cRDNAttr;
+      while (true) {
+         if (rdn_attr_iter == 0) {
+            break;
+         }
+         rdn_attr_iter--;
+
+         CERT_RDN_ATTR rdn_attr = nameInfo->rgRDN[rdn_iter].rgRDNAttr[rdn_attr_iter];
+         DWORD needed = CertRDNValueToStrA(rdn_attr.dwValueType, &rdn_attr.Value, NULL, 0); // Includes room for NULL terminator.
+         char *rdn_attr_str = bson_malloc (needed);
+         DWORD converted = CertRDNValueToStrA(rdn_attr.dwValueType,
+                                             &rdn_attr.Value,
+                                             rdn_attr_str,
+                                             needed);
+         BSON_ASSERT(needed == converted);
+         
+         // If return string is non-empty, first add a comma.
+         if (0 != mcommon_strlen_from_append (&retval)) {
+            mcommon_string_append (&retval, ",");
+         }
+
+         if (0 == strcmp(rdn_attr.pszObjId,szOID_COUNTRY_NAME)) {
+            mcommon_string_append (&retval, "C=");
+         } else if (0 == strcmp(rdn_attr.pszObjId,szOID_STATE_OR_PROVINCE_NAME)) {
+            mcommon_string_append (&retval, "ST=");
+         } else if (0 == strcmp(rdn_attr.pszObjId,szOID_LOCALITY_NAME)) {
+            mcommon_string_append (&retval, "L=");
+         } else if (0 == strcmp(rdn_attr.pszObjId,szOID_ORGANIZATION_NAME)) {
+            mcommon_string_append (&retval, "O=");
+         } else if (0 == strcmp(rdn_attr.pszObjId,szOID_ORGANIZATIONAL_UNIT_NAME)) {
+            mcommon_string_append (&retval, "OU=");
+         } else if (0 == strcmp(rdn_attr.pszObjId,szOID_COMMON_NAME)) {
+            mcommon_string_append (&retval, "CN=");
+         } else if (0 == strcmp(rdn_attr.pszObjId,szOID_STREET_ADDRESS)) {
+            mcommon_string_append (&retval, "STREET=");
+         } else {
+            MONGOC_ERROR ("Unsupported X509 subject object ID: %s", rdn_attr.pszObjId);
+            bson_free (rdn_attr_str);
+            goto fail;
+         }
+         mcommon_string_append (&retval, rdn_attr_str);
+         bson_free (rdn_attr_str);
+      }
+   }
+
+ok = true;
+   fail:
+   if (!ok) {
+      mcommon_string_from_append_destroy (&retval);
+      return NULL;
+   }
    return mcommon_string_from_append_destroy_with_steal (&retval);
 }
 
