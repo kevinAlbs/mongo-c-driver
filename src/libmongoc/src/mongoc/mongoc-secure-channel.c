@@ -93,7 +93,9 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
    }
 
    if (!pem_private) {
-      MONGOC_ERROR ("Can't find private key in '%s'", filename);
+      MONGOC_ERROR ("Cannot import certificate from file (%s). Cannot find private key. Certificate and private key "
+                    "must be in the same file",
+                    filename);
       goto fail;
    }
 
