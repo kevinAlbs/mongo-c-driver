@@ -38,6 +38,11 @@ test_extract_subject (void)
                   "CN=Chris,OU=TestClientCertificateOrgUnit,O=EducationClientCertificate,L="
                   "TestClientCertificateLocality,ST=TestClientCertificateState,C=US");
    bson_free (subject);
+
+   subject = mongoc_ssl_extract_subject (CERT_TEST_DIR "/client-subject-needs-escaping.pem", NULL);
+   ASSERT_CMPSTR (
+      subject, "O=(Has other chars) \\+ \\\" \\\\ \\< \\> \\;,L=(Ends with space)\\ ,ST=\\ (Starts with space),C=US");
+   bson_free (subject);
 }
 #endif
 
