@@ -952,7 +952,7 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
       LPTSTR msg = NULL;
       FormatMessage (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
                      NULL,
-                     GetLastError (),
+                     sspi_status,
                      LANG_NEUTRAL,
                      (LPTSTR) &msg,
                      0,
