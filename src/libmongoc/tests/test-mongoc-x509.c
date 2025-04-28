@@ -160,6 +160,29 @@ test_x509_auth (void *unused)
       mongoc_uri_destroy (uri);
    }
 
+   // Test auth works with PKCS8 key:
+   {
+      // Create URI:
+      mongoc_uri_t *uri = get_x509_uri ();
+      {
+         ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCERTIFICATEKEYFILE, CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"));
+         ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCAFILE, CERT_CA));
+      }
+
+      // Try auth:
+      bson_error_t error = {0};
+      bool ok;
+      {
+         mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+         ASSERT_OR_PRINT (client, error);
+         ok = try_insert (client, &error);
+         mongoc_client_destroy (client);
+      }
+
+      ASSERT_OR_PRINT (ok, error);
+      mongoc_uri_destroy (uri);
+   }
+
    // Test auth fails with no client certificate:
    {
       // Create URI:
