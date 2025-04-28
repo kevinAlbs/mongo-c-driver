@@ -75,7 +75,7 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
       return NULL;
    }
 
-   pem = (char *) bson_malloc0 (pem_length);
+   pem = (char *) bson_malloc0 (pem_length + 1);
    fread ((void *) pem, 1, pem_length, file);
    fclose (file);
 
