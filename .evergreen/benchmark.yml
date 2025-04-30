@@ -36,7 +36,7 @@ variables:
           set -o verbose
 
           cmake -DENABLE_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=mongoc . && make -j8 && make install
-          git clone https://github.com/mongodb/mongo-c-driver-performance.git
+          git clone https://github.com/kevinAlbs/mongo-c-driver-performance.git --branch fix-2.0
           cd mongo-c-driver-performance
           cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../mongoc . && make -j8
 
