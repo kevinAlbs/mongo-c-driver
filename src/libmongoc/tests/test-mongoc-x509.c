@@ -137,12 +137,12 @@ test_x509_auth (void *unused)
    drop_x509_user (true /* ignore "not found" error */);
    create_x509_user ();
 
-   // Test auth works:
+   // Test auth works with PKCS8 key:
    {
       // Create URI:
       mongoc_uri_t *uri = get_x509_uri ();
       {
-         ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCERTIFICATEKEYFILE, CERT_CLIENT));
+         ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCERTIFICATEKEYFILE, CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"));
          ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCAFILE, CERT_CA));
       }
 
@@ -160,12 +160,12 @@ test_x509_auth (void *unused)
       mongoc_uri_destroy (uri);
    }
 
-   // Test auth works with PKCS8 key:
+   // Test auth works:
    {
       // Create URI:
       mongoc_uri_t *uri = get_x509_uri ();
       {
-         ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCERTIFICATEKEYFILE, CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"));
+         ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCERTIFICATEKEYFILE, CERT_CLIENT));
          ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCAFILE, CERT_CA));
       }
 
