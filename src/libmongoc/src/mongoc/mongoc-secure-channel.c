@@ -334,6 +334,11 @@ fail:
       bson_free (blob_private_rsa);
    }
 
+   if (blob_private) {
+      SecureZeroMemory (blob_private, blob_private_len);
+      bson_free (blob_private);
+   }
+
    return NULL;
 }
 
