@@ -54,9 +54,9 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
    CERT_BLOB public_blob;
    const char *pem_public;
    const char *pem_private;
-   LPBYTE blob_private = NULL;
+   LPBYTE blob_private_rsa = NULL;
    PCCERT_CONTEXT cert = NULL;
-   DWORD blob_private_len = 0;
+   DWORD blob_private_rsa_len = 0;
    DWORD encoded_private_len = 0;
    LPBYTE encoded_private = NULL;
 
@@ -152,7 +152,7 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
                                   0,                                       /* dwFlags */
                                   NULL,                                    /* pDecodePara */
                                   NULL,                                    /* pvStructInfo */
-                                  &blob_private_len);                      /* pcbStructInfo */
+                                  &blob_private_rsa_len);                      /* pcbStructInfo */
    if (!success) {
       LPTSTR msg = NULL;
       FormatMessage (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
@@ -167,15 +167,15 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
       goto fail;
    }
 
-   blob_private = (LPBYTE) bson_malloc0 (blob_private_len);
+   blob_private_rsa = (LPBYTE) bson_malloc0 (blob_private_rsa_len);
    success = CryptDecodeObjectEx (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
                                   PKCS_RSA_PRIVATE_KEY,
                                   encoded_private,
                                   encoded_private_len,
                                   0,
                                   NULL,
-                                  blob_private,
-                                  &blob_private_len);
+                                  blob_private_rsa,
+                                  &blob_private_rsa_len);
    if (!success) {
       MONGOC_ERROR ("Failed to parse private key. Error 0x%.8X", (unsigned int) GetLastError ());
       goto fail;
@@ -195,12 +195,12 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
 
    /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa380207%28v=vs.85%29.aspx
     */
-   success = CryptImportKey (provider,         /* hProv */
-                             blob_private,     /* pbData */
-                             blob_private_len, /* dwDataLen */
-                             0,                /* hPubKey */
-                             0,                /* dwFlags */
-                             &hKey);           /* phKey, OUT */
+   success = CryptImportKey (provider,             /* hProv */
+                             blob_private_rsa,     /* pbData */
+                             blob_private_rsa_len, /* dwDataLen */
+                             0,                    /* hPubKey */
+                             0,                    /* dwFlags */
+                             &hKey);               /* phKey, OUT */
    if (!success) {
       MONGOC_ERROR ("CryptImportKey for private key failed with error 0x%.8X", (unsigned int) GetLastError ());
       goto fail;
@@ -227,9 +227,9 @@ fail:
       bson_free (encoded_private);
    }
 
-   if (blob_private) {
-      SecureZeroMemory (blob_private, blob_private_len);
-      bson_free (blob_private);
+   if (blob_private_rsa) {
+      SecureZeroMemory (blob_private_rsa, blob_private_rsa_len);
+      bson_free (blob_private_rsa);
    }
 
    return NULL;
