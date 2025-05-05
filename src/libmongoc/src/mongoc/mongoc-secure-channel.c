@@ -80,22 +80,6 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
    fclose (file);
 
    pem_public = strstr (pem, "-----BEGIN CERTIFICATE-----");
-   pem_private = strstr (pem, "-----BEGIN ENCRYPTED PRIVATE KEY-----");
-
-   if (pem_private) {
-      MONGOC_ERROR ("Detected unsupported encrypted private key");
-      goto fail;
-   }
-
-   pem_private = strstr (pem, "-----BEGIN RSA PRIVATE KEY-----");
-   if (!pem_private) {
-      pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----");
-   }
-
-   if (!pem_private) {
-      MONGOC_ERROR ("Can't find private key in '%s'", filename);
-      goto fail;
-   }
 
    public_blob.cbData = (DWORD) strlen (pem_public);
    public_blob.pbData = (BYTE *) pem_public;
@@ -117,6 +101,23 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
 
    if (!cert) {
       MONGOC_ERROR ("Failed to extract public key from '%s'. Error 0x%.8X", filename, (unsigned int) GetLastError ());
+      goto fail;
+   }
+
+   pem_private = strstr (pem, "-----BEGIN ENCRYPTED PRIVATE KEY-----");
+
+   if (pem_private) {
+      MONGOC_ERROR ("Detected unsupported encrypted private key");
+      goto fail;
+   }
+
+   pem_private = strstr (pem, "-----BEGIN RSA PRIVATE KEY-----");
+   if (!pem_private) {
+      pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----");
+   }
+
+   if (!pem_private) {
+      MONGOC_ERROR ("Can't find private key in '%s'", filename);
       goto fail;
    }
 
