@@ -41,6 +41,45 @@
 #define SECBUFFER_ALERT 17
 #endif
 
+#define LOG_WINDOWS_ERROR_F(errcode, fmt, ...)                                                                        \
+   if (1) {                                                                                                           \
+      LPTSTR errmsg = NULL;                                                                                           \
+      if (FormatMessage (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY, \
+                         NULL,                                                                                        \
+                         errcode,                                                                                     \
+                         LANG_NEUTRAL,                                                                                \
+                         (LPTSTR) & errmsg,                                                                           \
+                         0,                                                                                           \
+                         NULL)) {                                                                                     \
+         MONGOC_ERROR (fmt ": (0x%.8X) %s", __VA_ARGS__, (unsigned int) errcode, errmsg);                             \
+      } else {                                                                                                        \
+         MONGOC_ERROR (fmt ": (0x%.8X)", __VA_ARGS__, (unsigned int) errcode);                                        \
+      }                                                                                                               \
+      LocalFree (errmsg);                                                                                             \
+   } else                                                                                                             \
+      (void) 0
+
+#define LOG_WINDOWS_ERROR(errcode, msg) LOG_WINDOWS_ERROR_F ("%s", MSG);
+
+// `decode_pem_base64` decodes a base-64 PEM blob with headers.
+// Returns NULL on error. Use GetLastError() to retrieve Windows error code.
+static LPBYTE
+decode_pem_base64 (const char *base64_in, DWORD *out_len)
+{
+   // Get needed output length:
+   if (!CryptStringToBinaryA (base64_in, 0, CRYPT_STRING_BASE64HEADER, NULL, out_len, NULL, NULL)) {
+      return NULL;
+   }
+
+   BSON_ASSERT (*out_len > 0);
+   LPBYTE out = (LPBYTE) bson_malloc (*out_len);
+
+   if (!CryptStringToBinaryA (base64_in, 0, CRYPT_STRING_BASE64HEADER, out, out_len, NULL, NULL)) {
+      bson_free (out);
+      return NULL;
+   }
+   return out;
+}
 
 PCCERT_CONTEXT
 mongoc_secure_channel_setup_certificate_from_file (const char *filename)
@@ -112,25 +151,9 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
    }
 
    if (NULL != (pem_private = strstr (pem, "-----BEGIN RSA PRIVATE KEY-----"))) {
-            /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa380285%28v=vs.85%29.aspx
-      */
-      success = CryptStringToBinaryA (pem_private,               /* pszString */
-                                    0,                         /* cchString */
-                                    CRYPT_STRING_BASE64HEADER, /* dwFlags */
-                                    NULL,                      /* pbBinary */
-                                    &encoded_private_len,      /* pcBinary, IN/OUT */
-                                    NULL,                      /* pdwSkip */
-                                    NULL);                     /* pdwFlags */
-      if (!success) {
-         MONGOC_ERROR ("Failed to convert base64 private key. Error 0x%.8X", (unsigned int) GetLastError ());
-         goto fail;
-      }
-
-      encoded_private = (LPBYTE) bson_malloc0 (encoded_private_len);
-      success = CryptStringToBinaryA (
-         pem_private, 0, CRYPT_STRING_BASE64HEADER, encoded_private, &encoded_private_len, NULL, NULL);
-      if (!success) {
-         MONGOC_ERROR ("Failed to convert base64 private key. Error 0x%.8X", (unsigned int) GetLastError ());
+      encoded_private = decode_pem_base64 (pem_private, &encoded_private_len);
+      if (!encoded_private) {
+         LOG_WINDOWS_ERROR_F (GetLastError (), "Failed to convert base64 RSA private key from file: %s", filename);
          goto fail;
       }
 
@@ -173,25 +196,9 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
       }
    }
    else if (NULL != (pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----"))) {
-      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa380285%28v=vs.85%29.aspx
-      */
-      success = CryptStringToBinaryA (pem_private,               /* pszString */
-                                    0,                         /* cchString */
-                                    CRYPT_STRING_BASE64HEADER, /* dwFlags */
-                                    NULL,                      /* pbBinary */
-                                    &encoded_private_len,      /* pcBinary, IN/OUT */
-                                    NULL,                      /* pdwSkip */
-                                    NULL);                     /* pdwFlags */
-      if (!success) {
-         MONGOC_ERROR ("Failed to convert base64 private key. Error 0x%.8X", (unsigned int) GetLastError ());
-         goto fail;
-      }
-
-      encoded_private = (LPBYTE) bson_malloc0 (encoded_private_len);
-      success = CryptStringToBinaryA (
-         pem_private, 0, CRYPT_STRING_BASE64HEADER, encoded_private, &encoded_private_len, NULL, NULL);
-      if (!success) {
-         MONGOC_ERROR ("Failed to convert base64 private key. Error 0x%.8X", (unsigned int) GetLastError ());
+      encoded_private = decode_pem_base64 (pem_private, &encoded_private_len);
+      if (!encoded_private) {
+         LOG_WINDOWS_ERROR_F (GetLastError(), "Failed to convert base64 private key from file: %s", filename);
          goto fail;
       }
 
