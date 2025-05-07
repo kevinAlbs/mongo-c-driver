@@ -63,7 +63,7 @@
 
 // `decode_pem_base64` decodes a base-64 PEM blob with headers.
 // Returns NULL on error. Use GetLastError() to retrieve Windows error code.
-LPBYTE
+static LPBYTE
 decode_pem_base64 (const char *base64_in, DWORD *out_len)
 {
    // Get needed output length:
