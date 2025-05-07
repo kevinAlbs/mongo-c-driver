@@ -81,6 +81,44 @@ decode_pem_base64 (const char *base64_in, DWORD *out_len)
    return out;
 }
 
+// `decode_object` decodes a cryptographic object from a blob.
+// Returns NULL on error. Use GetLastError() to retrieve Windows error code.
+static LPBYTE
+decode_object (const char *structType, const LPBYTE data, DWORD data_len, DWORD *out_len)
+{
+   if (!CryptDecodeObjectEx (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, /* dwCertEncodingType */
+                             structType,                              /* lpszStructType */
+                             data,                                    /* pbEncoded */
+                             data_len,                                /* cbEncoded */
+                             0,                                       /* dwFlags */
+                             NULL,                                    /* pDecodePara */
+                             NULL,                                    /* pvStructInfo */
+                             out_len) /* pcbStructInfo */) {
+      return NULL;
+   }
+
+   BSON_ASSERT (*out_len > 0);
+   LPBYTE out = (LPBYTE) bson_malloc (*out_len);
+
+   if (!CryptDecodeObjectEx (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, /* dwCertEncodingType */
+                             structType,                              /* lpszStructType */
+                             data,                                    /* pbEncoded */
+                             data_len,                                /* cbEncoded */
+                             0,                                       /* dwFlags */
+                             NULL,                                    /* pDecodePara */
+                             out,                                     /* pvStructInfo */
+                             out_len) /* pcbStructInfo */) {
+      return NULL;
+   }
+
+   if (!CryptDecodeObjectEx (X509_ASN_ENCODING, structType, data, data_len, 0, NULL, out, out_len)) {
+      bson_free (out);
+      return NULL;
+   }
+
+   return out;
+}
+
 PCCERT_CONTEXT
 mongoc_secure_channel_setup_certificate_from_file (const char *filename)
 {
@@ -157,134 +195,40 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
          goto fail;
       }
 
-      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa379912%28v=vs.85%29.aspx
-      */
-      success = CryptDecodeObjectEx (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, /* dwCertEncodingType */
-                                    PKCS_RSA_PRIVATE_KEY,                    /* lpszStructType */
-                                    encoded_private,                         /* pbEncoded */
-                                    encoded_private_len,                     /* cbEncoded */
-                                    0,                                       /* dwFlags */
-                                    NULL,                                    /* pDecodePara */
-                                    NULL,                                    /* pvStructInfo */
-                                    &blob_private_rsa_len);                      /* pcbStructInfo */
-      if (!success) {
-         LPTSTR msg = NULL;
-         FormatMessage (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
-                        NULL,
-                        GetLastError (),
-                        LANG_NEUTRAL,
-                        (LPTSTR) &msg,
-                        0,
-                        NULL);
-         MONGOC_ERROR ("Failed to parse private key. %s (0x%.8X)", msg, (unsigned int) GetLastError ());
-         LocalFree (msg);
+      blob_private_rsa =
+         decode_object (PKCS_RSA_PRIVATE_KEY, encoded_private, encoded_private_len, &blob_private_rsa_len);
+      if (NULL == blob_private_rsa) {
+         LOG_WINDOWS_ERROR_F (GetLastError (), "Failed to parse RSA private key from file: %s", filename);
          goto fail;
       }
-
-      blob_private_rsa = (LPBYTE) bson_malloc0 (blob_private_rsa_len);
-      success = CryptDecodeObjectEx (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-                                    PKCS_RSA_PRIVATE_KEY,
-                                    encoded_private,
-                                    encoded_private_len,
-                                    0,
-                                    NULL,
-                                    blob_private_rsa,
-                                    &blob_private_rsa_len);
-      if (!success) {
-         MONGOC_ERROR ("Failed to parse private key. Error 0x%.8X", (unsigned int) GetLastError ());
-         goto fail;
-      }
-   }
-   else if (NULL != (pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----"))) {
+   } else if (NULL != (pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----"))) {
       encoded_private = decode_pem_base64 (pem_private, &encoded_private_len);
       if (!encoded_private) {
-         LOG_WINDOWS_ERROR_F (GetLastError(), "Failed to convert base64 private key from file: %s", filename);
+         LOG_WINDOWS_ERROR_F (GetLastError (), "Failed to convert base64 private key from file: %s", filename);
          goto fail;
       }
 
-      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa379912%28v=vs.85%29.aspx
-      */
-      success = CryptDecodeObjectEx (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, /* dwCertEncodingType */
-                                    PKCS_PRIVATE_KEY_INFO,                    /* lpszStructType */
-                                    encoded_private,                         /* pbEncoded */
-                                    encoded_private_len,                     /* cbEncoded */
-                                    0,                                       /* dwFlags */
-                                    NULL,                                    /* pDecodePara */
-                                    NULL,                                    /* pvStructInfo */
-                                    &blob_private_len);                      /* pcbStructInfo */
-      if (!success) {
-         LPTSTR msg = NULL;
-         FormatMessage (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
-                        NULL,
-                        GetLastError (),
-                        LANG_NEUTRAL,
-                        (LPTSTR) &msg,
-                        0,
-                        NULL);
-         MONGOC_ERROR ("Failed to parse private key. %s (0x%.8X)", msg, (unsigned int) GetLastError ());
-         LocalFree (msg);
-         goto fail;
-      }
-
-      blob_private = (LPBYTE) bson_malloc0 (blob_private_len);
-      success = CryptDecodeObjectEx (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-                                    PKCS_PRIVATE_KEY_INFO,
-                                    encoded_private,
-                                    encoded_private_len,
-                                    0,
-                                    NULL,
-                                    blob_private,
-                                    &blob_private_len);
-      if (!success) {
-         MONGOC_ERROR ("Failed to parse private key. Error 0x%.8X", (unsigned int) GetLastError ());
+      blob_private = decode_object (PKCS_PRIVATE_KEY_INFO, encoded_private, encoded_private_len, &blob_private_len);
+      if (NULL == blob_private) {
+         LOG_WINDOWS_ERROR_F (GetLastError (), "Failed to parse private key from file: %s", filename);
          goto fail;
       }
 
       // Have PrivateKey. Get RSA key from it.
-      CRYPT_PRIVATE_KEY_INFO *privateKeyInfo = (CRYPT_PRIVATE_KEY_INFO*)blob_private;
-      if (strcmp(privateKeyInfo->Algorithm.pszObjId, szOID_RSA_RSA) != 0) {
+      CRYPT_PRIVATE_KEY_INFO *privateKeyInfo = (CRYPT_PRIVATE_KEY_INFO *) blob_private;
+      if (strcmp (privateKeyInfo->Algorithm.pszObjId, szOID_RSA_RSA) != 0) {
          MONGOC_ERROR ("Non-RSA private keys are not supported");
          goto fail;
       }
 
-      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa379912%28v=vs.85%29.aspx
-      */
-      success = CryptDecodeObjectEx (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, /* dwCertEncodingType */
-                                    PKCS_RSA_PRIVATE_KEY,                    /* lpszStructType */
-                                    privateKeyInfo->PrivateKey.pbData,                         /* pbEncoded */
-                                    privateKeyInfo->PrivateKey.cbData,                     /* cbEncoded */
-                                    0,                                       /* dwFlags */
-                                    NULL,                                    /* pDecodePara */
-                                    NULL,                                    /* pvStructInfo */
-                                    &blob_private_rsa_len);                      /* pcbStructInfo */
-      if (!success) {
-         LPTSTR msg = NULL;
-         FormatMessage (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
-                        NULL,
-                        GetLastError (),
-                        LANG_NEUTRAL,
-                        (LPTSTR) &msg,
-                        0,
-                        NULL);
-         MONGOC_ERROR ("Failed to parse private key. %s (0x%.8X)", msg, (unsigned int) GetLastError ());
-         LocalFree (msg);
+      blob_private_rsa = decode_object (PKCS_RSA_PRIVATE_KEY,
+                                        privateKeyInfo->PrivateKey.pbData,
+                                        privateKeyInfo->PrivateKey.cbData,
+                                        &blob_private_rsa_len);
+      if (NULL == blob_private_rsa) {
+         LOG_WINDOWS_ERROR_F (GetLastError (), "Failed to parse RSA private key from file: %s", filename);
          goto fail;
       }
-
-      blob_private_rsa = (LPBYTE) bson_malloc0 (blob_private_rsa_len);
-      success = CryptDecodeObjectEx (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-                                    PKCS_RSA_PRIVATE_KEY,
-                                    privateKeyInfo->PrivateKey.pbData,                         /* pbEncoded */
-                                    privateKeyInfo->PrivateKey.cbData,                     /* cbEncoded */
-                                    0,
-                                    NULL,
-                                    blob_private_rsa,
-                                    &blob_private_rsa_len);
-      if (!success) {
-         MONGOC_ERROR ("Failed to parse private key. Error 0x%.8X", (unsigned int) GetLastError ());
-         goto fail;
-      }
-
    } else {
       MONGOC_ERROR ("Can't find private key in '%s'", filename);
       goto fail;
