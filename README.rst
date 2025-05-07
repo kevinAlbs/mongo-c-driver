@@ -42,7 +42,7 @@ the `MongoDB Community Forums`_ to ask for help. Please include in your post all
 information:
 
 - The version of the driver you are trying to build (branch or tag).
-    - Examples: ``r1.17`` (branch), ``1.9.5`` (tag)
+    - Examples: ``r2.0`` (branch), ``2.0.1`` (tag)
 - Host OS, version, and architecture.
     - Examples: Windows 10 64-bit x86, Ubuntu 16.04 64-bit x86, macOS 11.0
 - C Compiler and version.
