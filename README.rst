@@ -57,6 +57,7 @@ information:
 
   Hello, I'm trying to build the C driver with Kerberos support, from
   mongo-c-driver-1.9.5.tar.gz. I'm on Ubuntu 16.04, 64-bit Intel, with gcc
+  
   5.4.0. I run CMake like::
 
     $ cmake .
