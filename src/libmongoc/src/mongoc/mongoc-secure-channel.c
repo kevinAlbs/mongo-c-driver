@@ -344,7 +344,7 @@ mongoc_secure_channel_setup_ca (mongoc_stream_tls_secure_channel_t *secure_chann
 
    encrypted_cert = decode_pem_base64 (pem, &encrypted_cert_len);
    if (!encrypted_cert) {
-      LOG_WINDOWS_ERROR_F (GetLastError(), "Failed to convert base64 public certificate from file: %s", opt->ca_file);
+      LOG_WINDOWS_ERROR_F (GetLastError (), "Failed to convert base64 public certificate from file: %s", opt->ca_file);
       goto fail;
    }
 
