@@ -108,10 +108,6 @@ decode_object (const char *structType, const LPBYTE data, DWORD data_len, DWORD 
                              NULL,                                    /* pDecodePara */
                              out,                                     /* pvStructInfo */
                              out_len) /* pcbStructInfo */) {
-      return NULL;
-   }
-
-   if (!CryptDecodeObjectEx (X509_ASN_ENCODING, structType, data, data_len, 0, NULL, out, out_len)) {
       bson_free (out);
       return NULL;
    }
