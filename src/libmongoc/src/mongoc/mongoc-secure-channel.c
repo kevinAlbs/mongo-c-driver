@@ -342,14 +342,9 @@ mongoc_secure_channel_setup_ca (mongoc_stream_tls_secure_channel_t *secure_chann
       goto fail;
    }
 
-   if (!CryptStringToBinaryA (pem_key, 0, CRYPT_STRING_BASE64HEADER, NULL, &encrypted_cert_len, NULL, NULL)) {
-      MONGOC_ERROR ("Failed to convert BASE64 public key. Error 0x%.8X", (unsigned int) GetLastError ());
-      goto fail;
-   }
-
-   encrypted_cert = (LPBYTE) LocalAlloc (0, encrypted_cert_len);
-   if (!CryptStringToBinaryA (pem_key, 0, CRYPT_STRING_BASE64HEADER, encrypted_cert, &encrypted_cert_len, NULL, NULL)) {
-      MONGOC_ERROR ("Failed to convert BASE64 public key. Error 0x%.8X", (unsigned int) GetLastError ());
+   encrypted_cert = decode_pem_base64 (pem, &encrypted_cert_len);
+   if (!encrypted_cert) {
+      LOG_WINDOWS_ERROR_F (GetLastError(), "Failed to convert base64 public certificate from file: %s", opt->ca_file);
       goto fail;
    }
 
@@ -381,7 +376,7 @@ mongoc_secure_channel_setup_ca (mongoc_stream_tls_secure_channel_t *secure_chann
    CertCloseStore (cert_store, 0);
    ok = true;
 fail:
-   LocalFree (encrypted_cert);
+   bson_free (encrypted_cert);
    bson_free (pem);
    return false;
 }
