@@ -362,7 +362,7 @@ mongoc_secure_channel_setup_ca (mongoc_stream_tls_secure_channel_t *secure_chann
                                L"Root");                                /* system store name. "My" or "Root" */
 
    if (cert_store == NULL) {
-      MONGOC_ERROR ("Error opening certificate store");
+      LOG_WINDOWS_ERROR_F (GetLastError (), "Error opening certificate store. Cannot add: %s", opt->ca_file);
       goto fail;
    }
 
