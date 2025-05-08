@@ -288,6 +288,9 @@ fail:
 
    if (!ret) {
       MONGOC_ERROR ("Can't associate private key with public key: 0x%.8X", (unsigned int) GetLastError ());
+      if (cert) {
+         CertFreeCertificateContext (cert);
+      }
       return NULL;
    }
 
