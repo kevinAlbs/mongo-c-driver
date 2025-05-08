@@ -376,6 +376,9 @@ mongoc_secure_channel_setup_ca (mongoc_stream_tls_secure_channel_t *secure_chann
    CertCloseStore (cert_store, 0);
    ok = true;
 fail:
+   if (cert) {
+      CertFreeCertificateContext (cert);
+   }
    bson_free (encrypted_cert);
    bson_free (pem);
    return false;
