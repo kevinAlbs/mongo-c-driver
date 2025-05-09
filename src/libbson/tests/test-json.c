@@ -13,6 +13,7 @@
 #include <common-json-private.h>
 #include <bson/bson-iso8601-private.h>
 #include <bson/bson-json-private.h>
+#include "test-libmongoc.h" // skip_if_no_large_allocations
 
 static ssize_t
 test_bson_json_read_cb_helper (void *string, uint8_t *buf, size_t len)
@@ -3793,6 +3794,42 @@ test_bson_as_json_all_formats (void)
    }
 }
 
+static void
+test_json_big_key (void *unused)
+{
+   BSON_UNUSED (unused);
+
+   // Create a JSON string like: { "<'a' repeated INT_MAX + 1 times>": 123 }
+   size_t keylen = INT_MAX + 1u;
+   size_t json_len = strlen ("{\"") + keylen + strlen ("\":123}");
+   char *json = bson_malloc (json_len + 1);
+   json[json_len] = '\0';
+
+   size_t offset = 0;
+   // Write {"
+   {
+      bson_strncpy (json, "{\"", json_len + 1);
+      offset += strlen ("{\"");
+   }
+   // Write key of repeated a
+   {
+      for (size_t i = 0; i < keylen; i++) {
+         json[offset++] = 'a';
+      }
+   }
+   // Write remaining ":123}
+   {
+      bson_strncpy (json + offset, "\":123}", json_len + 1 - offset);
+      offset += strlen ("\":123}");
+   }
+
+   bson_error_t error;
+   bson_t b;
+   bool ok = bson_init_from_json (&b, json, (ssize_t) json_len, &error);
+   ASSERT (!ok);
+   ASSERT_ERROR_CONTAINS (error, BSON_ERROR_JSON, BSON_JSON_ERROR_READ_INVALID_PARAM, "too large");
+   bson_free (json);
+}
 
 void
 test_json_install (TestSuite *suite)
@@ -3899,4 +3936,5 @@ test_json_install (TestSuite *suite)
    TestSuite_Add (suite, "/bson/parse_array", test_parse_array);
    TestSuite_Add (suite, "/bson/decimal128_overflowing_exponent", test_decimal128_overflowing_exponent);
    TestSuite_Add (suite, "/bson/as_json/all_formats", test_bson_as_json_all_formats);
+   TestSuite_AddFull (suite, "/bson/json/big_key", test_json_big_key, NULL, NULL, skip_if_no_large_allocations);
 }
