@@ -943,27 +943,70 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
       secure_channel->cred->cert = cert;
    }
 
-   /* Example:
-    *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa375454%28v=vs.85%29.aspx
-    * AcquireCredentialsHandle:
-    *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx
-    */
-   sspi_status = AcquireCredentialsHandle (NULL,                 /* principal */
-                                           UNISP_NAME,           /* security package */
-                                           SECPKG_CRED_OUTBOUND, /* we are preparing outbound connection */
-                                           NULL,                 /*  Optional logon */
-                                           &schannel_cred,       /* TLS "configuration", "auth data" */
-                                           NULL,                 /* unused */
-                                           NULL,                 /* unused */
-                                           &secure_channel->cred->cred_handle, /* credential OUT param */
-                                           &secure_channel->cred->time_stamp); /* certificate expiration time */
+   if (true) {
+        printf ("Trying to use TLS v1.3 ... \n");
+        // Try to use SCH_CREDENTIALS for TLS v1.3
+         SCH_CREDENTIALS credentials = {0};
+         TLS_PARAMETERS tls_parameters = {0};
+         CRYPTO_SETTINGS crypto_settings[1] = {{0}};
+         
+         tls_parameters.pDisabledCrypto = crypto_settings;
+         tls_parameters.cDisabledCrypto = (DWORD) 0;
+         credentials.pTlsParameters = &tls_parameters;
+         credentials.cTlsParameters = 1;
 
-   if (sspi_status != SEC_E_OK) {
-      // Cast signed SECURITY_STATUS to unsigned DWORD. FormatMessage expects DWORD.
-      char *msg = mongoc_winerr_to_string ((DWORD) sspi_status);
-      MONGOC_ERROR ("Failed to initialize security context: %s", msg);
-      bson_free (msg);
-      RETURN (NULL);
+         credentials.dwVersion = SCH_CREDENTIALS_VERSION;
+         credentials.dwFlags = schannel_cred.dwFlags | SCH_USE_STRONG_CRYPTO;
+
+         DWORD enabled_protocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_3_CLIENT;
+         credentials.pTlsParameters->grbitDisabledProtocols = (DWORD) ~enabled_protocols;
+
+         if (cert) {
+            printf ("adding cert\n");
+            credentials.cCreds = 1;
+            credentials.paCred = &cert;
+         }
+
+         sspi_status = AcquireCredentialsHandle (NULL,
+                                                 (TCHAR *) UNISP_NAME,
+                                                 SECPKG_CRED_OUTBOUND,
+                                                 NULL,
+                                                 &credentials,
+                                                 NULL,
+                                                 NULL,
+                                                 &secure_channel->cred->cred_handle,
+                                                 &secure_channel->cred->time_stamp);
+         if (sspi_status != SEC_E_OK) {
+            // Cast signed SECURITY_STATUS to unsigned DWORD. FormatMessage expects DWORD.
+            char *msg = mongoc_winerr_to_string ((DWORD) sspi_status);
+            MONGOC_ERROR ("Failed to initialize security context: %s", msg);
+            bson_free (msg);
+            RETURN (NULL);
+         }
+         printf ("Trying to use TLS v1.3 ... done \n");
+   } else {
+      /* Example:
+       *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa375454%28v=vs.85%29.aspx
+       * AcquireCredentialsHandle:
+       *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx
+       */
+      sspi_status = AcquireCredentialsHandle (NULL,                 /* principal */
+                                              UNISP_NAME,           /* security package */
+                                              SECPKG_CRED_OUTBOUND, /* we are preparing outbound connection */
+                                              NULL,                 /*  Optional logon */
+                                              &schannel_cred,       /* TLS "configuration", "auth data" */
+                                              NULL,                 /* unused */
+                                              NULL,                 /* unused */
+                                              &secure_channel->cred->cred_handle, /* credential OUT param */
+                                              &secure_channel->cred->time_stamp); /* certificate expiration time */
+
+      if (sspi_status != SEC_E_OK) {
+         // Cast signed SECURITY_STATUS to unsigned DWORD. FormatMessage expects DWORD.
+         char *msg = mongoc_winerr_to_string ((DWORD) sspi_status);
+         MONGOC_ERROR ("Failed to initialize security context: %s", msg);
+         bson_free (msg);
+         RETURN (NULL);
+      }
    }
 
    if (opt->ca_dir) {
