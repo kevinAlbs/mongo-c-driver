@@ -27,6 +27,11 @@
 
 #define SECURITY_WIN32
 #include <security.h>
+// From Windows docs:
+// > To use the SCH_CREDENTIALS structure define SCHANNEL_USE_BLACKLISTS along with UNICODE_STRING and PUNICODE_STRING.
+// > Alternatively, include Ntdef.h, SubAuth.h or Winternl.h.
+#define SCHANNEL_USE_BLACKLISTS 1
+#include <subauth.h>
 #include <schnlsp.h>
 #include <schannel.h>
 
