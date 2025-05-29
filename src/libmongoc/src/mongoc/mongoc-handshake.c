@@ -372,7 +372,9 @@ _get_container_info (mongoc_handshake_t *handshake)
    handshake->kubernetes = kubernetes_env;
 
    handshake->docker = false;
-#ifdef _POSIX_VERSION
+#ifdef _WIN32
+   handshake->docker = (_access ("/.dockerenv", 0) == 0);
+#else
    handshake->docker = (access ("/.dockerenv", F_OK) == 0);
 #endif
 
@@ -531,7 +533,7 @@ _mongoc_handshake_cleanup (void)
    bson_free (h->compiler_info);
    bson_free (h->flags);
    bson_free (h->env_region);
-   *h = (mongoc_handshake_t){0};
+   *h = (mongoc_handshake_t) {0};
 
    bson_mutex_destroy (&gHandshakeLock);
 }
