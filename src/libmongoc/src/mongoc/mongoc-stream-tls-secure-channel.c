@@ -537,6 +537,7 @@ _mongoc_stream_tls_secure_channel_decrypt (mongoc_stream_tls_secure_channel_t *s
          /* check if server wants to renegotiate the connection context */
          if (sspi_status == SEC_I_RENEGOTIATE) {
             TRACE ("%s", "remote party requests renegotiation");
+            printf ("renegotiation requested ...\n");
          }
          /* check if the server closed the connection */
          else if (sspi_status == SEC_I_CONTEXT_EXPIRED) {
@@ -802,6 +803,7 @@ mongoc_stream_tls_secure_channel_handshake (mongoc_stream_t *stream, const char 
       break;
 
    case ssl_connect_done:
+      printf ("handshake ... ok\n");
       TRACE ("%s", "Connect DONE!");
       /* reset our connection state machine */
       secure_channel->connecting_state = ssl_connect_1;
@@ -956,7 +958,8 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
          credentials.cTlsParameters = 1;
 
          credentials.dwVersion = SCH_CREDENTIALS_VERSION;
-         credentials.dwFlags = schannel_cred.dwFlags | SCH_USE_STRONG_CRYPTO;
+         credentials.dwFlags = schannel_cred.dwFlags | SCH_USE_STRONG_CRYPTO | SCH_CRED_NO_DEFAULT_CREDS;
+
 
          DWORD enabled_protocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_3_CLIENT;
          credentials.pTlsParameters->grbitDisabledProtocols = (DWORD) ~enabled_protocols;
@@ -985,6 +988,7 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
          }
          printf ("Trying to use TLS v1.3 ... done \n");
    } else {
+      printf ("Not using TLS v1.3\n");
       /* Example:
        *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa375454%28v=vs.85%29.aspx
        * AcquireCredentialsHandle:

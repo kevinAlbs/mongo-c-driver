@@ -657,6 +657,8 @@ mongoc_secure_channel_handshake_step_1 (mongoc_stream_tls_t *tls, char *hostname
    SECURITY_STATUS sspi_status = SEC_E_OK;
    mongoc_stream_tls_secure_channel_t *secure_channel = (mongoc_stream_tls_secure_channel_t *) tls->ctx;
 
+   printf ("mongoc_secure_channel_handshake_step_1 ...\n");
+
    TRACE ("SSL/TLS connection with '%s' (step 1/3)", hostname);
 
    /* setup output buffer */
@@ -719,6 +721,7 @@ mongoc_secure_channel_handshake_step_1 (mongoc_stream_tls_t *tls, char *hostname
    /* continue to second handshake step */
    secure_channel->connecting_state = ssl_connect_2;
 
+   printf ("mongoc_secure_channel_handshake_step_1 ... ok\n");
    return true;
 }
 
@@ -737,6 +740,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
 
    doread = (secure_channel->connecting_state != ssl_connect_2_writing) ? true : false;
 
+   printf ("mongoc_secure_channel_handshake_step_2 ...\n");
    TRACE ("%s", "SSL/TLS connection with endpoint (step 2/3)");
 
    if (!secure_channel->cred || !secure_channel->ctxt) {
@@ -766,6 +770,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
                }
 
                TRACE ("%s", "failed to receive handshake, need more data");
+               printf ("mongoc_secure_channel_handshake_step_2 ... need retry\n");
                return true;
             }
 
@@ -829,6 +834,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
       if (sspi_status == SEC_E_INCOMPLETE_MESSAGE) {
          secure_channel->connecting_state = ssl_connect_2_reading;
          TRACE ("%s", "received incomplete message, need more data");
+         printf ("mongoc_secure_channel_handshake_step_2 ... need more data\n");
          return true;
       }
 
@@ -839,6 +845,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
          secure_channel->req_flags |= ISC_REQ_USE_SUPPLIED_CREDS;
          secure_channel->connecting_state = ssl_connect_2_writing;
          TRACE ("%s", "A client certificate has been requested");
+         printf ("mongoc_secure_channel_handshake_step_2 ... need client cert\n");
          return true;
       }
 
@@ -968,6 +975,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
    /* check if the handshake needs to be continued */
    if (sspi_status == SEC_I_CONTINUE_NEEDED) {
       secure_channel->connecting_state = ssl_connect_2_reading;
+      printf ("mongoc_secure_channel_handshake_step_2 ... continue needed\n");
       return true;
    }
 
@@ -977,6 +985,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
       TRACE ("%s", "SSL/TLS handshake complete");
    }
 
+   printf ("mongoc_secure_channel_handshake_step_2 ... complete\n");
    return true;
 }
 
@@ -988,6 +997,7 @@ mongoc_secure_channel_handshake_step_3 (mongoc_stream_tls_t *tls, char *hostname
    BSON_ASSERT (ssl_connect_3 == secure_channel->connecting_state);
 
    TRACE ("SSL/TLS connection with %s (step 3/3)", hostname);
+   printf ("mongoc_secure_channel_handshake_step_3 ...\n");
 
    if (!secure_channel->cred) {
       MONGOC_LOG_AND_SET_ERROR (
@@ -1003,7 +1013,7 @@ mongoc_secure_channel_handshake_step_3 (mongoc_stream_tls_t *tls, char *hostname
    }
 
    secure_channel->connecting_state = ssl_connect_done;
-
+   printf ("mongoc_secure_channel_handshake_step_3 ... ok\n");
    return true;
 }
 #endif
