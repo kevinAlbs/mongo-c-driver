@@ -465,6 +465,7 @@ _mongoc_stream_tls_secure_channel_decrypt (mongoc_stream_tls_secure_channel_t *s
 
    /* decrypt loop */
    while (secure_channel->encdata_offset > 0 && sspi_status == SEC_E_OK) {
+      printf ("decrypting with encdata_offset=%d\n", (int) secure_channel->encdata_offset);
       /* prepare data buffer for DecryptMessage call */
       _mongoc_secure_channel_init_sec_buffer (&inbuf[0],
                                               SECBUFFER_DATA,
@@ -538,6 +539,32 @@ _mongoc_stream_tls_secure_channel_decrypt (mongoc_stream_tls_secure_channel_t *s
          if (sspi_status == SEC_I_RENEGOTIATE) {
             TRACE ("%s", "remote party requests renegotiation");
             printf ("renegotiation requested ...\n");
+            // TODO: loop and satisfy renegotiation request.
+            secure_channel->renegotiating = true;
+            secure_channel->connecting_state = ssl_connect_2_writing;
+      //   /* begin renegotiation */
+      //   infof(data, "schannel: renegotiating SSL/TLS connection");
+      //   connssl->state = ssl_connection_negotiating;
+      //   connssl->connecting_state = ssl_connect_2;
+      //   connssl->io_need = CURL_SSL_IO_NEED_SEND;
+      //   backend->recv_renegotiating = TRUE;
+      //   *err = schannel_connect(cf, data, &done);
+      //   backend->recv_renegotiating = FALSE;
+      //   if(*err) {
+      //     infof(data, "schannel: renegotiation failed");
+      //     goto cleanup;
+      //   }
+      //   /* now retry receiving data */
+      //   sspi_status = SEC_E_OK;
+      //   infof(data, "schannel: SSL/TLS connection renegotiated");
+      //   continue;
+            bson_error_t error;
+            bool ok = mongoc_secure_channel_handshake_step_2(secure_channel->tls, secure_channel->hostname, &error);
+            if (!ok) {
+               printf ("renegotiation error: %s\n", error.message);
+            }
+            sspi_status = SEC_E_OK;
+            continue;
          }
          /* check if the server closed the connection */
          else if (sspi_status == SEC_I_CONTEXT_EXPIRED) {
@@ -660,7 +687,7 @@ _mongoc_stream_tls_secure_channel_readv (
    tls->timeout_msec = timeout_msec;
 
    if (timeout_msec >= 0) {
-      expire = bson_get_monotonic_time () + (timeout_msec * 1000UL);
+      expire = bson_get_monotonic_time () + (500000 * 1000UL * 10);
    }
 
    for (i = 0; i < iovcnt; i++) {
@@ -837,7 +864,12 @@ _mongoc_stream_tls_secure_channel_should_retry (mongoc_stream_t *stream)
 {
    mongoc_stream_tls_t *tls = (mongoc_stream_tls_t *) stream;
 
+
    ENTRY;
+   mongoc_stream_tls_secure_channel_t *secure_channel = (mongoc_stream_tls_secure_channel_t*) tls->ctx;
+   if (secure_channel->renegotiating) {
+      return true;
+   }
 
    RETURN (mongoc_stream_should_retry (tls->base_stream));
 }
@@ -884,6 +916,9 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    tls->ctx = (void *) secure_channel;
    tls->timeout_msec = -1;
    tls->base_stream = base_stream;
+
+   secure_channel->tls = tls;
+   secure_channel->hostname = bson_strdup(host);
 
    TRACE ("%s", "SSL/TLS connection with endpoint AcquireCredentialsHandle");
 
@@ -958,7 +993,7 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
          credentials.cTlsParameters = 1;
 
          credentials.dwVersion = SCH_CREDENTIALS_VERSION;
-         credentials.dwFlags = schannel_cred.dwFlags | SCH_USE_STRONG_CRYPTO | SCH_CRED_NO_DEFAULT_CREDS;
+         credentials.dwFlags = SCH_CRED_NO_SERVERNAME_CHECK;
 
 
          DWORD enabled_protocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_3_CLIENT;

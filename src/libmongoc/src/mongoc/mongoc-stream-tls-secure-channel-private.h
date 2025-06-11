@@ -70,6 +70,9 @@ typedef struct {
                                    unrecoverable err */
    bool recv_sspi_close_notify; /* true if connection closed by close_notify */
    bool recv_connection_closed; /* true if connection closed, regardless how */
+   bool renegotiating;
+   mongoc_stream_tls_t *tls;
+   char* hostname;
 } mongoc_stream_tls_secure_channel_t;
 
 

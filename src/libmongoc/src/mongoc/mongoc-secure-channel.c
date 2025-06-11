@@ -856,6 +856,8 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
             if (outbuf[i].BufferType == SECBUFFER_TOKEN && outbuf[i].cbBuffer > 0) {
                TRACE ("sending next handshake data: sending %lu bytes...", outbuf[i].cbBuffer);
 
+               MONGOC_DEBUG ("sending next handshake data: sending %lu bytes...", outbuf[i].cbBuffer);
+
                /* send handshake token to server */
                written = mongoc_secure_channel_write (tls, outbuf[i].pvBuffer, outbuf[i].cbBuffer);
 
