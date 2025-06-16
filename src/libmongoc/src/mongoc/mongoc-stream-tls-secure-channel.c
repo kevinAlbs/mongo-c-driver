@@ -980,8 +980,13 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
       secure_channel->cred->cert = cert;
    }
 
-   if (true) {
-        printf ("Trying to use TLS v1.3 ... \n");
+   bool try_tls13 = true;
+   if (getenv("USE_TLS12") && 0 == strcmp(getenv("USE_TLS12"), "ON")) {
+      try_tls13 = false;
+   }
+
+   if (try_tls13) {
+        printf ("Trying TLS v1.3 ... \n");
         // Try to use SCH_CREDENTIALS for TLS v1.3
          SCH_CREDENTIALS credentials = {0};
          TLS_PARAMETERS tls_parameters = {0};
@@ -993,10 +998,10 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
          credentials.cTlsParameters = 1;
 
          credentials.dwVersion = SCH_CREDENTIALS_VERSION;
-         credentials.dwFlags = SCH_CRED_NO_SERVERNAME_CHECK;
+         credentials.dwFlags = SCH_CRED_NO_SERVERNAME_CHECK | SCH_CRED_MANUAL_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS | SCH_SEND_AUX_RECORD | SCH_USE_STRONG_CRYPTO;
 
 
-         DWORD enabled_protocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_3_CLIENT;
+         DWORD enabled_protocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT; // | SP_PROT_TLS1_3_CLIENT;
          credentials.pTlsParameters->grbitDisabledProtocols = (DWORD) ~enabled_protocols;
 
          if (cert) {
@@ -1021,9 +1026,8 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
             bson_free (msg);
             RETURN (NULL);
          }
-         printf ("Trying to use TLS v1.3 ... done \n");
    } else {
-      printf ("Not using TLS v1.3\n");
+      printf ("Trying TLS 1.2 ...\n");
       /* Example:
        *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa375454%28v=vs.85%29.aspx
        * AcquireCredentialsHandle:
