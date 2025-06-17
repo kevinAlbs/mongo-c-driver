@@ -450,6 +450,59 @@ test_crl (void *unused)
 }
 #endif // MONGOC_ENABLE_SSL
 
+#include <mongoc/mongoc-host-list-private.h>
+#include <mongoc/mongoc-stream-tls-secure-channel-private.h>
+#include <mongoc/mongoc-secure-channel-private.h>
+
+static bool try_connect (const char* host_and_port, PCCERT_CONTEXT cert, bson_error_t *handshake_error) {
+   bson_error_t error;
+   mongoc_host_list_t host;
+   const int32_t connect_timout_ms = 1000;
+
+   ASSERT_OR_PRINT (_mongoc_host_list_from_string_with_err(&host, host_and_port, &error), error);
+   mongoc_stream_t *stream = mongoc_client_connect_tcp (connect_timout_ms, &host, &error);
+   ASSERT_OR_PRINT (stream, error);
+   
+   mongoc_ssl_opt_t ssl_opt = {0};
+   stream = mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (stream, host.host, &ssl_opt, true, cert);
+   ASSERT (stream);
+
+   bool ok = mongoc_stream_tls_handshake_block (stream, host.host, connect_timout_ms, handshake_error);
+   mongoc_stream_destroy (stream);
+   return ok;
+}
+
+static void test_certs (void) {
+   char *CLOUD_PROD_HOST = test_framework_getenv ("CLOUD_PROD_HOST");
+   char *CLOUD_PROD_CERT = test_framework_getenv ("CLOUD_PROD_CERT");
+
+   char *CLOUD_DEV_HOST = test_framework_getenv ("CLOUD_DEV_HOST");
+   char *CLOUD_DEV_CERT = test_framework_getenv ("CLOUD_DEV_CERT");
+
+   
+   // Test cloud-prod:
+   {
+      bson_error_t error;
+      mongoc_ssl_opt_t ssl_opt = {.pem_file = CLOUD_PROD_CERT};
+      PCCERT_CONTEXT cert = mongoc_secure_channel_setup_certificate (&ssl_opt);
+      ASSERT_OR_PRINT (try_connect(CLOUD_PROD_HOST, cert, &error), error);
+      CertFreeCertificateContext (cert);
+   }
+
+   // Test cloud-dev:
+   {
+      bson_error_t error;
+      mongoc_ssl_opt_t ssl_opt = {.pem_file = CLOUD_DEV_CERT};
+      PCCERT_CONTEXT cert = mongoc_secure_channel_setup_certificate (&ssl_opt);
+      ASSERT (!try_connect(CLOUD_DEV_HOST, cert, &error));
+      // Expect error. See CDRIVER-5998. Appears due to client only using RSA+SHA1 for Certificate Verify.
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_STREAM, MONGOC_ERROR_STREAM_SOCKET, "do not possess a common algorithm");
+      CertFreeCertificateContext (cert);
+      // Q: Why does test-libmongoc fail when this is run with forking? A:
+   }
+
+}
+
 void
 test_x509_install (TestSuite *suite)
 {
@@ -467,4 +520,6 @@ test_x509_install (TestSuite *suite)
 #ifdef MONGOC_ENABLE_OCSP_OPENSSL
    TestSuite_Add (suite, "/X509/tlsfeature_parsing", test_tlsfeature_parsing);
 #endif
+
+   TestSuite_Add (suite, "/C5998", test_certs);
 }
