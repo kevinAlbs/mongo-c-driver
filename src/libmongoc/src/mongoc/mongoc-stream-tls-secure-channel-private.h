@@ -75,6 +75,9 @@ typedef struct {
    char* hostname;
 } mongoc_stream_tls_secure_channel_t;
 
+mongoc_stream_t *
+mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, PCCERT_CONTEXT cert);
+
 
 BSON_END_DECLS
 

@@ -876,6 +876,12 @@ _mongoc_stream_tls_secure_channel_should_retry (mongoc_stream_t *stream)
 mongoc_stream_t *
 mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client)
 {
+   return mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (base_stream, host, opt, client, NULL);
+}
+
+mongoc_stream_t *
+mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, PCCERT_CONTEXT cert)
+{
    BSON_UNUSED (host);
    BSON_UNUSED (client);
 
@@ -883,7 +889,6 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    SCHANNEL_CRED schannel_cred;
    mongoc_stream_tls_t *tls;
    mongoc_stream_tls_secure_channel_t *secure_channel;
-   PCCERT_CONTEXT cert = NULL;
 
    ENTRY;
    BSON_ASSERT (base_stream);
@@ -961,13 +966,15 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
       mongoc_secure_channel_setup_crl (opt);
    }
 
+   
+   BSON_ASSERT (!opt->pem_file != !cert); // Cannot pass both.
    if (opt->pem_file) {
       cert = mongoc_secure_channel_setup_certificate (opt);
+   }
 
    if (cert) {
       schannel_cred.cCreds = 1;
       schannel_cred.paCred = &cert;
-      }
    }
 
 
