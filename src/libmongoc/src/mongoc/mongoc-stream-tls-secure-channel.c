@@ -465,7 +465,6 @@ _mongoc_stream_tls_secure_channel_decrypt (mongoc_stream_tls_secure_channel_t *s
 
    /* decrypt loop */
    while (secure_channel->encdata_offset > 0 && sspi_status == SEC_E_OK) {
-      printf ("decrypting with encdata_offset=%d\n", (int) secure_channel->encdata_offset);
       /* prepare data buffer for DecryptMessage call */
       _mongoc_secure_channel_init_sec_buffer (&inbuf[0],
                                               SECBUFFER_DATA,
@@ -538,7 +537,7 @@ _mongoc_stream_tls_secure_channel_decrypt (mongoc_stream_tls_secure_channel_t *s
          /* check if server wants to renegotiate the connection context */
          if (sspi_status == SEC_I_RENEGOTIATE) {
             TRACE ("%s", "remote party requests renegotiation");
-            printf ("renegotiation requested ...\n");
+            MONGOC_DEBUG ("renegotiation requested ...\n");
             // TODO: loop and satisfy renegotiation request.
             secure_channel->renegotiating = true;
             secure_channel->connecting_state = ssl_connect_2_writing;
@@ -561,7 +560,7 @@ _mongoc_stream_tls_secure_channel_decrypt (mongoc_stream_tls_secure_channel_t *s
             bson_error_t error;
             bool ok = mongoc_secure_channel_handshake_step_2(secure_channel->tls, secure_channel->hostname, &error);
             if (!ok) {
-               printf ("renegotiation error: %s\n", error.message);
+               MONGOC_DEBUG ("renegotiation error: %s\n", error.message);
             }
             sspi_status = SEC_E_OK;
             continue;
@@ -830,7 +829,7 @@ mongoc_stream_tls_secure_channel_handshake (mongoc_stream_t *stream, const char 
       break;
 
    case ssl_connect_done:
-      printf ("handshake ... ok\n");
+      MONGOC_DEBUG ("handshake ... ok\n");
       TRACE ("%s", "Connect DONE!");
       /* reset our connection state machine */
       secure_channel->connecting_state = ssl_connect_1;
@@ -965,9 +964,9 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    if (opt->pem_file) {
       cert = mongoc_secure_channel_setup_certificate (opt);
 
-      if (cert) {
-         schannel_cred.cCreds = 1;
-         schannel_cred.paCred = &cert;
+   if (cert) {
+      schannel_cred.cCreds = 1;
+      schannel_cred.paCred = &cert;
       }
    }
 
@@ -986,7 +985,7 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    }
 
    if (try_tls13) {
-        printf ("Trying TLS v1.3 ... \n");
+        MONGOC_DEBUG ("Trying TLS v1.3 ... \n");
         // Try to use SCH_CREDENTIALS for TLS v1.3
          SCH_CREDENTIALS credentials = {0};
          TLS_PARAMETERS tls_parameters = {0};
@@ -1000,12 +999,11 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
          credentials.dwVersion = SCH_CREDENTIALS_VERSION;
          credentials.dwFlags = SCH_CRED_NO_SERVERNAME_CHECK | SCH_CRED_MANUAL_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS | SCH_SEND_AUX_RECORD | SCH_USE_STRONG_CRYPTO;
 
-         printf ("Downgrading to TLS v1.2 (testing SCH_CREDENTIALS)");
+         MONGOC_DEBUG ("Downgrading to TLS v1.2 (testing SCH_CREDENTIALS)");
          DWORD enabled_protocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT; // | SP_PROT_TLS1_3_CLIENT;
          credentials.pTlsParameters->grbitDisabledProtocols = (DWORD) ~enabled_protocols;
 
          if (cert) {
-            printf ("adding cert\n");
             credentials.cCreds = 1;
             credentials.paCred = &cert;
          }
@@ -1027,7 +1025,7 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
             RETURN (NULL);
          }
    } else {
-      printf ("Trying TLS 1.2 ...\n");
+      MONGOC_DEBUG ("Trying TLS 1.2 ...\n");
       /* Example:
        *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa375454%28v=vs.85%29.aspx
        * AcquireCredentialsHandle:
