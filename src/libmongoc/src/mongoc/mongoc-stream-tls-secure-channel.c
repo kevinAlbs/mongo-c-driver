@@ -1000,7 +1000,7 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
          credentials.dwVersion = SCH_CREDENTIALS_VERSION;
          credentials.dwFlags = SCH_CRED_NO_SERVERNAME_CHECK | SCH_CRED_MANUAL_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS | SCH_SEND_AUX_RECORD | SCH_USE_STRONG_CRYPTO;
 
-
+         printf ("Downgrading to TLS v1.2 (testing SCH_CREDENTIALS)");
          DWORD enabled_protocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT; // | SP_PROT_TLS1_3_CLIENT;
          credentials.pTlsParameters->grbitDisabledProtocols = (DWORD) ~enabled_protocols;
 
