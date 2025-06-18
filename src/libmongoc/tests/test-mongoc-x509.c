@@ -464,12 +464,54 @@ static bool try_connect (const char* host_and_port, PCCERT_CONTEXT cert, bson_er
    ASSERT_OR_PRINT (stream, error);
    
    mongoc_ssl_opt_t ssl_opt = {0};
-   stream = mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (stream, host.host, &ssl_opt, true, cert);
+   // Copy `cert`. TLS stream frees on destroy.
+   stream = mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (
+      stream, host.host, &ssl_opt, true, CertDuplicateCertificateContext (cert));
    ASSERT (stream);
 
    bool ok = mongoc_stream_tls_handshake_block (stream, host.host, connect_timout_ms, handshake_error);
    mongoc_stream_destroy (stream);
    return ok;
+}
+
+static size_t
+count_files (const char *dir_path)
+{
+   size_t count = 0;
+   char *dir_path_plus_star;
+   intptr_t handle;
+   struct _finddata_t info;
+
+   char child_path[MAX_TEST_NAME_LENGTH];
+
+   dir_path_plus_star = bson_strdup_printf ("%s/*", dir_path);
+   handle = _findfirst (dir_path_plus_star, &info);
+   ASSERT (handle != -1);
+
+   while (1) {
+      count++;
+      if (_findnext (handle, &info) == -1) {
+         break;
+      }
+   }
+
+   bson_free (dir_path_plus_star);
+   _findclose (handle);
+
+   return count;
+}
+
+static size_t
+count_capi_keys (void)
+{
+   return count_files ("C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\S-1-5-21-"
+                "238269189-1184923242-2057656851-500");
+}
+
+static size_t
+count_cng_keys (void)
+{
+   return count_files ("C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Crypto\\Keys");
 }
 
 static void test_certs (void) {
@@ -478,6 +520,7 @@ static void test_certs (void) {
 
    char *CLOUD_DEV_HOST = test_framework_getenv ("CLOUD_DEV_HOST");
    char *CLOUD_DEV_CERT = test_framework_getenv ("CLOUD_DEV_CERT");
+   char *CLOUD_DEV_CERT_PKCS12 = test_framework_getenv ("CLOUD_DEV_CERT_PKCS12");
 
    
    // Test cloud-prod:
@@ -500,6 +543,64 @@ static void test_certs (void) {
       CertFreeCertificateContext (cert);
       // Q: Why does test-libmongoc fail when this is run with forking? A:
    }
+
+   // Test cloud-dev with dotnet runtime approach (load PKCS#12 persisted, then delete later)
+   {
+      size_t key_count_capi = count_capi_keys ();
+      size_t key_count_cng = count_cng_keys ();
+
+      bson_error_t error;
+      extern char *read_file_and_null_terminate (const char *filename, size_t *out_len);
+
+      size_t out_len;
+      char* blob = read_file_and_null_terminate (CLOUD_DEV_CERT_PKCS12, &out_len);
+      ASSERT (blob);
+      ASSERT (mlib_in_range (DWORD, out_len));
+      CRYPT_DATA_BLOB datablob = {.cbData = out_len, .pbData = blob};
+      // Assume empty password for now.
+      LPWSTR pwd = L"";
+      HCERTSTORE cert_store = PFXImportCertStore (&datablob, pwd, 0);
+
+      // Imports as a CAPI key:
+      ASSERT_CMPSIZE_T (key_count_capi + 1, ==, count_capi_keys ());
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+
+      PCCERT_CONTEXT cert = CertFindCertificateInStore (
+         cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HAS_PRIVATE_KEY, NULL, NULL);
+
+      ASSERT (cert);      
+      ASSERT_OR_PRINT (try_connect (CLOUD_PROD_HOST, CertDuplicateCertificateContext (cert), &error), error);
+
+
+      // Delete imported key:
+      {
+         DWORD count = 0; // size contained in pcbData often exceeds the size of the base structure.
+         ASSERT (CertGetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, NULL, &count));
+         uint8_t *bytes = bson_malloc0 (count);
+         ASSERT (CertGetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, bytes, &count));
+         PCRYPT_KEY_PROV_INFO keyProviderInfo = bytes;
+
+         // dwProvType of 0 means CNG was used. Expect CAPI was used.
+         ASSERT_CMPUINT32 ((uint32_t) keyProviderInfo->dwProvType, !=, 0);
+         DWORD cryptAcquireContextFlags = keyProviderInfo->dwFlags | CRYPT_DELETE_KEYSET;
+         HCRYPTPROV hProv = 0;
+         CryptAcquireContextW (&hProv,
+                               keyProviderInfo->pwszContainerName,
+                               keyProviderInfo->pwszProvName,
+                               keyProviderInfo->dwProvType,
+                               cryptAcquireContextFlags);
+         ASSERT (hProv == 0);
+      }
+
+      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+
+      bson_free (blob);
+      CertFreeCertificateContext (cert);
+      CertCloseStore (cert_store, 0); // Keep open until after deleting persisted key.
+   }
+
+   // TODO: try to import PEM in CAPI and persist. Check if this fixes.
 
 }
 

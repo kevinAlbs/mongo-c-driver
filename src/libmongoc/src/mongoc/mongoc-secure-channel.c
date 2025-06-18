@@ -76,7 +76,7 @@ decode_pem_base64 (const char *base64_in, DWORD *out_len, const char *descriptor
 // `read_file_and_null_terminate` reads a file into a NUL-terminated string.
 // On success: returns a NUL-terminated string and (optionally) sets `*out_len` excluding NUL.
 // On error: returns NULL.
-static char *
+char *
 read_file_and_null_terminate (const char *filename, size_t *out_len)
 {
    BSON_ASSERT_PARAM (filename);
