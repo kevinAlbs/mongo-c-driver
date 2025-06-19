@@ -560,6 +560,7 @@ static void test_certs (void) {
       // Assume empty password for now.
       LPWSTR pwd = L"";
       HCERTSTORE cert_store = PFXImportCertStore (&datablob, pwd, 0);
+      ASSERT (cert_store);
 
       // Imports as a CAPI key:
       ASSERT_CMPSIZE_T (key_count_capi + 1, ==, count_capi_keys ());
@@ -569,7 +570,7 @@ static void test_certs (void) {
          cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HAS_PRIVATE_KEY, NULL, NULL);
 
       ASSERT (cert);      
-      ASSERT_OR_PRINT (try_connect (CLOUD_PROD_HOST, CertDuplicateCertificateContext (cert), &error), error);
+      ASSERT_OR_PRINT (try_connect (CLOUD_PROD_HOST, cert, &error), error);
 
 
       // Delete imported key:
@@ -578,7 +579,7 @@ static void test_certs (void) {
          ASSERT (CertGetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, NULL, &count));
          uint8_t *bytes = bson_malloc0 (count);
          ASSERT (CertGetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, bytes, &count));
-         PCRYPT_KEY_PROV_INFO keyProviderInfo = bytes;
+         PCRYPT_KEY_PROV_INFO keyProviderInfo = (PCRYPT_KEY_PROV_INFO) bytes;
 
          // dwProvType of 0 means CNG was used. Expect CAPI was used.
          ASSERT_CMPUINT32 ((uint32_t) keyProviderInfo->dwProvType, !=, 0);
@@ -600,7 +601,77 @@ static void test_certs (void) {
       CertCloseStore (cert_store, 0); // Keep open until after deleting persisted key.
    }
 
+   // Test cloud-dev with dotnet runtime approach with non-deprecated API (load PKCS#12 persisted to CNG-only, then delete later)
+   {
+      size_t key_count_capi = count_capi_keys ();
+      size_t key_count_cng = count_cng_keys ();
+
+      bson_error_t error;
+      extern char *read_file_and_null_terminate (const char *filename, size_t *out_len);
+
+      size_t out_len;
+      char *blob = read_file_and_null_terminate (CLOUD_DEV_CERT_PKCS12, &out_len);
+      ASSERT (blob);
+      ASSERT (mlib_in_range (DWORD, out_len));
+      CRYPT_DATA_BLOB datablob = {.cbData = out_len, .pbData = blob};
+      // Assume empty password for now.
+      LPWSTR pwd = L"";
+      HCERTSTORE cert_store = PFXImportCertStore (&datablob, pwd, PKCS12_ALWAYS_CNG_KSP);
+      ASSERT (cert_store);
+
+      // Imports as a CAPI key:
+      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
+      ASSERT_CMPSIZE_T (key_count_cng + 1, ==, count_cng_keys ());
+
+      PCCERT_CONTEXT cert = CertFindCertificateInStore (
+         cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HAS_PRIVATE_KEY, NULL, NULL);
+
+      ASSERT (cert);
+      ASSERT_OR_PRINT (try_connect (CLOUD_PROD_HOST, cert, &error), error);
+
+
+      // Delete imported key:
+      {
+         DWORD count = 0; // size contained in pcbData often exceeds the size of the base structure.
+         ASSERT (CertGetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, NULL, &count));
+         uint8_t *bytes = bson_malloc0 (count);
+         ASSERT (CertGetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, bytes, &count));
+         PCRYPT_KEY_PROV_INFO keyProviderInfo = (PCRYPT_KEY_PROV_INFO) bytes;
+
+         // dwProvType of 0 means CNG was used. Expect CNG was used.
+         ASSERT_CMPUINT32 ((uint32_t) keyProviderInfo->dwProvType, ==, 0);
+         DWORD ncryptFlags = 0;
+         // Check if a machine key (vs user key)
+         if (keyProviderInfo->dwFlags & CRYPT_MACHINE_KEYSET) {
+            ncryptFlags |= NCRYPT_MACHINE_KEY_FLAG;
+         }
+         NCRYPT_PROV_HANDLE provider;
+         SECURITY_STATUS sec_status = NCryptOpenStorageProvider (&provider, keyProviderInfo->pwszProvName, 0);
+         ASSERT_CMPUINT32 (sec_status, ==, SEC_E_OK);
+
+         NCRYPT_PROV_HANDLE keyHandle;
+         sec_status = NCryptOpenKey (provider, &keyHandle, keyProviderInfo->pwszContainerName, 0, ncryptFlags);
+         ASSERT_CMPUINT32 (sec_status, ==, SEC_E_OK);
+
+         sec_status = NCryptDeleteKey (keyHandle, 0); // Also frees handle.
+         ASSERT_CMPUINT32 (sec_status, ==, SEC_E_OK);
+
+         sec_status = NCryptFreeObject (provider);
+         ASSERT_CMPUINT32 (sec_status, ==, SEC_E_OK);
+      }
+
+      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+
+      bson_free (blob);
+      CertFreeCertificateContext (cert);
+      CertCloseStore (cert_store, 0); // Keep open until after deleting persisted key.
+   }
+
    // TODO: try to import PEM in CAPI and persist. Check if this fixes.
+   {
+      
+   }
 
 }
 
