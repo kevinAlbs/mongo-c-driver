@@ -537,7 +537,7 @@ _mongoc_stream_tls_secure_channel_decrypt (mongoc_stream_tls_secure_channel_t *s
          /* check if server wants to renegotiate the connection context */
          if (sspi_status == SEC_I_RENEGOTIATE) {
             TRACE ("%s", "remote party requests renegotiation");
-            MONGOC_DEBUG ("renegotiation requested ...\n");
+            MONGOC_DEBUG ("renegotiation requested ...");
             // TODO: loop and satisfy renegotiation request.
             secure_channel->renegotiating = true;
             secure_channel->connecting_state = ssl_connect_2_writing;
@@ -560,7 +560,7 @@ _mongoc_stream_tls_secure_channel_decrypt (mongoc_stream_tls_secure_channel_t *s
             bson_error_t error;
             bool ok = mongoc_secure_channel_handshake_step_2(secure_channel->tls, secure_channel->hostname, &error);
             if (!ok) {
-               MONGOC_DEBUG ("renegotiation error: %s\n", error.message);
+               MONGOC_DEBUG ("renegotiation error: %s", error.message);
             }
             sspi_status = SEC_E_OK;
             continue;
@@ -829,7 +829,7 @@ mongoc_stream_tls_secure_channel_handshake (mongoc_stream_t *stream, const char 
       break;
 
    case ssl_connect_done:
-      MONGOC_DEBUG ("handshake ... ok\n");
+      MONGOC_DEBUG ("handshake ... ok");
       TRACE ("%s", "Connect DONE!");
       /* reset our connection state machine */
       secure_channel->connecting_state = ssl_connect_1;
@@ -992,7 +992,7 @@ mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_s
    }
 
    if (try_tls13) {
-        MONGOC_DEBUG ("Trying TLS v1.3 ... \n");
+        MONGOC_DEBUG ("Trying TLS v1.3 ... ");
         // Try to use SCH_CREDENTIALS for TLS v1.3
          SCH_CREDENTIALS credentials = {0};
          TLS_PARAMETERS tls_parameters = {0};
@@ -1032,7 +1032,7 @@ mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_s
             RETURN (NULL);
          }
    } else {
-      MONGOC_DEBUG ("Trying TLS 1.2 ...\n");
+      MONGOC_DEBUG ("Trying TLS 1.2 ...");
       /* Example:
        *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa375454%28v=vs.85%29.aspx
        * AcquireCredentialsHandle:
