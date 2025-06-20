@@ -514,6 +514,7 @@ count_cng_keys (void)
    return count_files ("C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Crypto\\Keys");
 }
 
+#include <ncrypt.h>
 static void test_certs (void) {
    char *CLOUD_PROD_HOST = test_framework_getenv ("CLOUD_PROD_HOST");
    char *CLOUD_PROD_CERT = test_framework_getenv ("CLOUD_PROD_CERT");
@@ -667,6 +668,111 @@ static void test_certs (void) {
       CertFreeCertificateContext (cert);
       CertCloseStore (cert_store, 0); // Keep open until after deleting persisted key.
    }
+
+   // Test importing PKCS#8 key in CNG and persist.
+   {
+      size_t key_count_capi = count_capi_keys ();
+      size_t key_count_cng = count_cng_keys ();
+      bson_error_t error;
+
+      extern char *read_file_and_null_terminate (const char *filename, size_t *out_len);
+      extern LPBYTE decode_pem_base64 (const char *base64_in, DWORD *out_len, const char *descriptor, const char *filename);
+
+      size_t out_len;
+      char *pem = read_file_and_null_terminate (CLOUD_DEV_CERT, &out_len);
+      ASSERT (pem);
+      char* pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----");
+      ASSERT (pem_private);
+
+      // Find the private-key portion of the blob.
+      DWORD privateKeyBlobLen;
+      LPBYTE privateKeyBlob = decode_pem_base64 (pem_private, &privateKeyBlobLen, "private key", CLOUD_DEV_CERT);
+
+      NCRYPT_PROV_HANDLE hProv;
+      // Open the software key storage provider
+      SECURITY_STATUS status = NCryptOpenStorageProvider (&hProv, MS_KEY_STORAGE_PROVIDER, 0);
+      ASSERT_CMPUINT32 (status, ==, 0);
+      
+      // Supply a key name to persist the key:
+      NCryptBuffer buffer;
+      NCryptBufferDesc bufferDesc;
+
+      WCHAR keyName[] = L"TestKey"; // TODO: Replace with unique name? Q: What key name does PFXImportCertStore use? A:
+      buffer.cbBuffer = (ULONG) (wcslen (keyName) + 1) * sizeof (WCHAR);
+      buffer.BufferType = NCRYPTBUFFER_PKCS_KEY_NAME;
+      buffer.pvBuffer = keyName;
+
+      bufferDesc.ulVersion = NCRYPTBUFFER_VERSION;
+      bufferDesc.cBuffers = 1;
+      bufferDesc.pBuffers = &buffer;
+
+      // Import the private key blob
+      NCRYPT_KEY_HANDLE hKey;
+      ASSERT (mlib_in_range (DWORD, out_len));
+      status =
+         NCryptImportKey (hProv, 0, NCRYPT_PKCS8_PRIVATE_KEY_BLOB, &bufferDesc, &hKey, privateKeyBlob, privateKeyBlobLen, 0);
+      if (status != SEC_E_OK) {
+         test_error ("Failed to import key: %s", mongoc_winerr_to_string (status));
+      }
+
+      // Key is imported into CNG:
+      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
+      ASSERT_CMPSIZE_T (key_count_cng + 1, ==, count_cng_keys ());
+
+      const char* pem_public = strstr (pem, "-----BEGIN CERTIFICATE-----");
+      ASSERT (pem_public);
+
+      DWORD encoded_cert_len;
+      LPBYTE encoded_cert = decode_pem_base64 (pem_public, &encoded_cert_len, "public key", CLOUD_DEV_CERT);
+      ASSERT (encoded_cert);
+      PCCERT_CONTEXT cert = CertCreateCertificateContext (X509_ASN_ENCODING, encoded_cert, encoded_cert_len);
+      ASSERT (cert);
+
+      CRYPT_KEY_PROV_INFO keyProvInfo = {
+         .pwszContainerName = keyName, .dwProvType = 0 /* CNG */, .dwFlags = 0, .dwKeySpec = AT_KEYEXCHANGE};
+      bool ok = CertSetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, 0, &keyProvInfo);
+
+      ASSERT_OR_PRINT (try_connect (CLOUD_PROD_HOST, cert, &error), error);
+
+      // Delete key:
+      {
+         DWORD count = 0; // size contained in pcbData often exceeds the size of the base structure.
+         ASSERT (CertGetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, NULL, &count));
+         uint8_t *bytes = bson_malloc0 (count);
+         ASSERT (CertGetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, bytes, &count));
+         PCRYPT_KEY_PROV_INFO keyProviderInfo = (PCRYPT_KEY_PROV_INFO) bytes;
+
+         // dwProvType of 0 means CNG was used. Expect CNG was used.
+         ASSERT_CMPUINT32 ((uint32_t) keyProviderInfo->dwProvType, ==, 0);
+         DWORD ncryptFlags = 0;
+         // Check if a machine key (vs user key)
+         if (keyProviderInfo->dwFlags & CRYPT_MACHINE_KEYSET) {
+            ncryptFlags |= NCRYPT_MACHINE_KEY_FLAG;
+         }
+         NCRYPT_PROV_HANDLE provider;
+         SECURITY_STATUS sec_status = NCryptOpenStorageProvider (&provider, keyProviderInfo->pwszProvName, 0);
+         ASSERT_CMPUINT32 (sec_status, ==, SEC_E_OK);
+
+         NCRYPT_PROV_HANDLE keyHandle;
+         sec_status = NCryptOpenKey (provider, &keyHandle, keyProviderInfo->pwszContainerName, 0, ncryptFlags);
+         ASSERT_CMPUINT32 (sec_status, ==, SEC_E_OK);
+
+         sec_status = NCryptDeleteKey (keyHandle, 0); // Also frees handle.
+         ASSERT_CMPUINT32 (sec_status, ==, SEC_E_OK);
+
+         sec_status = NCryptFreeObject (provider);
+         ASSERT_CMPUINT32 (sec_status, ==, SEC_E_OK);
+      }
+      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+
+      NCryptFreeObject (hKey);
+      NCryptFreeObject (hProv);
+   }
+
+   // TODO: try to convert PKCS#8 to PKCS#12, then import.
+
+   // TODO: given a key (name?) try to load from the key store. Suggest users give key store (and name?) to avoid persisting key.
 
    // TODO: try to import PEM in CAPI and persist. Check if this fixes.
    {
