@@ -38,7 +38,8 @@ struct _mongoc_ssl_opt_t {
    bool weak_cert_validation;
    bool allow_invalid_hostname;
    void *internal;
-   void *padding[6];
+   const char *selector_thumbprint;
+   void *padding[5];
 };
 
 
