@@ -967,7 +967,7 @@ mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_s
    }
 
    
-   BSON_ASSERT (!opt->pem_file != !cert); // Cannot pass both.
+   BSON_ASSERT (!(opt->pem_file && cert)); // Cannot pass both.
    if (opt->pem_file) {
       cert = mongoc_secure_channel_setup_certificate (opt);
    }
