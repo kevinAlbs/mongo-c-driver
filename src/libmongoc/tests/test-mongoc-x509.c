@@ -143,6 +143,39 @@ test_x509_auth (void *unused)
    drop_x509_user (true /* ignore "not found" error */);
    create_x509_user ();
 
+   // Test auth works with certificate selector (Secure Channel only).
+   {
+      // Create URI:
+      mongoc_uri_t *uri = get_x509_uri ();
+
+      // Set TLS options with mongoc_ssl_opt_t instead of URI. URI does not support a certificate selector.
+      mongoc_ssl_opt_t ssl_opt = {
+         .ca_file = CERT_CA,
+         .selector_thumbprint = "foobar"
+      };
+
+      // Try auth:
+      bson_error_t error = {0};
+      bool ok;
+      {
+         capture_logs (true); // Capture logs before connecting. OpenSSL reads PEM file during client construction.
+         mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
+         mongoc_client_set_ssl_opts (client, &ssl_opt);
+
+         ok = try_insert (client, &error);
+#if defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT) || defined(MONGOC_ENABLE_SSL_OPENSSL)
+         ASSERT_CAPTURED_LOG ("tls", MONGOC_LOG_LEVEL_ERROR, "certificate selector not supported");
+#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+         ASSERT_OR_PRINT (ok, error);
+#else
+         BSON_UNREACHABLE();
+#endif
+         mongoc_client_destroy (client);
+      }
+
+      mongoc_uri_destroy (uri);
+   }
+
    // Test auth works with PKCS8 key:
    {
       // Create URI:
