@@ -158,10 +158,10 @@ test_x509_auth (void *unused)
       bson_error_t error = {0};
       bool ok;
       {
-         capture_logs (true); // Capture logs before connecting. OpenSSL reads PEM file during client construction.
          mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
          mongoc_client_set_ssl_opts (client, &ssl_opt);
 
+         capture_logs (true);
          ok = try_insert (client, &error);
 #if defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT) || defined(MONGOC_ENABLE_SSL_OPENSSL)
          ASSERT_CAPTURED_LOG ("tls", MONGOC_LOG_LEVEL_ERROR, "certificate selector not supported");
