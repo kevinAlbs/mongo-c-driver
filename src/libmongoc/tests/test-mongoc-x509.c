@@ -160,7 +160,7 @@ test_x509_auth (void *unused)
       {
          mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
          mongoc_client_set_ssl_opts (client, &ssl_opt);
-
+         
          capture_logs (true);
          ok = try_insert (client, &error);
 #if defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT) || defined(MONGOC_ENABLE_SSL_OPENSSL)
@@ -176,6 +176,18 @@ test_x509_auth (void *unused)
 
       mongoc_uri_destroy (uri);
    }
+
+#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+   // Test passing both certificate selector and client certificate is an error.
+   {
+      test_error ("Not yet implemented");
+   }
+
+   // Test passing an invalid certificate selector is an error.
+   {
+      test_error ("Not yet implemented");
+   }
+#endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL
 
    // Test auth works with PKCS8 key:
    {
@@ -501,7 +513,10 @@ static bool try_connect (const char* host_and_port, PCCERT_CONTEXT cert, bson_er
    // Copy `cert`. TLS stream frees on destroy.
    stream = mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (
       stream, host.host, &ssl_opt, true, CertDuplicateCertificateContext (cert));
-   ASSERT (stream);
+   if (!stream) {
+      *handshake_error = (bson_error_t) {0};
+      return false;
+   }
 
    bool ok = mongoc_stream_tls_handshake_block (stream, host.host, connect_timout_ms, handshake_error);
    mongoc_stream_destroy (stream);
@@ -549,6 +564,13 @@ count_cng_keys (void)
 }
 
 #include <ncrypt.h>
+
+extern char *
+read_file_and_null_terminate (const char *filename, size_t *out_len);
+
+extern LPBYTE
+decode_pem_base64 (const char *base64_in, DWORD *out_len, const char *descriptor, const char *filename);
+
 static void test_certs (void) {
    char *CLOUD_PROD_HOST = test_framework_getenv ("CLOUD_PROD_HOST");
    char *CLOUD_PROD_CERT = test_framework_getenv ("CLOUD_PROD_CERT");
@@ -556,6 +578,72 @@ static void test_certs (void) {
    char *CLOUD_DEV_HOST = test_framework_getenv ("CLOUD_DEV_HOST");
    char *CLOUD_DEV_CERT = test_framework_getenv ("CLOUD_DEV_CERT");
    char *CLOUD_DEV_CERT_PKCS12 = test_framework_getenv ("CLOUD_DEV_CERT_PKCS12");
+
+
+
+   // Test import with allow overwrite.
+   // With CAPI: appears to repeatedly add files.
+   // With CNG: appears to result in later call to AcquireCredentialsHandle failing...
+   {
+      size_t key_count_capi = count_capi_keys ();
+      size_t key_count_cng = count_cng_keys ();
+
+      bson_error_t error;
+
+
+      size_t out_len;
+      char *blob = read_file_and_null_terminate (CLOUD_DEV_CERT_PKCS12, &out_len);
+      ASSERT (blob);
+      ASSERT (mlib_in_range (DWORD, out_len));
+      CRYPT_DATA_BLOB datablob = {.cbData = out_len, .pbData = blob};
+      LPWSTR pwd = L"";
+
+      // Test CAPI:
+      {
+         HCERTSTORE cert_store = PFXImportCertStore (&datablob, pwd, PKCS12_ALLOW_OVERWRITE_KEY);
+         ASSERT (cert_store);
+
+         // Imports as a CAPI key and adds a file:
+         ASSERT_CMPSIZE_T (key_count_capi + 1, ==, count_capi_keys ());
+         ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+
+         PCCERT_CONTEXT cert = CertFindCertificateInStore (
+            cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HAS_PRIVATE_KEY, NULL, NULL);
+
+         ASSERT (cert);
+         bool ok = try_connect (CLOUD_PROD_HOST, cert, &error);
+         ASSERT_OR_PRINT (ok, error);
+
+         CertFreeCertificateContext (cert);
+         CertCloseStore (cert_store, 0);
+      }
+
+      // Test CNG:
+      {
+         HCERTSTORE cert_store = PFXImportCertStore (&datablob, pwd, PKCS12_ALLOW_OVERWRITE_KEY | PKCS12_ALWAYS_CNG_KSP);
+         ASSERT (cert_store);
+
+         // Imports as a CAPI key and adds a file:
+         ASSERT_CMPSIZE_T (key_count_capi + 1, ==, count_capi_keys ());
+         ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+
+         PCCERT_CONTEXT cert = CertFindCertificateInStore (
+            cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HAS_PRIVATE_KEY, NULL, NULL);
+
+         ASSERT (cert);
+         bool ok = try_connect (CLOUD_PROD_HOST, cert, &error);
+         ASSERT (!ok); // Fails!?
+         /// No error set.
+
+         CertFreeCertificateContext (cert);
+         CertCloseStore (cert_store, 0);
+
+      }
+
+         bson_free (blob);
+   }
+
+
 
    
    // Test cloud-prod:
@@ -585,7 +673,6 @@ static void test_certs (void) {
       size_t key_count_cng = count_cng_keys ();
 
       bson_error_t error;
-      extern char *read_file_and_null_terminate (const char *filename, size_t *out_len);
 
       size_t out_len;
       char* blob = read_file_and_null_terminate (CLOUD_DEV_CERT_PKCS12, &out_len);
@@ -642,7 +729,6 @@ static void test_certs (void) {
       size_t key_count_cng = count_cng_keys ();
 
       bson_error_t error;
-      extern char *read_file_and_null_terminate (const char *filename, size_t *out_len);
 
       size_t out_len;
       char *blob = read_file_and_null_terminate (CLOUD_DEV_CERT_PKCS12, &out_len);
@@ -724,9 +810,7 @@ static void test_certs (void) {
       size_t key_count_capi = count_capi_keys ();
       size_t key_count_cng = count_cng_keys ();
       bson_error_t error;
-
-      extern char *read_file_and_null_terminate (const char *filename, size_t *out_len);
-      extern LPBYTE decode_pem_base64 (const char *base64_in, DWORD *out_len, const char *descriptor, const char *filename);
+      
 
       size_t out_len;
       char *pem = read_file_and_null_terminate (CLOUD_DEV_CERT, &out_len);
@@ -829,8 +913,6 @@ static void test_certs (void) {
       bson_error_t error;
       bool ok;
 
-      extern char *read_file_and_null_terminate (const char *filename, size_t *out_len);
-      extern LPBYTE decode_pem_base64 (const char *base64_in, DWORD *out_len, const char *descriptor, const char *filename);
 
       size_t out_len;
       char *pem = read_file_and_null_terminate (CLOUD_DEV_CERT, &out_len);
@@ -927,7 +1009,7 @@ static void test_certs (void) {
       ASSERT (hash);
       CRYPT_HASH_BLOB hashBlob = {.cbData = (DWORD) len, .pbData = (BYTE *) hash};
 
-      DWORD storeType = CERT_SYSTEM_STORE_CURRENT_USER;
+      DWORD storeType = CERT_SYSTEM_STORE_LOCAL_MACHINE;
 
       HCERTSTORE store =
          CertOpenStore (CERT_STORE_PROV_SYSTEM,
