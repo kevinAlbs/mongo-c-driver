@@ -205,6 +205,61 @@ decode_object (const char *structType,
    return out;
 }
 
+static bool has_file_extension (const char* path, const char* ext) {
+   size_t path_len = strlen(path);
+   size_t ext_len = strlen(ext);
+   if (path_len < ext_len) {
+      return false;
+   }
+   return 0 == bson_strcasecmp (&path[path_len - ext_len], ext);
+}
+
+PCCERT_CONTEXT
+mongoc_secure_channel_setup_certificate_from_pkcs12_file (const char *path, const char *pwd)
+{
+   size_t file_len;
+   char *file_contents = NULL;
+   HCERTSTORE cert_store = NULL;
+   PCCERT_CONTEXT cert = NULL;
+
+   file_contents = read_file_and_null_terminate (path, &file_len);
+   if (!file_contents) {
+      goto fail;
+   }
+
+   if (!mlib_in_range (DWORD, file_len)) {
+      goto fail;
+   }
+   CRYPT_DATA_BLOB datablob = {.cbData = file_len, .pbData = file_contents};
+
+   // Assume empty password for now.
+   LPWSTR pwd_wide = L""; // TODO: use passed password.
+
+   // Import file to temporary store. Use PKCS12_ALLOW_OVERWRITE_KEY to prevent repeatedly persisting private key.
+   cert_store = PFXImportCertStore (&datablob, pwd_wide, PKCS12_ALLOW_OVERWRITE_KEY);
+   if (!cert_store) {
+      char *msg = mongoc_winerr_to_string (GetLastError ());
+      MONGOC_ERROR ("PFXImportCertStore failed for %s: %s", path, msg);
+      bson_free (msg);
+      goto fail;
+   }
+
+   // Return handle to the imported certificate.
+   cert =
+      CertFindCertificateInStore (cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_ANY, NULL, NULL);
+   if (!cert) {
+      char *msg = mongoc_winerr_to_string (GetLastError ());
+      MONGOC_ERROR ("CertFindCertificateInStore failed for %s: %s", path, msg);
+      bson_free (msg);
+      goto fail;
+   }
+
+fail:
+   CertCloseStore (cert_store, 0);
+   bson_free (file_contents);
+   return cert;
+}
+
 PCCERT_CONTEXT
 mongoc_secure_channel_setup_certificate_from_file (const char *filename)
 {
@@ -381,6 +436,9 @@ fail:
 PCCERT_CONTEXT
 mongoc_secure_channel_setup_certificate (mongoc_ssl_opt_t *opt)
 {
+   if (has_file_extension(opt->pem_file, ".p12") || has_file_extension(opt->pem_file, ".pfx")) {
+      return mongoc_secure_channel_setup_certificate_from_pkcs12_file (opt->pem_file, opt->pem_pwd);
+   }
    return mongoc_secure_channel_setup_certificate_from_file (opt->pem_file);
 }
 
