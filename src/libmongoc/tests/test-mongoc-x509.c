@@ -151,7 +151,7 @@ test_x509_auth (void *unused)
       // Set TLS options with mongoc_ssl_opt_t instead of URI. URI does not support a certificate selector.
       mongoc_ssl_opt_t ssl_opt = {
          .ca_file = CERT_CA,
-         .selector_thumbprint = "foobar"
+         .selector_thumbprint = "934494bc44ac628ccccd697a4a2bea7c62b5092f"
       };
 
       // Try auth:
@@ -166,6 +166,7 @@ test_x509_auth (void *unused)
 #if defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT) || defined(MONGOC_ENABLE_SSL_OPENSSL)
          ASSERT_CAPTURED_LOG ("tls", MONGOC_LOG_LEVEL_ERROR, "certificate selector not supported");
 #elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+         ASSERT_NO_CAPTURED_LOGS ("tls");
          ASSERT_OR_PRINT (ok, error);
 #else
          BSON_UNREACHABLE();

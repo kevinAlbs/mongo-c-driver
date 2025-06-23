@@ -85,6 +85,7 @@ _mongoc_ssl_opts_copy_to (const mongoc_ssl_opt_t *src, mongoc_ssl_opt_t *dst, bo
    dst->ca_file = bson_strdup (src->ca_file);
    dst->ca_dir = bson_strdup (src->ca_dir);
    dst->crl_file = bson_strdup (src->crl_file);
+   dst->selector_thumbprint = bson_strdup (src->selector_thumbprint);
    dst->weak_cert_validation = src->weak_cert_validation;
    dst->allow_invalid_hostname = src->allow_invalid_hostname;
    if (copy_internal) {
@@ -104,6 +105,7 @@ _mongoc_ssl_opts_cleanup (mongoc_ssl_opt_t *opt, bool free_internal)
    bson_free ((char *) opt->ca_file);
    bson_free ((char *) opt->ca_dir);
    bson_free ((char *) opt->crl_file);
+   bson_free ((char *) opt->selector_thumbprint);
    if (free_internal) {
       bson_free (opt->internal);
    }
