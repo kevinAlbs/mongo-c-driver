@@ -1067,7 +1067,7 @@ mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_s
          if (sspi_status != SEC_E_OK) {
             // Cast signed SECURITY_STATUS to unsigned DWORD. FormatMessage expects DWORD.
             char *msg = mongoc_winerr_to_string ((DWORD) sspi_status);
-            MONGOC_ERROR ("Failed to initialize security context: %s", msg);
+            MONGOC_ERROR ("AcquireCredentialsHandle failed: %s", msg);
             bson_free (msg);
             RETURN (NULL);
          }
@@ -1091,7 +1091,7 @@ mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_s
       if (sspi_status != SEC_E_OK) {
          // Cast signed SECURITY_STATUS to unsigned DWORD. FormatMessage expects DWORD.
          char *msg = mongoc_winerr_to_string ((DWORD) sspi_status);
-         MONGOC_ERROR ("Failed to initialize security context: %s", msg);
+         MONGOC_ERROR ("AcquireCredentialsHandle failed: %s", msg);
          bson_free (msg);
          RETURN (NULL);
       }
