@@ -273,6 +273,8 @@ fi
 # For mongocryptd, by integration-tests.sh.
 export PATH="${det_dir:?}/mongodb/bin:${PATH:-}"
 
+test_args+=("-l" "/X509/*")
+
 case "${OSTYPE}" in
 cygwin)
   check_mongocryptd
