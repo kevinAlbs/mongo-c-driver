@@ -27,9 +27,8 @@ it points to (``pem_file``, ``pem_pwd``, ``ca_file``, ``ca_dir``,
 ``crl_file``, and ``thumbprint``) so they don't have to remain valid after the call to
 :symbol:`mongoc_client_pool_set_ssl_opts`.
 
-A call to :symbol:`mongoc_client_pool_set_ssl_opts` overrides all TLS options set
-through the connection string with which the :symbol:`mongoc_client_pool_t` was
-constructed.
+A call to :symbol:`mongoc_client_pool_set_ssl_opts` overrides all corresponding TLS options set through the connection
+string when the :symbol:`mongoc_client_t` was constructed. See :ref:`mongoc_ssl_opt_t options <sslopts_and_uri>`.
 
 Parameters
 ----------

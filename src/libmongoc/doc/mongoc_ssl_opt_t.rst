@@ -35,6 +35,164 @@ This structure is used to set the TLS options for a :symbol:`mongoc_client_t` or
 
 .. versionadded:: 2.1.0 ``thumbprint`` is added.
 
+`Local Machine Certificate Store <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/certificate-stores>`_
+
+.. _sslopts_and_uri:
+
+Options
+-------
+
+Some options in :symbol:`mongoc_ssl_opt_t` have corresponding URI options.
+Others may only be set with :symbol:`mongoc_ssl_opt_t`.
+
+The following documents the corresponding URI option and support in each TLS back-end.
+
+``pem_file``
+------------
+
+Path to a file containing a client certificate and private key.
+
+.. list-table::
+   :widths: 30 70
+   :width: 100%
+
+   * - **URI option**
+     - ``MONGOC_URI_TLSCERTIFICATEKEYFILE`` (``tlsCertificateKeyFile``)
+   * - **OpenSSL**
+     - Supported.
+   * - **macOS Secure Transport**
+     - Supported.
+   * - **Windows Secure Channel**
+     - Supported. Only RSA keys are supported. Consider using ``thumbprint`` to avoid limitations with ephemeral keys in Secure Channel.
+
+``pem_pwd``
+-----------
+
+Password to decrypt ``pem_file``.
+
+.. list-table::
+   :widths: 30 70
+   :width: 100%
+
+   * - **URI option**
+     - ``MONGOC_URI_TLSCERTIFICATEKEYFILEPASSWORD`` (``tlsCertificateKeyFilePassword``)
+   * - **OpenSSL**
+     - Supported.
+   * - **macOS Secure Transport**
+     - Supported.
+   * - **Windows Secure Channel**
+     - Not supported. Set ``pem_file`` to an unencrypted certificate or use ``thumbprint`` to select a certificate from the `Local Machine Certificate Store`_.
+
+``ca_file``
+-----------
+
+Path to a file containing Certificate Authority (CA) certificates.
+
+.. list-table::
+   :widths: 30 70
+   :width: 100%
+
+   * - **URI option**
+     - ``MONGOC_URI_TLSCAFILE`` (``tlsCAFile``)
+   * - **OpenSSL**
+     - Supported.
+   * - **macOS Secure Transport**
+     - Supported.
+   * - **Windows Secure Channel**
+     - Supported. CA certificate is imported into the `Local Machine Certificate Store`_.
+
+``ca_dir``
+----------
+
+Path to a directory containing Certificate Authority (CA) certificates.
+
+.. list-table::
+   :widths: 30 70
+   :width: 100%
+
+   * - **URI option**
+     - None.
+   * - **OpenSSL**
+     - Supported.
+   * - **macOS Secure Transport**
+     - Not supported.
+   * - **Windows Secure Channel**
+     - Not supported.
+
+``crl_file``
+------------
+
+Path to a file containing a Certificate Revocation List (CRL).
+
+.. list-table::
+   :widths: 30 70
+   :width: 100%
+
+   * - **URI option**
+     - None.
+   * - **OpenSSL**
+     - Supported.
+   * - **macOS Secure Transport**
+     - Not supported.
+   * - **Windows Secure Channel**
+     - Supported. CRL certificate is imported into the `Local Machine Certificate Store`_.
+
+``weak_cert_validation``
+------------------------
+
+Disables validation of the server certificate.
+
+.. list-table::
+   :widths: 30 70
+   :width: 100%
+
+   * - **URI option**
+     - ``MONGOC_URI_TLSALLOWINVALIDCERTIFICATES`` (``tlsAllowInvalidCertificates``)
+   * - **OpenSSL**
+     - Supported.
+   * - **macOS Secure Transport**
+     - Supported.
+   * - **Windows Secure Channel**
+     - Supported.
+
+``allow_invalid_hostname``
+--------------------------
+
+Allows mismatch of the server hostname and hostname specified by the server certificate.
+
+.. list-table::
+   :widths: 30 70
+   :width: 100%
+
+   * - **URI option**
+     - ``MONGOC_URI_TLSALLOWINVALIDCERTIFICATES`` (``tlsAllowInvalidCertificates``)
+   * - **OpenSSL**
+     - Supported.
+   * - **macOS Secure Transport**
+     - Supported.
+   * - **Windows Secure Channel**
+     - Supported.
+
+``thumbprint``
+--------------
+
+Set to a SHA1 hash of a client certificate to select from a certificate store.
+
+``thumbprint`` is useful to avoid limitations with Windows Secure Channel.
+
+.. list-table::
+   :widths: 30 70
+   :width: 100%
+
+   * - **URI option**
+     - None.
+   * - **OpenSSL**
+     - Not supported.
+   * - **macOS Secure Transport**
+     - Not supported.
+   * - **Windows Secure Channel**
+     - Supported. Certificate is selected from the `Local Machine Certificate Store`_.
+
 .. only:: html
 
   Functions

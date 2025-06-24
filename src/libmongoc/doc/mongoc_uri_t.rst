@@ -193,6 +193,8 @@ TLS Options
 
 See `Configuring TLS <configuring_tls_>`_ for details about these options and about building libmongoc with TLS support.
 
+See :symbol:`mongoc_ssl_opt_t` for additional TLS options.
+
 Deprecated SSL Options
 ----------------------
 
