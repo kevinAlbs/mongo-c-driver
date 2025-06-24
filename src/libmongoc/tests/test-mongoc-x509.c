@@ -122,6 +122,8 @@ get_x509_uri (void)
    ASSERT_OR_PRINT (uri, error);
    ASSERT (mongoc_uri_set_auth_mechanism (uri, "MONGODB-X509"));
    ASSERT (mongoc_uri_set_auth_source (uri, "$external"));
+   ASSERT (mongoc_uri_set_option_as_bool (
+      uri, MONGOC_URI_SERVERSELECTIONTRYONCE, true)); // Fail quickly for tests expecting an error.
    bson_free (uristr_noauth);
    return uri;
 }
@@ -381,7 +383,6 @@ test_x509_auth (void *unused)
          ASSERT (
             mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCERTIFICATEKEYFILE, CERT_TEST_DIR "/client-private.pem"));
          ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCAFILE, CERT_CA));
-         ASSERT (mongoc_uri_set_option_as_bool (uri, MONGOC_URI_SERVERSELECTIONTRYONCE, true)); // Fail quickly.
       }
 
       // Try auth:
