@@ -29,7 +29,9 @@ Description
 
 This structure is used to set the TLS options for a :symbol:`mongoc_client_t` or :symbol:`mongoc_client_pool_t`.
 
-Beginning in version 1.2.0, once a pool or client has any TLS options set, all connections use TLS, even if ``ssl=true`` is omitted from the MongoDB URI. Before, TLS options were ignored unless ``tls=true`` was included in the URI.
+.. versionchanged:: 1.2.0 Once a pool or client has any TLS options set, all connections use TLS, even if ``ssl=true`` is omitted from the MongoDB URI. Before, TLS options were ignored unless ``tls=true`` was included in the URI.
+
+.. versionchanged:: 1.4.0 The :symbol:`mongoc_client_pool_set_ssl_opts` and :symbol:`mongoc_client_set_ssl_opts` will not only shallow copy the struct, but will also copy the ``const char*``. It is therefore no longer needed to make sure the values remain valid after setting them.
 
 .. versionadded:: 2.1.0 ``thumbprint`` is added.
 
