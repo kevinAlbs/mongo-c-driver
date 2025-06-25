@@ -579,7 +579,7 @@ static void test_certs (void) {
    char *CLOUD_DEV_CERT = test_framework_getenv ("CLOUD_DEV_CERT");
    char *CLOUD_DEV_CERT_PKCS12 = test_framework_getenv ("CLOUD_DEV_CERT_PKCS12");
 
-
+   bson_error_t error;
 
    // Test import with allow overwrite.
    // With CAPI: appears to repeatedly add files.
@@ -588,7 +588,6 @@ static void test_certs (void) {
       size_t key_count_capi = count_capi_keys ();
       size_t key_count_cng = count_cng_keys ();
 
-      bson_error_t error;
 
 
       size_t out_len;
@@ -642,13 +641,9 @@ static void test_certs (void) {
 
          bson_free (blob);
    }
-
-
-
    
    // Test cloud-prod:
    {
-      bson_error_t error;
       mongoc_ssl_opt_t ssl_opt = {.pem_file = CLOUD_PROD_CERT};
       PCCERT_CONTEXT cert = mongoc_secure_channel_setup_certificate (&ssl_opt);
       ASSERT_OR_PRINT (try_connect(CLOUD_PROD_HOST, cert, &error), error);
@@ -657,7 +652,6 @@ static void test_certs (void) {
 
    // Test cloud-dev:
    {
-      bson_error_t error;
       mongoc_ssl_opt_t ssl_opt = {.pem_file = CLOUD_DEV_CERT};
       PCCERT_CONTEXT cert = mongoc_secure_channel_setup_certificate (&ssl_opt);
       ASSERT (!try_connect(CLOUD_DEV_HOST, cert, &error));
@@ -671,8 +665,6 @@ static void test_certs (void) {
    {
       size_t key_count_capi = count_capi_keys ();
       size_t key_count_cng = count_cng_keys ();
-
-      bson_error_t error;
 
       size_t out_len;
       char* blob = read_file_and_null_terminate (CLOUD_DEV_CERT_PKCS12, &out_len);
@@ -727,8 +719,6 @@ static void test_certs (void) {
    {
       size_t key_count_capi = count_capi_keys ();
       size_t key_count_cng = count_cng_keys ();
-
-      bson_error_t error;
 
       size_t out_len;
       char *blob = read_file_and_null_terminate (CLOUD_DEV_CERT_PKCS12, &out_len);
@@ -809,16 +799,15 @@ static void test_certs (void) {
    {
       size_t key_count_capi = count_capi_keys ();
       size_t key_count_cng = count_cng_keys ();
-      bson_error_t error;
       
 
       size_t out_len;
       char *pem = read_file_and_null_terminate (CLOUD_DEV_CERT, &out_len);
       ASSERT (pem);
-      char* pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----");
-      ASSERT (pem_private);
 
       // Find the private-key portion of the blob.
+      char* pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----");
+      ASSERT (pem_private);
       DWORD privateKeyBlobLen;
       LPBYTE privateKeyBlob = decode_pem_base64 (pem_private, &privateKeyBlobLen, "private key", CLOUD_DEV_CERT);
 
@@ -831,7 +820,9 @@ static void test_certs (void) {
       NCryptBuffer buffer;
       NCryptBufferDesc bufferDesc;
 
-      WCHAR keyName[] = L"TestKey"; // TODO: Replace with unique name? Q: What key name does PFXImportCertStore use? A:
+      // Compute a name using a hash of the key contents.
+
+      WCHAR keyName[] = L"TestKey"; // TODO: Replace with unique name? Q: What key name does PFXImportCertStore use? A: Appears generated and non-deterministic
       buffer.cbBuffer = (ULONG) (wcslen (keyName) + 1) * sizeof (WCHAR);
       buffer.BufferType = NCRYPTBUFFER_PKCS_KEY_NAME;
       buffer.pvBuffer = keyName;
@@ -845,6 +836,8 @@ static void test_certs (void) {
       ASSERT (mlib_in_range (DWORD, out_len));
       status =
          NCryptImportKey (hProv, 0, NCRYPT_PKCS8_PRIVATE_KEY_BLOB, &bufferDesc, &hKey, privateKeyBlob, privateKeyBlobLen, 0);
+
+      
       if (status != SEC_E_OK) {
          test_error ("Failed to import key: %s", mongoc_winerr_to_string (status));
       }
@@ -906,102 +899,6 @@ static void test_certs (void) {
       NCryptFreeObject (hProv);
    }
 
-   // TODO: try to convert PKCS#8 to PKCS#12, then import. This appears to still require a key name.
-   if (0) {
-      size_t key_count_capi = count_capi_keys ();
-      size_t key_count_cng = count_cng_keys ();
-      bson_error_t error;
-      bool ok;
-
-
-      size_t out_len;
-      char *pem = read_file_and_null_terminate (CLOUD_DEV_CERT, &out_len);
-      ASSERT (pem);
-      char* pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----");
-      ASSERT (pem_private);
-
-      // Find the private-key portion of the blob.
-      DWORD privateKeyBlobLen;
-      LPBYTE privateKeyBlob = decode_pem_base64 (pem_private, &privateKeyBlobLen, "private key", CLOUD_DEV_CERT);
-
-      NCRYPT_PROV_HANDLE hProv;
-      // Open the software key storage provider
-      SECURITY_STATUS status = NCryptOpenStorageProvider (&hProv, MS_KEY_STORAGE_PROVIDER, 0);
-      ASSERT_CMPUINT32 (status, ==, 0);
-      
-      // Import the private key blob as an ephemeral key
-      NCRYPT_KEY_HANDLE hKey;
-      ASSERT (mlib_in_range (DWORD, out_len));
-      status =
-         NCryptImportKey (hProv, 0, NCRYPT_PKCS8_PRIVATE_KEY_BLOB, 0, &hKey, privateKeyBlob, privateKeyBlobLen, 0);
-      if (status != SEC_E_OK) {
-         test_error ("Failed to import key: %s", mongoc_winerr_to_string (status));
-      }
-
-      // Check that imported key is not persisted (because no key name given):
-      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
-      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
-
-      // Create certificate:
-      const char *pem_public = strstr (pem, "-----BEGIN CERTIFICATE-----");
-      ASSERT (pem_public);
-      DWORD encoded_cert_len;
-      LPBYTE encoded_cert = decode_pem_base64 (pem_public, &encoded_cert_len, "public key", CLOUD_DEV_CERT);
-      ASSERT (encoded_cert);
-      PCCERT_CONTEXT cert = CertCreateCertificateContext (X509_ASN_ENCODING, encoded_cert, encoded_cert_len);
-      ASSERT (cert);
-
-      // Add certificate to an in-memory certificate store
-      HCERTSTORE hStore = CertOpenStore (CERT_STORE_PROV_MEMORY, 0, 0, CERT_STORE_CREATE_NEW_FLAG, NULL);
-      ASSERT (hStore);
-      ASSERT (CertAddCertificateContextToStore (hStore, cert, CERT_STORE_ADD_REPLACE_EXISTING, NULL));
-
-      // Get the certificate from the store to attach the private key to the cert in the store
-      {
-         PCCERT_CONTEXT stored_cert = CertEnumCertificatesInStore (hStore, NULL);
-         ASSERT (stored_cert);
-         // Set private key on cert.
-         // Note: setting CERT_NCRYPT_KEY_HANDLE_PROP_ID on the cert context for SChannel results in: W(0x8009030E) No credentials are available in the security package
-         // Maybe PKCS#12 export attaches name?
-         //ok = CertSetCertificateContextProperty (stored_cert, CERT_NCRYPT_KEY_HANDLE_PROP_ID, 0, &hKey);
-         //ASSERT (ok);
-      }
-
-      // Export in-memory cert store as PKCS#12, then import and persist:
-      {
-         CRYPT_DATA_BLOB pfxBlob = {0};
-         ok =
-            PFXExportCertStoreEx (hStore,
-                                  &pfxBlob,
-                                  L"",
-                                  0,
-                                  EXPORT_PRIVATE_KEYS | REPORT_NO_PRIVATE_KEY | REPORT_NOT_ABLE_TO_EXPORT_PRIVATE_KEY);
-         if (!ok) {
-            test_error ("Failed to export PKCS#12 key: %s", mongoc_winerr_to_string (GetLastError ()));
-         }
-
-         pfxBlob.pbData = (BYTE *) bson_malloc (pfxBlob.cbData);
-
-         ok =
-            PFXExportCertStoreEx (hStore,
-                                  &pfxBlob,
-                                  L"",
-                                  0,
-                                  EXPORT_PRIVATE_KEYS | REPORT_NO_PRIVATE_KEY | REPORT_NOT_ABLE_TO_EXPORT_PRIVATE_KEY);
-         if (!ok) {
-            test_error ("Failed to export PKCS#12 key: %s", mongoc_winerr_to_string (GetLastError ()));
-         }
-
-         HCERTSTORE cert_store = PFXImportCertStore (&pfxBlob, L"", PKCS12_ALWAYS_CNG_KSP);
-         ASSERT (cert_store);
-      }
-
-
-      // Key is imported into CNG:
-      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
-      ASSERT_CMPSIZE_T (key_count_cng + 1, ==, count_cng_keys ());
-   }
-
    // Given a certificate thumbprint, load from the cert store:
    {
       uint32_t len;
@@ -1030,6 +927,8 @@ static void test_certs (void) {
       
       CertCloseStore (store, 0);
    }
+
+   // Try loading PKCS#12 without persisting but requiring CNG.
 }
 
 void
