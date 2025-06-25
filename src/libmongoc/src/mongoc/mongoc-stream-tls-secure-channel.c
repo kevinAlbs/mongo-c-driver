@@ -851,6 +851,7 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    mongoc_stream_tls_t *tls;
    mongoc_stream_tls_secure_channel_t *secure_channel;
    PCCERT_CONTEXT cert = NULL;
+   bool ok = false;
 
    ENTRY;
    BSON_ASSERT (base_stream);
@@ -963,7 +964,7 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
       char *msg = mongoc_winerr_to_string ((DWORD) sspi_status);
       MONGOC_ERROR ("Failed to initialize security context: %s", msg);
       bson_free (msg);
-      RETURN (NULL);
+      GOTO (fail);
    }
 
    if (opt->ca_dir) {
@@ -977,6 +978,14 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    }
 
    mongoc_counter_streams_active_inc ();
+   ok = true;
+fail:
+   if (!ok && tls) {
+      // Detach base stream since it is freed by caller.
+      tls->base_stream = NULL;
+      mongoc_stream_destroy ((mongoc_stream_t *) tls);
+      tls = NULL;
+   }
    RETURN ((mongoc_stream_t *) tls);
 }
 #endif /* MONGOC_ENABLE_SSL_SECURE_CHANNEL */
