@@ -923,6 +923,12 @@ _mongoc_openssl_ctx_new (mongoc_ssl_opt_t *opt)
     */
    mongoc_init ();
 
+   if (opt->thumbprint) {
+      MONGOC_ERROR ("Setting mongoc_ssl_opt_t.thumbprint is not supported when built against OpenSSL");
+      RETURN (NULL);
+   }
+
+
    ctx = SSL_CTX_new (SSLv23_method ());
 
    BSON_ASSERT (ctx);

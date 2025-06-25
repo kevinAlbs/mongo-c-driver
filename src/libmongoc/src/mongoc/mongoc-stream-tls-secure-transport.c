@@ -637,6 +637,10 @@ mongoc_stream_tls_secure_transport_new (mongoc_stream_t *base_stream,
                     "against Secure Transport");
       RETURN (NULL);
    }
+   if (opt->thumbprint) {
+      MONGOC_ERROR ("Setting mongoc_ssl_opt_t.thumbprint is not supported when built against Secure Transport");
+      RETURN (NULL);
+   }
 
    secure_transport = (mongoc_stream_tls_secure_transport_t *) bson_malloc0 (sizeof *secure_transport);
 

@@ -67,6 +67,7 @@
 #include <mongoc/mongoc-error-private.h>
 #include <mongoc/mongoc-counters-private.h>
 #include <mongoc/mongoc-errno-private.h>
+#include <mongoc/mongoc-util-private.h> // hex_to_bin
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "stream-tls-secure-channel"
@@ -926,13 +927,56 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
       mongoc_secure_channel_setup_crl (opt);
    }
 
+
+   if (opt->pem_file && opt->thumbprint) {
+      MONGOC_ERROR ("Cannot pass both client certificate file and thumbprint");
+      GOTO (fail);
+   }
+
    if (opt->pem_file) {
       cert = mongoc_secure_channel_setup_certificate (opt);
+   }
 
-      if (cert) {
-         schannel_cred.cCreds = 1;
-         schannel_cred.paCred = &cert;
+   if (opt->thumbprint) {
+      uint32_t len;
+      uint8_t *thumbprint_data = hex_to_bin (opt->thumbprint, &len);
+
+      if (!thumbprint_data) {
+         MONGOC_ERROR ("Failed to parse selector thumbprint. Expected hex, but got: %s", opt->thumbprint);
+         GOTO (fail);
       }
+
+      CRYPT_HASH_BLOB hash_blob = {.cbData = (DWORD) len, .pbData = (BYTE *) thumbprint_data};
+
+      // Open the Local Machine Certificate Store. Use the Personal store ("My") to search for a client certificate.
+      HCERTSTORE store = CertOpenStore (
+         CERT_STORE_PROV_SYSTEM, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_SYSTEM_STORE_LOCAL_MACHINE, L"My");
+      if (!store) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("Failed to open certificate store: %s", msg);
+         bson_free (msg);
+         bson_free (thumbprint_data);
+         GOTO (fail);
+      }
+
+      cert = CertFindCertificateInStore (
+         store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HASH, &hash_blob, NULL);
+      if (!cert) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("Failed to find cert from selector thumbprint (%s): %s", opt->thumbprint, msg);
+         bson_free (msg);
+         bson_free (thumbprint_data);
+         CertCloseStore (store, 0);
+         GOTO (fail);
+      }
+
+      bson_free (thumbprint_data);
+      CertCloseStore (store, 0);
+   }
+
+   if (cert) {
+      schannel_cred.cCreds = 1;
+      schannel_cred.paCred = &cert;
    }
 
 

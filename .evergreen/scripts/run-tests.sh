@@ -46,7 +46,24 @@ if [[ "${SSL}" != "nossl" ]]; then
   export MONGOC_TEST_SSL_WEAK_CERT_VALIDATION="off"
   export MONGOC_TEST_SSL_PEM_FILE="src/libmongoc/tests/x509gen/client.pem"
   export MONGOC_TEST_SSL_CA_FILE="src/libmongoc/tests/x509gen/ca.pem"
+  # Import client cert on Windows to test thumbprint.
+  if $IS_WINDOWS; then
+    # Import certificate to system "My" store:
+    certutil -importpfx -p "" "My" "$(cygpath -w -a ./src/libmongoc/tests/x509gen/client.p12)"
+    # Compute SHA1 thumbprint to remove later:
+    client_cert_thumbprint="$(openssl x509 -noout -fingerprint -sha1 -in "./src/libmongoc/tests/x509gen/client.pem" | sed 's/://g' | sed 's/^sha1 Fingerprint=//')"
+  fi
 fi
+
+delete_imported_cert () {
+  if $IS_WINDOWS && [ -n "${client_cert_thumbprint}" ]; then
+    echo "Deleting imported certificate ..."
+    certutil -delstore "My" "${client_cert_thumbprint}"
+    echo "Deleting imported certificate ... ok"
+  fi
+}
+
+trap delete_imported_cert EXIT
 
 export MONGOC_ENABLE_MAJORITY_READ_CONCERN=on
 export MONGOC_TEST_FUTURE_TIMEOUT_MS=30000

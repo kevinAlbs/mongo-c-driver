@@ -143,6 +143,89 @@ test_x509_auth (void *unused)
    drop_x509_user (true /* ignore "not found" error */);
    create_x509_user ();
 
+   // Test auth works with certificate thumbprint (Secure Channel only).
+   {
+      // Create URI:
+      mongoc_uri_t *uri = get_x509_uri ();
+
+      // Set TLS options with mongoc_ssl_opt_t instead of URI. URI does not support a certificate selector.
+      mongoc_ssl_opt_t ssl_opt = {.ca_file = CERT_CA, .thumbprint = "934494bc44ac628ccccd697a4a2bea7c62b5092f"};
+
+      // Try auth:
+      bson_error_t error = {0};
+      bool ok;
+      {
+         mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
+         mongoc_client_set_ssl_opts (client, &ssl_opt);
+
+         capture_logs (true);
+         ok = try_insert (client, &error);
+#if defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT) || defined(MONGOC_ENABLE_SSL_OPENSSL)
+         ASSERT (!ok);
+         ASSERT_CAPTURED_LOG ("tls", MONGOC_LOG_LEVEL_ERROR, "thumbprint not supported");
+#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+         ASSERT_NO_CAPTURED_LOGS ("tls");
+         ASSERT_OR_PRINT (ok, error);
+#endif
+         mongoc_client_destroy (client);
+      }
+
+      mongoc_uri_destroy (uri);
+   }
+
+#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+   // Test passing both certificate selector and client certificate is an error.
+   {
+      // Create URI:
+      mongoc_uri_t *uri = get_x509_uri ();
+
+      // Set TLS options with mongoc_ssl_opt_t instead of URI. URI does not support a certificate selector.
+      mongoc_ssl_opt_t ssl_opt = {
+         .ca_file = CERT_CA, .thumbprint = "934494bc44ac628ccccd697a4a2bea7c62b5092f", .pem_file = CERT_CLIENT};
+
+      // Try auth:
+      bson_error_t error = {0};
+      bool ok;
+      {
+         mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
+         mongoc_client_set_ssl_opts (client, &ssl_opt);
+
+         capture_logs (true);
+         ok = try_insert (client, &error);
+         ASSERT (!ok);
+         ASSERT_CAPTURED_LOG ("tls", MONGOC_LOG_LEVEL_ERROR, "Cannot pass both client certificate file and thumbprint");
+         mongoc_client_destroy (client);
+      }
+
+      mongoc_uri_destroy (uri);
+   }
+
+   // Test passing an invalid certificate selector is an error.
+   {
+      // Create URI:
+      mongoc_uri_t *uri = get_x509_uri ();
+
+      // Set TLS options with mongoc_ssl_opt_t instead of URI. URI does not support a certificate selector.
+      mongoc_ssl_opt_t ssl_opt = {.ca_file = CERT_CA, .thumbprint = "bad-hex"};
+
+      // Try auth:
+      bson_error_t error = {0};
+      bool ok;
+      {
+         mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
+         mongoc_client_set_ssl_opts (client, &ssl_opt);
+
+         capture_logs (true);
+         ok = try_insert (client, &error);
+         ASSERT (!ok);
+         ASSERT_CAPTURED_LOG ("tls", MONGOC_LOG_LEVEL_ERROR, "Failed to parse selector thumbprint");
+         mongoc_client_destroy (client);
+      }
+
+      mongoc_uri_destroy (uri);
+   }
+#endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL
+
    // Test auth works with PKCS8 key:
    {
       // Create URI:

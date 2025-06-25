@@ -3207,6 +3207,7 @@ test_set_ssl_opts (void)
    ASSERT (opts->ca_file == NULL);
    ASSERT (opts->ca_dir == NULL);
    ASSERT (opts->crl_file == NULL);
+   ASSERT (opts->thumbprint == NULL);
    ASSERT (!opts->weak_cert_validation);
    ASSERT (!opts->allow_invalid_hostname);
 }
