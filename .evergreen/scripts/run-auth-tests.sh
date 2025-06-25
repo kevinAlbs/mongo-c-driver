@@ -24,13 +24,36 @@ secrets_dir="$(to_absolute "${mongoc_dir}/../secrets")"
 mkdir -p "${secrets_dir}"
 chmod 700 "${secrets_dir}"
 
-# Create certificate to test X509 auth with Atlas:
+# Create certificate to test X509 auth with Atlas on cloud-prod:
 atlas_x509_path="${secrets_dir:?}/atlas_x509.pem"
-echo "${atlas_x509_cert_base64:?}" | base64 --decode > "${secrets_dir:?}/atlas_x509.pem"
+echo "${atlas_x509_cert_base64:?}" | base64 --decode > "${atlas_x509_path:?}"
 # Fix path on Windows:
 if $IS_WINDOWS; then
     atlas_x509_path="$(cygpath -m "${secrets_dir:?}/atlas_x509.pem")"
 fi
+
+# Create certificate to test X509 auth with Atlas on cloud-dev
+atlas_x509_dev_path="${secrets_dir:?}/atlas_x509_dev.pem"
+echo "${atlas_x509_dev_cert_base64:?}" | base64 --decode > "${atlas_x509_dev_path:?}"
+# Import cert on Windows to support SHA2 signature algorithm for client cert.
+if $IS_WINDOWS; then
+  # Convert to PKCS#12:
+  openssl pkcs12 -export -in "${atlas_x509_dev_path}" -inkey "${atlas_x509_dev_path}" -passout pass: -out "${secrets_dir:?}/atlas_x509_dev.p12"
+  # Import certificate to system "My" store:
+  certutil -importpfx -p "" "My" "$(cygpath -w -a "${secrets_dir:?}/atlas_x509_dev.p12")"
+  # Compute SHA1 thumbprint:
+  atlas_x509_dev_thumbprint="$(openssl x509 -noout -fingerprint -sha1 -in "${atlas_x509_dev_path}" | sed 's/://g' | sed 's/^sha1 Fingerprint=//')"
+fi
+
+delete_imported_cert () {
+  if $IS_WINDOWS && [ -n "${atlas_x509_dev_thumbprint}" ]; then
+    echo "Deleting imported certificate ..."
+    certutil -delstore "My" "${atlas_x509_dev_thumbprint}"
+    echo "Deleting imported certificate ... ok"
+  fi
+}
+
+trap delete_imported_cert EXIT
 
 # Create Kerberos config and keytab files.
 echo "Setting up Kerberos ... begin"
@@ -74,22 +97,26 @@ declare ip_addr
 case "${OSTYPE}" in
 cygwin)
   ping="${mongoc_dir}/cmake-build/src/libmongoc/Debug/mongoc-ping.exe"
+  test_connect="${mongoc_dir}/cmake-build/src/libmongoc/Debug/test-connect.exe"
   test_gssapi="${mongoc_dir}/cmake-build/src/libmongoc/Debug/test-mongoc-gssapi.exe"
   ip_addr="$(getent hosts "${auth_host:?}" | head -n 1 | awk '{print $1}')"
   ;;
 
 darwin*)
   ping="${mongoc_dir}/cmake-build/src/libmongoc/mongoc-ping"
+  test_connect="${mongoc_dir}/cmake-build/src/libmongoc/test-connect"
   test_gssapi="${mongoc_dir}/cmake-build/src/libmongoc/test-mongoc-gssapi"
   ip_addr="$(dig "${auth_host:?}" +short | tail -1)"
   ;;
 
 *)
   ping="${mongoc_dir}/cmake-build/src/libmongoc/mongoc-ping"
+  test_connect="${mongoc_dir}/cmake-build/src/libmongoc/test-connect"
   test_gssapi="${mongoc_dir}/cmake-build/src/libmongoc/test-mongoc-gssapi"
   ip_addr="$(getent hosts "${auth_host:?}" | head -n 1 | awk '{print $1}')"
   ;;
 esac
+: "${test_connect:?}"
 : "${ping:?}"
 : "${test_gssapi:?}"
 : "${ip_addr:?}"
@@ -187,8 +214,15 @@ if [[ "${ssl}" != "OFF" ]]; then
     LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_serverless:?}&${c_timeout}"
   fi
 
-  echo "Connecting to Atlas with X509"
+  echo "Connecting to Atlas with X509 to cloud-prod"
   LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_x509:?}&tlsCertificateKeyFile=${atlas_x509_path}&${c_timeout}"
+  
+  echo "Connecting to Atlas with X509 to cloud-dev"
+  if $IS_WINDOWS; then
+      LD_LIBRARY_PATH="${openssl_lib_prefix}" MONGOC_TEST_CONNECT_THUMBPRINT="${atlas_x509_dev_thumbprint}" "${test_connect}" "${atlas_x509_dev:?}&${c_timeout}"
+  else
+      LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_x509_dev:?}&tlsCertificateKeyFile=${atlas_x509_dev_path}&${c_timeout}"
+  fi
 
 fi
 

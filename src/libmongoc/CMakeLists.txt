@@ -1197,6 +1197,7 @@ if (ENABLE_TESTS)
    mongoc_add_test (test-azurekms ${PROJECT_SOURCE_DIR}/tests/test-azurekms.c)
    mongoc_add_test (test-gcpkms ${PROJECT_SOURCE_DIR}/tests/test-gcpkms.c)
    mongoc_add_test (test-awsauth ${PROJECT_SOURCE_DIR}/tests/test-awsauth.c)
+   mongoc_add_test (test-connect ${PROJECT_SOURCE_DIR}/tests/test-connect.c)
 
    # "make test" doesn't compile tests, so we create "make check" which compiles
    # and runs tests: https://gitlab.kitware.com/cmake/cmake/issues/8774
