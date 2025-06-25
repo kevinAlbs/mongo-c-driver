@@ -1,6 +1,10 @@
 libmongoc 2.1.0 (Unreleased)
 ============================
 
+## Features
+
+* Add `mongoc_ssl_opt_t.thumbprint` to select client certificate for Windows Secure Channel. Useful to avoid limitations of loading ephemeral keys on Windows.
+
 ## Notes
 
 * The minimum supported MongoDB Server version is raised from 4.0 to 4.2. This is in accordance with [MongoDB Software Lifecycle Schedules](https://www.mongodb.com/legal/support-policy/lifecycles).
