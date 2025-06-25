@@ -96,28 +96,24 @@ declare test_gssapi
 declare ip_addr
 case "${OSTYPE}" in
 cygwin)
-  ping="${mongoc_dir}/cmake-build/src/libmongoc/Debug/mongoc-ping.exe"
   test_connect="${mongoc_dir}/cmake-build/src/libmongoc/Debug/test-connect.exe"
   test_gssapi="${mongoc_dir}/cmake-build/src/libmongoc/Debug/test-mongoc-gssapi.exe"
   ip_addr="$(getent hosts "${auth_host:?}" | head -n 1 | awk '{print $1}')"
   ;;
 
 darwin*)
-  ping="${mongoc_dir}/cmake-build/src/libmongoc/mongoc-ping"
   test_connect="${mongoc_dir}/cmake-build/src/libmongoc/test-connect"
   test_gssapi="${mongoc_dir}/cmake-build/src/libmongoc/test-mongoc-gssapi"
   ip_addr="$(dig "${auth_host:?}" +short | tail -1)"
   ;;
 
 *)
-  ping="${mongoc_dir}/cmake-build/src/libmongoc/mongoc-ping"
   test_connect="${mongoc_dir}/cmake-build/src/libmongoc/test-connect"
   test_gssapi="${mongoc_dir}/cmake-build/src/libmongoc/test-mongoc-gssapi"
   ip_addr="$(getent hosts "${auth_host:?}" | head -n 1 | awk '{print $1}')"
   ;;
 esac
 : "${test_connect:?}"
-: "${ping:?}"
 : "${test_gssapi:?}"
 : "${ip_addr:?}"
 
@@ -146,11 +142,11 @@ fi
 ulimit -c unlimited || true
 
 if command -v ldd >/dev/null; then
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" ldd "${ping}" | grep "libssl" || true
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" ldd "${test_connect}" | grep "libssl" || true
   LD_LIBRARY_PATH="${openssl_lib_prefix}" ldd "${test_gssapi}" | grep "libssl" || true
 elif command -v otool >/dev/null; then
   # Try using otool on MacOS if ldd is not available.
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" otool -L "${ping}" | grep "libssl" || true
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" otool -L "${test_connect}" | grep "libssl" || true
   LD_LIBRARY_PATH="${openssl_lib_prefix}" otool -L "${test_gssapi}" | grep "libssl" || true
 fi
 
@@ -174,30 +170,30 @@ if [[ "${ssl}" != "OFF" ]]; then
   # FIXME: CDRIVER-2008 for the cygwin check
   if [[ "${OSTYPE}" != "cygwin" ]]; then
     echo "Authenticating using X.509"
-    LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${ping}" "mongodb://CN=client,OU=kerneluser,O=10Gen,L=New York City,ST=New York,C=US@${auth_host}/?ssl=true&authMechanism=MONGODB-X509&sslClientCertificateKeyFile=src/libmongoc/tests/x509gen/ldaptest-client-key-and-cert.pem&sslCertificateAuthorityFile=src/libmongoc/tests/x509gen/ldaptest-ca-cert.crt&sslAllowInvalidHostnames=true&${c_timeout}"
+    LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${test_connect}" "mongodb://CN=client,OU=kerneluser,O=10Gen,L=New York City,ST=New York,C=US@${auth_host}/?ssl=true&authMechanism=MONGODB-X509&sslClientCertificateKeyFile=src/libmongoc/tests/x509gen/ldaptest-client-key-and-cert.pem&sslCertificateAuthorityFile=src/libmongoc/tests/x509gen/ldaptest-ca-cert.crt&sslAllowInvalidHostnames=true&${c_timeout}"
   fi
   echo "Connecting to Atlas Free Tier"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_free:?}&${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_free:?}&${c_timeout}"
   echo "Connecting to Atlas Free Tier with SRV"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_free_srv:?}&${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_free_srv:?}&${c_timeout}"
   echo "Connecting to Atlas Replica Set"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_replset:?}&${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_replset:?}&${c_timeout}"
   echo "Connecting to Atlas Replica Set with SRV"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_replset_srv:?}${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_replset_srv:?}${c_timeout}"
   echo "Connecting to Atlas Sharded Cluster"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_shard:?}&${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_shard:?}&${c_timeout}"
   echo "Connecting to Atlas Sharded Cluster with SRV"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_shard_srv:?}${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_shard_srv:?}${c_timeout}"
   if [[ -z "${require_tls12:-}" ]]; then
     echo "Connecting to Atlas with only TLS 1.1 enabled"
-    LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_tls11:?}&${c_timeout}"
+    LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_tls11:?}&${c_timeout}"
     echo "Connecting to Atlas with only TLS 1.1 enabled with SRV"
-    LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_tls11_srv:?}${c_timeout}"
+    LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_tls11_srv:?}${c_timeout}"
   fi
   echo "Connecting to Atlas with only TLS 1.2 enabled"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_tls12:?}&${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_tls12:?}&${c_timeout}"
   echo "Connecting to Atlas with only TLS 1.2 enabled with SRV"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_tls12_srv:?}${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_tls12_srv:?}${c_timeout}"
   HAS_CIPHERSUITES_FOR_SERVERLESS="YES"
   if [[ "${OSTYPE}" == "cygwin" ]]; then
     # Windows Server 2008 hosts do not appear to share TLS 1.2 cipher suites with Atlas Serverless.
@@ -209,36 +205,36 @@ if [[ "${ssl}" != "OFF" ]]; then
   fi
   if [[ "${HAS_CIPHERSUITES_FOR_SERVERLESS}" == "YES" ]]; then
     echo "Connecting to Atlas Serverless with SRV"
-    LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_serverless_srv:?}/?${c_timeout}"
+    LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_serverless_srv:?}/?${c_timeout}"
     echo "Connecting to Atlas Serverless"
-    LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_serverless:?}&${c_timeout}"
+    LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_serverless:?}&${c_timeout}"
   fi
 
   echo "Connecting to Atlas with X509 to cloud-prod"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_x509:?}&tlsCertificateKeyFile=${atlas_x509_path}&${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_x509:?}&tlsCertificateKeyFile=${atlas_x509_path}&${c_timeout}"
   
   echo "Connecting to Atlas with X509 to cloud-dev"
   if $IS_WINDOWS; then
       LD_LIBRARY_PATH="${openssl_lib_prefix}" MONGOC_TEST_CONNECT_THUMBPRINT="${atlas_x509_dev_thumbprint}" "${test_connect}" "${atlas_x509_dev:?}&${c_timeout}"
   else
-      LD_LIBRARY_PATH="${openssl_lib_prefix}" "${ping}" "${atlas_x509_dev:?}&tlsCertificateKeyFile=${atlas_x509_dev_path}&${c_timeout}"
+      LD_LIBRARY_PATH="${openssl_lib_prefix}" "${test_connect}" "${atlas_x509_dev:?}&tlsCertificateKeyFile=${atlas_x509_dev_path}&${c_timeout}"
   fi
 
 fi
 
 echo "Authenticating using PLAIN"
-LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${ping}" "mongodb://${auth_plain:?}@${auth_host}/?authMechanism=PLAIN&${c_timeout}"
+LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${test_connect}" "mongodb://${auth_plain:?}@${auth_host}/?authMechanism=PLAIN&${c_timeout}"
 
 echo "Authenticating using default auth mechanism"
 # Though the auth source is named "mongodb-cr", authentication uses the default mechanism (currently SCRAM-SHA-1).
-LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${ping}" "mongodb://${auth_mongodbcr:?}@${auth_host}/mongodb-cr?${c_timeout}"
+LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${test_connect}" "mongodb://${auth_mongodbcr:?}@${auth_host}/mongodb-cr?${c_timeout}"
 
 if [[ "${sasl}" != "OFF" ]]; then
   echo "Authenticating using GSSAPI"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${ping}" "mongodb://${auth_gssapi:?}@${auth_host}/?authMechanism=GSSAPI&${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${test_connect}" "mongodb://${auth_gssapi:?}@${auth_host}/?authMechanism=GSSAPI&${c_timeout}"
 
   echo "Authenticating with CANONICALIZE_HOST_NAME"
-  LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${ping}" "mongodb://${auth_gssapi:?}@${ip_addr}/?authMechanism=GSSAPI&authMechanismProperties=CANONICALIZE_HOST_NAME:true&${c_timeout}"
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${test_connect}" "mongodb://${auth_gssapi:?}@${ip_addr}/?authMechanism=GSSAPI&authMechanismProperties=CANONICALIZE_HOST_NAME:true&${c_timeout}"
 
   declare ld_preload="${LD_PRELOAD:-}"
   if [[ "${ASAN:-}" == "on" ]]; then
@@ -251,8 +247,8 @@ if [[ "${sasl}" != "OFF" ]]; then
 
   if [[ "${OSTYPE}" == "cygwin" ]]; then
     echo "Authenticating using GSSAPI (service realm: LDAPTEST.10GEN.CC)"
-    LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${ping}" "mongodb://${auth_crossrealm:?}@${auth_host}/?authMechanism=GSSAPI&authMechanismProperties=SERVICE_REALM:LDAPTEST.10GEN.CC&${c_timeout}"
+    LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${test_connect}" "mongodb://${auth_crossrealm:?}@${auth_host}/?authMechanism=GSSAPI&authMechanismProperties=SERVICE_REALM:LDAPTEST.10GEN.CC&${c_timeout}"
     echo "Authenticating using GSSAPI (UTF-8 credentials)"
-    LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${ping}" "mongodb://${auth_gssapi_utf8:?}@${auth_host}/?authMechanism=GSSAPI&${c_timeout}"
+    LD_LIBRARY_PATH="${openssl_lib_prefix}" maybe_skip "${test_connect}" "mongodb://${auth_gssapi_utf8:?}@${auth_host}/?authMechanism=GSSAPI&${c_timeout}"
   fi
 fi
