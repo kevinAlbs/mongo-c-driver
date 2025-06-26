@@ -927,6 +927,7 @@ static void test_certs (void) {
       
       CertCloseStore (store, 0);
    }
+}
 
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
 static void test_secure_channel_load_cert (void) {
