@@ -442,6 +442,276 @@ mongoc_secure_channel_setup_certificate (mongoc_ssl_opt_t *opt)
    return mongoc_secure_channel_setup_certificate_from_file (opt->pem_file);
 }
 
+mongoc_secure_channel_certcontext_t
+mongoc_secure_channel_certcontext_load (const char* filename) {
+   char *pem;
+   mongoc_secure_channel_certcontext_t ret = {0};
+   bool success;
+   size_t pem_length;
+   HCRYPTPROV provider;
+   DWORD encoded_cert_len;
+   LPBYTE encoded_cert = NULL;
+   const char *pem_public;
+   const char *pem_private;
+   PCCERT_CONTEXT cert = NULL;
+   LPBYTE blob_private = NULL;
+   DWORD blob_private_len = 0;
+   LPBYTE blob_private_rsa = NULL;
+   DWORD blob_private_rsa_len = 0;
+   DWORD encoded_private_len = 0;
+   LPBYTE encoded_private = NULL;
+   NCRYPT_PROV_HANDLE hProv = 0;
+
+   pem = read_file_and_null_terminate (filename, &pem_length);
+   if (!pem) {
+      goto fail;
+   }
+
+   pem_public = strstr (pem, "-----BEGIN CERTIFICATE-----");
+   if (!pem_public) {
+      MONGOC_ERROR ("Can't find public certificate in '%s'", filename);
+      goto fail;
+   }
+
+   pem_private = strstr (pem, "-----BEGIN ENCRYPTED PRIVATE KEY-----");
+
+   if (pem_private) {
+      MONGOC_ERROR ("Detected unsupported encrypted private key");
+      goto fail;
+   }
+
+   encoded_cert = decode_pem_base64 (pem_public, &encoded_cert_len, "public key", filename);
+   if (!encoded_cert) {
+      goto fail;
+   }
+   cert = CertCreateCertificateContext (X509_ASN_ENCODING, encoded_cert, encoded_cert_len);
+
+   if (!cert) {
+      char *msg = mongoc_winerr_to_string (GetLastError ());
+      MONGOC_ERROR ("Failed to extract public key from '%s': %s", filename, msg);
+      bson_free (msg);
+      goto fail;
+   }
+
+   if (NULL != (pem_private = strstr (pem, "-----BEGIN RSA PRIVATE KEY-----"))) {
+      encoded_private = decode_pem_base64 (pem_private, &encoded_private_len, "private key", filename);
+      if (!encoded_private) {
+         goto fail;
+      }
+
+      blob_private_rsa = decode_object (
+         PKCS_RSA_PRIVATE_KEY, encoded_private, encoded_private_len, &blob_private_rsa_len, "private key", filename);
+      if (!blob_private_rsa) {
+         goto fail;
+      }
+
+
+      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa379886%28v=vs.85%29.aspx
+       */
+      success = CryptAcquireContext (&provider,            /* phProv */
+                                     NULL,                 /* pszContainer */
+                                     MS_ENHANCED_PROV,     /* pszProvider */
+                                     PROV_RSA_FULL,        /* dwProvType */
+                                     CRYPT_VERIFYCONTEXT); /* dwFlags */
+      if (!success) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("CryptAcquireContext failed: %s", msg);
+         bson_free (msg);
+         goto fail;
+      }
+
+      HCRYPTKEY hKey;
+      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa380207%28v=vs.85%29.aspx
+       */
+      success = CryptImportKey (provider,             /* hProv */
+                                blob_private_rsa,     /* pbData */
+                                blob_private_rsa_len, /* dwDataLen */
+                                0,                    /* hPubKey */
+                                0,                    /* dwFlags */
+                                &hKey);               /* phKey, OUT */
+      if (!success) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("CryptImportKey for private key failed: %s", msg);
+         bson_free (msg);
+         CryptReleaseContext (provider, 0);
+         goto fail;
+      }
+      CryptDestroyKey (hKey);
+
+      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa376573%28v=vs.85%29.aspx
+       */
+      // The CERT_KEY_PROV_HANDLE_PROP_ID property takes ownership of `provider`.
+      success = CertSetCertificateContextProperty (cert,                         /* pCertContext */
+                                                   CERT_KEY_PROV_HANDLE_PROP_ID, /* dwPropId */
+                                                   0,                            /* dwFlags */
+                                                   (const void *) provider);     /* pvData */
+      if (!success) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("Can't associate private key with public key: %s", msg);
+         bson_free (msg);
+         goto fail;
+      }
+   } else if (NULL != (pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----"))) {
+      encoded_private = decode_pem_base64 (pem_private, &encoded_private_len, "private key", filename);
+      if (!encoded_private) {
+         goto fail;
+      }
+
+      // Open the software key storage provider
+      SECURITY_STATUS status = NCryptOpenStorageProvider (&hProv, MS_KEY_STORAGE_PROVIDER, 0);
+      if (status != SEC_E_OK) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("Can't open key storage provider: %s", msg);
+         bson_free (msg);
+         goto fail;
+      }
+      
+      // Supply a key name to persist the key:
+      NCryptBuffer buffer;
+      NCryptBufferDesc bufferDesc;
+      wchar_t guidString[39] = {0};
+      // Compute a unique name using a GUID.
+      {
+         GUID guid;
+         HRESULT res = CoCreateGuid(&guid);
+         if (res != S_OK) { 
+            char *msg = mongoc_winerr_to_string (res);
+            MONGOC_ERROR ("Can't create GUID: %s", msg);
+            bson_free (msg);
+            goto fail;
+         }
+         if (0 == StringFromGUID2(&guid, guidString, 39)) {  
+            MONGOC_ERROR ("Can't stringify GUID");
+            goto fail;
+         }
+      }
+
+      memcpy (ret.key_name, guidString, sizeof (guidString));
+
+      buffer.cbBuffer = (ULONG) (wcslen (guidString) + 1) * sizeof (WCHAR);
+      buffer.BufferType = NCRYPTBUFFER_PKCS_KEY_NAME;
+      buffer.pvBuffer = guidString;
+
+      bufferDesc.ulVersion = NCRYPTBUFFER_VERSION;
+      bufferDesc.cBuffers = 1;
+      bufferDesc.pBuffers = &buffer;
+
+      // Import the private key blob
+      {
+         NCRYPT_KEY_HANDLE hKey;
+         status = NCryptImportKey (
+            hProv, 0, NCRYPT_PKCS8_PRIVATE_KEY_BLOB, &bufferDesc, &hKey, encoded_private, encoded_private_len, 0);
+         NCryptFreeObject (hKey);
+
+         if (status != SEC_E_OK) {
+            char *msg = mongoc_winerr_to_string ((DWORD) status);
+            MONGOC_ERROR ("Failed to import key: %s", msg);
+            bson_free (msg);
+            goto fail;
+         }
+
+         ret.imported_private_key = true;
+      }
+
+      // Attach key to certificate.
+      {
+         // Attach private key to certificate:
+         CRYPT_KEY_PROV_INFO keyProvInfo = {
+            .pwszContainerName = guidString, .dwProvType = 0 /* CNG */, .dwFlags = 0, .dwKeySpec = AT_KEYEXCHANGE};
+         if (!CertSetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, 0, &keyProvInfo)) {
+            char *msg = mongoc_winerr_to_string (GetLastError());
+            MONGOC_ERROR ("Failed to attach key to certificate: %s", msg);
+            bson_free (msg);
+            goto fail;
+         }
+      }
+   } else {
+      MONGOC_ERROR ("Can't find private key in '%s'", filename);
+      goto fail;
+   }
+
+
+   TRACE ("%s", "Successfully loaded client certificate");
+   ret.ok = true;
+   ret.cert = cert;
+   
+
+fail:
+
+   if (hProv) {
+      NCryptFreeObject (hProv);
+   }
+
+   if (pem) {
+      SecureZeroMemory (pem, pem_length);
+      bson_free (pem);
+   }
+   bson_free (encoded_cert);
+   if (encoded_private) {
+      SecureZeroMemory (encoded_private, encoded_private_len);
+      bson_free (encoded_private);
+   }
+
+   if (blob_private_rsa) {
+      SecureZeroMemory (blob_private_rsa, blob_private_rsa_len);
+      bson_free (blob_private_rsa);
+   }
+
+   if (blob_private) {
+      SecureZeroMemory (blob_private, blob_private_len);
+      bson_free (blob_private);
+   }
+
+   if (!ret.ok) {
+      CertFreeCertificateContext (cert);
+      return ret;
+   }
+
+   return ret;
+}
+
+void
+mongoc_secure_channel_certcontext_unload (mongoc_secure_channel_certcontext_t certcontext) {
+   bool ok = false;
+   NCRYPT_PROV_HANDLE hProv = 0;
+   NCRYPT_PROV_HANDLE keyHandle = 0;
+
+   // Open the software key storage provider
+   SECURITY_STATUS status = NCryptOpenStorageProvider (&hProv, MS_KEY_STORAGE_PROVIDER, 0);
+   if (status != SEC_E_OK) {
+      char *msg = mongoc_winerr_to_string (GetLastError ());
+      MONGOC_ERROR ("Can't open key storage provider: %s", msg);
+      bson_free (msg);
+      goto fail;
+   }
+
+   status = NCryptOpenKey (hProv, &keyHandle, certcontext.key_name, 0, 0);
+   if (status != SEC_E_OK) {
+      char *msg = mongoc_winerr_to_string (GetLastError ());
+      MONGOC_ERROR ("Failed to open key: %s", msg);
+      bson_free (msg);
+      goto fail;
+   }
+
+   status = NCryptDeleteKey (keyHandle, 0); // Also frees handle.
+   if (status != SEC_E_OK) {
+      char *msg = mongoc_winerr_to_string (GetLastError ());
+      MONGOC_ERROR ("Failed to delete key: %s", msg);
+      bson_free (msg);
+      goto fail;
+   }
+   // NCryptDeleteKey freed handle.
+   keyHandle = 0;
+
+fail:
+   if (hProv) {
+      NCryptFreeObject (hProv);
+   }
+   if (keyHandle) {
+      NCryptFreeObject (keyHandle); 
+   }
+}
+
 
 bool
 mongoc_secure_channel_setup_ca (mongoc_ssl_opt_t *opt)

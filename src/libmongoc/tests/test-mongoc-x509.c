@@ -928,8 +928,30 @@ static void test_certs (void) {
       CertCloseStore (store, 0);
    }
 
-   // Try loading PKCS#12 without persisting but requiring CNG.
+#ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+static void test_secure_channel_load_cert (void) {
+   // Test loading a PKCS#1 certificate (expect key is ephemeral)
+   {
+      // TODO.
+   }
+
+   // Test loading a PKCS#8 certificate (expect key is persisted)
+   {
+      size_t key_count_capi = count_capi_keys();
+      size_t key_count_cng = count_cng_keys();
+
+      mongoc_secure_channel_certcontext_t cert_ctx = mongoc_secure_channel_certcontext_load (CERT_TEST_DIR "/client-pkcs8-unencrypted.pem");
+      
+      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
+      ASSERT_CMPSIZE_T (key_count_cng + 1, ==, count_cng_keys ());
+      
+      mongoc_secure_channel_certcontext_unload (cert_ctx);
+
+      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+   }
 }
+#endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL
 
 void
 test_x509_install (TestSuite *suite)
@@ -950,4 +972,8 @@ test_x509_install (TestSuite *suite)
 #endif
 
    TestSuite_Add (suite, "/C5998", test_certs);
+
+#ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+   TestSuite_Add (suite, "/X509/secure_channel_load_cert", test_secure_channel_load_cert);
+#endif
 }
