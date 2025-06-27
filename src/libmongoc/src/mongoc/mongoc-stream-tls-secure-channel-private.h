@@ -54,6 +54,13 @@ typedef struct {
    TimeStamp time_stamp;
 } mongoc_secure_channel_ctxt;
 
+typedef struct {
+    PCCERT_CONTEXT cert;
+    bool imported_private_key;
+    wchar_t key_name[39]; // Holds max-length GUID string.
+    bool ok;
+} mongoc_secure_channel_sharedcert_t;
+
 /**
  * mongoc_stream_tls_secure_channel_t:
  *
@@ -75,14 +82,8 @@ typedef struct {
    bool renegotiating;
    mongoc_stream_tls_t *tls;
    char* hostname;
+   mongoc_secure_channel_sharedcert_t* sharedcert; // Set if the mongoc_stream_t creates an owned certificate context (to free on destroy).
 } mongoc_stream_tls_secure_channel_t;
-
-typedef struct {
-    PCCERT_CONTEXT cert;
-    bool imported_private_key;
-    wchar_t key_name[39]; // Holds max-length GUID string.
-    bool ok;
-} mongoc_secure_channel_sharedcert_t;
 
 mongoc_stream_t *
 mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, PCCERT_CONTEXT cert);

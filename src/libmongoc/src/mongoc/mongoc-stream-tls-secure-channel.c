@@ -181,6 +181,10 @@ _mongoc_stream_tls_secure_channel_destroy (mongoc_stream_t *stream)
       secure_channel->decdata_offset = 0;
    }
 
+   if (secure_channel->sharedcert) {
+      mongoc_secure_channel_sharedcert_destroy (secure_channel->sharedcert);
+   }
+
    mongoc_stream_destroy (tls->base_stream);
 
    bson_free (secure_channel);
@@ -968,9 +972,14 @@ mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_s
    }
 
    
-   // BSON_ASSERT (!(opt->pem_file && cert)); // Cannot pass both.
    if (!cert && opt->pem_file) {
-      cert = mongoc_secure_channel_setup_certificate (opt);
+      secure_channel->sharedcert = mongoc_secure_channel_sharedcert_new (opt->pem_file);
+      if (secure_channel->sharedcert) {
+         cert = secure_channel->sharedcert->cert;
+      } else {
+         MONGOC_ERROR ("Failed to load client certificate");
+         return NULL;
+      }
    }
 
    if (opt->selector_thumbprint) {

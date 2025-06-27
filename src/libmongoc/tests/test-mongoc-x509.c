@@ -500,7 +500,7 @@ test_crl (void *unused)
 #include <mongoc/mongoc-stream-tls-secure-channel-private.h>
 #include <mongoc/mongoc-secure-channel-private.h>
 
-static bool try_connect (const char* host_and_port, PCCERT_CONTEXT cert, bson_error_t *handshake_error) {
+static bool try_connect_with_cert (const char* host_and_port, PCCERT_CONTEXT cert, bson_error_t *handshake_error) {
    bson_error_t error;
    mongoc_host_list_t host;
    const int32_t connect_timout_ms = 1000;
@@ -610,7 +610,7 @@ static void test_certs (void) {
             cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HAS_PRIVATE_KEY, NULL, NULL);
 
          ASSERT (cert);
-         bool ok = try_connect (CLOUD_PROD_HOST, cert, &error);
+         bool ok = try_connect_with_cert (CLOUD_PROD_HOST, cert, &error);
          ASSERT_OR_PRINT (ok, error);
 
          CertFreeCertificateContext (cert);
@@ -630,7 +630,7 @@ static void test_certs (void) {
             cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HAS_PRIVATE_KEY, NULL, NULL);
 
          ASSERT (cert);
-         bool ok = try_connect (CLOUD_PROD_HOST, cert, &error);
+         bool ok = try_connect_with_cert (CLOUD_PROD_HOST, cert, &error);
          ASSERT (!ok); // Fails!?
          /// No error set.
 
@@ -646,7 +646,7 @@ static void test_certs (void) {
    {
       mongoc_ssl_opt_t ssl_opt = {.pem_file = CLOUD_PROD_CERT};
       PCCERT_CONTEXT cert = mongoc_secure_channel_setup_certificate (&ssl_opt);
-      ASSERT_OR_PRINT (try_connect(CLOUD_PROD_HOST, cert, &error), error);
+      ASSERT_OR_PRINT (try_connect_with_cert(CLOUD_PROD_HOST, cert, &error), error);
       CertFreeCertificateContext (cert);
    }
 
@@ -654,7 +654,7 @@ static void test_certs (void) {
    {
       mongoc_ssl_opt_t ssl_opt = {.pem_file = CLOUD_DEV_CERT};
       PCCERT_CONTEXT cert = mongoc_secure_channel_setup_certificate (&ssl_opt);
-      ASSERT (!try_connect(CLOUD_DEV_HOST, cert, &error));
+      ASSERT (!try_connect_with_cert(CLOUD_DEV_HOST, cert, &error));
       // Expect error. See CDRIVER-5998. Appears due to client only using RSA+SHA1 for Certificate Verify.
       ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_STREAM, MONGOC_ERROR_STREAM_SOCKET, "do not possess a common algorithm");
       CertFreeCertificateContext (cert);
@@ -684,7 +684,7 @@ static void test_certs (void) {
          cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HAS_PRIVATE_KEY, NULL, NULL);
 
       ASSERT (cert);      
-      ASSERT_OR_PRINT (try_connect (CLOUD_PROD_HOST, cert, &error), error);
+      ASSERT_OR_PRINT (try_connect_with_cert (CLOUD_PROD_HOST, cert, &error), error);
 
 
       // Delete imported key:
@@ -751,7 +751,7 @@ static void test_certs (void) {
          cert_store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_HAS_PRIVATE_KEY, NULL, NULL);
 
       ASSERT (cert);
-      ASSERT_OR_PRINT (try_connect (CLOUD_PROD_HOST, cert, &error), error);
+      ASSERT_OR_PRINT (try_connect_with_cert (CLOUD_PROD_HOST, cert, &error), error);
 
 
       // Delete imported key:
@@ -861,7 +861,7 @@ static void test_certs (void) {
        bool ok = CertSetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, 0, &keyProvInfo);
        ASSERT (ok);
 
-      ASSERT_OR_PRINT (try_connect (CLOUD_PROD_HOST, cert, &error), error);
+      ASSERT_OR_PRINT (try_connect_with_cert (CLOUD_PROD_HOST, cert, &error), error);
 
       // Delete key:
       {
@@ -923,7 +923,7 @@ static void test_certs (void) {
 
       
       bson_error_t error;
-      ASSERT_OR_PRINT (try_connect (CLOUD_PROD_HOST, cert, &error), error);
+      ASSERT_OR_PRINT (try_connect_with_cert (CLOUD_PROD_HOST, cert, &error), error);
       
       CertCloseStore (store, 0);
    }
@@ -949,6 +949,31 @@ static void test_secure_channel_sharedcert (void) {
 
       ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
    }
+}
+
+static mongoc_stream_t * try_connect (const char* host_and_port, const char* client_cert, bson_error_t *handshake_error) {
+   bson_error_t error;
+   mongoc_host_list_t host;
+   const int32_t connect_timout_ms = 1000;
+
+   *handshake_error = (bson_error_t) {0};
+
+   ASSERT_OR_PRINT (_mongoc_host_list_from_string_with_err(&host, host_and_port, &error), error);
+   mongoc_stream_t *stream = mongoc_client_connect_tcp (connect_timout_ms, &host, &error);
+   ASSERT_OR_PRINT (stream, error);
+   
+   mongoc_ssl_opt_t ssl_opt = {.pem_file = client_cert};
+   stream = mongoc_stream_tls_new_with_hostname (stream, host_and_port, &ssl_opt, 1 /* client */);
+   if (!stream) {
+      return NULL;
+   }
+
+   bool ok = mongoc_stream_tls_handshake_block (stream, host.host, connect_timout_ms, handshake_error);
+   if (!ok) {
+      mongoc_stream_destroy (stream);
+      return NULL;
+   }
+   return stream;
 }
 
 // test_secure_channel_pkcs8 tests Secure Channel loads a persistent CNG key for PKCS#8:
@@ -1000,8 +1025,20 @@ test_secure_channel_pkcs8 (void *unused)
       // Expect PKCS#8 key is deleted.
       ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
    }
-   mongoc_uri_destroy (uri);
 
+   // Test a direct stream
+   {
+      bson_error_t error = {0};
+      mongoc_stream_t *stream = try_connect ("localhost:27017", CERT_TEST_DIR "/client-pkcs8-unencrypted.pem", &error);
+      // Expect PKCS#8 key is loaded.
+      ASSERT_CMPSIZE_T (key_count_cng + 1, ==, count_cng_keys ());
+      ASSERT_OR_PRINT (stream, error);
+      mongoc_stream_destroy (stream);
+      // Expect PKCS#8 key is deleted.
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+   }
+   
+   mongoc_uri_destroy (uri);
    drop_x509_user (false);
 }
 #endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL

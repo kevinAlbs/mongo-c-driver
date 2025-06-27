@@ -806,6 +806,8 @@ _mongoc_topology_scanner_node_setup_stream_for_tls (mongoc_topology_scanner_node
 #if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
       tls_stream = mongoc_stream_tls_new_with_hostname_and_openssl_context (
          stream, node->host.host, node->ts->ssl_opts, 1, node->ts->openssl_ctx);
+#elif defined (MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+      tls_stream = mongoc_stream_tls_secure_channel_new_with_sharedcert (stream, node->host.host, node->ts->ssl_opts, 1, node->ts->secure_channel_sharedcert);
 #else
       tls_stream = mongoc_stream_tls_new_with_hostname (stream, node->host.host, node->ts->ssl_opts, 1);
 #endif
