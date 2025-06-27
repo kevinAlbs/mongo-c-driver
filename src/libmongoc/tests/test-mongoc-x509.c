@@ -1041,6 +1041,46 @@ test_secure_channel_pkcs8 (void *unused)
    mongoc_uri_destroy (uri);
    drop_x509_user (false);
 }
+
+static BSON_THREAD_FUN(thread_fn, ctx) {
+   bson_error_t error;
+   mongoc_secure_channel_sharedcert_t* sharedcert = ctx;
+
+   for (size_t i = 0; i < 100; i++) {
+      printf ("Making connections ...\n");
+      ASSERT_OR_PRINT (try_connect_with_cert ("localhost:27017", sharedcert->cert, &error), error);
+   }
+}
+
+// Test many threads sharing the same PCCERT_CONTEXT
+static void
+test_secure_channel_multithreaded (void *unused)
+{
+   BSON_UNUSED (unused);
+
+   bson_thread_t threads[100];
+
+   size_t key_count_capi = count_capi_keys();
+   size_t key_count_cng = count_cng_keys();
+
+   mongoc_secure_channel_sharedcert_t* sharedcert = mongoc_secure_channel_sharedcert_new (CERT_TEST_DIR "/client-pkcs8-unencrypted.pem");
+   
+   ASSERT_CMPSIZE_T (key_count_cng + 1, ==, count_cng_keys ());
+
+   for (size_t i = 0; i < 100; i++) {
+      mcommon_thread_create (&threads[i], thread_fn, sharedcert);
+   }
+
+   printf ("About to join...\n");
+
+   for (size_t i = 0; i < 100; i++) {
+      mcommon_thread_join (threads[i]);
+   }
+
+   mongoc_secure_channel_sharedcert_destroy (sharedcert);
+   ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+}
+
 #endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL
 
 void
@@ -1066,5 +1106,6 @@ test_x509_install (TestSuite *suite)
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
    TestSuite_Add (suite, "/X509/secure_channel/sharedcert", test_secure_channel_sharedcert);
    TestSuite_AddFull (suite, "/X509/secure_channel/pkcs8", test_secure_channel_pkcs8, NULL, NULL, test_framework_skip_if_no_auth, test_framework_skip_if_no_server_ssl);
+   TestSuite_AddFull (suite, "/X509/secure_channel/multithreaded", test_secure_channel_multithreaded, NULL, NULL, test_framework_skip_if_no_auth, test_framework_skip_if_no_server_ssl);
 #endif
 }
