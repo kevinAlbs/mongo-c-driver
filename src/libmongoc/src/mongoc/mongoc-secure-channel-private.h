@@ -56,18 +56,11 @@ mongoc_secure_channel_write (mongoc_stream_tls_t *tls, const void *data, size_t 
 PCCERT_CONTEXT
 mongoc_secure_channel_setup_certificate (mongoc_ssl_opt_t *opt);
 
-typedef struct {
-    PCCERT_CONTEXT cert;
-    bool imported_private_key;
-    wchar_t key_name[39]; // Holds max-length GUID string.
-    bool ok;
-} mongoc_secure_channel_certcontext_t;
-
-mongoc_secure_channel_certcontext_t
-mongoc_secure_channel_certcontext_load (const char* filename);
+mongoc_secure_channel_sharedcert_t *
+mongoc_secure_channel_sharedcert_new (const char* filename);
 
 void
-mongoc_secure_channel_certcontext_unload (mongoc_secure_channel_certcontext_t certcontext);
+mongoc_secure_channel_sharedcert_destroy (mongoc_secure_channel_sharedcert_t* certctx);
 
 
 /* it may require 16k + some overhead to hold one decryptable block of data - do

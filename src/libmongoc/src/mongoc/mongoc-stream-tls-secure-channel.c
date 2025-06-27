@@ -968,8 +968,8 @@ mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_s
    }
 
    
-   BSON_ASSERT (!(opt->pem_file && cert)); // Cannot pass both.
-   if (opt->pem_file) {
+   // BSON_ASSERT (!(opt->pem_file && cert)); // Cannot pass both.
+   if (!cert && opt->pem_file) {
       cert = mongoc_secure_channel_setup_certificate (opt);
    }
 
@@ -1109,5 +1109,19 @@ mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_s
 
    mongoc_counter_streams_active_inc ();
    RETURN ((mongoc_stream_t *) tls);
+}
+
+mongoc_stream_t *
+mongoc_stream_tls_secure_channel_new_with_sharedcert (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, mongoc_secure_channel_sharedcert_t* sharedcert) {
+   // Set allow_invalid_hostname matching behavior of mongoc_stream_tls_new_with_hostname
+   if (!client || opt->weak_cert_validation) {
+      opt->allow_invalid_hostname = true;
+   }
+
+   PCCERT_CONTEXT cert = NULL;
+   if (sharedcert && sharedcert->cert) {
+      cert = CertDuplicateCertificateContext (sharedcert->cert);
+   }
+   return mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (base_stream, host, opt, client, cert);
 }
 #endif /* MONGOC_ENABLE_SSL_SECURE_CHANNEL */

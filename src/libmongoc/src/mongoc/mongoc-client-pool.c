@@ -269,6 +269,7 @@ _start_scanner_if_needed (mongoc_client_pool_t *pool)
    BSON_ASSERT_PARAM (pool);
 
    if (!pool->topology->single_threaded) {
+      mongoc_topology_scanner_load_secure_channel_sharedcert (pool->topology->scanner);
       _mongoc_topology_background_monitoring_start (pool->topology);
    }
 }

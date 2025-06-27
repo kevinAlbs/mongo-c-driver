@@ -19,6 +19,8 @@
 #ifndef MONGOC_STREAM_TLS_SECURE_CHANNEL_PRIVATE_H
 #define MONGOC_STREAM_TLS_SECURE_CHANNEL_PRIVATE_H
 
+#include <mongoc/mongoc-stream-tls-private.h>
+
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
 #include <bson/bson.h>
 
@@ -75,9 +77,22 @@ typedef struct {
    char* hostname;
 } mongoc_stream_tls_secure_channel_t;
 
+typedef struct {
+    PCCERT_CONTEXT cert;
+    bool imported_private_key;
+    wchar_t key_name[39]; // Holds max-length GUID string.
+    bool ok;
+} mongoc_secure_channel_sharedcert_t;
+
 mongoc_stream_t *
 mongoc_stream_tls_secure_channel_new_with_PCERT_CONTEXT (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, PCCERT_CONTEXT cert);
 
+mongoc_stream_t *
+mongoc_stream_tls_secure_channel_new_with_sharedcert (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, mongoc_secure_channel_sharedcert_t* sharedcert);
+
+mongoc_stream_t *
+mongoc_stream_tls_new_with_hostname_and_secure_channel_sharedcert (
+   mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client, mongoc_secure_channel_sharedcert_t *sharedcert);
 
 BSON_END_DECLS
 

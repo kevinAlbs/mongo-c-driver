@@ -930,7 +930,7 @@ static void test_certs (void) {
 }
 
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
-static void test_secure_channel_load_cert (void) {
+static void test_secure_channel_sharedcert (void) {
    // Test loading a PKCS#1 certificate (expect key is ephemeral)
    {
       // TODO.
@@ -941,16 +941,68 @@ static void test_secure_channel_load_cert (void) {
       size_t key_count_capi = count_capi_keys();
       size_t key_count_cng = count_cng_keys();
 
-      mongoc_secure_channel_certcontext_t cert_ctx = mongoc_secure_channel_certcontext_load (CERT_TEST_DIR "/client-pkcs8-unencrypted.pem");
+      mongoc_secure_channel_sharedcert_t* sharedcert = mongoc_secure_channel_sharedcert_new (CERT_TEST_DIR "/client-pkcs8-unencrypted.pem");
       
-      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
       ASSERT_CMPSIZE_T (key_count_cng + 1, ==, count_cng_keys ());
       
-      mongoc_secure_channel_certcontext_unload (cert_ctx);
+      mongoc_secure_channel_sharedcert_destroy (sharedcert);
 
-      ASSERT_CMPSIZE_T (key_count_capi, ==, count_capi_keys ());
       ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
    }
+}
+
+// test_secure_channel_pkcs8 tests Secure Channel loads a persistent CNG key for PKCS#8:
+static void
+test_secure_channel_pkcs8 (void *unused)
+{
+   BSON_UNUSED (unused);
+   drop_x509_user (true /* ignore "not found" error */);
+   create_x509_user ();
+
+   size_t key_count_cng = count_cng_keys ();
+
+   // Create URI:
+   mongoc_uri_t *uri = get_x509_uri ();
+   {
+      ASSERT (mongoc_uri_set_option_as_utf8 (
+         uri, MONGOC_URI_TLSCERTIFICATEKEYFILE, CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"));
+      ASSERT (mongoc_uri_set_option_as_utf8 (uri, MONGOC_URI_TLSCAFILE, CERT_CA));
+   }
+
+   // Test a single-threaded client:
+   {
+      bson_error_t error = {0};
+      mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
+      // Expect PKCS#8 key is not loaded until monitoring connections are started.
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+      bool ok = try_insert (client, &error);
+      ASSERT_OR_PRINT (ok, error);
+      // Expect PKCS#8 key is loaded.
+      ASSERT_CMPSIZE_T (key_count_cng + 1, ==, count_cng_keys ());
+      mongoc_client_destroy (client);
+      // Expect PKCS#8 key is deleted.
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+   }
+
+   // Test a client pool
+   {
+      bson_error_t error = {0};
+      mongoc_client_pool_t *pool = test_framework_client_pool_new_from_uri (uri, NULL);
+      // Expect PKCS#8 key is not loaded until monitoring connections are started.
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      // Expect PKCS#8 key is loaded.
+      ASSERT_CMPSIZE_T (key_count_cng + 1, ==, count_cng_keys ());
+      bool ok = try_insert (client, &error);
+      ASSERT_OR_PRINT (ok, error);
+      mongoc_client_pool_push (pool, client);
+      mongoc_client_pool_destroy (pool);
+      // Expect PKCS#8 key is deleted.
+      ASSERT_CMPSIZE_T (key_count_cng, ==, count_cng_keys ());
+   }
+   mongoc_uri_destroy (uri);
+
+   drop_x509_user (false);
 }
 #endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL
 
@@ -975,6 +1027,7 @@ test_x509_install (TestSuite *suite)
    TestSuite_Add (suite, "/C5998", test_certs);
 
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
-   TestSuite_Add (suite, "/X509/secure_channel_load_cert", test_secure_channel_load_cert);
+   TestSuite_Add (suite, "/X509/secure_channel/sharedcert", test_secure_channel_sharedcert);
+   TestSuite_AddFull (suite, "/X509/secure_channel/pkcs8", test_secure_channel_pkcs8, NULL, NULL, test_framework_skip_if_no_auth, test_framework_skip_if_no_server_ssl);
 #endif
 }

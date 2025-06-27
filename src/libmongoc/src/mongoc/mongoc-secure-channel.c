@@ -442,10 +442,10 @@ mongoc_secure_channel_setup_certificate (mongoc_ssl_opt_t *opt)
    return mongoc_secure_channel_setup_certificate_from_file (opt->pem_file);
 }
 
-mongoc_secure_channel_certcontext_t
-mongoc_secure_channel_certcontext_load (const char* filename) {
+mongoc_secure_channel_sharedcert_t*
+mongoc_secure_channel_sharedcert_new (const char* filename) {
    char *pem;
-   mongoc_secure_channel_certcontext_t ret = {0};
+   mongoc_secure_channel_sharedcert_t *ret = (mongoc_secure_channel_sharedcert_t*) bson_malloc0 (sizeof (mongoc_secure_channel_sharedcert_t));
    bool success;
    size_t pem_length;
    HCRYPTPROV provider;
@@ -586,7 +586,7 @@ mongoc_secure_channel_certcontext_load (const char* filename) {
          }
       }
 
-      memcpy (ret.key_name, guidString, sizeof (guidString));
+      memcpy (ret->key_name, guidString, sizeof (guidString));
 
       buffer.cbBuffer = (ULONG) (wcslen (guidString) + 1) * sizeof (WCHAR);
       buffer.BufferType = NCRYPTBUFFER_PKCS_KEY_NAME;
@@ -610,7 +610,7 @@ mongoc_secure_channel_certcontext_load (const char* filename) {
             goto fail;
          }
 
-         ret.imported_private_key = true;
+         ret->imported_private_key = true;
       }
 
       // Attach key to certificate.
@@ -632,8 +632,8 @@ mongoc_secure_channel_certcontext_load (const char* filename) {
 
 
    TRACE ("%s", "Successfully loaded client certificate");
-   ret.ok = true;
-   ret.cert = cert;
+   ret->ok = true;
+   ret->cert = cert;
    
 
 fail:
@@ -662,7 +662,7 @@ fail:
       bson_free (blob_private);
    }
 
-   if (!ret.ok) {
+   if (!ret->ok) {
       CertFreeCertificateContext (cert);
       return ret;
    }
@@ -671,10 +671,14 @@ fail:
 }
 
 void
-mongoc_secure_channel_certcontext_unload (mongoc_secure_channel_certcontext_t certcontext) {
+mongoc_secure_channel_sharedcert_destroy (mongoc_secure_channel_sharedcert_t* sharedcert) {
    bool ok = false;
    NCRYPT_PROV_HANDLE hProv = 0;
    NCRYPT_PROV_HANDLE keyHandle = 0;
+
+   if (!sharedcert) {
+      return;
+   }
 
    // Open the software key storage provider
    SECURITY_STATUS status = NCryptOpenStorageProvider (&hProv, MS_KEY_STORAGE_PROVIDER, 0);
@@ -685,7 +689,7 @@ mongoc_secure_channel_certcontext_unload (mongoc_secure_channel_certcontext_t ce
       goto fail;
    }
 
-   status = NCryptOpenKey (hProv, &keyHandle, certcontext.key_name, 0, 0);
+   status = NCryptOpenKey (hProv, &keyHandle, sharedcert->key_name, 0, 0);
    if (status != SEC_E_OK) {
       char *msg = mongoc_winerr_to_string (GetLastError ());
       MONGOC_ERROR ("Failed to open key: %s", msg);
@@ -710,6 +714,7 @@ fail:
    if (keyHandle) {
       NCryptFreeObject (keyHandle); 
    }
+   bson_free (sharedcert);
 }
 
 

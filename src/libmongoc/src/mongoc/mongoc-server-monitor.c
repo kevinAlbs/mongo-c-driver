@@ -933,6 +933,7 @@ _server_monitor_setup_connection (mongoc_server_monitor_t *server_monitor,
    } else {
       void *ssl_opts_void = NULL;
       void *openssl_ctx_void = NULL;
+      void* secure_channel_sharedcert_void = NULL;
 
 #ifdef MONGOC_ENABLE_SSL
       ssl_opts_void = server_monitor->ssl_opts;
@@ -942,12 +943,17 @@ _server_monitor_setup_connection (mongoc_server_monitor_t *server_monitor,
       openssl_ctx_void = server_monitor->topology->scanner->openssl_ctx;
 #endif
 
+#if defined (MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+     secure_channel_sharedcert_void = server_monitor->topology->scanner->secure_channel_sharedcert;
+#endif
+
       server_monitor->stream = mongoc_client_connect (false,
                                                       ssl_opts_void != NULL,
                                                       ssl_opts_void,
                                                       server_monitor->uri,
                                                       &server_monitor->description->host,
                                                       openssl_ctx_void,
+                                                      secure_channel_sharedcert_void,
                                                       error);
    }
 

@@ -475,6 +475,12 @@ mongoc_topology_scanner_destroy (mongoc_topology_scanner_t *ts)
    ts->openssl_ctx = NULL;
 #endif
 
+#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+   MONGOC_DEBUG("destroying sharedcert ...");
+   mongoc_secure_channel_sharedcert_destroy (ts->secure_channel_sharedcert);
+   MONGOC_DEBUG("destroying sharedcert ... done");
+#endif
+
    /* This field can be set by a mongoc_client */
    bson_free ((char *) ts->appname);
 
@@ -973,6 +979,14 @@ mongoc_topology_scanner_node_connect_unix (mongoc_topology_scanner_node_t *node,
 #endif
 }
 
+void
+mongoc_topology_scanner_load_secure_channel_sharedcert (mongoc_topology_scanner_t *ts) {
+#if defined (MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+   if (ts->ssl_opts->pem_file && !ts->secure_channel_sharedcert) {
+      ts->secure_channel_sharedcert = mongoc_secure_channel_sharedcert_new (ts->ssl_opts->pem_file);
+   }
+#endif
+}
 
 /*
  *--------------------------------------------------------------------------
@@ -993,6 +1007,8 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node, bson_e
    bool success = false;
    mongoc_stream_t *stream;
    int64_t start;
+
+   mongoc_topology_scanner_load_secure_channel_sharedcert (node->ts);
 
    _mongoc_topology_scanner_monitor_heartbeat_started (node->ts, &node->host);
    start = bson_get_monotonic_time ();

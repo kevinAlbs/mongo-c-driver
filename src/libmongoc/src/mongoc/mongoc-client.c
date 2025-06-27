@@ -70,6 +70,11 @@
 #include <mongoc/mongoc-stream-tls-private.h>
 #endif
 
+#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#include <mongoc/mongoc-secure-channel-private.h>
+#include <mongoc/mongoc-stream-tls-private.h>
+#endif
+
 #include <common-string-private.h>
 #include <mlib/cmp.h>
 
@@ -756,6 +761,7 @@ mongoc_client_connect (bool buffered,
                        const mongoc_uri_t *uri,
                        const mongoc_host_list_t *host,
                        void *openssl_ctx_void,
+                       void *secure_channel_sharedcert_void,
                        bson_error_t *error)
 {
    mongoc_stream_t *base_stream = NULL;
@@ -765,6 +771,7 @@ mongoc_client_connect (bool buffered,
    BSON_ASSERT (host);
 
    BSON_UNUSED (openssl_ctx_void);
+   BSON_UNUSED (secure_channel_sharedcert_void);
 
 #ifndef MONGOC_ENABLE_SSL
    if (ssl_opts_void || mongoc_uri_get_tls (uri)) {
@@ -814,6 +821,10 @@ mongoc_client_connect (bool buffered,
          // Use shared OpenSSL context.
          base_stream = mongoc_stream_tls_new_with_hostname_and_openssl_context (
             base_stream, host->host, ssl_opts, true, (SSL_CTX *) openssl_ctx_void);
+#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+         // Use shared Secure Channel context.
+         base_stream = mongoc_stream_tls_secure_channel_new_with_sharedcert (
+            base_stream, host->host, ssl_opts, true, (mongoc_secure_channel_sharedcert_t* ) secure_channel_sharedcert_void);
 #else
          base_stream = mongoc_stream_tls_new_with_hostname (base_stream, host->host, ssl_opts, true);
 #endif
@@ -882,8 +893,11 @@ mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
 #if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
    SSL_CTX *ssl_ctx = client->topology->scanner->openssl_ctx;
    return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, (void *) ssl_ctx, error);
+#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+   mongoc_secure_channel_sharedcert_t *sharedcert = client->topology->scanner->secure_channel_sharedcert;
+   return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, NULL, sharedcert, error);
 #else
-   return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, NULL, error);
+   return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, NULL, NULL, error);
 #endif
 }
 
