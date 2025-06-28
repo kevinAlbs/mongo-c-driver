@@ -9,6 +9,8 @@
 #include <mongoc/mongoc-secure-channel-private.h>
 #endif
 
+#include <mongoc/mongoc-host-list-private.h>
+
 #include "TestSuite.h"
 #include "test-libmongoc.h"
 #include "test-conveniences.h" // tmp_bson
@@ -450,6 +452,80 @@ test_crl (void *unused)
 }
 #endif // MONGOC_ENABLE_SSL
 
+#ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+
+static void try_connect (void) {
+   bson_error_t error;
+   mongoc_host_list_t host;
+   const int32_t connect_timout_ms = 1000;
+
+   // Use IPv4 literal to avoid 1 second delay when server not listening on IPv6 (see CDRIVER-????).
+   ASSERT_OR_PRINT (_mongoc_host_list_from_string_with_err(&host, "127.0.0.1:27017", &error), error);
+   mongoc_stream_t *stream = mongoc_client_connect_tcp (connect_timout_ms, &host, &error);
+   ASSERT_OR_PRINT (stream, error);
+   
+   mongoc_ssl_opt_t ssl_opt = {.pem_file = CERT_TEST_DIR "/client-pkcs8-unencrypted.pem" };
+   stream = mongoc_stream_tls_new_with_hostname (stream, "127.0.0.1:27017", &ssl_opt, 1 /* client */);
+   ASSERT (stream);
+
+   bool ok = mongoc_stream_tls_handshake_block (stream, host.host, connect_timout_ms, &error);
+   ASSERT_OR_PRINT (ok, error);
+
+   mongoc_stream_destroy (stream);
+}
+
+static BSON_THREAD_FUN(thread_fn, ctx) {
+   bson_error_t error;
+
+   for (size_t i = 0; i < 100; i++) {
+      try_connect();
+   }
+   BSON_THREAD_RETURN;
+}
+
+// Test many threads doing client-auth with Secure Channel.
+static void
+test_secure_channel_multithreaded (void *unused)
+{
+   BSON_UNUSED (unused);
+
+   bson_thread_t threads[10];
+
+   // Test with no sharing:
+   {
+      int64_t start = bson_get_monotonic_time();
+      MONGOC_DEBUG ("Connecting ... starting");
+      for (size_t i = 0; i < 10; i++) {
+         mcommon_thread_create (&threads[i], thread_fn, NULL);
+      }
+      MONGOC_DEBUG ("Connecting ... joining");
+      for (size_t i = 0; i < 10; i++) {
+         mcommon_thread_join (threads[i]);
+      }
+      MONGOC_DEBUG ("Connecting ... done");
+      int64_t end = bson_get_monotonic_time ();
+      MONGOC_DEBUG ("No sharing took: %.02fms", (double)(end - start) / 1000.0);
+   }
+
+   // Test with sharing (TODO):
+   {
+      int64_t start = bson_get_monotonic_time();
+      MONGOC_DEBUG ("Connecting ... starting");
+      for (size_t i = 0; i < 10; i++) {
+         mcommon_thread_create (&threads[i], thread_fn, NULL);
+      }
+      MONGOC_DEBUG ("Connecting ... joining");
+      for (size_t i = 0; i < 10; i++) {
+         mcommon_thread_join (threads[i]);
+      }
+      MONGOC_DEBUG ("Connecting ... done");
+      int64_t end = bson_get_monotonic_time ();
+      MONGOC_DEBUG ("Sharing took: %.02fms", (double)(end - start) / 1000.0);
+   }
+}
+
+#endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL
+
 void
 test_x509_install (TestSuite *suite)
 {
@@ -466,5 +542,9 @@ test_x509_install (TestSuite *suite)
 
 #ifdef MONGOC_ENABLE_OCSP_OPENSSL
    TestSuite_Add (suite, "/X509/tlsfeature_parsing", test_tlsfeature_parsing);
+#endif
+
+#ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+   TestSuite_AddFull (suite, "/X509/secure_channel/multithreaded", test_secure_channel_multithreaded, NULL, NULL, test_framework_skip_if_no_auth, test_framework_skip_if_no_server_ssl);
 #endif
 }
