@@ -994,6 +994,9 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node, bson_e
    mongoc_stream_t *stream;
    int64_t start;
 
+   // Before creating first connection, ensure Secure Channel credentials are created.
+   mongoc_topology_scanner_load_secure_channel_cred (node->ts);
+
    _mongoc_topology_scanner_monitor_heartbeat_started (node->ts, &node->host);
    start = bson_get_monotonic_time ();
 
@@ -1457,4 +1460,14 @@ mongoc_topology_scanner_uses_loadbalanced (const mongoc_topology_scanner_t *ts)
 {
    BSON_ASSERT_PARAM (ts);
    return ts->loadbalanced;
+}
+
+void
+mongoc_topology_scanner_load_secure_channel_sharedcert (mongoc_topology_scanner_t *ts)
+{
+#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+   if (ts->ssl_opts && !ts->secure_channel_cred) {
+      ts->secure_channel_cred = mongoc_secure_channel_cred_new (ts->ssl_opts);
+   }
+#endif
 }

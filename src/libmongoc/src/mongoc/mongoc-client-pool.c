@@ -269,6 +269,8 @@ _start_scanner_if_needed (mongoc_client_pool_t *pool)
    BSON_ASSERT_PARAM (pool);
 
    if (!pool->topology->single_threaded) {
+      // Before creating first connection, ensure Secure Channel credentials are created.
+      mongoc_topology_scanner_load_secure_channel_cred (pool->topology->scanner);
       _mongoc_topology_background_monitoring_start (pool->topology);
    }
 }
