@@ -162,9 +162,10 @@ _mongoc_stream_tls_secure_channel_destroy (mongoc_stream_t *stream)
       /* if the handle was not cached and the refcount is zero */
       TRACE ("%s", "clear credential handle");
       FreeCredentialsHandle (&secure_channel->cred_handle->cred_handle);
-      CertFreeCertificateContext (secure_channel->cred_handle->cert);
       bson_free (secure_channel->cred_handle);
    }
+
+   mongoc_secure_channel_cred_destroy (secure_channel->cred);
 
    /* free internal buffer for received encrypted data */
    if (secure_channel->encdata_buffer != NULL) {
@@ -840,6 +841,73 @@ _mongoc_stream_tls_secure_channel_should_retry (mongoc_stream_t *stream)
    RETURN (mongoc_stream_should_retry (tls->base_stream));
 }
 
+mongoc_secure_channel_cred *
+mongoc_secure_channel_cred_new (mongoc_ssl_opt_t *opt)
+{
+   BSON_ASSERT_PARAM (opt);
+   mongoc_secure_channel_cred *cred = bson_malloc0 (sizeof (mongoc_secure_channel_cred));
+
+   cred->cred.dwVersion = SCHANNEL_CRED_VERSION;
+
+/* SCHANNEL_CRED:
+ * SCH_USE_STRONG_CRYPTO is not available in VS2010
+ *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa379810.aspx */
+#ifdef SCH_USE_STRONG_CRYPTO
+   cred->cred.dwFlags = SCH_USE_STRONG_CRYPTO;
+#endif
+
+   /* By default, enable soft failing.
+    * A certificate with no revocation check is a soft failure. */
+   cred->cred.dwFlags |= SCH_CRED_IGNORE_NO_REVOCATION_CHECK;
+   /* An offline OCSP responder / CRL distribution list is a soft failure. */
+   cred->cred.dwFlags |= SCH_CRED_IGNORE_REVOCATION_OFFLINE;
+   if (opt->weak_cert_validation) {
+      cred->cred.dwFlags |= SCH_CRED_MANUAL_CRED_VALIDATION;
+      TRACE ("%s", "disabled server certificate checks");
+   } else {
+      cred->cred.dwFlags |= SCH_CRED_AUTO_CRED_VALIDATION;
+      if (!_mongoc_ssl_opts_disable_certificate_revocation_check (opt)) {
+         cred->cred.dwFlags |= SCH_CRED_REVOCATION_CHECK_CHAIN;
+         TRACE ("%s", "enabled server certificate revocation checks");
+      }
+      TRACE ("%s", "enabled server certificate checks");
+   }
+
+   if (opt->allow_invalid_hostname) {
+      cred->cred.dwFlags |= SCH_CRED_NO_SERVERNAME_CHECK;
+   }
+
+   if (opt->ca_file) {
+      mongoc_secure_channel_setup_ca (opt);
+   }
+
+   if (opt->crl_file) {
+      mongoc_secure_channel_setup_crl (opt);
+   }
+
+   if (opt->pem_file) {
+      cred->cert = mongoc_secure_channel_setup_certificate (opt);
+
+      if (cred->cert) {
+         cred->cred.cCreds = 1;
+         cred->cred.paCred = &cred->cert;
+      }
+   }
+
+   cred->cred.grbitEnabledProtocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT;
+   return cred;
+}
+
+void
+mongoc_secure_channel_cred_destroy (mongoc_secure_channel_cred *cred)
+{
+   if (!cred) {
+      return;
+   }
+   CertFreeCertificateContext (cred->cert);
+   bson_free (cred);
+}
+
 mongoc_stream_t *
 mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client)
 {
@@ -847,7 +915,6 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    BSON_UNUSED (client);
 
    SECURITY_STATUS sspi_status = SEC_E_OK;
-   SCHANNEL_CRED schannel_cred;
    mongoc_stream_tls_t *tls;
    mongoc_stream_tls_secure_channel_t *secure_channel;
    PCCERT_CONTEXT cert = NULL;
@@ -886,76 +953,23 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    TRACE ("%s", "SSL/TLS connection with endpoint AcquireCredentialsHandle");
 
    /* setup Schannel API options */
-   memset (&schannel_cred, 0, sizeof (schannel_cred));
-   schannel_cred.dwVersion = SCHANNEL_CRED_VERSION;
-
-/* SCHANNEL_CRED:
- * SCH_USE_STRONG_CRYPTO is not available in VS2010
- *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa379810.aspx */
-#ifdef SCH_USE_STRONG_CRYPTO
-   schannel_cred.dwFlags = SCH_USE_STRONG_CRYPTO;
-#endif
-
-   /* By default, enable soft failing.
-    * A certificate with no revocation check is a soft failure. */
-   schannel_cred.dwFlags |= SCH_CRED_IGNORE_NO_REVOCATION_CHECK;
-   /* An offline OCSP responder / CRL distribution list is a soft failure. */
-   schannel_cred.dwFlags |= SCH_CRED_IGNORE_REVOCATION_OFFLINE;
-   if (opt->weak_cert_validation) {
-      schannel_cred.dwFlags |= SCH_CRED_MANUAL_CRED_VALIDATION;
-      TRACE ("%s", "disabled server certificate checks");
-   } else {
-      schannel_cred.dwFlags |= SCH_CRED_AUTO_CRED_VALIDATION;
-      if (!_mongoc_ssl_opts_disable_certificate_revocation_check (opt)) {
-         schannel_cred.dwFlags |= SCH_CRED_REVOCATION_CHECK_CHAIN;
-         TRACE ("%s", "enabled server certificate revocation checks");
-      }
-      TRACE ("%s", "enabled server certificate checks");
-   }
-
-   if (opt->allow_invalid_hostname) {
-      schannel_cred.dwFlags |= SCH_CRED_NO_SERVERNAME_CHECK;
-   }
-
-   if (opt->ca_file) {
-      mongoc_secure_channel_setup_ca (opt);
-   }
-
-   if (opt->crl_file) {
-      mongoc_secure_channel_setup_crl (opt);
-   }
-
-   if (opt->pem_file) {
-      cert = mongoc_secure_channel_setup_certificate (opt);
-
-      if (cert) {
-         schannel_cred.cCreds = 1;
-         schannel_cred.paCred = &cert;
-      }
-   }
-
-
-   schannel_cred.grbitEnabledProtocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT;
+   secure_channel->cred = mongoc_secure_channel_cred_new (opt);
 
    secure_channel->cred_handle =
       (mongoc_secure_channel_cred_handle *) bson_malloc0 (sizeof (mongoc_secure_channel_cred_handle));
-   if (cert) {
-      // Store client cert to free later.
-      secure_channel->cred_handle->cert = cert;
-   }
 
    /* Example:
     *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa375454%28v=vs.85%29.aspx
     * AcquireCredentialsHandle:
     *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx
     */
-   sspi_status = AcquireCredentialsHandle (NULL,                 /* principal */
-                                           UNISP_NAME,           /* security package */
-                                           SECPKG_CRED_OUTBOUND, /* we are preparing outbound connection */
-                                           NULL,                 /*  Optional logon */
-                                           &schannel_cred,       /* TLS "configuration", "auth data" */
-                                           NULL,                 /* unused */
-                                           NULL,                 /* unused */
+   sspi_status = AcquireCredentialsHandle (NULL,                        /* principal */
+                                           UNISP_NAME,                  /* security package */
+                                           SECPKG_CRED_OUTBOUND,        /* we are preparing outbound connection */
+                                           NULL,                        /*  Optional logon */
+                                           &secure_channel->cred->cred, /* TLS "configuration", "auth data" */
+                                           NULL,                        /* unused */
+                                           NULL,                        /* unused */
                                            &secure_channel->cred_handle->cred_handle, /* credential OUT param */
                                            &secure_channel->cred_handle->time_stamp); /* certificate expiration time */
 

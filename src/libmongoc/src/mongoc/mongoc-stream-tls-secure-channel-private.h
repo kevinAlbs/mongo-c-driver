@@ -25,6 +25,7 @@
 /* Its mandatory to indicate to Windows who is compiling the code */
 #define SECURITY_WIN32
 #include <security.h>
+#include <schannel.h>
 
 
 BSON_BEGIN_DECLS
@@ -44,8 +45,12 @@ typedef enum {
 typedef struct {
    CredHandle cred_handle;
    TimeStamp time_stamp;
-   PCCERT_CONTEXT cert; /* Owning. Optional client cert. */
 } mongoc_secure_channel_cred_handle;
+
+typedef struct {
+   PCCERT_CONTEXT cert; /* Owning. Optional client cert. */
+   SCHANNEL_CRED cred;  // TODO: switch to SCH_CRED to support TLS v1.3
+} mongoc_secure_channel_cred;
 
 typedef struct {
    CtxtHandle ctxt_handle;
@@ -59,6 +64,7 @@ typedef struct {
  */
 typedef struct {
    ssl_connect_state connecting_state;
+   mongoc_secure_channel_cred *cred;
    mongoc_secure_channel_cred_handle *cred_handle;
    mongoc_secure_channel_ctxt *ctxt;
    SecPkgContext_StreamSizes stream_sizes;
@@ -72,6 +78,11 @@ typedef struct {
    bool recv_connection_closed; /* true if connection closed, regardless how */
 } mongoc_stream_tls_secure_channel_t;
 
+mongoc_secure_channel_cred *
+mongoc_secure_channel_cred_new (mongoc_ssl_opt_t *opt);
+
+void
+mongoc_secure_channel_cred_destroy (mongoc_secure_channel_cred *cred);
 
 BSON_END_DECLS
 
