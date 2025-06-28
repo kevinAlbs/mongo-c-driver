@@ -913,6 +913,17 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
 {
    BSON_UNUSED (host);
    BSON_UNUSED (client);
+   return mongoc_stream_tls_secure_channel_new_with_creds (base_stream, opt, NULL);
+}
+
+mongoc_stream_t *
+mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,
+                                                 mongoc_ssl_opt_t *opt,
+                                                 mongoc_secure_channel_cred *cred)
+{
+   BSON_ASSERT_PARAM (base_stream);
+   BSON_ASSERT_PARAM (opt);
+   BSON_OPTIONAL_PARAM (cred);
 
    SECURITY_STATUS sspi_status = SEC_E_OK;
    mongoc_stream_tls_t *tls;
@@ -920,8 +931,6 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    PCCERT_CONTEXT cert = NULL;
 
    ENTRY;
-   BSON_ASSERT (base_stream);
-   BSON_ASSERT (opt);
 
 
    secure_channel = (mongoc_stream_tls_secure_channel_t *) bson_malloc0 (sizeof *secure_channel);
@@ -953,7 +962,12 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
    TRACE ("%s", "SSL/TLS connection with endpoint AcquireCredentialsHandle");
 
    /* setup Schannel API options */
-   secure_channel->cred = mongoc_secure_channel_cred_new (opt);
+   if (!cred) {
+      // Shared credentials were not passed. Create credentials for this stream:
+      cred = mongoc_secure_channel_cred_new (opt);
+      // Destroy cred when stream is destroyed:
+      secure_channel->cred = cred;
+   }
 
    secure_channel->cred_handle =
       (mongoc_secure_channel_cred_handle *) bson_malloc0 (sizeof (mongoc_secure_channel_cred_handle));
@@ -963,13 +977,13 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
     * AcquireCredentialsHandle:
     *   https://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx
     */
-   sspi_status = AcquireCredentialsHandle (NULL,                        /* principal */
-                                           UNISP_NAME,                  /* security package */
-                                           SECPKG_CRED_OUTBOUND,        /* we are preparing outbound connection */
-                                           NULL,                        /*  Optional logon */
-                                           &secure_channel->cred->cred, /* TLS "configuration", "auth data" */
-                                           NULL,                        /* unused */
-                                           NULL,                        /* unused */
+   sspi_status = AcquireCredentialsHandle (NULL,                 /* principal */
+                                           UNISP_NAME,           /* security package */
+                                           SECPKG_CRED_OUTBOUND, /* we are preparing outbound connection */
+                                           NULL,                 /*  Optional logon */
+                                           &cred->cred,          /* TLS "configuration", "auth data" */
+                                           NULL,                 /* unused */
+                                           NULL,                 /* unused */
                                            &secure_channel->cred_handle->cred_handle, /* credential OUT param */
                                            &secure_channel->cred_handle->time_stamp); /* certificate expiration time */
 

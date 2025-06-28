@@ -84,6 +84,11 @@ mongoc_secure_channel_cred_new (mongoc_ssl_opt_t *opt);
 void
 mongoc_secure_channel_cred_destroy (mongoc_secure_channel_cred *cred);
 
+mongoc_stream_t *
+mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,
+                                                 mongoc_ssl_opt_t *opt,
+                                                 mongoc_secure_channel_cred *cred);
+
 BSON_END_DECLS
 
 #endif /* MONGOC_ENABLE_SSL_SECURE_CHANNEL */
