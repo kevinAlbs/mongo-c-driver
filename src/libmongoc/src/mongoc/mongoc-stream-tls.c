@@ -143,7 +143,7 @@ mongoc_stream_tls_handshake_block (mongoc_stream_t *stream, const char *host, in
  *       NULL on failure, otherwise a mongoc_stream_t.
  *
  * Side effects:
- *       None.
+ *       May set out->allow_invalid_hostname to true.
  *
  *--------------------------------------------------------------------------
  */
