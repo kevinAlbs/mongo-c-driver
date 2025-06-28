@@ -454,18 +454,20 @@ test_crl (void *unused)
 
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
 
-static void try_connect (void) {
+static void
+try_connect (void *cred)
+{
    bson_error_t error;
    mongoc_host_list_t host;
    const int32_t connect_timout_ms = 1000;
 
    // Use IPv4 literal to avoid 1 second delay when server not listening on IPv6 (see CDRIVER-????).
-   ASSERT_OR_PRINT (_mongoc_host_list_from_string_with_err(&host, "127.0.0.1:27017", &error), error);
+   ASSERT_OR_PRINT (_mongoc_host_list_from_string_with_err (&host, "127.0.0.1:27017", &error), error);
    mongoc_stream_t *stream = mongoc_client_connect_tcp (connect_timout_ms, &host, &error);
    ASSERT_OR_PRINT (stream, error);
-   
-   mongoc_ssl_opt_t ssl_opt = {.pem_file = CERT_TEST_DIR "/client-pkcs8-unencrypted.pem" };
-   stream = mongoc_stream_tls_new_with_hostname (stream, "127.0.0.1:27017", &ssl_opt, 1 /* client */);
+
+   mongoc_ssl_opt_t ssl_opt = {.pem_file = CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"};
+   stream = mongoc_stream_tls_secure_channel_new_with_creds (stream, &ssl_opt, (mongoc_secure_channel_cred *) cred);
    ASSERT (stream);
 
    bool ok = mongoc_stream_tls_handshake_block (stream, host.host, connect_timout_ms, &error);
@@ -474,11 +476,12 @@ static void try_connect (void) {
    mongoc_stream_destroy (stream);
 }
 
-static BSON_THREAD_FUN(thread_fn, ctx) {
+static BSON_THREAD_FUN (thread_fn, ctx)
+{
    bson_error_t error;
 
    for (size_t i = 0; i < 100; i++) {
-      try_connect();
+      try_connect (ctx);
    }
    BSON_THREAD_RETURN;
 }
@@ -493,7 +496,7 @@ test_secure_channel_multithreaded (void *unused)
 
    // Test with no sharing:
    {
-      int64_t start = bson_get_monotonic_time();
+      int64_t start = bson_get_monotonic_time ();
       MONGOC_DEBUG ("Connecting ... starting");
       for (size_t i = 0; i < 10; i++) {
          mcommon_thread_create (&threads[i], thread_fn, NULL);
@@ -504,15 +507,17 @@ test_secure_channel_multithreaded (void *unused)
       }
       MONGOC_DEBUG ("Connecting ... done");
       int64_t end = bson_get_monotonic_time ();
-      MONGOC_DEBUG ("No sharing took: %.02fms", (double)(end - start) / 1000.0);
+      MONGOC_DEBUG ("No sharing took: %.02fms", (double) (end - start) / 1000.0);
    }
 
-   // Test with sharing (TODO):
+   // Test with sharing:
    {
-      int64_t start = bson_get_monotonic_time();
+      int64_t start = bson_get_monotonic_time ();
+      mongoc_ssl_opt_t ssl_opt = {.pem_file = CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"};
+      mongoc_secure_channel_cred *cred = mongoc_secure_channel_cred_new (&ssl_opt);
       MONGOC_DEBUG ("Connecting ... starting");
       for (size_t i = 0; i < 10; i++) {
-         mcommon_thread_create (&threads[i], thread_fn, NULL);
+         mcommon_thread_create (&threads[i], thread_fn, cred);
       }
       MONGOC_DEBUG ("Connecting ... joining");
       for (size_t i = 0; i < 10; i++) {
@@ -520,7 +525,7 @@ test_secure_channel_multithreaded (void *unused)
       }
       MONGOC_DEBUG ("Connecting ... done");
       int64_t end = bson_get_monotonic_time ();
-      MONGOC_DEBUG ("Sharing took: %.02fms", (double)(end - start) / 1000.0);
+      MONGOC_DEBUG ("Sharing took: %.02fms", (double) (end - start) / 1000.0);
    }
 }
 
@@ -545,6 +550,12 @@ test_x509_install (TestSuite *suite)
 #endif
 
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
-   TestSuite_AddFull (suite, "/X509/secure_channel/multithreaded", test_secure_channel_multithreaded, NULL, NULL, test_framework_skip_if_no_auth, test_framework_skip_if_no_server_ssl);
+   TestSuite_AddFull (suite,
+                      "/X509/secure_channel/multithreaded",
+                      test_secure_channel_multithreaded,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_auth,
+                      test_framework_skip_if_no_server_ssl);
 #endif
 }
