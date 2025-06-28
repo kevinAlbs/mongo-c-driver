@@ -78,6 +78,9 @@ typedef struct {
    bool recv_connection_closed; /* true if connection closed, regardless how */
 } mongoc_stream_tls_secure_channel_t;
 
+typedef struct _mongoc_ssl_opt_t mongoc_ssl_opt_t; // Forward declare. Defined in mongoc-ssl.h.
+typedef struct _mongoc_stream_t mongoc_stream_t;   // Forward declare.  Defined in mongoc-stream.h.
+
 mongoc_secure_channel_cred *
 mongoc_secure_channel_cred_new (mongoc_ssl_opt_t *opt);
 

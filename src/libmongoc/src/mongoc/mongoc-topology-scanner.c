@@ -973,6 +973,11 @@ mongoc_topology_scanner_node_connect_unix (mongoc_topology_scanner_node_t *node,
 #endif
 }
 
+void
+mongoc_topology_scanner_load_secure_channel_cred (mongoc_topology_scanner_t *ts)
+{
+   // TODO
+}
 
 /*
  *--------------------------------------------------------------------------
