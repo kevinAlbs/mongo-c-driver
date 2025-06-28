@@ -103,7 +103,7 @@ _mongoc_stream_tls_secure_channel_destroy (mongoc_stream_t *stream)
 
    TRACE ("%s", "shutting down SSL/TLS connection");
 
-   if (secure_channel->cred && secure_channel->ctxt) {
+   if (secure_channel->cred_handle && secure_channel->ctxt) {
       SecBufferDesc BuffDesc;
       SecBuffer Buffer;
       SECURITY_STATUS sspi_status;
@@ -124,7 +124,7 @@ _mongoc_stream_tls_secure_channel_destroy (mongoc_stream_t *stream)
       _mongoc_secure_channel_init_sec_buffer (&outbuf, SECBUFFER_EMPTY, NULL, 0);
       _mongoc_secure_channel_init_sec_buffer_desc (&outbuf_desc, &outbuf, 1);
 
-      sspi_status = InitializeSecurityContext (&secure_channel->cred->cred_handle,
+      sspi_status = InitializeSecurityContext (&secure_channel->cred_handle->cred_handle,
                                                &secure_channel->ctxt->ctxt_handle,
                                                /*tls->hostname*/ NULL,
                                                secure_channel->req_flags,
@@ -157,13 +157,13 @@ _mongoc_stream_tls_secure_channel_destroy (mongoc_stream_t *stream)
    }
 
    /* free SSPI Schannel API credential handle */
-   if (secure_channel->cred) {
+   if (secure_channel->cred_handle) {
       /* decrement the reference counter of the credential/session handle */
       /* if the handle was not cached and the refcount is zero */
       TRACE ("%s", "clear credential handle");
-      FreeCredentialsHandle (&secure_channel->cred->cred_handle);
-      CertFreeCertificateContext (secure_channel->cred->cert);
-      bson_free (secure_channel->cred);
+      FreeCredentialsHandle (&secure_channel->cred_handle->cred_handle);
+      CertFreeCertificateContext (secure_channel->cred_handle->cert);
+      bson_free (secure_channel->cred_handle);
    }
 
    /* free internal buffer for received encrypted data */
@@ -937,10 +937,11 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
 
    schannel_cred.grbitEnabledProtocols = SP_PROT_TLS1_1_CLIENT | SP_PROT_TLS1_2_CLIENT;
 
-   secure_channel->cred = (mongoc_secure_channel_cred *) bson_malloc0 (sizeof (mongoc_secure_channel_cred));
+   secure_channel->cred_handle =
+      (mongoc_secure_channel_cred_handle *) bson_malloc0 (sizeof (mongoc_secure_channel_cred_handle));
    if (cert) {
       // Store client cert to free later.
-      secure_channel->cred->cert = cert;
+      secure_channel->cred_handle->cert = cert;
    }
 
    /* Example:
@@ -955,8 +956,8 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
                                            &schannel_cred,       /* TLS "configuration", "auth data" */
                                            NULL,                 /* unused */
                                            NULL,                 /* unused */
-                                           &secure_channel->cred->cred_handle, /* credential OUT param */
-                                           &secure_channel->cred->time_stamp); /* certificate expiration time */
+                                           &secure_channel->cred_handle->cred_handle, /* credential OUT param */
+                                           &secure_channel->cred_handle->time_stamp); /* certificate expiration time */
 
    if (sspi_status != SEC_E_OK) {
       // Cast signed SECURITY_STATUS to unsigned DWORD. FormatMessage expects DWORD.
