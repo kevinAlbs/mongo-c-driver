@@ -25,6 +25,9 @@
 #ifdef MONGOC_ENABLE_SSL_OPENSSL
 #include <openssl/ssl.h>
 #endif
+#ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+#include <mongoc/mongoc-stream-tls-secure-channel-private.h>
+#endif
 #include <mongoc/mongoc-async-private.h>
 #include <mongoc/mongoc-async-cmd-private.h>
 #include <mongoc/mongoc-handshake-private.h>
@@ -133,6 +136,8 @@ typedef struct mongoc_topology_scanner {
 
 #if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
    SSL_CTX *openssl_ctx;
+#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+   mongoc_secure_channel_cred *secure_channel_cred;
 #endif
 
    int64_t dns_cache_timeout_ms;
@@ -266,6 +271,9 @@ mongoc_topology_scanner_uses_server_api (const mongoc_topology_scanner_t *ts);
 /* Returns true if load balancing mode has been selected, otherwise false. */
 bool
 mongoc_topology_scanner_uses_loadbalanced (const mongoc_topology_scanner_t *ts);
+
+void
+mongoc_topology_scanner_load_secure_channel_cred (mongoc_topology_scanner_t *ts);
 
 BSON_END_DECLS
 
