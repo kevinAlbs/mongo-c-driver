@@ -37,6 +37,7 @@
 
 #if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
 #include <mongoc/mongoc-stream-tls-private.h>
+#include <mongoc/mongoc-stream-tls-secure-channel-private.h>
 #endif
 
 #include <mongoc/mongoc-counters-private.h>
@@ -433,6 +434,9 @@ mongoc_topology_scanner_new (const mongoc_uri_t *uri,
    /* may be overridden for testing. */
    ts->dns_cache_timeout_ms = DNS_CACHE_TIMEOUT_MS;
    bson_mutex_init (&ts->handshake_cmd_mtx);
+#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+   ts->secure_channel_cred_ptr = MONGOC_SHARED_PTR_NULL;
+#endif
 
    _init_hello (ts);
 
@@ -480,7 +484,7 @@ mongoc_topology_scanner_destroy (mongoc_topology_scanner_t *ts)
 #endif
 
 #if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
-   mongoc_secure_channel_cred_destroy (ts->secure_channel_cred);
+   mongoc_shared_ptr_reset_null (&ts->secure_channel_cred_ptr);
 #endif
 
    /* This field can be set by a mongoc_client */
@@ -810,7 +814,7 @@ _mongoc_topology_scanner_node_setup_stream_for_tls (mongoc_topology_scanner_node
          stream, node->host.host, node->ts->ssl_opts, 1, node->ts->openssl_ctx);
 #elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
       tls_stream =
-         mongoc_stream_tls_new_with_secure_channel_cred (stream, node->ts->ssl_opts, node->ts->secure_channel_cred);
+         mongoc_stream_tls_new_with_secure_channel_cred (stream, node->ts->ssl_opts, node->ts->secure_channel_cred_ptr);
 #else
       tls_stream = mongoc_stream_tls_new_with_hostname (stream, node->host.host, node->ts->ssl_opts, 1);
 #endif
@@ -1004,9 +1008,6 @@ mongoc_topology_scanner_node_setup (mongoc_topology_scanner_node_t *node, bson_e
    bool success = false;
    mongoc_stream_t *stream;
    int64_t start;
-
-   // Before creating first connection, ensure Secure Channel credentials are created.
-   mongoc_topology_scanner_load_secure_channel_cred (node->ts);
 
    _mongoc_topology_scanner_monitor_heartbeat_started (node->ts, &node->host);
    start = bson_get_monotonic_time ();
@@ -1473,12 +1474,25 @@ mongoc_topology_scanner_uses_loadbalanced (const mongoc_topology_scanner_t *ts)
    return ts->loadbalanced;
 }
 
+static void
+secure_channel_cred_deleter (void *data)
+{
+   mongoc_secure_channel_cred *cred = data;
+   mongoc_secure_channel_cred_destroy (cred);
+}
+
 void
 mongoc_topology_scanner_load_secure_channel_cred (mongoc_topology_scanner_t *ts)
 {
 #if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
-   if (ts->ssl_opts && !ts->secure_channel_cred) {
-      ts->secure_channel_cred = mongoc_secure_channel_cred_new (ts->ssl_opts);
+   if (!ts->ssl_opts) {
+      return;
    }
+
+   // Access to secure_channel_cred_ptr does not need the thread-safe `mongoc_atomic_*` functions.
+   // secure_channel_cred_ptr is not expected to be modified by multiple threads.
+   // mongoc_client_pool_t documents SSL options may not be set after connections are created.
+   mongoc_shared_ptr_reset (
+      &ts->secure_channel_cred_ptr, mongoc_secure_channel_cred_new (ts->ssl_opts), secure_channel_cred_deleter);
 #endif
 }

@@ -165,7 +165,7 @@ _mongoc_stream_tls_secure_channel_destroy (mongoc_stream_t *stream)
       bson_free (secure_channel->cred_handle);
    }
 
-   mongoc_secure_channel_cred_destroy (secure_channel->cred);
+   mongoc_shared_ptr_reset_null (&secure_channel->cred_ptr);
 
    /* free internal buffer for received encrypted data */
    if (secure_channel->encdata_buffer != NULL) {
@@ -913,17 +913,23 @@ mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *
 {
    BSON_UNUSED (host);
    BSON_UNUSED (client);
-   return mongoc_stream_tls_secure_channel_new_with_creds (base_stream, opt, NULL);
+   return mongoc_stream_tls_secure_channel_new_with_creds (base_stream, opt, MONGOC_SHARED_PTR_NULL);
+}
+
+static void
+secure_channel_cred_deleter (void *data)
+{
+   mongoc_secure_channel_cred *cred = data;
+   mongoc_secure_channel_cred_destroy (cred);
 }
 
 mongoc_stream_t *
 mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,
                                                  mongoc_ssl_opt_t *opt,
-                                                 mongoc_secure_channel_cred *cred)
+                                                 mongoc_shared_ptr cred_ptr)
 {
    BSON_ASSERT_PARAM (base_stream);
    BSON_ASSERT_PARAM (opt);
-   BSON_OPTIONAL_PARAM (cred);
 
    SECURITY_STATUS sspi_status = SEC_E_OK;
    mongoc_stream_tls_t *tls;
@@ -962,12 +968,13 @@ mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,
    TRACE ("%s", "SSL/TLS connection with endpoint AcquireCredentialsHandle");
 
    /* setup Schannel API options */
-   if (!cred) {
+   if (mongoc_shared_ptr_is_null (cred_ptr)) {
       // Shared credentials were not passed. Create credentials for this stream:
-      cred = mongoc_secure_channel_cred_new (opt);
-      // Destroy cred when stream is destroyed:
-      secure_channel->cred = cred;
+      mongoc_shared_ptr_reset (&cred_ptr, mongoc_secure_channel_cred_new (opt), secure_channel_cred_deleter);
    }
+
+   mongoc_shared_ptr_assign (&secure_channel->cred_ptr, cred_ptr); // Increase reference count.
+   mongoc_secure_channel_cred *cred = secure_channel->cred_ptr.ptr;
 
    secure_channel->cred_handle =
       (mongoc_secure_channel_cred_handle *) bson_malloc0 (sizeof (mongoc_secure_channel_cred_handle));

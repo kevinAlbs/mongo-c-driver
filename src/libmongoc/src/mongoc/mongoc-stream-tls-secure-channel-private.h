@@ -22,6 +22,8 @@
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
 #include <bson/bson.h>
 
+#include <mongoc/mongoc-shared-private.h>
+
 /* Its mandatory to indicate to Windows who is compiling the code */
 #define SECURITY_WIN32
 #include <security.h>
@@ -64,7 +66,7 @@ typedef struct {
  */
 typedef struct {
    ssl_connect_state connecting_state;
-   mongoc_secure_channel_cred *cred;
+   mongoc_shared_ptr cred_ptr; // Manages a mongoc_secure_channel_cred.
    mongoc_secure_channel_cred_handle *cred_handle;
    mongoc_secure_channel_ctxt *ctxt;
    SecPkgContext_StreamSizes stream_sizes;
@@ -90,7 +92,7 @@ mongoc_secure_channel_cred_destroy (mongoc_secure_channel_cred *cred);
 mongoc_stream_t *
 mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,
                                                  mongoc_ssl_opt_t *opt,
-                                                 mongoc_secure_channel_cred *cred /* optional */);
+                                                 mongoc_shared_ptr cred_ptr /* optional */);
 
 BSON_END_DECLS
 

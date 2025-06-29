@@ -87,6 +87,7 @@ mongoc_client_pool_set_ssl_opts (mongoc_client_pool_t *pool, const mongoc_ssl_op
    }
 
    mongoc_topology_scanner_set_ssl_opts (pool->topology->scanner, &pool->ssl_opts);
+   mongoc_topology_scanner_load_secure_channel_cred (pool->topology->scanner);
 
    bson_mutex_unlock (&pool->mutex);
 }
@@ -269,8 +270,6 @@ _start_scanner_if_needed (mongoc_client_pool_t *pool)
    BSON_ASSERT_PARAM (pool);
 
    if (!pool->topology->single_threaded) {
-      // Before creating first connection, ensure Secure Channel credentials are created.
-      mongoc_topology_scanner_load_secure_channel_cred (pool->topology->scanner);
       _mongoc_topology_background_monitoring_start (pool->topology);
    }
 }
