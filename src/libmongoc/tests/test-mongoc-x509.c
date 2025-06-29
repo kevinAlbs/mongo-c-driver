@@ -591,6 +591,7 @@ test_secure_channel_shared_creds_stream (void *unused)
 
 typedef struct {
    size_t failures;
+   size_t failures2;
 } cert_failures;
 
 
@@ -602,6 +603,31 @@ count_cert_failures (mongoc_log_level_t log_level, const char *log_domain, const
    if (strstr (message, "Failed to open file: 'does-not-exist.pem'")) {
       cf->failures++;
    }
+   if (strstr (message, "Failed to open file: 'does-not-exist-2.pem'")) {
+      cf->failures2++;
+   }
+}
+
+static bool
+try_insert_with_reconnect (mongoc_client_t *client, bson_error_t *error)
+{
+   // Force a connection error with a failpoint:
+   if (!mongoc_client_command_simple (
+          client,
+          "admin",
+          tmp_bson (BSON_STR (
+             {"configureFailPoint" : "failCommand", "mode" : {"times" : 1}, "data" : {"closeConnection" : true}})),
+          NULL,
+          NULL,
+          error)) {
+      return false;
+   }
+
+   mongoc_collection_t *coll = mongoc_client_get_collection (client, "db", "coll");
+   // Expect insert to reconnect (due to retryable writes) and succeed:
+   bool ok = mongoc_collection_insert_one (coll, tmp_bson ("{}"), NULL, NULL, error);
+   mongoc_collection_destroy (coll);
+   return ok;
 }
 
 static void
@@ -668,6 +694,51 @@ test_secure_channel_shared_creds_client (void *unused)
       ASSERT_CMPSIZE_T (1, ==, cf.failures);
 
       mongoc_client_pool_destroy (pool);
+   }
+
+   // Test client changing TLS options after connecting:
+   // Changing TLS options after connecting is discouraged, but is tested for backwards compatibility.
+   {
+      mongoc_client_t *client = test_framework_new_default_client ();
+
+      // Set client cert to a bad path:
+      {
+         mongoc_ssl_opt_t ssl_opt = *test_framework_get_ssl_opts ();
+         ssl_opt.pem_file = "does-not-exist.pem";
+         mongoc_client_set_ssl_opts (client, &ssl_opt);
+      }
+
+      // Expect insert OK. Cert fails to load, but server configured with --tlsAllowConnectionsWithoutCertificates:
+      {
+         bool ok = try_insert (client, &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+
+      // Expect exactly one attempt to load the client cert:
+      ASSERT_CMPSIZE_T (1, ==, cf.failures);
+      ASSERT_CMPSIZE_T (0, ==, cf.failures2);
+
+      // Change the client cert:
+      {
+         mongoc_ssl_opt_t ssl_opt = *test_framework_get_ssl_opts ();
+         ssl_opt.pem_file = "does-not-exist-2.pem";
+         mongoc_client_set_ssl_opts (client, &ssl_opt);
+      }
+
+      // Force a reconnect.
+      {
+         bool ok = try_insert_with_reconnect (client, &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+
+      // Expect an attempt to load the new cert:
+      ASSERT_CMPSIZE_T (1, ==, cf.failures); // Unchanged.
+      ASSERT_CMPSIZE_T (1, ==, cf.failures2);
+   }
+
+   // Test pool changing TLS options after connecting.
+   // Changing TLS options after connecting is discouraged, but is tested for backwards compatibility.
+   {
    }
 
    // Restore log handler:
