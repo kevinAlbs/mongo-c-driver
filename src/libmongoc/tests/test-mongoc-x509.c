@@ -597,7 +597,7 @@ typedef struct {
 void
 count_cert_failures (mongoc_log_level_t log_level, const char *log_domain, const char *message, void *user_data)
 {
-   MONGOC_DEBUG ("Would have logged: %s\n", message);
+   printf ("Would have logged: %s\n", message);
    cert_failures *cf = user_data;
    if (strstr (message, "Failed to open file: 'does-not-exist.pem'")) {
       cf->failures++;
@@ -620,18 +620,15 @@ test_secure_channel_shared_creds_client (void *unused)
    cert_failures cf = {0};
    mongoc_log_set_handler (count_cert_failures, &cf);
 
+   // Test client:
    {
-      // Create client with a bad client cert:
-      mongoc_client_t *client;
+      mongoc_client_t *client = test_framework_new_default_client ();
+
+      // Set client cert to a bad path:
       {
-         mongoc_uri_t *uri = test_framework_get_uri ();
-         client = mongoc_client_new_from_uri_with_error (uri, &error);
-         ASSERT_OR_PRINT (client, &error);
          mongoc_ssl_opt_t ssl_opt = *test_framework_get_ssl_opts ();
-         // Set client cert to a bad path.
          ssl_opt.pem_file = "does-not-exist.pem";
          mongoc_client_set_ssl_opts (client, &ssl_opt);
-         mongoc_uri_destroy (uri);
       }
 
       // Expect insert OK. Cert fails to load, but server configured with --tlsAllowConnectionsWithoutCertificates:
@@ -644,9 +641,33 @@ test_secure_channel_shared_creds_client (void *unused)
       ASSERT_CMPSIZE_T (1, ==, cf.failures);
    }
 
-   // Test client pool.
+   cf = (cert_failures) {0};
+
+   // Test pool:
    {
-      test_error ("Not yet implemented");
+      mongoc_client_pool_t *pool = test_framework_new_default_client_pool ();
+
+      // Set client cert to a bad path:
+      {
+         mongoc_ssl_opt_t ssl_opt = *test_framework_get_ssl_opts ();
+         ssl_opt.pem_file = "does-not-exist.pem";
+         mongoc_client_pool_set_ssl_opts (pool, &ssl_opt);
+      }
+
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+
+      // Expect insert OK. Cert fails to load, but server configured with --tlsAllowConnectionsWithoutCertificates:
+      {
+         bool ok = try_insert (client, &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+
+      mongoc_client_pool_push (pool, client);
+
+      // Expect exactly one attempt to load the client cert:
+      ASSERT_CMPSIZE_T (1, ==, cf.failures);
+
+      mongoc_client_pool_destroy (pool);
    }
 
    // Restore log handler:

@@ -47,7 +47,7 @@ typedef struct {
    TimeStamp time_stamp;
 } mongoc_secure_channel_cred_handle;
 
-typedef struct {
+typedef struct _mongoc_secure_channel_cred {
    PCCERT_CONTEXT cert; /* Owning. Optional client cert. */
    SCHANNEL_CRED cred;  // TODO: switch to SCH_CRED to support TLS v1.3
 } mongoc_secure_channel_cred;
