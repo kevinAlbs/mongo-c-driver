@@ -13,7 +13,8 @@
 
 #include "TestSuite.h"
 #include "test-libmongoc.h"
-#include "test-conveniences.h" // tmp_bson
+#include "test-conveniences.h"         // tmp_bson
+#include <mongoc/mongoc-log-private.h> // _mongoc_log_get_handler
 
 #ifdef MONGOC_ENABLE_OCSP_OPENSSL
 /* Test parsing a DER encoded tlsfeature extension contents for the
@@ -562,7 +563,7 @@ connect_with_secure_channel_cred (mongoc_ssl_opt_t *ssl_opt, mongoc_secure_chann
 }
 
 static void
-test_secure_channel_shared_creds (void *unused)
+test_secure_channel_shared_creds_stream (void *unused)
 {
    BSON_UNUSED (unused);
 
@@ -587,6 +588,71 @@ test_secure_channel_shared_creds (void *unused)
       mongoc_secure_channel_cred_destroy (cred);
    }
 }
+
+typedef struct {
+   size_t failures;
+} cert_failures;
+
+
+void
+count_cert_failures (mongoc_log_level_t log_level, const char *log_domain, const char *message, void *user_data)
+{
+   MONGOC_DEBUG ("Would have logged: %s\n", message);
+   cert_failures *cf = user_data;
+   if (strstr (message, "Failed to open file: 'does-not-exist.pem'")) {
+      cf->failures++;
+   }
+}
+
+static void
+test_secure_channel_shared_creds_client (void *unused)
+{
+   BSON_UNUSED (unused);
+
+   bson_error_t error;
+
+   // Save log function:
+   mongoc_log_func_t saved_log_func;
+   void *saved_log_data;
+   _mongoc_log_get_handler (&saved_log_func, &saved_log_data);
+
+   // Set log function to count failed attempts to load client cert:
+   cert_failures cf = {0};
+   mongoc_log_set_handler (count_cert_failures, &cf);
+
+   {
+      // Create client with a bad client cert:
+      mongoc_client_t *client;
+      {
+         mongoc_uri_t *uri = test_framework_get_uri ();
+         client = mongoc_client_new_from_uri_with_error (uri, &error);
+         ASSERT_OR_PRINT (client, &error);
+         mongoc_ssl_opt_t ssl_opt = *test_framework_get_ssl_opts ();
+         // Set client cert to a bad path.
+         ssl_opt.pem_file = "does-not-exist.pem";
+         mongoc_client_set_ssl_opts (client, &ssl_opt);
+         mongoc_uri_destroy (uri);
+      }
+
+      // Expect insert OK. Cert fails to load, but server configured with --tlsAllowConnectionsWithoutCertificates:
+      {
+         bool ok = try_insert (client, &error);
+         ASSERT_OR_PRINT (ok, error);
+      }
+
+      // Expect exactly one attempt to load the client cert:
+      ASSERT_CMPSIZE_T (1, ==, cf.failures);
+   }
+
+   // Test client pool.
+   {
+      test_error ("Not yet implemented");
+   }
+
+   // Restore log handler:
+   mongoc_log_set_handler (saved_log_func, saved_log_data);
+}
+
 
 #endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL
 
@@ -617,11 +683,19 @@ test_x509_install (TestSuite *suite)
                       test_framework_skip_if_no_auth,
                       test_framework_skip_if_no_server_ssl);
    TestSuite_AddFull (suite,
-                      "/X509/secure_channel/shared_creds",
-                      test_secure_channel_shared_creds,
+                      "/X509/secure_channel/shared_creds/stream",
+                      test_secure_channel_shared_creds_stream,
                       NULL,
                       NULL,
                       test_framework_skip_if_no_auth,
                       test_framework_skip_if_no_server_ssl);
+
+   TestSuite_AddFull (suite,
+                      "/X509/secure_channel/shared_creds/client",
+                      test_secure_channel_shared_creds_client,
+                      NULL,
+                      NULL,
+                      test_framework_skip_if_no_server_ssl,
+                      test_framework_skip_if_not_replset);
 #endif
 }
