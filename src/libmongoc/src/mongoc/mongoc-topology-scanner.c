@@ -35,6 +35,10 @@
 #include <mongoc/mongoc-stream-tls-private.h>
 #endif
 
+#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+#include <mongoc/mongoc-stream-tls-private.h>
+#endif
+
 #include <mongoc/mongoc-counters-private.h>
 #include <mongoc/utlist.h>
 #include <mongoc/mongoc-topology-private.h>
@@ -475,6 +479,10 @@ mongoc_topology_scanner_destroy (mongoc_topology_scanner_t *ts)
    ts->openssl_ctx = NULL;
 #endif
 
+#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+   mongoc_secure_channel_cred_destroy (ts->secure_channel_cred);
+#endif
+
    /* This field can be set by a mongoc_client */
    bson_free ((char *) ts->appname);
 
@@ -800,6 +808,9 @@ _mongoc_topology_scanner_node_setup_stream_for_tls (mongoc_topology_scanner_node
 #if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
       tls_stream = mongoc_stream_tls_new_with_hostname_and_openssl_context (
          stream, node->host.host, node->ts->ssl_opts, 1, node->ts->openssl_ctx);
+#elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
+      tls_stream =
+         mongoc_stream_tls_new_with_secure_channel_cred (stream, node->ts->ssl_opts, node->ts->secure_channel_cred);
 #else
       tls_stream = mongoc_stream_tls_new_with_hostname (stream, node->host.host, node->ts->ssl_opts, 1);
 #endif
@@ -973,11 +984,6 @@ mongoc_topology_scanner_node_connect_unix (mongoc_topology_scanner_node_t *node,
 #endif
 }
 
-void
-mongoc_topology_scanner_load_secure_channel_cred (mongoc_topology_scanner_t *ts)
-{
-   // TODO
-}
 
 /*
  *--------------------------------------------------------------------------
@@ -1468,7 +1474,7 @@ mongoc_topology_scanner_uses_loadbalanced (const mongoc_topology_scanner_t *ts)
 }
 
 void
-mongoc_topology_scanner_load_secure_channel_sharedcert (mongoc_topology_scanner_t *ts)
+mongoc_topology_scanner_load_secure_channel_cred (mongoc_topology_scanner_t *ts)
 {
 #if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
    if (ts->ssl_opts && !ts->secure_channel_cred) {
