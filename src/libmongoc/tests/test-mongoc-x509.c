@@ -456,7 +456,14 @@ test_crl (void *unused)
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
 
 static void
-try_connect (void *cred)
+secure_channel_cred_deleter (void *data)
+{
+   mongoc_secure_channel_cred *cred = data;
+   mongoc_secure_channel_cred_destroy (cred);
+}
+
+static void
+try_connect (mongoc_shared_ptr cred_ptr)
 {
    bson_error_t error;
    mongoc_host_list_t host;
@@ -468,12 +475,11 @@ try_connect (void *cred)
    ASSERT_OR_PRINT (stream, error);
 
    mongoc_ssl_opt_t ssl_opt = {.pem_file = CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"};
-   stream = mongoc_stream_tls_secure_channel_new_with_creds (stream, &ssl_opt, (mongoc_secure_channel_cred *) cred);
+   stream = mongoc_stream_tls_secure_channel_new_with_creds (stream, &ssl_opt, cred_ptr);
    ASSERT (stream);
 
    bool ok = mongoc_stream_tls_handshake_block (stream, host.host, connect_timout_ms, &error);
    ASSERT_OR_PRINT (ok, error);
-
    mongoc_stream_destroy (stream);
 }
 
@@ -481,8 +487,10 @@ static BSON_THREAD_FUN (thread_fn, ctx)
 {
    bson_error_t error;
 
+   mongoc_shared_ptr *cred_ptr = ctx;
+
    for (size_t i = 0; i < 100; i++) {
-      try_connect (ctx);
+      try_connect (*cred_ptr);
    }
    BSON_THREAD_RETURN;
 }
@@ -497,10 +505,12 @@ test_secure_channel_multithreaded (void *unused)
 
    // Test with no sharing:
    {
+      mongoc_shared_ptr nullptr = MONGOC_SHARED_PTR_NULL;
+
       int64_t start = bson_get_monotonic_time ();
       MONGOC_DEBUG ("Connecting ... starting");
       for (size_t i = 0; i < 10; i++) {
-         mcommon_thread_create (&threads[i], thread_fn, NULL);
+         mcommon_thread_create (&threads[i], thread_fn, &nullptr);
       }
       MONGOC_DEBUG ("Connecting ... joining");
       for (size_t i = 0; i < 10; i++) {
@@ -515,10 +525,11 @@ test_secure_channel_multithreaded (void *unused)
    {
       int64_t start = bson_get_monotonic_time ();
       mongoc_ssl_opt_t ssl_opt = {.pem_file = CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"};
-      mongoc_secure_channel_cred *cred = mongoc_secure_channel_cred_new (&ssl_opt);
+      mongoc_shared_ptr cred_ptr =
+         mongoc_shared_ptr_create (mongoc_secure_channel_cred_new (&ssl_opt), secure_channel_cred_deleter);
       MONGOC_DEBUG ("Connecting ... starting");
       for (size_t i = 0; i < 10; i++) {
-         mcommon_thread_create (&threads[i], thread_fn, cred);
+         mcommon_thread_create (&threads[i], thread_fn, &cred_ptr);
       }
       MONGOC_DEBUG ("Connecting ... joining");
       for (size_t i = 0; i < 10; i++) {
@@ -527,11 +538,12 @@ test_secure_channel_multithreaded (void *unused)
       MONGOC_DEBUG ("Connecting ... done");
       int64_t end = bson_get_monotonic_time ();
       MONGOC_DEBUG ("Sharing took: %.02fms", (double) (end - start) / 1000.0);
+      mongoc_shared_ptr_reset_null (&cred_ptr);
    }
 }
 
 static bool
-connect_with_secure_channel_cred (mongoc_ssl_opt_t *ssl_opt, mongoc_secure_channel_cred *cred, bson_error_t *error)
+connect_with_secure_channel_cred (mongoc_ssl_opt_t *ssl_opt, mongoc_shared_ptr cred_ptr, bson_error_t *error)
 {
    mongoc_host_list_t host;
    const int32_t connect_timout_ms = 1000;
@@ -547,7 +559,7 @@ connect_with_secure_channel_cred (mongoc_ssl_opt_t *ssl_opt, mongoc_secure_chann
       return false;
    }
 
-   mongoc_stream_t *tls_stream = mongoc_stream_tls_secure_channel_new_with_creds (tcp_stream, ssl_opt, cred);
+   mongoc_stream_t *tls_stream = mongoc_stream_tls_secure_channel_new_with_creds (tcp_stream, ssl_opt, cred_ptr);
    if (!tls_stream) {
       mongoc_stream_destroy (tcp_stream);
       return false;
@@ -573,19 +585,20 @@ test_secure_channel_shared_creds_stream (void *unused)
                                .pem_file = CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"};
    // Test with no sharing:
    {
-      ok = connect_with_secure_channel_cred (&ssl_opt, NULL, &error);
+      ok = connect_with_secure_channel_cred (&ssl_opt, MONGOC_SHARED_PTR_NULL, &error);
       ASSERT_OR_PRINT (ok, error);
    }
 
    // Test with sharing:
    {
-      mongoc_secure_channel_cred *cred = mongoc_secure_channel_cred_new (&ssl_opt);
-      ok = connect_with_secure_channel_cred (&ssl_opt, cred, &error);
+      mongoc_shared_ptr cred_ptr =
+         mongoc_shared_ptr_create (mongoc_secure_channel_cred_new (&ssl_opt), secure_channel_cred_deleter);
+      ok = connect_with_secure_channel_cred (&ssl_opt, cred_ptr, &error);
       ASSERT_OR_PRINT (ok, error);
       // Use again.
-      ok = connect_with_secure_channel_cred (&ssl_opt, cred, &error);
+      ok = connect_with_secure_channel_cred (&ssl_opt, cred_ptr, &error);
       ASSERT_OR_PRINT (ok, error);
-      mongoc_secure_channel_cred_destroy (cred);
+      mongoc_shared_ptr_reset_null (&cred_ptr);
    }
 }
 
@@ -609,25 +622,30 @@ count_cert_failures (mongoc_log_level_t log_level, const char *log_domain, const
 }
 
 static bool
-try_insert_with_reconnect (mongoc_client_t *client, bson_error_t *error)
+try_ping_with_reconnect (mongoc_client_t *client, bson_error_t *error)
 {
    // Force a connection error with a failpoint:
-   if (!mongoc_client_command_simple (
-          client,
-          "admin",
-          tmp_bson (BSON_STR (
-             {"configureFailPoint" : "failCommand", "mode" : {"times" : 1}, "data" : {"closeConnection" : true}})),
-          NULL,
-          NULL,
-          error)) {
+   if (!mongoc_client_command_simple (client,
+                                      "admin",
+                                      tmp_bson (BSON_STR ({
+                                         "configureFailPoint" : "failCommand",
+                                         "mode" : {"times" : 1},
+                                         "data" : {"closeConnection" : true, "failCommands" : ["ping"]}
+                                      })),
+                                      NULL,
+                                      NULL,
+                                      error)) {
       return false;
    }
 
-   mongoc_collection_t *coll = mongoc_client_get_collection (client, "db", "coll");
-   // Expect insert to reconnect (due to retryable writes) and succeed:
-   bool ok = mongoc_collection_insert_one (coll, tmp_bson ("{}"), NULL, NULL, error);
-   mongoc_collection_destroy (coll);
-   return ok;
+   // Expect first ping to fail:
+   if (mongoc_client_command_simple (client, "admin", tmp_bson (BSON_STR ({"ping" : 1})), NULL, NULL, error)) {
+      bson_set_error (error, 0, 0, "unexpected: ping succeeded, but expected to fail");
+      return false;
+   }
+
+   // Ping again:
+   return mongoc_client_command_simple (client, "admin", tmp_bson (BSON_STR ({"ping" : 1})), NULL, NULL, error);
 }
 
 static void
@@ -696,6 +714,8 @@ test_secure_channel_shared_creds_client (void *unused)
       mongoc_client_pool_destroy (pool);
    }
 
+   cf = (cert_failures) {0};
+
    // Test client changing TLS options after connecting:
    // Changing TLS options after connecting is discouraged, but is tested for backwards compatibility.
    {
@@ -727,18 +747,15 @@ test_secure_channel_shared_creds_client (void *unused)
 
       // Force a reconnect.
       {
-         bool ok = try_insert_with_reconnect (client, &error);
+         bool ok = try_ping_with_reconnect (client, &error);
          ASSERT_OR_PRINT (ok, error);
       }
 
       // Expect an attempt to load the new cert:
       ASSERT_CMPSIZE_T (1, ==, cf.failures); // Unchanged.
       ASSERT_CMPSIZE_T (1, ==, cf.failures2);
-   }
 
-   // Test pool changing TLS options after connecting.
-   // Changing TLS options after connecting is discouraged, but is tested for backwards compatibility.
-   {
+      mongoc_client_destroy (client);
    }
 
    // Restore log handler:
@@ -787,7 +804,6 @@ test_x509_install (TestSuite *suite)
                       test_secure_channel_shared_creds_client,
                       NULL,
                       NULL,
-                      test_framework_skip_if_no_server_ssl,
-                      test_framework_skip_if_not_replset);
+                      test_framework_skip_if_no_server_ssl);
 #endif
 }

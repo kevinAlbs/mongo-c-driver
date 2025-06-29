@@ -760,7 +760,7 @@ mongoc_client_connect (bool buffered,
                        const mongoc_uri_t *uri,
                        const mongoc_host_list_t *host,
                        void *openssl_ctx_void,
-                       void *secure_channel_cred_void,
+                       mongoc_shared_ptr secure_channel_cred_ptr,
                        bson_error_t *error)
 {
    mongoc_stream_t *base_stream = NULL;
@@ -770,7 +770,7 @@ mongoc_client_connect (bool buffered,
    BSON_ASSERT (host);
 
    BSON_UNUSED (openssl_ctx_void);
-   BSON_UNUSED (secure_channel_cred_void);
+   BSON_UNUSED (secure_channel_cred_ptr);
 
 #ifndef MONGOC_ENABLE_SSL
    if (ssl_opts_void || mongoc_uri_get_tls (uri)) {
@@ -822,7 +822,7 @@ mongoc_client_connect (bool buffered,
             base_stream, host->host, ssl_opts, true, (SSL_CTX *) openssl_ctx_void);
 #elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
          // Use shared Secure Channel credentials.
-         base_stream = mongoc_stream_tls_new_with_secure_channel_cred (base_stream, ssl_opts, secure_channel_cred_void);
+         base_stream = mongoc_stream_tls_new_with_secure_channel_cred (base_stream, ssl_opts, secure_channel_cred_ptr);
 #else
          base_stream = mongoc_stream_tls_new_with_hostname (base_stream, host->host, ssl_opts, true);
 #endif
@@ -892,8 +892,8 @@ mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
    SSL_CTX *ssl_ctx = client->topology->scanner->openssl_ctx;
    return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, (void *) ssl_ctx, NULL, error);
 #elif defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
-   mongoc_secure_channel_cred *cred = client->topology->scanner->secure_channel_cred;
-   return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, NULL, cred, error);
+   mongoc_shared_ptr cred_ptr = client->topology->scanner->secure_channel_cred_ptr;
+   return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, NULL, cred_ptr, error);
 #else
    return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, NULL, error);
 #endif
@@ -1040,6 +1040,8 @@ _mongoc_client_set_ssl_opts_for_single_or_pooled (mongoc_client_t *client, const
       SSL_CTX_free (client->topology->scanner->openssl_ctx);
       client->topology->scanner->openssl_ctx = _mongoc_openssl_ctx_new (&client->ssl_opts);
 #endif
+
+      mongoc_topology_scanner_load_secure_channel_cred (client->topology->scanner);
    }
 }
 #endif // MONGOC_ENABLE_SSL
