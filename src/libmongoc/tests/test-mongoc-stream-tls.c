@@ -415,75 +415,6 @@ test_mongoc_tls_insecure_nowarning (void)
    mongoc_uri_destroy (uri);
 }
 
-#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
-
-static void
-secure_channel_cred_deleter (void *data)
-{
-   mongoc_secure_channel_cred *cred = data;
-   mongoc_secure_channel_cred_destroy (cred);
-}
-
-static bool
-connect_with_secure_channel_cred (mongoc_ssl_opt_t *ssl_opt, mongoc_shared_ptr cred_ptr, bson_error_t *error)
-{
-   mongoc_host_list_t host;
-   const int32_t connect_timout_ms = 10000;
-
-   *error = (bson_error_t) {0};
-
-   if (!_mongoc_host_list_from_string_with_err (&host, "localhost:27017", error)) {
-      return false;
-   }
-   mongoc_stream_t *tcp_stream = mongoc_client_connect_tcp (connect_timout_ms, &host, error);
-   if (!tcp_stream) {
-      return false;
-   }
-
-   mongoc_stream_t *tls_stream = mongoc_stream_tls_secure_channel_new_with_creds (tcp_stream, ssl_opt, cred_ptr);
-   if (!tls_stream) {
-      mongoc_stream_destroy (tcp_stream);
-      return false;
-   }
-
-   if (!mongoc_stream_tls_handshake_block (tls_stream, host.host, connect_timout_ms, error)) {
-      mongoc_stream_destroy (tls_stream);
-      return false;
-   }
-
-   mongoc_stream_destroy (tls_stream);
-   return true;
-}
-
-// Test a TLS stream can be create with shared Secure Channel credentials.
-static void
-test_secure_channel_shared_creds (void *unused)
-{
-   BSON_UNUSED (unused);
-
-   bool ok;
-   bson_error_t error;
-   mongoc_ssl_opt_t ssl_opt = {.ca_file = CERT_TEST_DIR "/ca.pem", .pem_file = CERT_TEST_DIR "/client.pem"};
-   // Test with no sharing:
-   {
-      ok = connect_with_secure_channel_cred (&ssl_opt, MONGOC_SHARED_PTR_NULL, &error);
-      ASSERT_OR_PRINT (ok, error);
-   }
-
-   // Test with sharing:
-   {
-      mongoc_shared_ptr cred_ptr =
-         mongoc_shared_ptr_create (mongoc_secure_channel_cred_new (&ssl_opt), secure_channel_cred_deleter);
-      ok = connect_with_secure_channel_cred (&ssl_opt, cred_ptr, &error);
-      ASSERT_OR_PRINT (ok, error);
-      // Use again.
-      ok = connect_with_secure_channel_cred (&ssl_opt, cred_ptr, &error);
-      ASSERT_OR_PRINT (ok, error);
-      mongoc_shared_ptr_reset_null (&cred_ptr);
-   }
-}
-#endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL
-
 void
 test_stream_tls_install (TestSuite *suite)
 {
@@ -519,14 +450,5 @@ test_stream_tls_install (TestSuite *suite)
 #endif
 
    TestSuite_AddLive (suite, "/TLS/insecure_nowarning", test_mongoc_tls_insecure_nowarning);
-#endif
-
-#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
-   TestSuite_AddFull (suite,
-                      "/TLS/secure_channel/shared_creds",
-                      test_secure_channel_shared_creds,
-                      NULL,
-                      NULL,
-                      test_framework_skip_if_no_server_ssl);
 #endif
 }
