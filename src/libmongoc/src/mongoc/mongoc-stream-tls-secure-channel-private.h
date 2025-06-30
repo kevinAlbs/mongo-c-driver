@@ -52,7 +52,6 @@ typedef struct {
 // `mongoc_secure_channel_cred` may be shared on multiple connections.
 typedef struct _mongoc_secure_channel_cred {
    PCCERT_CONTEXT cert; /* Owning. Optional client cert. */
-   SCHANNEL_CRED cred;  // TODO: switch to SCH_CREDENTIALS to support TLS v1.3
 } mongoc_secure_channel_cred;
 
 typedef struct {
