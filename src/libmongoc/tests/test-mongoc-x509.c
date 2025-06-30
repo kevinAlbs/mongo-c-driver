@@ -518,7 +518,7 @@ test_secure_channel_multithreaded (void *unused)
       }
       MONGOC_DEBUG ("Connecting ... done");
       int64_t end = bson_get_monotonic_time ();
-      MONGOC_DEBUG ("No sharing took: %.02fms", (double) (end - start) / 1000.0);
+      printf ("No sharing took: %.02fms\n", (double) (end - start) / 1000.0);
    }
 
    // Test with sharing:
@@ -537,7 +537,7 @@ test_secure_channel_multithreaded (void *unused)
       }
       MONGOC_DEBUG ("Connecting ... done");
       int64_t end = bson_get_monotonic_time ();
-      MONGOC_DEBUG ("Sharing took: %.02fms", (double) (end - start) / 1000.0);
+      printf ("Sharing took: %.02fms\n", (double) (end - start) / 1000.0);
       mongoc_shared_ptr_reset_null (&cred_ptr);
    }
 }
