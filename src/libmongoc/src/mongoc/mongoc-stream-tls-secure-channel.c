@@ -933,7 +933,6 @@ mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,
    SECURITY_STATUS sspi_status = SEC_E_OK;
    mongoc_stream_tls_t *tls;
    mongoc_stream_tls_secure_channel_t *secure_channel;
-   PCCERT_CONTEXT cert = NULL;
 
    ENTRY;
 
@@ -969,10 +968,12 @@ mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,
    /* setup Schannel API options */
    if (mongoc_shared_ptr_is_null (cred_ptr)) {
       // Shared credentials were not passed. Create credentials for this stream:
-      mongoc_shared_ptr_reset (&cred_ptr, mongoc_secure_channel_cred_new (opt), mongoc_secure_channel_cred_deleter);
+      mongoc_shared_ptr_reset (
+         &secure_channel->cred_ptr, mongoc_secure_channel_cred_new (opt), mongoc_secure_channel_cred_deleter);
+   } else {
+      mongoc_shared_ptr_assign (&secure_channel->cred_ptr, cred_ptr); // Increase reference count.
    }
 
-   mongoc_shared_ptr_assign (&secure_channel->cred_ptr, cred_ptr); // Increase reference count.
    mongoc_secure_channel_cred *cred = secure_channel->cred_ptr.ptr;
 
    secure_channel->cred_handle =
