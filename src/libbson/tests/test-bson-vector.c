@@ -1545,6 +1545,54 @@ test_bson_vector_edge_cases_packed_bit (void)
 #endif // BSON_WORD_SIZE > 32
 }
 
+static void
+test_prose (void)
+{
+   bool one = true;
+
+   // Test encoding:
+   {
+      bson_vector_packed_bit_view_t view;
+      const size_t bitlength = 1;
+      bson_t bson = BSON_INITIALIZER;
+      ASSERT (BSON_APPEND_VECTOR_PACKED_BIT_UNINIT (&bson, "v", bitlength, &view));
+      // Pack one 1 bit:
+      ASSERT (bson_vector_packed_bit_view_pack_bool (view, &one, 1, 0));
+      // Attempting to access bits outside of `bitlength` is an error:
+      ASSERT (!bson_vector_packed_bit_view_pack_bool (view, &one, 1, 1));
+      bson_destroy (&bson);
+   }
+
+   // Test decoding:
+   {
+      bson_t bson = BSON_INITIALIZER;
+      BSON_APPEND_BINARY (&bson, "v", BSON_SUBTYPE_VECTOR, (uint8_t *) "\x10\x07\xff", 3);
+      bson_iter_t iter;
+      ASSERT (bson_iter_init_find (&iter, &bson, "v"));
+
+      bson_vector_packed_bit_view_t view;
+      ASSERT (!bson_vector_packed_bit_view_from_iter (&view, &iter));
+      bson_destroy (&bson);
+   }
+
+   // Test comparison:
+   {
+      bson_t b1 = BSON_INITIALIZER;
+      BSON_APPEND_BINARY (&b1, "v", BSON_SUBTYPE_VECTOR, (uint8_t *) "\x10\x07\xff", 3);
+      bson_iter_t i1;
+      ASSERT (bson_iter_init_find (&i1, &b1, "v"));
+
+      bson_t b2 = BSON_INITIALIZER;
+      BSON_APPEND_BINARY (&b2, "v", BSON_SUBTYPE_VECTOR, (uint8_t *) "\x10\x07\x80", 3);
+      bson_iter_t i2;
+      ASSERT (bson_iter_init_find (&i2, &b2, "v"));
+
+      // Test comparing two BSON binary types:
+      ASSERT (!bson_iter_binary_equal (&i1, &i2));
+      // `bson_vector_packed_bit_view_t` does not support comparison.
+   }
+}
+
 void
 test_bson_vector_install (TestSuite *suite)
 {
@@ -1569,4 +1617,5 @@ test_bson_vector_install (TestSuite *suite)
    TestSuite_Add (suite, "/bson_binary_vector/edge_cases/int8", test_bson_vector_edge_cases_int8);
    TestSuite_Add (suite, "/bson_binary_vector/edge_cases/float32", test_bson_vector_edge_cases_float32);
    TestSuite_Add (suite, "/bson_binary_vector/edge_cases/packed_bit", test_bson_vector_edge_cases_packed_bit);
+   TestSuite_Add (suite, "/bson_binary_vector/prose", test_prose);
 }
