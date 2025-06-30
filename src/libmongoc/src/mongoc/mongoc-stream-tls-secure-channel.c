@@ -842,7 +842,7 @@ _mongoc_stream_tls_secure_channel_should_retry (mongoc_stream_t *stream)
 }
 
 mongoc_secure_channel_cred *
-mongoc_secure_channel_cred_new (mongoc_ssl_opt_t *opt)
+mongoc_secure_channel_cred_new (const mongoc_ssl_opt_t *opt)
 {
    BSON_ASSERT_PARAM (opt);
    mongoc_secure_channel_cred *cred = bson_malloc0 (sizeof (mongoc_secure_channel_cred));
@@ -908,19 +908,18 @@ mongoc_secure_channel_cred_destroy (mongoc_secure_channel_cred *cred)
    bson_free (cred);
 }
 
+void
+mongoc_secure_channel_cred_deleter (void *cred_void)
+{
+   mongoc_secure_channel_cred_destroy ((mongoc_secure_channel_cred *) cred_void);
+}
+
 mongoc_stream_t *
 mongoc_stream_tls_secure_channel_new (mongoc_stream_t *base_stream, const char *host, mongoc_ssl_opt_t *opt, int client)
 {
    BSON_UNUSED (host);
    BSON_UNUSED (client);
    return mongoc_stream_tls_secure_channel_new_with_creds (base_stream, opt, MONGOC_SHARED_PTR_NULL);
-}
-
-static void
-secure_channel_cred_deleter (void *data)
-{
-   mongoc_secure_channel_cred *cred = data;
-   mongoc_secure_channel_cred_destroy (cred);
 }
 
 mongoc_stream_t *
@@ -970,7 +969,7 @@ mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,
    /* setup Schannel API options */
    if (mongoc_shared_ptr_is_null (cred_ptr)) {
       // Shared credentials were not passed. Create credentials for this stream:
-      mongoc_shared_ptr_reset (&cred_ptr, mongoc_secure_channel_cred_new (opt), secure_channel_cred_deleter);
+      mongoc_shared_ptr_reset (&cred_ptr, mongoc_secure_channel_cred_new (opt), mongoc_secure_channel_cred_deleter);
    }
 
    mongoc_shared_ptr_assign (&secure_channel->cred_ptr, cred_ptr); // Increase reference count.

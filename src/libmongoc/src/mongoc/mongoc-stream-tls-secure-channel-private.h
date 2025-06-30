@@ -84,10 +84,14 @@ typedef struct _mongoc_ssl_opt_t mongoc_ssl_opt_t; // Forward declare. Defined i
 typedef struct _mongoc_stream_t mongoc_stream_t;   // Forward declare.  Defined in mongoc-stream.h.
 
 mongoc_secure_channel_cred *
-mongoc_secure_channel_cred_new (mongoc_ssl_opt_t *opt);
+mongoc_secure_channel_cred_new (const mongoc_ssl_opt_t *opt);
 
 void
 mongoc_secure_channel_cred_destroy (mongoc_secure_channel_cred *cred);
+
+// mongoc_secure_channel_cred_deleter is useful as a deleter for mongoc_shared_t.
+void
+mongoc_secure_channel_cred_deleter (void *cred_void);
 
 mongoc_stream_t *
 mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,

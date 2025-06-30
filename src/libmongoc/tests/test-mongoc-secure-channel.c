@@ -11,13 +11,6 @@
 #include <test-conveniences.h>
 
 
-static void
-secure_channel_cred_deleter (void *data)
-{
-   mongoc_secure_channel_cred *cred = data;
-   mongoc_secure_channel_cred_destroy (cred);
-}
-
 static bool
 connect_with_secure_channel_cred (mongoc_ssl_opt_t *ssl_opt, mongoc_shared_ptr cred_ptr, bson_error_t *error)
 {
@@ -67,7 +60,7 @@ test_secure_channel_shared_creds_stream (void *unused)
    // Test with sharing:
    {
       mongoc_shared_ptr cred_ptr =
-         mongoc_shared_ptr_create (mongoc_secure_channel_cred_new (&ssl_opt), secure_channel_cred_deleter);
+         mongoc_shared_ptr_create (mongoc_secure_channel_cred_new (&ssl_opt), mongoc_secure_channel_cred_deleter);
       ok = connect_with_secure_channel_cred (&ssl_opt, cred_ptr, &error);
       ASSERT_OR_PRINT (ok, error);
       // Use again.

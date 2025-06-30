@@ -1473,28 +1473,3 @@ mongoc_topology_scanner_uses_loadbalanced (const mongoc_topology_scanner_t *ts)
    BSON_ASSERT_PARAM (ts);
    return ts->loadbalanced;
 }
-
-#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
-static void
-secure_channel_cred_deleter (void *data)
-{
-   mongoc_secure_channel_cred *cred = data;
-   mongoc_secure_channel_cred_destroy (cred);
-}
-#endif
-
-void
-mongoc_topology_scanner_load_secure_channel_cred (mongoc_topology_scanner_t *ts)
-{
-#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
-   if (!ts->ssl_opts) {
-      return;
-   }
-
-   // Access to secure_channel_cred_ptr does not need the thread-safe `mongoc_atomic_*` functions.
-   // secure_channel_cred_ptr is not expected to be modified by multiple threads.
-   // mongoc_client_pool_t documents SSL options may not be set after connections are created.
-   mongoc_shared_ptr_reset (
-      &ts->secure_channel_cred_ptr, mongoc_secure_channel_cred_new (ts->ssl_opts), secure_channel_cred_deleter);
-#endif
-}

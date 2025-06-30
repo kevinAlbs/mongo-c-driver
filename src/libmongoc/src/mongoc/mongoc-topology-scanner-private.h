@@ -270,9 +270,6 @@ mongoc_topology_scanner_uses_server_api (const mongoc_topology_scanner_t *ts);
 bool
 mongoc_topology_scanner_uses_loadbalanced (const mongoc_topology_scanner_t *ts);
 
-void
-mongoc_topology_scanner_load_secure_channel_cred (mongoc_topology_scanner_t *ts);
-
 BSON_END_DECLS
 
 #endif /* MONGOC_TOPOLOGY_SCANNER_PRIVATE_H */
