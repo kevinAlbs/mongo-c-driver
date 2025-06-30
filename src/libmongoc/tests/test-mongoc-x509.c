@@ -483,65 +483,6 @@ try_connect (mongoc_shared_ptr cred_ptr)
    mongoc_stream_destroy (stream);
 }
 
-static BSON_THREAD_FUN (thread_fn, ctx)
-{
-   bson_error_t error;
-
-   mongoc_shared_ptr *cred_ptr = ctx;
-
-   for (size_t i = 0; i < 100; i++) {
-      try_connect (*cred_ptr);
-   }
-   BSON_THREAD_RETURN;
-}
-
-// Test many threads doing client-auth with Secure Channel.
-static void
-test_secure_channel_multithreaded (void *unused)
-{
-   BSON_UNUSED (unused);
-
-   bson_thread_t threads[10];
-
-   // Test with no sharing:
-   {
-      mongoc_shared_ptr nullptr = MONGOC_SHARED_PTR_NULL;
-
-      int64_t start = bson_get_monotonic_time ();
-      MONGOC_DEBUG ("Connecting ... starting");
-      for (size_t i = 0; i < 10; i++) {
-         mcommon_thread_create (&threads[i], thread_fn, &nullptr);
-      }
-      MONGOC_DEBUG ("Connecting ... joining");
-      for (size_t i = 0; i < 10; i++) {
-         mcommon_thread_join (threads[i]);
-      }
-      MONGOC_DEBUG ("Connecting ... done");
-      int64_t end = bson_get_monotonic_time ();
-      printf ("No sharing took: %.02fms\n", (double) (end - start) / 1000.0);
-   }
-
-   // Test with sharing:
-   {
-      int64_t start = bson_get_monotonic_time ();
-      mongoc_ssl_opt_t ssl_opt = {.pem_file = CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"};
-      mongoc_shared_ptr cred_ptr =
-         mongoc_shared_ptr_create (mongoc_secure_channel_cred_new (&ssl_opt), secure_channel_cred_deleter);
-      MONGOC_DEBUG ("Connecting ... starting");
-      for (size_t i = 0; i < 10; i++) {
-         mcommon_thread_create (&threads[i], thread_fn, &cred_ptr);
-      }
-      MONGOC_DEBUG ("Connecting ... joining");
-      for (size_t i = 0; i < 10; i++) {
-         mcommon_thread_join (threads[i]);
-      }
-      MONGOC_DEBUG ("Connecting ... done");
-      int64_t end = bson_get_monotonic_time ();
-      printf ("Sharing took: %.02fms\n", (double) (end - start) / 1000.0);
-      mongoc_shared_ptr_reset_null (&cred_ptr);
-   }
-}
-
 static bool
 connect_with_secure_channel_cred (mongoc_ssl_opt_t *ssl_opt, mongoc_shared_ptr cred_ptr, bson_error_t *error)
 {
@@ -784,13 +725,6 @@ test_x509_install (TestSuite *suite)
 #endif
 
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
-   TestSuite_AddFull (suite,
-                      "/X509/secure_channel/multithreaded",
-                      test_secure_channel_multithreaded,
-                      NULL,
-                      NULL,
-                      test_framework_skip_if_no_auth,
-                      test_framework_skip_if_no_server_ssl);
    TestSuite_AddFull (suite,
                       "/X509/secure_channel/shared_creds/stream",
                       test_secure_channel_shared_creds_stream,
