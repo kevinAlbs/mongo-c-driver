@@ -49,6 +49,7 @@ typedef struct {
    TimeStamp time_stamp;
 } mongoc_secure_channel_cred_handle;
 
+// `mongoc_secure_channel_cred` may be shared on multiple connections.
 typedef struct _mongoc_secure_channel_cred {
    PCCERT_CONTEXT cert; /* Owning. Optional client cert. */
    SCHANNEL_CRED cred;  // TODO: switch to SCH_CRED to support TLS v1.3
@@ -85,9 +86,6 @@ struct _mongoc_stream_t;  // Forward declare. Defined in mongoc-stream.h.
 
 mongoc_secure_channel_cred *
 mongoc_secure_channel_cred_new (const struct _mongoc_ssl_opt_t *opt);
-
-void
-mongoc_secure_channel_cred_destroy (mongoc_secure_channel_cred *cred);
 
 // mongoc_secure_channel_cred_deleter is useful as a deleter for mongoc_shared_t.
 void

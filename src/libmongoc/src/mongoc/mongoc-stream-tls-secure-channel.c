@@ -899,19 +899,14 @@ mongoc_secure_channel_cred_new (const mongoc_ssl_opt_t *opt)
 }
 
 void
-mongoc_secure_channel_cred_destroy (mongoc_secure_channel_cred *cred)
+mongoc_secure_channel_cred_deleter (void *cred_void)
 {
+   mongoc_secure_channel_cred *cred = cred_void;
    if (!cred) {
       return;
    }
    CertFreeCertificateContext (cred->cert);
    bson_free (cred);
-}
-
-void
-mongoc_secure_channel_cred_deleter (void *cred_void)
-{
-   mongoc_secure_channel_cred_destroy ((mongoc_secure_channel_cred *) cred_void);
 }
 
 mongoc_stream_t *
