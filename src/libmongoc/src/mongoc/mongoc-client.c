@@ -1032,21 +1032,20 @@ _mongoc_client_set_ssl_opts_for_single_or_pooled (mongoc_client_t *client, const
    client->use_ssl = true;
    _mongoc_ssl_opts_copy_to (opts, &client->ssl_opts, false /* don't overwrite internal opts */);
 
-   mongoc_topology_scanner_t *ts = client->topology->scanner;
-
    if (client->topology->single_threaded) {
       mongoc_topology_scanner_set_ssl_opts (client->topology->scanner, &client->ssl_opts);
 
 /* Update the OpenSSL context associated with this client to match new ssl opts. */
 /* Active connections previously made by client can still access original OpenSSL context. */
 #if defined(MONGOC_ENABLE_SSL_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10100000L
-      SSL_CTX_free (ts->openssl_ctx);
-      ts->openssl_ctx = _mongoc_openssl_ctx_new (&client->ssl_opts);
+      SSL_CTX_free (client->topology->scanner->openssl_ctx);
+      client->topology->scanner->openssl_ctx = _mongoc_openssl_ctx_new (&client->ssl_opts);
 #endif
 
 #if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
-      mongoc_shared_ptr_reset (
-         &ts->secure_channel_cred_ptr, mongoc_secure_channel_cred_new (opts), mongoc_secure_channel_cred_deleter);
+      mongoc_shared_ptr_reset (&client->topology->scanner->secure_channel_cred_ptr,
+                               mongoc_secure_channel_cred_new (opts),
+                               mongoc_secure_channel_cred_deleter);
 #endif
    }
 }
