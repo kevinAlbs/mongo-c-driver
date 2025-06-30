@@ -922,14 +922,13 @@ mongoc_stream_tls_secure_channel_new_with_creds (mongoc_stream_t *base_stream,
                                                  mongoc_ssl_opt_t *opt,
                                                  mongoc_shared_ptr cred_ptr)
 {
-   BSON_ASSERT_PARAM (base_stream);
-   BSON_ASSERT_PARAM (opt);
-
    SECURITY_STATUS sspi_status = SEC_E_OK;
    mongoc_stream_tls_t *tls;
    mongoc_stream_tls_secure_channel_t *secure_channel;
 
    ENTRY;
+   BSON_ASSERT_PARAM (base_stream);
+   BSON_ASSERT_PARAM (opt);
 
 
    secure_channel = (mongoc_stream_tls_secure_channel_t *) bson_malloc0 (sizeof *secure_channel);
