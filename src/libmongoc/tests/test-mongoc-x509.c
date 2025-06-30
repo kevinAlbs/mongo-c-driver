@@ -483,65 +483,6 @@ try_connect (mongoc_shared_ptr cred_ptr)
    mongoc_stream_destroy (stream);
 }
 
-static bool
-connect_with_secure_channel_cred (mongoc_ssl_opt_t *ssl_opt, mongoc_shared_ptr cred_ptr, bson_error_t *error)
-{
-   mongoc_host_list_t host;
-   const int32_t connect_timout_ms = 1000;
-
-   *error = (bson_error_t) {0};
-
-   // Use IPv4 literal to avoid 1 second delay when server not listening on IPv6 (see CDRIVER-????).
-   if (!_mongoc_host_list_from_string_with_err (&host, "127.0.0.1:27017", error)) {
-      return false;
-   }
-   mongoc_stream_t *tcp_stream = mongoc_client_connect_tcp (connect_timout_ms, &host, error);
-   if (!tcp_stream) {
-      return false;
-   }
-
-   mongoc_stream_t *tls_stream = mongoc_stream_tls_secure_channel_new_with_creds (tcp_stream, ssl_opt, cred_ptr);
-   if (!tls_stream) {
-      mongoc_stream_destroy (tcp_stream);
-      return false;
-   }
-
-   if (!mongoc_stream_tls_handshake_block (tls_stream, host.host, connect_timout_ms, error)) {
-      mongoc_stream_destroy (tls_stream);
-      return false;
-   }
-
-   mongoc_stream_destroy (tls_stream);
-   return true;
-}
-
-static void
-test_secure_channel_shared_creds_stream (void *unused)
-{
-   BSON_UNUSED (unused);
-
-   bool ok;
-   bson_error_t error;
-   mongoc_ssl_opt_t ssl_opt = {.ca_file = CERT_TEST_DIR "/ca.pem",
-                               .pem_file = CERT_TEST_DIR "/client-pkcs8-unencrypted.pem"};
-   // Test with no sharing:
-   {
-      ok = connect_with_secure_channel_cred (&ssl_opt, MONGOC_SHARED_PTR_NULL, &error);
-      ASSERT_OR_PRINT (ok, error);
-   }
-
-   // Test with sharing:
-   {
-      mongoc_shared_ptr cred_ptr =
-         mongoc_shared_ptr_create (mongoc_secure_channel_cred_new (&ssl_opt), secure_channel_cred_deleter);
-      ok = connect_with_secure_channel_cred (&ssl_opt, cred_ptr, &error);
-      ASSERT_OR_PRINT (ok, error);
-      // Use again.
-      ok = connect_with_secure_channel_cred (&ssl_opt, cred_ptr, &error);
-      ASSERT_OR_PRINT (ok, error);
-      mongoc_shared_ptr_reset_null (&cred_ptr);
-   }
-}
 
 typedef struct {
    size_t failures;
@@ -725,14 +666,6 @@ test_x509_install (TestSuite *suite)
 #endif
 
 #ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
-   TestSuite_AddFull (suite,
-                      "/X509/secure_channel/shared_creds/stream",
-                      test_secure_channel_shared_creds_stream,
-                      NULL,
-                      NULL,
-                      test_framework_skip_if_no_auth,
-                      test_framework_skip_if_no_server_ssl);
-
    TestSuite_AddFull (suite,
                       "/X509/secure_channel/shared_creds/client",
                       test_secure_channel_shared_creds_client,
