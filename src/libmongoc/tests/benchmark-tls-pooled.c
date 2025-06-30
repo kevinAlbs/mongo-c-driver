@@ -1,6 +1,6 @@
 /*
- * Used as a benchmark for CDRIVER-4656 to test the performance effect of sharing the OpenSSL context among all clients
- * in a pool.
+ * Used as a benchmark for CDRIVER-4656 and CDRIVER-5998 to test the performance effect of sharing TLS contexts among
+ * all clients in a pool.
  *
  * TO BUILD: % cmake --build cmake-build --target benchmark-tls-pooled
  * TO RUN: % ./cmake-build/src/libmongoc/benchmark-tls-pooled  [number of clients to check out]
@@ -9,13 +9,11 @@
 
 #include <mongoc/mongoc.h>
 #include <mlib/loop.h>
-
-#include <pthread.h>
+#include <common-thread-private.h>
 #include <stdio.h>
 
 
-static void *
-worker (void *data)
+static BSON_THREAD_FUN (worker, data)
 {
    mongoc_client_pool_t *pool = data;
    mongoc_client_t *client;
@@ -38,7 +36,7 @@ worker (void *data)
    mongoc_client_pool_push (pool, client);
 
    bson_destroy (&ping);
-   return NULL;
+   BSON_THREAD_RETURN;
 }
 
 int
@@ -52,7 +50,7 @@ main (int argc, char *argv[])
 
    mongoc_uri_t *uri;
    mongoc_client_pool_t *pool;
-   pthread_t threads[num_clients];
+   bson_thread_t *threads = bson_malloc (sizeof (bson_thread_t) * num_clients);
    void *ret;
 
    mongoc_init ();
@@ -77,13 +75,14 @@ main (int argc, char *argv[])
    mongoc_client_pool_set_error_api (pool, MONGOC_ERROR_API_VERSION_2);
 
    mlib_foreach_irange (i, num_clients) {
-      pthread_create (&threads[i], NULL, worker, pool);
+      mcommon_thread_create (&threads[i], worker, pool);
    }
 
    mlib_foreach_irange (i, num_clients) {
-      pthread_join (threads[i], &ret);
+      mcommon_thread_join (threads[i]);
    }
 
+   bson_free (threads);
    mongoc_client_pool_destroy (pool);
    mongoc_uri_destroy (uri);
 
