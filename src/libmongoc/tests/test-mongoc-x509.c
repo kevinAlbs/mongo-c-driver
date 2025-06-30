@@ -9,12 +9,9 @@
 #include <mongoc/mongoc-secure-channel-private.h>
 #endif
 
-#include <mongoc/mongoc-host-list-private.h>
-
 #include "TestSuite.h"
 #include "test-libmongoc.h"
-#include "test-conveniences.h"         // tmp_bson
-#include <mongoc/mongoc-log-private.h> // _mongoc_log_get_handler
+#include "test-conveniences.h" // tmp_bson
 
 #ifdef MONGOC_ENABLE_OCSP_OPENSSL
 /* Test parsing a DER encoded tlsfeature extension contents for the
@@ -450,6 +447,7 @@ test_crl (void *unused)
    mongoc_uri_destroy (uri);
 }
 #endif // MONGOC_ENABLE_SSL
+
 void
 test_x509_install (TestSuite *suite)
 {
