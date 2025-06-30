@@ -1474,12 +1474,14 @@ mongoc_topology_scanner_uses_loadbalanced (const mongoc_topology_scanner_t *ts)
    return ts->loadbalanced;
 }
 
+#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
 static void
 secure_channel_cred_deleter (void *data)
 {
    mongoc_secure_channel_cred *cred = data;
    mongoc_secure_channel_cred_destroy (cred);
 }
+#endif
 
 void
 mongoc_topology_scanner_load_secure_channel_cred (mongoc_topology_scanner_t *ts)
