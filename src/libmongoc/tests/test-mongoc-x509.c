@@ -349,8 +349,8 @@ test_x509_auth (void *unused)
       bson_error_t error = {0};
       bool ok;
       {
+         capture_logs (true); // Secure Channel tries to load client cert when applying TLS options.
          mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
-         capture_logs (true);
          ok = try_insert (client, &error);
 #if defined(MONGOC_ENABLE_SSL_SECURE_TRANSPORT)
          ASSERT_CAPTURED_LOG ("tls", MONGOC_LOG_LEVEL_ERROR, "Cannot find certificate");
