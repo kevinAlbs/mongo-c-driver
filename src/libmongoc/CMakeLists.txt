@@ -1285,10 +1285,12 @@ if (ENABLE_EXAMPLES AND ENABLE_SHARED)
    mongoc_add_example (appending ${PROJECT_SOURCE_DIR}/examples/tutorial/appending.c)
 endif ()
 
-if (ENABLE_TESTS AND ENABLE_SHARED AND MONGOC_ENABLE_SSL)
+if (ENABLE_TESTS AND ENABLE_SHARED AND MONGOC_ENABLE_SSL AND NOT WIN32)
    # Add benchmarks to measure opening many TLS connections.
    # Benchmarks require SSL, and do not build on Windows.
-   mongoc_add_test (benchmark-tls-pooled ${PROJECT_SOURCE_DIR}/tests/benchmark-tls-pooled.c)
+   add_executable (benchmark-tls-pooled ${PROJECT_SOURCE_DIR}/tests/benchmark-tls-pooled.c)
+   target_compile_options (benchmark-tls-pooled PRIVATE ${mongoc-warning-options})
+   target_link_libraries (benchmark-tls-pooled PRIVATE mongoc::shared ${LIBRARIES})
 endif ()
 
 file (COPY ${PROJECT_SOURCE_DIR}/tests/binary DESTINATION ${PROJECT_BINARY_DIR}/tests)
