@@ -94,7 +94,7 @@ mongoc_client_pool_set_ssl_opts (mongoc_client_pool_t *pool, const mongoc_ssl_op
       // secure_channel_cred_ptr is not expected to be modified by multiple threads.
       // mongoc_client_pool_set_ssl_opts documentation prohibits calling after threads start.
       mongoc_shared_ptr_reset (&pool->topology->scanner->secure_channel_cred_ptr,
-                               mongoc_secure_channel_cred_new (opts),
+                               mongoc_secure_channel_cred_new (&pool->ssl_opts),
                                mongoc_secure_channel_cred_deleter);
 #endif
    }

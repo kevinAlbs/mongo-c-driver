@@ -1045,7 +1045,7 @@ _mongoc_client_set_ssl_opts_for_single_or_pooled (mongoc_client_t *client, const
 
 #if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
       mongoc_shared_ptr_reset (&client->topology->scanner->secure_channel_cred_ptr,
-                               mongoc_secure_channel_cred_new (opts),
+                               mongoc_secure_channel_cred_new (&client->ssl_opts),
                                mongoc_secure_channel_cred_deleter);
 #endif
    }
