@@ -895,7 +895,7 @@ mongoc_client_default_stream_initiator (const mongoc_uri_t *uri,
    mongoc_shared_ptr cred_ptr = client->topology->scanner->secure_channel_cred_ptr;
    return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, NULL, cred_ptr, error);
 #else
-   return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, NULL, error);
+   return mongoc_client_connect (true, use_ssl, ssl_opts_void, uri, host, NULL, MONGOC_SHARED_PTR_NULL, error);
 #endif
 }
 
