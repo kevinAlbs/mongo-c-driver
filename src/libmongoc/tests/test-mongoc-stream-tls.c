@@ -10,11 +10,6 @@
 #include "test-libmongoc.h"
 #include "test-conveniences.h"
 
-#if defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
-#include <mongoc/mongoc-stream-tls-secure-channel-private.h>
-#include <mongoc/mongoc-host-list-private.h> // _mongoc_host_list_from_string_with_err
-#endif
-
 #if !defined(MONGOC_ENABLE_SSL_SECURE_CHANNEL)
 
 static void
