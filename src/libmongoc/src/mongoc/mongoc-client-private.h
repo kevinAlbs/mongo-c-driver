@@ -38,6 +38,7 @@
 #include <mongoc/mongoc-topology-private.h>
 #include <mongoc/mongoc-write-concern.h>
 #include <mongoc/mongoc-crypt-private.h>
+#include <mongoc/mongoc-shared-private.h>
 
 BSON_BEGIN_DECLS
 
