@@ -75,11 +75,9 @@ typedef struct {
    size_t failures2;
 } cert_failures;
 
-
 void
 count_cert_failures (mongoc_log_level_t log_level, const char *log_domain, const char *message, void *user_data)
 {
-   printf ("Would have logged: %s\n", message);
    cert_failures *cf = user_data;
    if (strstr (message, "Failed to open file: 'does-not-exist.pem'")) {
       cf->failures++;
@@ -192,7 +190,7 @@ test_secure_channel_shared_creds_client (void *unused)
 
    // Test client changing TLS options after connecting:
    {
-      // Changing TLS options after connecting is prohibited on a client pool, but not a single-threaded client.
+      // Changing TLS options after connecting is prohibited on a client pool, but not on a single-threaded client.
       // It is not a documented feature, but is tested for OpenSSL.
       mongoc_client_t *client = test_framework_new_default_client ();
 
