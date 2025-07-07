@@ -135,10 +135,53 @@ try_insert (mongoc_client_t *client, bson_error_t *error)
    return ok;
 }
 
+#ifdef MONGOC_ENABLE_SSL_SECURE_CHANNEL
+// Define utilities to count and assert the number of imported CNG keys for Secure Channel.
+static size_t
+count_files (const char *dir_path)
+{
+   size_t count = 0;
+   char *dir_path_plus_star;
+   intptr_t handle;
+   struct _finddata_t info;
+
+   char child_path[MAX_TEST_NAME_LENGTH];
+
+   dir_path_plus_star = bson_strdup_printf ("%s/*", dir_path);
+   handle = _findfirst (dir_path_plus_star, &info);
+   ASSERT (handle != -1);
+
+   while (1) {
+      count++;
+      if (_findnext (handle, &info) == -1) {
+         break;
+      }
+   }
+
+   bson_free (dir_path_plus_star);
+   _findclose (handle);
+
+   return count;
+}
+
+static size_t
+cng_count_keys (void)
+{
+   return count_files ("C:\\Users\\Administrator\\AppData\\Roaming\\Microsoft\\Crypto\\Keys");
+}
+
+#define CNG_DECL_KEYCOUNT size_t cng_starting_keycount = cng_count_keys ()
+#define CNG_ASSERT_KEYCOUNT(more) ASSERT_CMPSIZE_T (cng_starting_keycount + more, ==, cng_count_keys ())
+#else
+#define CNG_DECL_KEYCOUNT (void) 0
+#define CNG_ASSERT_KEYCOUNT (void) 0
+#endif // MONGOC_ENABLE_SSL_SECURE_CHANNEL
+
 static void
 test_x509_auth (void *unused)
 {
    BSON_UNUSED (unused);
+   CNG_DECL_KEYCOUNT;
 
    drop_x509_user (true /* ignore "not found" error */);
    create_x509_user ();
@@ -158,7 +201,9 @@ test_x509_auth (void *unused)
       bool ok;
       {
          mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
+         CNG_ASSERT_KEYCOUNT (1); // key imported (if using Windows Secure Channel)
          ok = try_insert (client, &error);
+         CNG_ASSERT_KEYCOUNT (0); // key deleted (if using Windows Secure Channel)
          mongoc_client_destroy (client);
       }
 
