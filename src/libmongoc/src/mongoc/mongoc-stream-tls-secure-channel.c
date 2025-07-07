@@ -905,7 +905,7 @@ mongoc_secure_channel_cred_deleter (void *cred_void)
    if (!cred) {
       return;
    }
-   CertFreeCertificateContext (cred->cert);
+   mongoc_secure_channel_cert_destroy (cred->cert);
    bson_free (cred);
 }
 

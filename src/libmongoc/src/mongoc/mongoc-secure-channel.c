@@ -205,7 +205,18 @@ decode_object (const char *structType,
    return out;
 }
 
-PCCERT_CONTEXT
+void
+mongoc_secure_channel_cert_destroy (mongoc_secure_channel_cert *cert)
+{
+   if (!cert) {
+      return;
+   }
+   CertFreeCertificateContext (cert->cert);
+   // TODO: maybe delete imported key.
+   bson_free (cert);
+}
+
+mongoc_secure_channel_cert *
 mongoc_secure_channel_setup_certificate_from_file (const char *filename)
 {
    char *pem;
@@ -375,10 +386,13 @@ fail:
       return NULL;
    }
 
-   return cert;
+   mongoc_secure_channel_cert *sc_cert = bson_malloc0 (sizeof (mongoc_secure_channel_cert));
+   sc_cert->cert = cert;
+   sc_cert->imported = false;
+   return sc_cert;
 }
 
-PCCERT_CONTEXT
+mongoc_secure_channel_cert *
 mongoc_secure_channel_setup_certificate (const mongoc_ssl_opt_t *opt)
 {
    return mongoc_secure_channel_setup_certificate_from_file (opt->pem_file);

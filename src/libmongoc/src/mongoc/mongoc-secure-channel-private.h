@@ -48,7 +48,10 @@ mongoc_secure_channel_read (mongoc_stream_tls_t *tls, void *data, size_t data_le
 ssize_t
 mongoc_secure_channel_write (mongoc_stream_tls_t *tls, const void *data, size_t data_length);
 
-PCCERT_CONTEXT
+void
+mongoc_secure_channel_cert_destroy (mongoc_secure_channel_cert *cert);
+
+mongoc_secure_channel_cert *
 mongoc_secure_channel_setup_certificate (const mongoc_ssl_opt_t *opt);
 
 
