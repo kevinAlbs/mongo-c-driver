@@ -51,8 +51,8 @@ typedef struct {
 
 typedef struct {
    PCCERT_CONTEXT cert;
-   char guid[39];
-   bool imported;
+   char key_name[39];
+   bool imported_private_key;
 } mongoc_secure_channel_cert;
 
 // `mongoc_secure_channel_cred` may be shared on multiple connections.

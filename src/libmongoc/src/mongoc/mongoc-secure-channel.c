@@ -220,7 +220,8 @@ mongoc_secure_channel_cert *
 mongoc_secure_channel_setup_certificate_from_file (const char *filename)
 {
    char *pem;
-   bool ret = false;
+   bool ok = false;
+   mongoc_secure_channel_cert *ret = (mongoc_secure_channel_cert *) bson_malloc0 (sizeof (mongoc_secure_channel_cert));
    bool success;
    size_t pem_length;
    HCRYPTPROV provider;
@@ -235,6 +236,7 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
    DWORD blob_private_rsa_len = 0;
    DWORD encoded_private_len = 0;
    LPBYTE encoded_private = NULL;
+   NCRYPT_PROV_HANDLE hProv = 0;
 
    pem = read_file_and_null_terminate (filename, &pem_length);
    if (!pem) {
@@ -278,89 +280,144 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
       if (!blob_private_rsa) {
          goto fail;
       }
+
+
+      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa379886%28v=vs.85%29.aspx
+       */
+      success = CryptAcquireContext (&provider,            /* phProv */
+                                     NULL,                 /* pszContainer */
+                                     MS_ENHANCED_PROV,     /* pszProvider */
+                                     PROV_RSA_FULL,        /* dwProvType */
+                                     CRYPT_VERIFYCONTEXT); /* dwFlags */
+      if (!success) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("CryptAcquireContext failed: %s", msg);
+         bson_free (msg);
+         goto fail;
+      }
+
+      HCRYPTKEY hKey;
+      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa380207%28v=vs.85%29.aspx
+       */
+      success = CryptImportKey (provider,             /* hProv */
+                                blob_private_rsa,     /* pbData */
+                                blob_private_rsa_len, /* dwDataLen */
+                                0,                    /* hPubKey */
+                                0,                    /* dwFlags */
+                                &hKey);               /* phKey, OUT */
+      if (!success) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("CryptImportKey for private key failed: %s", msg);
+         bson_free (msg);
+         CryptReleaseContext (provider, 0);
+         goto fail;
+      }
+      CryptDestroyKey (hKey);
+
+      /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa376573%28v=vs.85%29.aspx
+       */
+      // The CERT_KEY_PROV_HANDLE_PROP_ID property takes ownership of `provider`.
+      success = CertSetCertificateContextProperty (cert,                         /* pCertContext */
+                                                   CERT_KEY_PROV_HANDLE_PROP_ID, /* dwPropId */
+                                                   0,                            /* dwFlags */
+                                                   (const void *) provider);     /* pvData */
+      if (!success) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("Can't associate private key with public key: %s", msg);
+         bson_free (msg);
+         goto fail;
+      }
    } else if (NULL != (pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----"))) {
       encoded_private = decode_pem_base64 (pem_private, &encoded_private_len, "private key", filename);
       if (!encoded_private) {
          goto fail;
       }
 
-      blob_private = decode_object (
-         PKCS_PRIVATE_KEY_INFO, encoded_private, encoded_private_len, &blob_private_len, "private key", filename);
-      if (!blob_private) {
+      // Open the software key storage provider
+      SECURITY_STATUS status = NCryptOpenStorageProvider (&hProv, MS_KEY_STORAGE_PROVIDER, 0);
+      if (status != SEC_E_OK) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("Can't open key storage provider: %s", msg);
+         bson_free (msg);
          goto fail;
       }
 
-      // Have PrivateKey. Get RSA key from it.
-      CRYPT_PRIVATE_KEY_INFO *privateKeyInfo = (CRYPT_PRIVATE_KEY_INFO *) blob_private;
-      if (strcmp (privateKeyInfo->Algorithm.pszObjId, szOID_RSA_RSA) != 0) {
-         MONGOC_ERROR ("Non-RSA private keys are not supported");
-         goto fail;
+      // Supply a key name to persist the key:
+      NCryptBuffer buffer;
+      NCryptBufferDesc bufferDesc;
+      wchar_t guidString[39] = {0};
+      // Compute a unique name using a GUID.
+      {
+         GUID guid;
+         HRESULT res = CoCreateGuid (&guid);
+         if (res != S_OK) {
+            char *msg = mongoc_winerr_to_string (res);
+            MONGOC_ERROR ("Can't create GUID: %s", msg);
+            bson_free (msg);
+            goto fail;
+         }
+         if (0 == StringFromGUID2 (&guid, guidString, 39)) {
+            MONGOC_ERROR ("Can't stringify GUID");
+            goto fail;
+         }
       }
 
-      blob_private_rsa = decode_object (PKCS_RSA_PRIVATE_KEY,
-                                        privateKeyInfo->PrivateKey.pbData,
-                                        privateKeyInfo->PrivateKey.cbData,
-                                        &blob_private_rsa_len,
-                                        "private key",
-                                        filename);
-      if (!blob_private_rsa) {
-         goto fail;
+      memcpy (ret->key_name, guidString, sizeof (guidString));
+
+      buffer.cbBuffer = (ULONG) (wcslen (guidString) + 1) * sizeof (WCHAR);
+      buffer.BufferType = NCRYPTBUFFER_PKCS_KEY_NAME;
+      buffer.pvBuffer = guidString;
+
+      bufferDesc.ulVersion = NCRYPTBUFFER_VERSION;
+      bufferDesc.cBuffers = 1;
+      bufferDesc.pBuffers = &buffer;
+
+      // Import the private key blob
+      {
+         NCRYPT_KEY_HANDLE hKey;
+         status = NCryptImportKey (
+            hProv, 0, NCRYPT_PKCS8_PRIVATE_KEY_BLOB, &bufferDesc, &hKey, encoded_private, encoded_private_len, 0);
+         NCryptFreeObject (hKey);
+
+         if (status != SEC_E_OK) {
+            char *msg = mongoc_winerr_to_string ((DWORD) status);
+            MONGOC_ERROR ("Failed to import key: %s", msg);
+            bson_free (msg);
+            goto fail;
+         }
+
+         ret->imported_private_key = true;
+      }
+
+      // Attach key to certificate.
+      {
+         // Attach private key to certificate:
+         CRYPT_KEY_PROV_INFO keyProvInfo = {
+            .pwszContainerName = guidString, .dwProvType = 0 /* CNG */, .dwFlags = 0, .dwKeySpec = AT_KEYEXCHANGE};
+         if (!CertSetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, 0, &keyProvInfo)) {
+            char *msg = mongoc_winerr_to_string (GetLastError ());
+            MONGOC_ERROR ("Failed to attach key to certificate: %s", msg);
+            bson_free (msg);
+            goto fail;
+         }
       }
    } else {
       MONGOC_ERROR ("Can't find private key in '%s'", filename);
       goto fail;
    }
 
-   /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa379886%28v=vs.85%29.aspx
-    */
-   success = CryptAcquireContext (&provider,            /* phProv */
-                                  NULL,                 /* pszContainer */
-                                  MS_ENHANCED_PROV,     /* pszProvider */
-                                  PROV_RSA_FULL,        /* dwProvType */
-                                  CRYPT_VERIFYCONTEXT); /* dwFlags */
-   if (!success) {
-      char *msg = mongoc_winerr_to_string (GetLastError ());
-      MONGOC_ERROR ("CryptAcquireContext failed: %s", msg);
-      bson_free (msg);
-      goto fail;
-   }
-
-   HCRYPTKEY hKey;
-   /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa380207%28v=vs.85%29.aspx
-    */
-   success = CryptImportKey (provider,             /* hProv */
-                             blob_private_rsa,     /* pbData */
-                             blob_private_rsa_len, /* dwDataLen */
-                             0,                    /* hPubKey */
-                             0,                    /* dwFlags */
-                             &hKey);               /* phKey, OUT */
-   if (!success) {
-      char *msg = mongoc_winerr_to_string (GetLastError ());
-      MONGOC_ERROR ("CryptImportKey for private key failed: %s", msg);
-      bson_free (msg);
-      CryptReleaseContext (provider, 0);
-      goto fail;
-   }
-   CryptDestroyKey (hKey);
-
-   /* https://msdn.microsoft.com/en-us/library/windows/desktop/aa376573%28v=vs.85%29.aspx
-    */
-   // The CERT_KEY_PROV_HANDLE_PROP_ID property takes ownership of `provider`.
-   success = CertSetCertificateContextProperty (cert,                         /* pCertContext */
-                                                CERT_KEY_PROV_HANDLE_PROP_ID, /* dwPropId */
-                                                0,                            /* dwFlags */
-                                                (const void *) provider);     /* pvData */
-   if (!success) {
-      char *msg = mongoc_winerr_to_string (GetLastError ());
-      MONGOC_ERROR ("Can't associate private key with public key: %s", msg);
-      bson_free (msg);
-      goto fail;
-   }
 
    TRACE ("%s", "Successfully loaded client certificate");
-   ret = true;
+   ret->cert = cert;
+   ok = true;
+
 
 fail:
+
+   if (hProv) {
+      NCryptFreeObject (hProv);
+   }
+
    if (pem) {
       SecureZeroMemory (pem, pem_length);
       bson_free (pem);
@@ -381,15 +438,12 @@ fail:
       bson_free (blob_private);
    }
 
-   if (!ret) {
-      CertFreeCertificateContext (cert);
+   if (!ok) {
+      mongoc_secure_channel_cert_destroy (ret);
       return NULL;
    }
 
-   mongoc_secure_channel_cert *sc_cert = bson_malloc0 (sizeof (mongoc_secure_channel_cert));
-   sc_cert->cert = cert;
-   sc_cert->imported = false;
-   return sc_cert;
+   return ret;
 }
 
 mongoc_secure_channel_cert *
