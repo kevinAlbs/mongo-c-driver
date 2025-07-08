@@ -890,7 +890,7 @@ mongoc_secure_channel_cred_new (const mongoc_ssl_opt_t *opt)
 
       if (cred->cert) {
          cred->cred.cCreds = 1;
-         cred->cred.paCred = &cred->cert;
+         cred->cred.paCred = &cred->cert->cert;
       }
    }
 

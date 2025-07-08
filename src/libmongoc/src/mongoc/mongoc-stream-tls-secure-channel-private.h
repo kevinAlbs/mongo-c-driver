@@ -51,7 +51,7 @@ typedef struct {
 
 typedef struct {
    PCCERT_CONTEXT cert;
-   char key_name[39];
+   wchar_t key_name[39];
    bool imported_private_key;
 } mongoc_secure_channel_cert;
 

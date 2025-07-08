@@ -211,8 +211,47 @@ mongoc_secure_channel_cert_destroy (mongoc_secure_channel_cert *cert)
    if (!cert) {
       return;
    }
+
+   NCRYPT_PROV_HANDLE hProv = 0;
+   NCRYPT_PROV_HANDLE keyHandle = 0;
+   // Delete persisted private key if imported:
+   if (cert->imported_private_key) {
+      // Open the software key storage provider
+      SECURITY_STATUS status = NCryptOpenStorageProvider (&hProv, MS_KEY_STORAGE_PROVIDER, 0);
+      if (status != SEC_E_OK) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("Can't open key storage provider: %s", msg);
+         bson_free (msg);
+         goto fail;
+      }
+
+      status = NCryptOpenKey (hProv, &keyHandle, cert->key_name, 0, 0);
+      if (status != SEC_E_OK) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("Failed to open key: %s", msg);
+         bson_free (msg);
+         goto fail;
+      }
+
+      status = NCryptDeleteKey (keyHandle, 0); // Also frees handle.
+      if (status != SEC_E_OK) {
+         char *msg = mongoc_winerr_to_string (GetLastError ());
+         MONGOC_ERROR ("Failed to delete key: %s", msg);
+         bson_free (msg);
+         goto fail;
+      }
+      // NCryptDeleteKey freed handle.
+      keyHandle = 0;
+   }
+
+fail:
+   if (hProv) {
+      NCryptFreeObject (hProv);
+   }
+   if (keyHandle) {
+      NCryptFreeObject (keyHandle);
+   }
    CertFreeCertificateContext (cert->cert);
-   // TODO: maybe delete imported key.
    bson_free (cert);
 }
 

@@ -200,11 +200,12 @@ test_x509_auth (void *unused)
       bson_error_t error = {0};
       bool ok;
       {
+         CNG_ASSERT_KEYCOUNT (0); // key not-yet imported.
          mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
-         CNG_ASSERT_KEYCOUNT (1); // key imported (if using Windows Secure Channel)
+         CNG_ASSERT_KEYCOUNT (1); // key imported.
          ok = try_insert (client, &error);
-         CNG_ASSERT_KEYCOUNT (0); // key deleted (if using Windows Secure Channel)
          mongoc_client_destroy (client);
+         CNG_ASSERT_KEYCOUNT (0); // key deleted.
       }
 
       ASSERT_OR_PRINT (ok, error);
