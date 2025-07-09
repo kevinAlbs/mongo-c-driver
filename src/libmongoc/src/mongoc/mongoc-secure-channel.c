@@ -411,12 +411,14 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
       bufferDesc.cBuffers = 1;
       bufferDesc.pBuffers = &buffer;
 
-      // Import the private key blob
+      // Import the private key blob as a persisted CNG key:
       {
-         NCRYPT_KEY_HANDLE hKey;
+         NCRYPT_KEY_HANDLE hKey = 0;
          status = NCryptImportKey (
             hProv, 0, NCRYPT_PKCS8_PRIVATE_KEY_BLOB, &bufferDesc, &hKey, encoded_private, encoded_private_len, 0);
+         if (hKey) {
          NCryptFreeObject (hKey);
+         }
 
          if (status != SEC_E_OK) {
             char *msg = mongoc_winerr_to_string ((DWORD) status);
