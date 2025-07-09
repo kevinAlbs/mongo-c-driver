@@ -309,6 +309,10 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
    }
 
    if (NULL != (pem_private = strstr (pem, "-----BEGIN RSA PRIVATE KEY-----"))) {
+      // Import legacy PKCS#1 with as an ephemeral (not persisted) key.
+      // Ephemeral keys do not appear to support modern signatures. See CDRIVER-5998.
+      // However, Windows APIs do not appear to support importing PKCS#1 as persisted keys.
+      // On algorithm mismatch, an error is shown to the user to recommend PKCS#8.
       encoded_private = decode_pem_base64 (pem_private, &encoded_private_len, "private key", filename);
       if (!encoded_private) {
          goto fail;
@@ -367,6 +371,9 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
          goto fail;
       }
    } else if (NULL != (pem_private = strstr (pem, "-----BEGIN PRIVATE KEY-----"))) {
+      // Import PKCS#8 as a persisted (not ephemeral) key.
+      // Ephemeral keys do not appear to support modern signatures. See CDRIVER-5998.
+      // The persisted key is deleted later when a client/pool is destroyed.
       encoded_private = decode_pem_base64 (pem_private, &encoded_private_len, "private key", filename);
       if (!encoded_private) {
          goto fail;
@@ -384,7 +391,6 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
       // Supply a key name to persist the key:
       NCryptBuffer buffer;
       NCryptBufferDesc bufferDesc;
-      wchar_t guidString[39] = {0};
       // Compute a unique name using a GUID.
       {
          GUID guid;
@@ -416,7 +422,7 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
          status = NCryptImportKey (
             hProv, 0, NCRYPT_PKCS8_PRIVATE_KEY_BLOB, &bufferDesc, &hKey, encoded_private, encoded_private_len, 0);
          if (hKey) {
-         NCryptFreeObject (hKey);
+            NCryptFreeObject (hKey);
          }
 
          if (status != SEC_E_OK) {
