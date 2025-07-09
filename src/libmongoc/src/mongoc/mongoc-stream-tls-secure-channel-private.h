@@ -51,7 +51,7 @@ typedef struct {
 
 typedef struct {
    PCCERT_CONTEXT cert;
-   wchar_t key_name[39];
+   WCHAR key_name_guid[39]; // 39 includes space for nul terminator. Example: {F1D1492B-593D-4737-9FE5-8CA85F10E397}
    bool imported_private_key;
 } mongoc_secure_channel_cert;
 

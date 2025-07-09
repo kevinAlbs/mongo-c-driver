@@ -395,17 +395,16 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
             bson_free (msg);
             goto fail;
          }
-         if (0 == StringFromGUID2 (&guid, guidString, 39)) {
+         int capacity = (int) sizeof (ret->key_name_guid) / sizeof (WCHAR);
+         if (0 == StringFromGUID2 (&guid, ret->key_name_guid, capacity)) {
             MONGOC_ERROR ("Can't stringify GUID");
             goto fail;
          }
       }
 
-      memcpy (ret->key_name, guidString, sizeof (guidString));
-
-      buffer.cbBuffer = (ULONG) (wcslen (guidString) + 1) * sizeof (WCHAR);
+      buffer.cbBuffer = (ULONG) (wcslen (ret->key_name_guid) + 1) * sizeof (WCHAR);
       buffer.BufferType = NCRYPTBUFFER_PKCS_KEY_NAME;
-      buffer.pvBuffer = guidString;
+      buffer.pvBuffer = ret->key_name_guid;
 
       bufferDesc.ulVersion = NCRYPTBUFFER_VERSION;
       bufferDesc.cBuffers = 1;
@@ -433,8 +432,10 @@ mongoc_secure_channel_setup_certificate_from_file (const char *filename)
       // Attach key to certificate.
       {
          // Attach private key to certificate:
-         CRYPT_KEY_PROV_INFO keyProvInfo = {
-            .pwszContainerName = guidString, .dwProvType = 0 /* CNG */, .dwFlags = 0, .dwKeySpec = AT_KEYEXCHANGE};
+         CRYPT_KEY_PROV_INFO keyProvInfo = {.pwszContainerName = ret->key_name_guid,
+                                            .dwProvType = 0 /* CNG */,
+                                            .dwFlags = 0,
+                                            .dwKeySpec = AT_KEYEXCHANGE};
          if (!CertSetCertificateContextProperty (cert, CERT_KEY_PROV_INFO_PROP_ID, 0, &keyProvInfo)) {
             char *msg = mongoc_winerr_to_string (GetLastError ());
             MONGOC_ERROR ("Failed to attach key to certificate: %s", msg);
