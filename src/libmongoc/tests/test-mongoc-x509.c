@@ -212,7 +212,7 @@ test_x509_auth (void *unused)
       mongoc_uri_destroy (uri);
    }
 
-   // Test auth works:
+   // Test auth works with a PKCS1 key:
    {
       // Create URI:
       mongoc_uri_t *uri = get_x509_uri ();
@@ -226,6 +226,7 @@ test_x509_auth (void *unused)
       bool ok;
       {
          mongoc_client_t *client = test_framework_client_new_from_uri (uri, NULL);
+         CNG_ASSERT_KEYCOUNT (0); // Imports key as ephemeral (not persisted)
          ok = try_insert (client, &error);
          mongoc_client_destroy (client);
       }
