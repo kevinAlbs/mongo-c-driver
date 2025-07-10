@@ -1017,7 +1017,22 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
                                       "TLS Certification verification failed: certificate "
                                       "does not include revocation check.");
             break;
-
+         case SEC_E_ALGORITHM_MISMATCH: {
+            const char *workaround = "";
+            // Suggest upgrading client cert to PKCS#8 if possibly impacted by CDRIVER-5998:
+            {
+               mongoc_secure_channel_cred *cred = secure_channel->cred_ptr.ptr;
+               if (cred->cert && !cred->cert->imported_private_key) {
+                  workaround =
+                     ": Client certificate not imported as a persistent key. Consider updating certificate to PKCS#8";
+               }
+               char *msg = mongoc_winerr_to_string ((DWORD) sspi_status);
+               MONGOC_LOG_AND_SET_ERROR (
+                  error, MONGOC_ERROR_STREAM, MONGOC_ERROR_STREAM_SOCKET, "%s%s", msg, workaround);
+               bson_free (msg);
+            }
+            break;
+         }
          case SEC_E_INSUFFICIENT_MEMORY:
          case SEC_E_INTERNAL_ERROR:
          case SEC_E_INVALID_HANDLE:
