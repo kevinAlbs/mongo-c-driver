@@ -991,7 +991,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
             MONGOC_LOG_AND_SET_ERROR (error,
                                       MONGOC_ERROR_STREAM,
                                       MONGOC_ERROR_STREAM_SOCKET,
-                                      "SSL Certification verification failed: hostname "
+                                      "TLS Certification verification failed: hostname "
                                       "doesn't match certificate");
             break;
 
@@ -999,7 +999,7 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
             MONGOC_LOG_AND_SET_ERROR (error,
                                       MONGOC_ERROR_STREAM,
                                       MONGOC_ERROR_STREAM_SOCKET,
-                                      "SSL Certification verification failed: Untrusted "
+                                      "TLS Certification verification failed: Untrusted "
                                       "root certificate");
             break;
 
@@ -1007,14 +1007,14 @@ mongoc_secure_channel_handshake_step_2 (mongoc_stream_tls_t *tls, char *hostname
             MONGOC_LOG_AND_SET_ERROR (error,
                                       MONGOC_ERROR_STREAM,
                                       MONGOC_ERROR_STREAM_SOCKET,
-                                      "SSL Certification verification failed: certificate "
+                                      "TLS Certification verification failed: certificate "
                                       "has expired");
             break;
          case CRYPT_E_NO_REVOCATION_CHECK:
             MONGOC_LOG_AND_SET_ERROR (error,
                                       MONGOC_ERROR_STREAM,
                                       MONGOC_ERROR_STREAM_SOCKET,
-                                      "SSL Certification verification failed: certificate "
+                                      "TLS Certification verification failed: certificate "
                                       "does not include revocation check.");
             break;
 
