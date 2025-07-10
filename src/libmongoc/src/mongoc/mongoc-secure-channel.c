@@ -225,7 +225,7 @@ mongoc_secure_channel_cert_destroy (mongoc_secure_channel_cert *cert)
          goto fail;
       }
 
-      status = NCryptOpenKey (hProv, &keyHandle, cert->key_name, 0, 0);
+      status = NCryptOpenKey (hProv, &keyHandle, cert->key_name_guid, 0, 0);
       if (status != SEC_E_OK) {
          char *msg = mongoc_winerr_to_string (GetLastError ());
          MONGOC_ERROR ("Failed to open key: %s", msg);
