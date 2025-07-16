@@ -1199,6 +1199,8 @@ if (ENABLE_TESTS)
    mongoc_add_test (test-gcpkms ${PROJECT_SOURCE_DIR}/tests/test-gcpkms.c)
    mongoc_add_test (test-awsauth ${PROJECT_SOURCE_DIR}/tests/test-awsauth.c)
 
+   mongoc_add_test (test-memory-usage ${PROJECT_SOURCE_DIR}/tests/HELP-78501/test-memory-usage.c)
+
    # "make test" doesn't compile tests, so we create "make check" which compiles
    # and runs tests: https://gitlab.kitware.com/cmake/cmake/issues/8774
    add_custom_target (check COMMAND ${CMAKE_CTEST_COMMAND} -V
