@@ -1541,6 +1541,103 @@ test_cluster_stream_invalidation_pooled (void)
    mongoc_client_pool_destroy (pool);
 }
 
+static struct {
+   size_t large_allocs;
+} alloc_tracker;
+
+static void *
+alloc_tracker_malloc (size_t size)
+{
+   if (size > 1024 * 1024) {
+      alloc_tracker.large_allocs++;
+   }
+   return malloc (size);
+}
+
+static void *
+alloc_tracker_calloc (size_t count, size_t size)
+{
+   if (size > 1024 * 1024) {
+      alloc_tracker.large_allocs++;
+   }
+   return calloc (count, size);
+}
+
+static void *
+alloc_tracker_realloc (void *ptr, size_t size)
+{
+   if (size > 1024 * 1024) {
+      alloc_tracker.large_allocs++;
+   }
+   return realloc (ptr, size);
+}
+
+static void *
+alloc_tracker_aligned_alloc (size_t alignment, size_t size)
+{
+   if (size > 1024 * 1024) {
+      alloc_tracker.large_allocs++;
+   }
+   return aligned_alloc (alignment, size);
+}
+
+
+static void
+test_cluster_allocs_one_read_buffer (void)
+{
+   // Test that a large read only allocates one buffer.
+   bson_error_t error;
+   mongoc_client_t *client = test_framework_new_default_client ();
+   mongoc_collection_t *coll = mongoc_client_get_collection (client, "db", "coll");
+
+   // Drop collection if already exists:
+   mongoc_collection_drop (coll, NULL);
+
+   // Insert a large document:
+   {
+      bson_t large_doc = BSON_INITIALIZER;
+      char *large_data = bson_malloc (2 * 1024 * 1024); // 2 MB of data
+      memset (large_data, 'x', 2 * 1024 * 1024 - 1);
+      large_data[1024 * 1024 - 1] = '\0'; // Null-terminate;
+      BSON_APPEND_UTF8 (&large_doc, "large_data", large_data);
+      bson_free (large_data);
+      ASSERT_OR_PRINT (mongoc_collection_insert_one (coll, &large_doc, NULL, NULL, &error), error);
+      bson_destroy (&large_doc);
+   }
+
+   // Track memory allocations:
+   {
+      bson_mem_vtable_t vtable = {.malloc = alloc_tracker_malloc,
+                                  .calloc = alloc_tracker_calloc,
+                                  .realloc = alloc_tracker_realloc,
+                                  .free = free,
+                                  .aligned_alloc = alloc_tracker_aligned_alloc};
+      bson_mem_set_vtable (&vtable);
+      memset (&alloc_tracker, 0, sizeof alloc_tracker);
+   }
+
+   // Find the large document:
+   {
+      bson_t filter = BSON_INITIALIZER;
+      mongoc_cursor_t *cursor = mongoc_collection_find_with_opts (coll, &filter, NULL, NULL);
+      const bson_t *doc;
+      size_t count = 0;
+      while (mongoc_cursor_next (cursor, &doc)) {
+         count++;
+      }
+      ASSERT_CMPSIZE_T (count, ==, 1);
+      mongoc_cursor_destroy (cursor);
+   }
+
+   ASSERT_CMPSIZE_T (alloc_tracker.large_allocs, ==, 1);
+
+   // Reset memory allocator functions:
+   bson_mem_restore_vtable ();
+
+   mongoc_collection_drop (coll, NULL);
+   mongoc_client_destroy (client);
+}
+
 void
 test_cluster_install (TestSuite *suite)
 {
@@ -1614,4 +1711,5 @@ test_cluster_install (TestSuite *suite)
    */
    TestSuite_AddLive (suite, "/Cluster/stream_invalidation/single", test_cluster_stream_invalidation_single);
    TestSuite_AddLive (suite, "/Cluster/stream_invalidation/pooled", test_cluster_stream_invalidation_pooled);
+   TestSuite_AddLive (suite, "/Cluster/allocs_one_read_buffer", test_cluster_allocs_one_read_buffer);
 }
