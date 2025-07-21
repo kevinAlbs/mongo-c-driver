@@ -50,10 +50,6 @@ find_all_documents (mongoc_client_t *client, const char *db, const char *coll)
 int
 main (int argc, char *argv[])
 {
-   bson_mem_vtable_t vtable = {
-      .malloc = malloc, .calloc = calloc, .realloc = realloc, .free = free, .aligned_alloc = aligned_alloc};
-   bson_mem_set_vtable (&vtable);
-
    mongoc_init ();
    mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017");
    mongoc_client_pool_t *pool = mongoc_client_pool_new (uri);
