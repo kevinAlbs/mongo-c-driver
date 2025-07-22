@@ -1540,6 +1540,50 @@ test_bson_vector_edge_cases_packed_bit (void)
 #endif // BSON_WORD_SIZE > 32
 }
 
+// Test converting vector to/from array without `bson_t`
+static void
+test_vector (void)
+{
+   // Convert an array of int8 to a vector (without `bson_t`):
+   {
+      // Input is an array:
+      int8_t array[] = {1, 2, 3};
+      size_t element_count = sizeof (array) / sizeof (int8_t);
+
+      // Allocate data for vector:
+      size_t vec_len = BSON_VECTOR_HEADER_LEN + element_count * sizeof (int8_t);
+      uint8_t *vec_data = (uint8_t *) bson_malloc (vec_len);
+
+      // Set header bytes:
+      vec_data[0] = 0x03; // Vector of int8.
+      vec_data[1] = 0;    // Padding.
+      // TODO add API to create view from data: bson_vector_int8_view_from_uninit (&vec, vec_data, vec_len);
+
+      // Convert to vector:
+      bson_vector_int8_view_t vec;
+      ASSERT (bson_vector_int8_view_init (&vec, vec_data, vec_len));
+      bson_vector_int8_view_write (vec, array, element_count, 0);
+      ASSERT_MEMCMP (vec_data, (uint8_t *) "\x03\x00\x01\x02\x03", vec_len);
+   }
+
+   // Convert a vector to an array:
+   {
+      // Input is a vector:
+      bson_vector_int8_view_t vec;
+      uint8_t *vec_data = (uint8_t *) "\x03\x00\x01\x02\x03";
+      size_t vec_len = 5u;
+      ASSERT (bson_vector_int8_view_init (&vec, vec_data, vec_len));
+
+      // Allocate data for array:
+      size_t element_count = bson_vector_int8_view_length (vec);
+      int8_t *array = bson_malloc (sizeof (int8_t) * element_count);
+
+      // Convert to array:
+      ASSERT (bson_vector_int8_view_read (vec, array, element_count, 0));
+      ASSERT_MEMCMP (array, (uint8_t *) "\x01\x02\x03", element_count);
+   }
+}
+
 void
 test_bson_vector_install (TestSuite *suite)
 {
@@ -1564,4 +1608,5 @@ test_bson_vector_install (TestSuite *suite)
    TestSuite_Add (suite, "/bson_binary_vector/edge_cases/int8", test_bson_vector_edge_cases_int8);
    TestSuite_Add (suite, "/bson_binary_vector/edge_cases/float32", test_bson_vector_edge_cases_float32);
    TestSuite_Add (suite, "/bson_binary_vector/edge_cases/packed_bit", test_bson_vector_edge_cases_packed_bit);
+   TestSuite_Add (suite, "/test_vector", test_vector);
 }
