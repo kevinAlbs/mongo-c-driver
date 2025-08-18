@@ -247,16 +247,6 @@ if [[ "${LOADBALANCED}" != "noloadbalanced" ]]; then
   test_args+=("-l" "/command_monitoring/unified/*")
 fi
 
-test_args=(
-  "-d"
-  "-F"
-  "test-results.json"
-  "--skip-tests"
-  ".evergreen/etc/skip-tests.txt"
-  "-l"
-   "/client_pool/disconnects_removed_servers/*"
-)
-
 if [[ ! "${test_args[*]}" =~ "-l" ]]; then
   # /http tests are only run if the set of tests to execute were not limited.
   echo "Waiting for simple HTTP server to start..."
@@ -292,9 +282,7 @@ cygwin)
     openssl_lib_prefix="${openssl_install_dir}/lib:${openssl_lib_prefix:-}"
   fi
 
-  for i in {0..100}; do
-    LD_LIBRARY_PATH="${openssl_lib_prefix}" LD_PRELOAD="${ld_preload:-}" ./cmake-build/src/libmongoc/test-libmongoc --no-fork "${test_args[@]}"
-  done
+  LD_LIBRARY_PATH="${openssl_lib_prefix}" LD_PRELOAD="${ld_preload:-}" ./cmake-build/src/libmongoc/test-libmongoc --no-fork "${test_args[@]}"
   ;;
 esac
 
