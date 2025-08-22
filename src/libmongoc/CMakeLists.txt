@@ -669,6 +669,8 @@ set (MONGOC_SOURCES
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-openssl.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-ocsp-cache.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-bulkwrite.c
+
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-cluster-oidc.c
 )
 
 if (MONGOC_ENABLE_SASL)

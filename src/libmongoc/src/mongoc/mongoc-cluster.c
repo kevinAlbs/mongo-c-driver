@@ -40,6 +40,7 @@
 #include <common-bson-dsl-private.h>
 #include <common-oid-private.h>
 #include <mongoc/mongoc-cluster-aws-private.h>
+#include <mongoc/mongoc-cluster-oidc-private.h>
 #include <mongoc/mongoc-cmd-private.h>
 #include <mongoc/mongoc-compression-private.h>
 #include <mongoc/mongoc-error-private.h>
@@ -1626,6 +1627,8 @@ _mongoc_cluster_auth_node (mongoc_cluster_t *cluster,
       ret = _mongoc_cluster_auth_node_plain (cluster, stream, sd, error);
    } else if (0 == strcasecmp (mechanism, "MONGODB-AWS")) {
       ret = _mongoc_cluster_auth_node_aws (cluster, stream, sd, error);
+   } else if (0 == strcasecmp (mechanism, "MONGODB-OIDC")) {
+      ret = _mongoc_cluster_auth_node_oidc (cluster, stream, sd, error);
    } else {
       _mongoc_set_error (error,
                          MONGOC_ERROR_CLIENT,
