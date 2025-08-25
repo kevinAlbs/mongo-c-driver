@@ -43,6 +43,7 @@
 #include <mongoc/mongoc-error-private.h>
 #include <mongoc/mongoc-gridfs-private.h>
 #include <mongoc/mongoc-host-list-private.h>
+#include <mongoc/mongoc-oidc-callback-private.h>
 #include <mongoc/mongoc-queue-private.h>
 #include <mongoc/mongoc-read-concern-private.h>
 #include <mongoc/mongoc-read-prefs-private.h>
@@ -2734,4 +2735,6 @@ mongoc_client_set_oidc_callback (mongoc_client_t *client, const mongoc_oidc_call
                     "For client pools, use mongoc_client_pool_set_oidc_callback instead.");
       return;
    }
+
+   client->topology->oidc_callback = mongoc_oidc_callback_copy (callback);
 }

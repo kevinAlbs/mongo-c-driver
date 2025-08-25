@@ -32,6 +32,7 @@
 #include <mongoc/mongoc-ts-pool-private.h>
 
 #include <mongoc/mongoc-config.h>
+#include <mongoc/mongoc-oidc-callback.h>
 #include <mongoc/mongoc-sleep.h>
 #include <mongoc/mongoc-uri.h>
 
@@ -233,6 +234,11 @@ typedef struct _mongoc_topology_t {
    // DNS implementations are expected to try UDP first, then retry with TCP if the UDP response indicates truncation.
    // Some DNS servers truncate UDP responses without setting the truncated (TC) flag. This may result in no TCP retry.
    bool srv_prefer_tcp;
+
+
+   // oidc_callback is owned. NULL if unset. It is not protected by a lock. It is only expected to be modified before
+   // creating connections.
+   mongoc_oidc_callback_t *oidc_callback;
 } mongoc_topology_t;
 
 mongoc_topology_t *
