@@ -23,7 +23,28 @@
 static mongoc_oidc_credential_t *
 oidc_callback_fn (mongoc_oidc_callback_params_t *params)
 {
-   return NULL;
+   FILE *token_file = fopen ("/tmp/tokens/test_user1", "r");
+   ASSERT (token_file);
+
+   // Determine length of token:
+   ASSERT (0 == fseek (token_file, 0, SEEK_END));
+   long token_len = ftell (token_file);
+   ASSERT (token_len > 0);
+   ASSERT (0 == fseek (token_file, 0, SEEK_SET));
+
+   /* Allocate buffer for token string */
+   char *token = bson_malloc (token_len + 1);
+
+
+   /* Read file into token buffer */
+   size_t nread = fread (token, 1, token_len, token_file);
+   ASSERT (nread == (size_t) token_len);
+   token[token_len] = '\0';
+
+   mongoc_oidc_credential_t *cred = mongoc_oidc_credential_new (token);
+   fclose (token_file);
+   bson_free (token);
+   return cred;
 }
 
 static bool
