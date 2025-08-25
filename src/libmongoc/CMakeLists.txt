@@ -1128,6 +1128,7 @@ set (test-libmongoc-sources
    ${PROJECT_SOURCE_DIR}/tests/test-mcd-integer.c
    ${PROJECT_SOURCE_DIR}/tests/test-mcd-nsinfo.c
    ${PROJECT_SOURCE_DIR}/tests/test-mcd-rpc.c
+   ${PROJECT_SOURCE_DIR}/tests/test-mongoc-oidc.c
    ${PROJECT_SOURCE_DIR}/tests/TestSuite.c
    ${PROJECT_SOURCE_DIR}/tests/unified/operation.c
    ${PROJECT_SOURCE_DIR}/tests/unified/entity-map.c
