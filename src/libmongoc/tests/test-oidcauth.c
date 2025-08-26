@@ -20,11 +20,19 @@
 #include <test-conveniences.h>
 #include <test-libmongoc.h>
 
+typedef struct {
+   int call_count;
+} callback_ctx_t;
+
 static mongoc_oidc_credential_t *
 oidc_callback_fn (mongoc_oidc_callback_params_t *params)
 {
    FILE *token_file = fopen ("/tmp/tokens/test_machine", "r");
    ASSERT (token_file);
+
+   callback_ctx_t *ctx = mongoc_oidc_callback_params_get_user_data (params);
+   ASSERT (ctx);
+   ctx->call_count += 1;
 
    // Determine length of token:
    ASSERT (0 == fseek (token_file, 0, SEEK_END));
@@ -32,11 +40,8 @@ oidc_callback_fn (mongoc_oidc_callback_params_t *params)
    ASSERT (token_len > 0);
    ASSERT (0 == fseek (token_file, 0, SEEK_SET));
 
-   /* Allocate buffer for token string */
+   // Read file into buffer:
    char *token = bson_malloc (token_len + 1);
-
-
-   /* Read file into token buffer */
    size_t nread = fread (token, 1, token_len, token_file);
    ASSERT (nread == (size_t) token_len);
    token[token_len] = '\0';
@@ -89,10 +94,15 @@ main (void)
 
       // Configure OIDC callback:
       mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {0};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
       mongoc_client_set_oidc_callback (client, oidc_callback);
 
       // Expect auth to succeed:
       ASSERT_OR_PRINT (do_find (client, &error), error);
+
+      // Expect callback was called exactly once.
+      ASSERT_CMPINT (ctx.call_count, ==, 1);
 
       mongoc_oidc_callback_destroy (oidc_callback);
       mongoc_client_destroy (client);

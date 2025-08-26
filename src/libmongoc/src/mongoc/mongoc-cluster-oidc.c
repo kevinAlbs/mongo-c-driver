@@ -52,6 +52,7 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
       }
 
       mongoc_oidc_callback_params_t *params = mongoc_oidc_callback_params_new ();
+      mongoc_oidc_callback_params_set_user_data (params, mongoc_oidc_callback_get_user_data (oidc_callback));
       creds = mongoc_oidc_callback_get_fn (oidc_callback) (params);
       mongoc_oidc_callback_params_destroy (params);
 
@@ -80,7 +81,6 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
          goto fail;
       }
 
-      printf ("Sending command: %s\n", bson_as_canonical_extended_json (&cmd, NULL));
       bson_destroy (&jwt_doc);
    }
 
