@@ -14,10 +14,15 @@
  * limitations under the License.
  */
 
+#include <common-bson-dsl-private.h>
+#include <mongoc/mongoc-client-private.h>
 #include <mongoc/mongoc-cluster-private.h>
 #include <mongoc/mongoc-error-private.h>
+#include <mongoc/mongoc-oidc-callback-private.h>
 #include <mongoc/mongoc-server-description-private.h>
 #include <mongoc/mongoc-stream-private.h>
+
+#define SET_ERROR(...) _mongoc_set_error (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, __VA_ARGS__)
 
 bool
 _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
@@ -30,8 +35,83 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
    BSON_ASSERT_PARAM (sd);
    BSON_ASSERT_PARAM (error);
 
-   // TODO
+   bool ok = false;
+   bson_t cmd = BSON_INITIALIZER;
+   bson_t reply = BSON_INITIALIZER;
+   mongoc_oidc_credential_t *creds = NULL;
+   mongoc_server_stream_t *server_stream = NULL;
 
-   _mongoc_set_error (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "OIDC-auth not-yet implemented");
-   return false;
+
+   // Get access token.
+   {
+      mongoc_oidc_callback_t *oidc_callback = cluster->client->topology->oidc_callback;
+      if (!oidc_callback) {
+         SET_ERROR ("MONGODB-OIDC requested, but no callback set. Use mongoc_client_set_oidc_callback or "
+                    "mongoc_client_pool_set_oidc_callback.");
+         goto fail;
+      }
+
+      mongoc_oidc_callback_params_t *params = mongoc_oidc_callback_params_new ();
+      creds = mongoc_oidc_callback_get_fn (oidc_callback) (params);
+      mongoc_oidc_callback_params_destroy (params);
+
+      if (!creds) {
+         SET_ERROR ("MONGODB-OIDC callback failed.");
+         goto fail;
+      }
+   }
+
+   // Build `saslStart` command:
+   {
+      bsonBuildDecl (jwt_doc, kv ("jwt", cstr (mongoc_oidc_credential_get_access_token (creds))));
+      if (bsonBuildError) {
+         SET_ERROR ("BSON error: %s", bsonBuildError);
+         goto fail;
+      }
+
+      bsonBuild (cmd,
+                 kv ("saslStart", int32 (1)),
+                 kv ("mechanism", cstr ("MONGODB-OIDC")),
+                 kv ("payload", binary (BSON_SUBTYPE_BINARY, bson_get_data (&jwt_doc), jwt_doc.len)));
+
+      if (bsonBuildError) {
+         SET_ERROR ("BSON error: %s", bsonBuildError);
+         bson_destroy (&jwt_doc);
+         goto fail;
+      }
+
+      printf ("Sending command: %s\n", bson_as_canonical_extended_json (&cmd, NULL));
+      bson_destroy (&jwt_doc);
+   }
+
+   // Send command:
+   {
+      mongoc_cmd_parts_t parts;
+
+      mc_shared_tpld td = mc_tpld_take_ref (BSON_ASSERT_PTR_INLINE (cluster)->client->topology);
+
+      mongoc_cmd_parts_init (&parts, cluster->client, "$external", MONGOC_QUERY_NONE /* unused for OP_MSG */, &cmd);
+      parts.prohibit_lsid = true; // Do not append session ids to auth commands per session spec.
+      server_stream = _mongoc_cluster_create_server_stream (td.ptr, sd, stream);
+      mc_tpld_drop_ref (&td);
+      if (!mongoc_cluster_run_command_parts (cluster, server_stream, &parts, &reply, error)) {
+         goto fail;
+      }
+   }
+
+   // Expect successful reply to include `done: true`:
+   {
+      bsonParse (reply, require (allOf (key ("done"), isTrue), nop));
+      if (bsonParseError) {
+         SET_ERROR ("Error in OIDC reply: %s", bsonParseError);
+         goto fail;
+      }
+   }
+
+   ok = true;
+fail:
+   mongoc_server_stream_cleanup (server_stream);
+   mongoc_oidc_credential_destroy (creds);
+   bson_destroy (&cmd);
+   return ok;
 }

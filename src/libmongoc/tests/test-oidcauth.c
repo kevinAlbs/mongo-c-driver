@@ -23,7 +23,7 @@
 static mongoc_oidc_credential_t *
 oidc_callback_fn (mongoc_oidc_callback_params_t *params)
 {
-   FILE *token_file = fopen ("/tmp/tokens/test_user1", "r");
+   FILE *token_file = fopen ("/tmp/tokens/test_machine", "r");
    ASSERT (token_file);
 
    // Determine length of token:
@@ -54,7 +54,7 @@ do_find (mongoc_client_t *client, bson_error_t *error)
    mongoc_cursor_t *cursor = NULL;
    bool ret = false;
 
-   coll = mongoc_client_get_collection (client, "db", "coll");
+   coll = mongoc_client_get_collection (client, "test", "test");
    cursor = mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), NULL, NULL);
 
    const bson_t *doc;
