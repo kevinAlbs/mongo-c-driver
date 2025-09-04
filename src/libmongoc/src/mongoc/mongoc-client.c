@@ -2736,5 +2736,5 @@ mongoc_client_set_oidc_callback (mongoc_client_t *client, const mongoc_oidc_call
       return;
    }
 
-   client->topology->oidc_callback = mongoc_oidc_callback_copy (callback);
+   client->topology->oidc.callback = mongoc_oidc_callback_copy (callback);
 }

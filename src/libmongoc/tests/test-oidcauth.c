@@ -58,9 +58,10 @@ do_find (mongoc_client_t *client, bson_error_t *error)
    mongoc_collection_t *coll = NULL;
    mongoc_cursor_t *cursor = NULL;
    bool ret = false;
+   bson_t filter = BSON_INITIALIZER;
 
    coll = mongoc_client_get_collection (client, "test", "test");
-   cursor = mongoc_collection_find_with_opts (coll, tmp_bson ("{}"), NULL, NULL);
+   cursor = mongoc_collection_find_with_opts (coll, &filter, NULL, NULL);
 
    const bson_t *doc;
    while (mongoc_cursor_next (cursor, &doc))
@@ -77,6 +78,19 @@ fail:
    return ret;
 }
 
+static BSON_THREAD_FUN (do_100_finds, pool_void)
+{
+   mongoc_client_pool_t *pool = pool_void;
+   for (int i = 0; i < 100; i++) {
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      bson_error_t error;
+      bool ok = do_find (client, &error);
+      ASSERT_OR_PRINT (ok, error);
+      mongoc_client_pool_push (pool, client);
+   }
+   BSON_THREAD_RETURN;
+}
+
 int
 main (void)
 {
@@ -85,7 +99,7 @@ main (void)
 
    // Prose test: 1.1 Callback is called during authentication
    {
-      mongoc_uri_t *uri = test_framework_get_uri ();
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017");
       mongoc_uri_set_option_as_bool (uri, MONGOC_URI_RETRYREADS, false);
       mongoc_uri_set_auth_mechanism (uri, "MONGODB-OIDC");
 
@@ -106,6 +120,39 @@ main (void)
 
       mongoc_oidc_callback_destroy (oidc_callback);
       mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
+   }
+
+   // Prose test: 1.2 Callback is called once for multiple connections
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017");
+      mongoc_uri_set_option_as_bool (uri, MONGOC_URI_RETRYREADS, false);
+      mongoc_uri_set_auth_mechanism (uri, "MONGODB-OIDC");
+
+      mongoc_client_pool_t *pool = mongoc_client_pool_new_with_error (uri, &error);
+      ASSERT_OR_PRINT (pool, error);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {0};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_pool_set_oidc_callback (pool, oidc_callback);
+
+      // Start 10 threads. Each thread runs 100 find operations:
+      bson_thread_t threads[10];
+      for (int i = 0; i < 10; i++) {
+         ASSERT (0 == mcommon_thread_create (&threads[i], do_100_finds, pool));
+      }
+
+      // Wait for threads to finish:
+      for (int i = 0; i < 10; i++) {
+         mcommon_thread_join (threads[i]);
+      }
+
+      // Expect callback was called exactly once.
+      ASSERT_CMPINT (ctx.call_count, ==, 1);
+
+      mongoc_oidc_callback_destroy (oidc_callback);
       mongoc_uri_destroy (uri);
    }
 

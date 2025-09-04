@@ -24,6 +24,48 @@
 
 #define SET_ERROR(...) _mongoc_set_error (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, __VA_ARGS__)
 
+static char *
+get_access_token (mongoc_topology_t *tp, bson_error_t *error)
+{
+   char *access_token = NULL;
+
+   bson_mutex_lock (&tp->oidc.cache.lock);
+
+   mongoc_oidc_credential_t *cred = tp->oidc.cache.cred;
+
+   if (NULL == cred) {
+      // Credential is cached.
+      access_token = bson_strdup (mongoc_oidc_credential_get_access_token (cred));
+      goto done;
+   }
+
+   if (!tp->oidc.callback) {
+      SET_ERROR ("MONGODB-OIDC requested, but no callback set. Use mongoc_client_set_oidc_callback or "
+                 "mongoc_client_pool_set_oidc_callback.");
+      goto done;
+   }
+
+   mongoc_oidc_callback_params_t *params = mongoc_oidc_callback_params_new ();
+   mongoc_oidc_callback_params_set_user_data (params, mongoc_oidc_callback_get_user_data (tp->oidc.callback));
+   cred = mongoc_oidc_callback_get_fn (tp->oidc.callback) (params);
+   mongoc_oidc_callback_params_destroy (params);
+
+   if (!cred) {
+      SET_ERROR ("MONGODB-OIDC callback failed.");
+      goto done;
+   }
+
+   access_token = bson_strdup (mongoc_oidc_credential_get_access_token (cred));
+   // Transfer ownership to cache.
+   tp->oidc.cache.cred = cred;
+   cred = NULL;
+
+done:
+   bson_mutex_unlock (&tp->oidc.cache.lock);
+   return access_token;
+}
+
+
 bool
 _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
                                 mongoc_stream_t *stream,
@@ -38,33 +80,18 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
    bool ok = false;
    bson_t cmd = BSON_INITIALIZER;
    bson_t reply = BSON_INITIALIZER;
-   mongoc_oidc_credential_t *creds = NULL;
+   char *access_token = NULL;
    mongoc_server_stream_t *server_stream = NULL;
 
 
-   // Get access token.
-   {
-      mongoc_oidc_callback_t *oidc_callback = cluster->client->topology->oidc_callback;
-      if (!oidc_callback) {
-         SET_ERROR ("MONGODB-OIDC requested, but no callback set. Use mongoc_client_set_oidc_callback or "
-                    "mongoc_client_pool_set_oidc_callback.");
-         goto fail;
-      }
-
-      mongoc_oidc_callback_params_t *params = mongoc_oidc_callback_params_new ();
-      mongoc_oidc_callback_params_set_user_data (params, mongoc_oidc_callback_get_user_data (oidc_callback));
-      creds = mongoc_oidc_callback_get_fn (oidc_callback) (params);
-      mongoc_oidc_callback_params_destroy (params);
-
-      if (!creds) {
-         SET_ERROR ("MONGODB-OIDC callback failed.");
-         goto fail;
-      }
+   access_token = get_access_token (cluster->client->topology, error);
+   if (!access_token) {
+      goto fail;
    }
 
    // Build `saslStart` command:
    {
-      bsonBuildDecl (jwt_doc, kv ("jwt", cstr (mongoc_oidc_credential_get_access_token (creds))));
+      bsonBuildDecl (jwt_doc, kv ("jwt", cstr (access_token)));
       if (bsonBuildError) {
          SET_ERROR ("BSON error: %s", bsonBuildError);
          goto fail;
@@ -111,7 +138,7 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
    ok = true;
 fail:
    mongoc_server_stream_cleanup (server_stream);
-   mongoc_oidc_credential_destroy (creds);
+   bson_free (access_token);
    bson_destroy (&cmd);
    return ok;
 }

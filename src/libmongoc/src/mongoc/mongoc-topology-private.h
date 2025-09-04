@@ -235,10 +235,22 @@ typedef struct _mongoc_topology_t {
    // Some DNS servers truncate UDP responses without setting the truncated (TC) flag. This may result in no TCP retry.
    bool srv_prefer_tcp;
 
+   struct {
+      // oidc.callback is owned. NULL if unset. Setting oidc.callback is only expected before
+      // creating connections. Setting oidc_callback does not require locking.
+      mongoc_oidc_callback_t *callback;
 
-   // oidc_callback is owned. NULL if unset. It is not protected by a lock. It is only expected to be modified before
-   // creating connections.
-   mongoc_oidc_callback_t *oidc_callback;
+      struct {
+         // cred is a cached OIDC credential.
+         mongoc_oidc_credential_t *cred;
+
+         // lock is used to prevent concurrent calls to oidc.callback and guard access to oidc.cache.
+         bson_mutex_t lock;
+      } cache;
+
+   } oidc;
+
+
 } mongoc_topology_t;
 
 mongoc_topology_t *
