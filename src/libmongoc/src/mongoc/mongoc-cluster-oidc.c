@@ -33,7 +33,7 @@ get_access_token (mongoc_topology_t *tp, bson_error_t *error)
 
    mongoc_oidc_credential_t *cred = tp->oidc.cache.cred;
 
-   if (NULL == cred) {
+   if (NULL != cred) {
       // Credential is cached.
       access_token = bson_strdup (mongoc_oidc_credential_get_access_token (cred));
       goto done;
