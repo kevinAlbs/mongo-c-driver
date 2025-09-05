@@ -20,19 +20,11 @@
 #include <test-conveniences.h>
 #include <test-libmongoc.h>
 
-typedef struct {
-   int call_count;
-} callback_ctx_t;
-
-static mongoc_oidc_credential_t *
-oidc_callback_fn (mongoc_oidc_callback_params_t *params)
+static char *
+read_test_token (void)
 {
    FILE *token_file = fopen ("/tmp/tokens/test_machine", "r");
    ASSERT (token_file);
-
-   callback_ctx_t *ctx = mongoc_oidc_callback_params_get_user_data (params);
-   ASSERT (ctx);
-   ctx->call_count += 1;
 
    // Determine length of token:
    ASSERT (0 == fseek (token_file, 0, SEEK_END));
@@ -45,12 +37,42 @@ oidc_callback_fn (mongoc_oidc_callback_params_t *params)
    size_t nread = fread (token, 1, token_len, token_file);
    ASSERT (nread == (size_t) token_len);
    token[token_len] = '\0';
-
-   mongoc_oidc_credential_t *cred = mongoc_oidc_credential_new (token);
    fclose (token_file);
+   return token;
+}
+
+typedef struct {
+   int call_count;
+   bool validate_params;
+} callback_ctx_t;
+
+static mongoc_oidc_credential_t *
+oidc_callback_fn (mongoc_oidc_callback_params_t *params)
+{
+   callback_ctx_t *ctx = mongoc_oidc_callback_params_get_user_data (params);
+   ASSERT (ctx);
+   ctx->call_count += 1;
+
+   if (ctx->validate_params) {
+      const int64_t *timeout = mongoc_oidc_callback_params_get_timeout (params);
+      ASSERT (timeout);
+      // Expect the timeout to be set to 60 seconds from the start.
+      ASSERT_CMPINT64 (*timeout, >=, bson_get_monotonic_time ());
+      ASSERT_CMPINT64 (*timeout, <, bson_get_monotonic_time () + 60 * 1000 * 1000);
+
+      int version = mongoc_oidc_callback_params_get_version (params);
+      ASSERT_CMPINT (version, ==, 1);
+
+      const char *username = mongoc_oidc_callback_params_get_username (params);
+      ASSERT (!username);
+   }
+
+   char *token = read_test_token ();
+   mongoc_oidc_credential_t *cred = mongoc_oidc_credential_new (token);
    bson_free (token);
    return cred;
 }
+
 
 static bool
 do_find (mongoc_client_t *client, bson_error_t *error)
@@ -99,10 +121,7 @@ main (void)
 
    // Prose test: 1.1 Callback is called during authentication
    {
-      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017");
-      mongoc_uri_set_option_as_bool (uri, MONGOC_URI_RETRYREADS, false);
-      mongoc_uri_set_auth_mechanism (uri, "MONGODB-OIDC");
-
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
       mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
       ASSERT_OR_PRINT (client, error);
 
@@ -125,10 +144,7 @@ main (void)
 
    // Prose test: 1.2 Callback is called once for multiple connections
    {
-      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017");
-      mongoc_uri_set_option_as_bool (uri, MONGOC_URI_RETRYREADS, false);
-      mongoc_uri_set_auth_mechanism (uri, "MONGODB-OIDC");
-
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
       mongoc_client_pool_t *pool = mongoc_client_pool_new_with_error (uri, &error);
       ASSERT_OR_PRINT (pool, error);
 
@@ -153,6 +169,29 @@ main (void)
       ASSERT_CMPINT (ctx.call_count, ==, 1);
 
       mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_uri_destroy (uri);
+   }
+
+   // Prose test: 2.1 Valid Callback Inputs
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      ASSERT_OR_PRINT (client, error);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {.validate_params = true};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      // Expect auth to succeed:
+      ASSERT_OR_PRINT (do_find (client, &error), error);
+
+      // Expect callback was called exactly once.
+      ASSERT_CMPINT (ctx.call_count, ==, 1);
+
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
       mongoc_uri_destroy (uri);
    }
 

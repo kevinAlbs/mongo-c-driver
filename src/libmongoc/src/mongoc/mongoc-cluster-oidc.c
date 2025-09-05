@@ -47,6 +47,12 @@ get_access_token (mongoc_topology_t *tp, bson_error_t *error)
 
    mongoc_oidc_callback_params_t *params = mongoc_oidc_callback_params_new ();
    mongoc_oidc_callback_params_set_user_data (params, mongoc_oidc_callback_get_user_data (tp->oidc.callback));
+   {
+      // From spec: "If CSOT is not applied, then the driver MUST use 1 minute as the timeout."
+      // The timeout parameter (when set) is meant to be directly compared against bson_get_monotonic_time(). It is a
+      // time point, not a duration.
+      mongoc_oidc_callback_params_set_timeout (params, bson_get_monotonic_time () + 60 * 1000 * 1000);
+   }
    cred = mongoc_oidc_callback_get_fn (tp->oidc.callback) (params);
    mongoc_oidc_callback_params_destroy (params);
 
