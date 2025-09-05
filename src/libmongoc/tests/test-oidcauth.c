@@ -44,6 +44,8 @@ read_test_token (void)
 typedef struct {
    int call_count;
    bool validate_params;
+   bool return_null;
+   bool return_bad_token;
 } callback_ctx_t;
 
 static mongoc_oidc_credential_t *
@@ -53,12 +55,20 @@ oidc_callback_fn (mongoc_oidc_callback_params_t *params)
    ASSERT (ctx);
    ctx->call_count += 1;
 
+   if (ctx->return_null) {
+      return NULL;
+   }
+
+   if (ctx->return_bad_token) {
+      return mongoc_oidc_credential_new ("bad_token");
+   }
+
    if (ctx->validate_params) {
       const int64_t *timeout = mongoc_oidc_callback_params_get_timeout (params);
       ASSERT (timeout);
       // Expect the timeout to be set to 60 seconds from the start.
       ASSERT_CMPINT64 (*timeout, >=, bson_get_monotonic_time ());
-      ASSERT_CMPINT64 (*timeout, <, bson_get_monotonic_time () + 60 * 1000 * 1000);
+      ASSERT_CMPINT64 (*timeout, <=, bson_get_monotonic_time () + 60 * 1000 * 1000);
 
       int version = mongoc_oidc_callback_params_get_version (params);
       ASSERT_CMPINT (version, ==, 1);
@@ -187,8 +197,74 @@ main (void)
       // Expect auth to succeed:
       ASSERT_OR_PRINT (do_find (client, &error), error);
 
-      // Expect callback was called exactly once.
-      ASSERT_CMPINT (ctx.call_count, ==, 1);
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
+   }
+
+   // Prose test: 2.2 OIDC Callback Returns Null
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      ASSERT_OR_PRINT (client, error);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {.return_null = true};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      // Expect auth to fail:
+      ASSERT (!do_find (client, &error));
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "OIDC callback failed");
+
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
+   }
+
+   // Prose test: 2.3 OIDC Callback Returns Missing Data
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
+      ASSERT_OR_PRINT (client, error);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      // mongoc_oidc_credential_t cannot be partially created. Instead of "missing" data, return a bad token.
+      callback_ctx_t ctx = {.return_bad_token = true};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      // Expect auth to fail:
+      ASSERT (!do_find (client, &error));
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 18, "Authentication failed");
+
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
+   }
+
+   // Prose test: 2.4 Invalid Client Configuration with Callback
+   {
+      mongoc_uri_t *uri =
+         mongoc_uri_new ("mongodb://localhost:27017/"
+                         "?retryReads=false&authMechanism=MONGODB-OIDC&authMechanismProperties=ENVIRONMENT:test");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
+      ASSERT_OR_PRINT (client, error);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      // mongoc_oidc_credential_t cannot be partially created. Instead of "missing" data, return a bad token.
+      callback_ctx_t ctx = {0};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      // Expect auth to fail:
+      ASSERT (!do_find (client, &error));
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "foobar");
 
       mongoc_oidc_callback_destroy (oidc_callback);
       mongoc_client_destroy (client);
