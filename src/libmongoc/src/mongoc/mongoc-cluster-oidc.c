@@ -196,19 +196,22 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
       goto fail;
    }
 
-   if (!run_sasl_start (cluster, stream, sd, access_token, error)) {
-      if (error->code != MONGOC_SERVER_ERR_AUTHENTICATION) {
-         goto fail;
-      }
-      // Retry once:
-      invalidate_cache (cluster, access_token);
-      access_token = get_access_token (cluster->client, &is_cache, error);
-      if (!access_token) {
-         goto fail;
-      }
+   if (is_cache) {
       if (!run_sasl_start (cluster, stream, sd, access_token, error)) {
-         goto fail;
+         if (error->code != MONGOC_SERVER_ERR_AUTHENTICATION) {
+            goto fail;
+         }
+         // Retry getting the access token once:
+         invalidate_cache (cluster, access_token);
+         access_token = get_access_token (cluster->client, &is_cache, error);
       }
+   }
+
+   if (!access_token) {
+      goto fail;
+   }
+   if (!run_sasl_start (cluster, stream, sd, access_token, error)) {
+      goto fail;
    }
 
    ok = true;

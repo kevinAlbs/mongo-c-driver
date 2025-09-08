@@ -344,8 +344,6 @@ main (void)
       mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
       mongoc_client_set_oidc_callback (client, oidc_callback);
 
-      poison_client_cache (client);
-
       // Expect auth to fail:
       ASSERT (!do_find (client, &error));
       ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 18, "Authentication failed");
