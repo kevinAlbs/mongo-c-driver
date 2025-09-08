@@ -144,6 +144,31 @@ poison_client_cache (mongoc_client_t *client)
    bson_mutex_unlock (&tp->oidc.cache.lock);
 }
 
+static void
+configure_failpoint (const char *failpoint_json)
+// Configure failpoint on a separate client:
+{
+   bson_error_t error;
+   mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+   mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+   ASSERT_OR_PRINT (client, error);
+
+   // Configure OIDC callback:
+   mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+   callback_ctx_t ctx = {0};
+   mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+   mongoc_client_set_oidc_callback (client, oidc_callback);
+
+   // Configure fail point:
+   bson_t *failpoint = tmp_bson (failpoint_json);
+
+   ASSERT_OR_PRINT (mongoc_client_command_simple (client, "admin", failpoint, NULL, NULL, &error), error);
+
+   mongoc_oidc_callback_destroy (oidc_callback);
+   mongoc_client_destroy (client);
+   mongoc_uri_destroy (uri);
+}
+
 #define PROSE_TEST(desc) \
    for (int ctrl = printf ("%s ...\n", desc); ctrl != -1; ctrl = -1, printf ("%s ... done\n", desc))
 
@@ -358,60 +383,45 @@ main (void)
 
    PROSE_TEST ("3.3 Unexpected error code does not clear the cache")
    {
+      // Configure failpoint:
+      configure_failpoint (BSON_STR ({
+         "configureFailPoint" : "failCommand",
+         "mode" : {"times" : 1},
+         "data" : {"failCommands" : ["saslStart"], "errorCode" : 20}
+      }));
+
       mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      ASSERT_OR_PRINT (client, error);
+      mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
 
-      // Configure failpoint on a separate client:
-      {
-         mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
-         ASSERT_OR_PRINT (client, error);
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {0};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
 
-         // Configure OIDC callback:
-         mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
-         callback_ctx_t ctx = {0};
-         mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
-         mongoc_client_set_oidc_callback (client, oidc_callback);
+      // Expect auth to fail:
+      ASSERT (!do_find (client, &error));
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 20, "Failing command");
 
-         // Configure fail point:
-         bson_t *failpoint = tmp_bson (BSON_STR ({
-            "configureFailPoint" : "failCommand",
-            "mode" : {"times" : 1},
-            "data" : {"failCommands" : ["saslStart"], "errorCode" : 20}
-         }));
-         ASSERT_OR_PRINT (mongoc_client_command_simple (client, "admin", failpoint, NULL, NULL, &error), error);
+      // Expect callback was called.
+      ASSERT_CMPINT (ctx.call_count, ==, 1);
 
-         mongoc_client_destroy (client);
-      }
+      // Expect second attempt succeeds:
+      ASSERT_OR_PRINT (do_find (client, &error), error);
 
-      // Test authentication:
-      {
-         mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
-         ASSERT_OR_PRINT (client, error);
-         mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
+      // Expect callback was not called again.
+      ASSERT_CMPINT (ctx.call_count, ==, 1);
 
-         // Configure OIDC callback:
-         mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
-         callback_ctx_t ctx = {0};
-         mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
-         mongoc_client_set_oidc_callback (client, oidc_callback);
-
-         // Expect auth to fail:
-         ASSERT (!do_find (client, &error));
-         ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 20, "Failing command");
-
-         // Expect callback was called.
-         ASSERT_CMPINT (ctx.call_count, ==, 1);
-
-         // Expect second attempt succeeds:
-         ASSERT_OR_PRINT (do_find (client, &error), error);
-
-         // Expect callback was not called again.
-         ASSERT_CMPINT (ctx.call_count, ==, 1);
-
-         mongoc_oidc_callback_destroy (oidc_callback);
-         mongoc_client_destroy (client);
-         mongoc_uri_destroy (uri);
-      }
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
    }
+
+   PROSE_TEST ("4.1 Reauthentication Succeeds")
+   {
+      }
 
 
    ASSERT (false && "Not yet implemented");
