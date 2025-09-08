@@ -25,11 +25,15 @@
 #define SET_ERROR(...) _mongoc_set_error (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, __VA_ARGS__)
 
 static char *
-get_access_token (mongoc_client_t *client, bson_error_t *error)
+get_access_token (mongoc_client_t *client, bool *is_cache, bson_error_t *error)
 {
    BSON_ASSERT_PARAM (client);
+   BSON_ASSERT_PARAM (is_cache);
+
    mongoc_topology_t *tp = client->topology;
    char *access_token = NULL;
+
+   *is_cache = false;
 
    bson_mutex_lock (&tp->oidc.cache.lock);
 
@@ -38,6 +42,7 @@ get_access_token (mongoc_client_t *client, bson_error_t *error)
    if (NULL != cred) {
       // Credential is cached.
       access_token = bson_strdup (mongoc_oidc_credential_get_access_token (cred));
+      *is_cache = true;
       goto done;
    }
 
@@ -81,30 +86,22 @@ done:
    return access_token;
 }
 
-
-bool
-_mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
-                                mongoc_stream_t *stream,
-                                mongoc_server_description_t *sd,
-                                bson_error_t *error)
+static bool
+run_sasl_start (mongoc_cluster_t *cluster,
+                mongoc_stream_t *stream,
+                mongoc_server_description_t *sd,
+                const char *access_token,
+                bson_error_t *error)
 {
    BSON_ASSERT_PARAM (cluster);
    BSON_ASSERT_PARAM (stream);
    BSON_ASSERT_PARAM (sd);
-   BSON_ASSERT_PARAM (error);
-
-   bool ok = false;
+   BSON_ASSERT_PARAM (access_token);
+   BSON_OPTIONAL_PARAM (error);
+   mongoc_server_stream_t *server_stream = NULL;
    bson_t cmd = BSON_INITIALIZER;
    bson_t reply = BSON_INITIALIZER;
-   char *access_token = NULL;
-   mongoc_server_stream_t *server_stream = NULL;
-
-
-   access_token = get_access_token (cluster->client, error);
-   if (!access_token) {
-      goto fail;
-   }
-
+   bool ok = false;
    // Build `saslStart` command:
    {
       bsonBuildDecl (jwt_doc, kv ("jwt", cstr (access_token)));
@@ -152,9 +149,70 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
    }
 
    ok = true;
+
 fail:
    mongoc_server_stream_cleanup (server_stream);
-   bson_free (access_token);
    bson_destroy (&cmd);
+   return ok;
+}
+
+static void
+invalidate_cache (mongoc_cluster_t *cluster, const char *access_token)
+{
+   BSON_ASSERT_PARAM (cluster);
+   BSON_ASSERT_PARAM (access_token);
+
+   mongoc_topology_t *tp = cluster->client->topology;
+
+   bson_mutex_lock (&tp->oidc.cache.lock);
+
+   if (tp->oidc.cache.cred &&
+       0 == strcmp (mongoc_oidc_credential_get_access_token (tp->oidc.cache.cred), access_token)) {
+      mongoc_oidc_credential_destroy (tp->oidc.cache.cred);
+      tp->oidc.cache.cred = NULL;
+   }
+
+   bson_mutex_unlock (&tp->oidc.cache.lock);
+}
+
+bool
+_mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
+                                mongoc_stream_t *stream,
+                                mongoc_server_description_t *sd,
+                                bson_error_t *error)
+{
+   BSON_ASSERT_PARAM (cluster);
+   BSON_ASSERT_PARAM (stream);
+   BSON_ASSERT_PARAM (sd);
+   BSON_ASSERT_PARAM (error);
+
+   bool ok = false;
+   char *access_token = NULL;
+
+
+   bool is_cache = false;
+   access_token = get_access_token (cluster->client, &is_cache, error);
+   if (!access_token) {
+      goto fail;
+   }
+
+   if (!run_sasl_start (cluster, stream, sd, access_token, error)) {
+      if (error->code != MONGOC_SERVER_ERR_AUTHENTICATION) {
+         goto fail;
+      }
+      // Retry once:
+      invalidate_cache (cluster, access_token);
+      access_token = get_access_token (cluster->client, &is_cache, error);
+      if (!access_token) {
+         goto fail;
+      }
+      if (!run_sasl_start (cluster, stream, sd, access_token, error)) {
+         goto fail;
+      }
+   }
+
+   ok = true;
+fail:
+   bson_free (access_token);
    return ok;
 }
