@@ -25,8 +25,10 @@
 #define SET_ERROR(...) _mongoc_set_error (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, __VA_ARGS__)
 
 static char *
-get_access_token (mongoc_topology_t *tp, bson_error_t *error)
+get_access_token (mongoc_client_t *client, bson_error_t *error)
 {
+   BSON_ASSERT_PARAM (client);
+   mongoc_topology_t *tp = client->topology;
    char *access_token = NULL;
 
    bson_mutex_lock (&tp->oidc.cache.lock);
@@ -36,6 +38,14 @@ get_access_token (mongoc_topology_t *tp, bson_error_t *error)
    if (NULL != cred) {
       // Credential is cached.
       access_token = bson_strdup (mongoc_oidc_credential_get_access_token (cred));
+      goto done;
+   }
+
+   // From spec: "If both ENVIRONMENT and an OIDC Callback [...] are provided the driver MUST raise an error."
+   bson_t authMechanismProperties = BSON_INITIALIZER;
+   mongoc_uri_get_mechanism_properties (client->uri, &authMechanismProperties);
+   if (tp->oidc.callback && bson_has_field (&authMechanismProperties, "ENVIRONMENT")) {
+      SET_ERROR ("MONGODB-OIDC requested with both ENVIRONMENT and an OIDC Callback. Use one or the other.");
       goto done;
    }
 
@@ -90,7 +100,7 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
    mongoc_server_stream_t *server_stream = NULL;
 
 
-   access_token = get_access_token (cluster->client->topology, error);
+   access_token = get_access_token (cluster->client, error);
    if (!access_token) {
       goto fail;
    }

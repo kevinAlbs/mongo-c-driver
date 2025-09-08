@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <mongoc/mongoc-topology-private.h> // To poison the client cache.
+
 #include <mongoc/mongoc-oidc-callback.h>
 
 #include <TestSuite.h>
@@ -121,6 +123,25 @@ static BSON_THREAD_FUN (do_100_finds, pool_void)
       mongoc_client_pool_push (pool, client);
    }
    BSON_THREAD_RETURN;
+}
+
+static void
+poison_client_cache (mongoc_client_t *client)
+{
+   BSON_ASSERT_PARAM (client);
+   mongoc_topology_t *tp = client->topology;
+   BSON_ASSERT_PARAM (tp);
+   bson_mutex_lock (&tp->oidc.cache.lock);
+
+   if (tp->oidc.cache.cred) {
+      mongoc_oidc_credential_destroy (tp->oidc.cache.cred);
+      tp->oidc.cache.cred = NULL;
+   }
+
+   // Insert an invalid token into the cache:
+   tp->oidc.cache.cred = mongoc_oidc_credential_new ("bad_token");
+
+   bson_mutex_unlock (&tp->oidc.cache.lock);
 }
 
 int
@@ -264,7 +285,43 @@ main (void)
 
       // Expect auth to fail:
       ASSERT (!do_find (client, &error));
-      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "foobar");
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "Use one or the other");
+
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
+   }
+
+   // Prose test: 2.5 Invalid use of ALLOWED_HOSTS
+   {
+      mongoc_uri_t *uri = mongoc_uri_new_with_error (
+         "mongodb://localhost:27017/"
+         "?retryReads=false&authMechanism=MONGODB-OIDC&authMechanismProperties=ENVIRONMENT:azure,ALLOWED_HOSTS:",
+         &error);
+      ASSERT (!uri);
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "Unsupported");
+      mongoc_uri_destroy (uri);
+   }
+
+   // Prose test: 3.1 Authentication failure with cached tokens fetch a new token and retry auth
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      ASSERT_OR_PRINT (client, error);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {0};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      poison_client_cache (client);
+
+      // Expect auth to succeed:
+      ASSERT_OR_PRINT (do_find (client, &error), error);
+
+      // Expect callback was called exactly once.
+      ASSERT_CMPINT (ctx.call_count, ==, 1);
 
       mongoc_oidc_callback_destroy (oidc_callback);
       mongoc_client_destroy (client);
