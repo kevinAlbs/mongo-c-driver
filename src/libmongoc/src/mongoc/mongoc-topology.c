@@ -719,6 +719,7 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
 
    bson_destroy (topology->encrypted_fields_map);
 
+   bson_free (topology->oidc.cache.access_token);
    bson_mutex_destroy (&topology->oidc.cache.lock);
 
    bson_free (topology);

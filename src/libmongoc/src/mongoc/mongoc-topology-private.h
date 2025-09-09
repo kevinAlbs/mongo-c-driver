@@ -241,8 +241,8 @@ typedef struct _mongoc_topology_t {
       mongoc_oidc_callback_t *callback;
 
       struct {
-         // cred is a cached OIDC credential.
-         mongoc_oidc_credential_t *cred;
+         // access_token is a cached OIDC access token.
+         char *access_token;
 
          // lock is used to prevent concurrent calls to oidc.callback and guard access to oidc.cache.
          bson_mutex_t lock;

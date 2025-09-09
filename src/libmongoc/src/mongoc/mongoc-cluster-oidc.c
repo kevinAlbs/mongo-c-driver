@@ -32,16 +32,15 @@ get_access_token (mongoc_client_t *client, bool *is_cache, bson_error_t *error)
 
    mongoc_topology_t *tp = client->topology;
    char *access_token = NULL;
+   mongoc_oidc_credential_t *cred = NULL;
 
    *is_cache = false;
 
    bson_mutex_lock (&tp->oidc.cache.lock);
 
-   mongoc_oidc_credential_t *cred = tp->oidc.cache.cred;
-
-   if (NULL != cred) {
-      // Credential is cached.
-      access_token = bson_strdup (mongoc_oidc_credential_get_access_token (cred));
+   if (NULL != tp->oidc.cache.access_token) {
+      // Access token is cached.
+      access_token = bson_strdup (tp->oidc.cache.access_token);
       *is_cache = true;
       goto done;
    }
@@ -77,12 +76,11 @@ get_access_token (mongoc_client_t *client, bool *is_cache, bson_error_t *error)
    }
 
    access_token = bson_strdup (mongoc_oidc_credential_get_access_token (cred));
-   // Transfer ownership to cache.
-   tp->oidc.cache.cred = cred;
-   cred = NULL;
+   tp->oidc.cache.access_token = bson_strdup (access_token); // Cache a copy.
 
 done:
    bson_mutex_unlock (&tp->oidc.cache.lock);
+   mongoc_oidc_credential_destroy (cred);
    return access_token;
 }
 
@@ -166,10 +164,9 @@ invalidate_cache (mongoc_cluster_t *cluster, const char *access_token)
 
    bson_mutex_lock (&tp->oidc.cache.lock);
 
-   if (tp->oidc.cache.cred &&
-       0 == strcmp (mongoc_oidc_credential_get_access_token (tp->oidc.cache.cred), access_token)) {
-      mongoc_oidc_credential_destroy (tp->oidc.cache.cred);
-      tp->oidc.cache.cred = NULL;
+   if (tp->oidc.cache.access_token && 0 == strcmp (tp->oidc.cache.access_token, access_token)) {
+      bson_free (tp->oidc.cache.access_token);
+      tp->oidc.cache.access_token = NULL;
    }
 
    bson_mutex_unlock (&tp->oidc.cache.lock);

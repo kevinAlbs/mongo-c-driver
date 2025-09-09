@@ -133,13 +133,13 @@ poison_client_cache (mongoc_client_t *client)
    BSON_ASSERT_PARAM (tp);
    bson_mutex_lock (&tp->oidc.cache.lock);
 
-   if (tp->oidc.cache.cred) {
-      mongoc_oidc_credential_destroy (tp->oidc.cache.cred);
-      tp->oidc.cache.cred = NULL;
+   if (tp->oidc.cache.access_token) {
+      bson_free (tp->oidc.cache.access_token);
+      tp->oidc.cache.access_token = NULL;
    }
 
    // Insert an invalid token into the cache:
-   tp->oidc.cache.cred = mongoc_oidc_credential_new ("bad_token");
+   tp->oidc.cache.access_token = bson_strdup ("bad_token");
 
    bson_mutex_unlock (&tp->oidc.cache.lock);
 }
