@@ -194,6 +194,7 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
    }
 
    if (is_cache) {
+      mongoc_cluster_set_oidc_connection_cache_token (cluster, sd->id, access_token);
       if (!run_sasl_start (cluster, stream, sd, access_token, error)) {
          if (error->code != MONGOC_SERVER_ERR_AUTHENTICATION) {
             goto fail;
@@ -207,6 +208,7 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
    if (!access_token) {
       goto fail;
    }
+   mongoc_cluster_set_oidc_connection_cache_token (cluster, sd->id, access_token);
    if (!run_sasl_start (cluster, stream, sd, access_token, error)) {
       goto fail;
    }
@@ -215,4 +217,20 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
 fail:
    bson_free (access_token);
    return ok;
+}
+
+bool
+_mongoc_cluster_reauth_node_oidc (mongoc_cluster_t *cluster,
+                                  mongoc_stream_t *stream,
+                                  mongoc_server_description_t *sd,
+                                  bson_error_t *error)
+{
+   char *connection_cached_token = mongoc_cluster_get_oidc_connection_cache_token (cluster, sd->id);
+   if (connection_cached_token) {
+      // Invalidate shared cache:
+      invalidate_cache (cluster, connection_cached_token); // Does nothing if token was already invalidated.
+      // Clear connection cached:
+      mongoc_cluster_set_oidc_connection_cache_token (cluster, sd->id, NULL);
+   }
+   return _mongoc_cluster_auth_node_oidc (cluster, stream, sd, error);
 }

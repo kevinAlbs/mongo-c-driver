@@ -64,6 +64,9 @@ typedef struct _mongoc_cluster_t {
 
    mongoc_set_t *nodes;
    mongoc_array_t iov;
+
+   // oidc_connection_cache maps server ID to OIDC access token.
+   mongoc_set_t *oidc_connection_cache;
 } mongoc_cluster_t;
 
 
@@ -81,6 +84,16 @@ mongoc_cluster_reset_sockettimeoutms (mongoc_cluster_t *cluster);
 
 void
 mongoc_cluster_disconnect_node (mongoc_cluster_t *cluster, uint32_t id);
+
+// mongoc_cluster_get_oidc_connection_cache_token returns the connection cached OIDC access token or NULL.
+char *
+mongoc_cluster_get_oidc_connection_cache_token (mongoc_cluster_t *cluster, uint32_t server_id);
+
+// mongoc_cluster_set_oidc_connection_cache_token sets or clears a connection cached OIDC access token.
+void
+mongoc_cluster_set_oidc_connection_cache_token (mongoc_cluster_t *cluster,
+                                                uint32_t server_id,
+                                                const char *access_token);
 
 int32_t
 mongoc_cluster_get_max_bson_obj_size (mongoc_cluster_t *cluster);

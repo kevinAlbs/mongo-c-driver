@@ -466,26 +466,9 @@ _handle_txn_error_labels (bool cmd_ret, const bson_error_t *cmd_err, const mongo
    _mongoc_write_error_handle_labels (cmd_ret, cmd_err, reply, cmd->server_stream->sd);
 }
 
-/*
- *--------------------------------------------------------------------------
- *
- * mongoc_cluster_run_command_monitored --
- *
- *       Internal function to run a command on a given stream.
- *       @error and @reply are optional out-pointers.
- *
- * Returns:
- *       true if successful; otherwise false and @error is set.
- *
- * Side effects:
- *       If the client's APM callbacks are set, they are executed.
- *       @reply is set and should ALWAYS be released with bson_destroy().
- *
- *--------------------------------------------------------------------------
- */
-
-bool
-mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster, mongoc_cmd_t *cmd, bson_t *reply, bson_error_t *error)
+// run_command_monitored is an internal helper to run a command with APM monitoring.
+static bool
+run_command_monitored (mongoc_cluster_t *cluster, mongoc_cmd_t *cmd, bson_t *reply, bson_error_t *error)
 {
    bool retval;
    const int32_t request_id = ++cluster->request_id;
@@ -659,6 +642,60 @@ fail_no_events:
    _mongoc_topology_update_last_used (cluster->client->topology, server_id);
 
    return retval;
+}
+
+static bool
+is_reauthentication_error (const bson_error_t *error, int error_api_version)
+{
+   uint32_t expected_domain =
+      error_api_version == MONGOC_ERROR_API_VERSION_2 ? MONGOC_ERROR_SERVER : MONGOC_ERROR_QUERY;
+   return error->domain == expected_domain && error->code == MONGOC_SERVER_ERR_REAUTHENTICATION_REQUIRED;
+}
+
+/*
+ *--------------------------------------------------------------------------
+ *
+ * mongoc_cluster_run_command_monitored --
+ *
+ *       Internal function to run a command on a given stream.
+ *       @error and @reply are optional out-pointers.
+ *       If the server returns a ReauthenticationRequired error, auth
+ *       may be re-attempted.
+ *
+ * Returns:
+ *       true if successful; otherwise false and @error is set.
+ *
+ * Side effects:
+ *       If the client's APM callbacks are set, they are executed.
+ *       @reply is set and should ALWAYS be released with bson_destroy().
+ *
+ *--------------------------------------------------------------------------
+ */
+
+bool
+mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster, mongoc_cmd_t *cmd, bson_t *reply, bson_error_t *error)
+{
+   bool ok = run_command_monitored (cluster, cmd, reply, error);
+   if (!ok) {
+      const char *mechanism = mongoc_uri_get_auth_mechanism (cluster->uri);
+      bool using_oidc = mechanism && 0 == strcasecmp (mechanism, "MONGODB-OIDC");
+      printf ("Got error\n");
+
+      // From auth spec:
+      // > If any operation fails with `ReauthenticationRequired` (error code 391) and MONGODB-OIDC is in use, the
+      // > driver MUST reauthenticate the connection.
+      if (using_oidc && is_reauthentication_error (error, cluster->client->error_api_version)) {
+         printf ("Detected reauth error ... going to reauth\n");
+         if (reply) {
+            bson_destroy (reply);
+         }
+         if (!_mongoc_cluster_reauth_node_oidc (cluster, cmd->server_stream->stream, cmd->server_stream->sd, error)) {
+            return false;
+         }
+         return run_command_monitored (cluster, cmd, reply, error);
+      }
+   }
+   return ok;
 }
 
 
@@ -1682,6 +1719,31 @@ mongoc_cluster_disconnect_node (mongoc_cluster_t *cluster, uint32_t server_id)
    EXIT;
 }
 
+char *
+mongoc_cluster_get_oidc_connection_cache_token (mongoc_cluster_t *cluster, uint32_t server_id)
+{
+   BSON_ASSERT_PARAM (cluster);
+   const char *got = mongoc_set_get (cluster->oidc_connection_cache, server_id);
+   if (got) {
+      return bson_strdup (got);
+   }
+   return NULL;
+}
+
+void
+mongoc_cluster_set_oidc_connection_cache_token (mongoc_cluster_t *cluster, uint32_t server_id, const char *access_token)
+{
+   BSON_ASSERT_PARAM (cluster);
+   BSON_OPTIONAL_PARAM (access_token); // NULL to clear access token.
+
+   // Remove cached token if exists.
+   mongoc_set_rm (cluster->oidc_connection_cache, server_id);
+
+   if (access_token) {
+      mongoc_set_add (cluster->oidc_connection_cache, server_id, (void *) bson_strdup (access_token));
+   }
+}
+
 static void
 _mongoc_cluster_node_destroy (mongoc_cluster_node_t *node)
 {
@@ -2318,6 +2380,13 @@ _cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
    }
 }
 
+static void
+free_oidc_cached_token (void *data, void *ctx)
+{
+   bson_free (data);
+   BSON_UNUSED (ctx);
+}
+
 /*
  *--------------------------------------------------------------------------
  *
@@ -2359,6 +2428,8 @@ mongoc_cluster_init (mongoc_cluster_t *cluster, const mongoc_uri_t *uri, void *c
    /* TODO for single-threaded case we don't need this */
    cluster->nodes = mongoc_set_new (8, _mongoc_cluster_node_dtor, NULL);
 
+   cluster->oidc_connection_cache = mongoc_set_new (8, free_oidc_cached_token, NULL);
+
    _mongoc_array_init (&cluster->iov, sizeof (mongoc_iovec_t));
 
    cluster->operation_id = _mongoc_simple_rand_uint64_t ();
@@ -2393,6 +2464,8 @@ mongoc_cluster_destroy (mongoc_cluster_t *cluster) /* INOUT */
    mongoc_uri_destroy (cluster->uri);
 
    mongoc_set_destroy (cluster->nodes);
+
+   mongoc_set_destroy (cluster->oidc_connection_cache);
 
    _mongoc_array_destroy (&cluster->iov);
 
