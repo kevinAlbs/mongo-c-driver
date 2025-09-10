@@ -117,6 +117,24 @@ fail:
    return ret;
 }
 
+static bool
+do_insert (mongoc_client_t *client, bson_error_t *error)
+{
+   mongoc_collection_t *coll = NULL;
+   bool ret = false;
+   bson_t doc = BSON_INITIALIZER;
+
+   coll = mongoc_client_get_collection (client, "test", "test");
+   if (!mongoc_collection_insert_one (coll, &doc, NULL, NULL, error)) {
+      goto fail;
+   }
+
+   ret = true;
+fail:
+   mongoc_collection_destroy (coll);
+   return ret;
+}
+
 static BSON_THREAD_FUN (do_100_finds, pool_void)
 {
    mongoc_client_pool_t *pool = pool_void;
@@ -487,6 +505,37 @@ main (void)
       mongoc_uri_destroy (uri);
    }
 
+   PROSE_TEST ("4.3 Write Commands Fail If Reauthentication Fails")
+   {
+      // Configure failpoint:
+      configure_failpoint (BSON_STR ({
+         "configureFailPoint" : "failCommand",
+         "mode" : {"times" : 1},
+         "data" : {"failCommands" : ["insert"], "errorCode" : 391}
+      }));
+
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      ASSERT_OR_PRINT (client, error);
+      mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {.return_bad_token_after_first_call = true};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      // Expect auth to fail:
+      ASSERT (!do_insert (client, &error));
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 18, "Authentication failed");
+
+      // Expect callback was called twice: once for initial auth, once for reauth.
+      ASSERT_CMPINT (ctx.call_count, ==, 2);
+
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
+   }
 
    ASSERT (false && "Not yet implemented");
    mongoc_cleanup ();
