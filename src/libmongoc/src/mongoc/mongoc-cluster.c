@@ -688,6 +688,7 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster, mongoc_cmd_t *c
          printf ("Detected reauth error ... going to reauth\n");
          if (reply) {
             bson_destroy (reply);
+            bson_init (reply);
          }
          if (!_mongoc_cluster_reauth_node_oidc (cluster, cmd->server_stream->stream, cmd->server_stream->sd, error)) {
             return false;

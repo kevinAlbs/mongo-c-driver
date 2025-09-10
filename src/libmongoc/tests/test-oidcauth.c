@@ -48,6 +48,7 @@ typedef struct {
    bool validate_params;
    bool return_null;
    bool return_bad_token;
+   bool return_bad_token_after_first_call;
 } callback_ctx_t;
 
 static mongoc_oidc_credential_t *
@@ -62,6 +63,10 @@ oidc_callback_fn (mongoc_oidc_callback_params_t *params)
    }
 
    if (ctx->return_bad_token) {
+      return mongoc_oidc_credential_new ("bad_token");
+   }
+
+   if (ctx->return_bad_token_after_first_call && ctx->call_count > 1) {
       return mongoc_oidc_credential_new ("bad_token");
    }
 
@@ -441,6 +446,38 @@ main (void)
 
       // Expect auth to succeed:
       ASSERT_OR_PRINT (do_find (client, &error), error);
+
+      // Expect callback was called twice: once for initial auth, once for reauth.
+      ASSERT_CMPINT (ctx.call_count, ==, 2);
+
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
+   }
+
+   PROSE_TEST ("4.2 Read Commands Fail If Reauthentication Fails")
+   {
+      // Configure failpoint:
+      configure_failpoint (BSON_STR ({
+         "configureFailPoint" : "failCommand",
+         "mode" : {"times" : 1},
+         "data" : {"failCommands" : ["find"], "errorCode" : 391}
+      }));
+
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      ASSERT_OR_PRINT (client, error);
+      mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {.return_bad_token_after_first_call = true};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      // Expect auth to fail:
+      ASSERT (!do_find (client, &error));
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 18, "Authentication failed");
 
       // Expect callback was called twice: once for initial auth, once for reauth.
       ASSERT_CMPINT (ctx.call_count, ==, 2);
