@@ -679,13 +679,11 @@ mongoc_cluster_run_command_monitored (mongoc_cluster_t *cluster, mongoc_cmd_t *c
    if (!ok) {
       const char *mechanism = mongoc_uri_get_auth_mechanism (cluster->uri);
       bool using_oidc = mechanism && 0 == strcasecmp (mechanism, "MONGODB-OIDC");
-      printf ("Got error\n");
 
       // From auth spec:
       // > If any operation fails with `ReauthenticationRequired` (error code 391) and MONGODB-OIDC is in use, the
       // > driver MUST reauthenticate the connection.
       if (using_oidc && is_reauthentication_error (error, cluster->client->error_api_version)) {
-         printf ("Detected reauth error ... going to reauth\n");
          if (reply) {
             bson_destroy (reply);
             bson_init (reply);
