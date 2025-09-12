@@ -265,7 +265,7 @@ main (void)
       mongoc_uri_destroy (uri);
    }
 
-   PROSE_TEST ("Prose test: 1.2 Callback is called once for multiple connections")
+   PROSE_TEST ("1.2 Callback is called once for multiple connections")
    {
       mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
       mongoc_client_pool_t *pool = mongoc_client_pool_new_with_error (uri, &error);
@@ -295,7 +295,7 @@ main (void)
       mongoc_uri_destroy (uri);
    }
 
-   PROSE_TEST ("Prose test: 2.1 Valid Callback Inputs")
+   PROSE_TEST ("2.1 Valid Callback Inputs")
    {
       mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
       mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
@@ -315,7 +315,7 @@ main (void)
       mongoc_uri_destroy (uri);
    }
 
-   PROSE_TEST ("Prose test: 2.2 OIDC Callback Returns Null")
+   PROSE_TEST ("2.2 OIDC Callback Returns Null")
    {
       mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
       mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
@@ -336,7 +336,7 @@ main (void)
       mongoc_uri_destroy (uri);
    }
 
-   PROSE_TEST ("Prose test: 2.3 OIDC Callback Returns Missing Data")
+   PROSE_TEST ("2.3 OIDC Callback Returns Missing Data")
    {
       mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
       mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
@@ -359,7 +359,7 @@ main (void)
       mongoc_uri_destroy (uri);
    }
 
-   PROSE_TEST ("Prose test: 2.4 Invalid Client Configuration with Callback")
+   PROSE_TEST ("2.4 Invalid Client Configuration with Callback")
    {
       mongoc_uri_t *uri =
          mongoc_uri_new ("mongodb://localhost:27017/"
@@ -384,7 +384,7 @@ main (void)
       mongoc_uri_destroy (uri);
    }
 
-   PROSE_TEST ("Prose test: 2.5 Invalid use of ALLOWED_HOSTS")
+   PROSE_TEST ("2.5 Invalid use of ALLOWED_HOSTS")
    {
       mongoc_uri_t *uri = mongoc_uri_new_with_error (
          "mongodb://localhost:27017/"
@@ -395,7 +395,7 @@ main (void)
       mongoc_uri_destroy (uri);
    }
 
-   PROSE_TEST ("Prose test: 3.1 Authentication failure with cached tokens fetch a new token and retry auth")
+   PROSE_TEST ("3.1 Authentication failure with cached tokens fetch a new token and retry auth")
    {
       mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
       mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
