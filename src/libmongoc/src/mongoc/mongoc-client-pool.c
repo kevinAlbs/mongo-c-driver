@@ -692,5 +692,5 @@ mongoc_client_pool_set_oidc_callback (mongoc_client_pool_t *pool, const mongoc_o
    BSON_ASSERT_PARAM (pool);
    BSON_ASSERT_PARAM (callback);
 
-   pool->topology->oidc.callback = mongoc_oidc_callback_copy (callback);
+   mongoc_oidc_set_callback (pool->topology->oidc, callback);
 }

@@ -29,6 +29,7 @@
 #include <mongoc/mongoc-apm-private.h>
 #include <mongoc/mongoc-async-cmd-private.h>
 #include <mongoc/mongoc-async-private.h>
+#include <mongoc/mongoc-cluster-oidc-private.h>
 #include <mongoc/mongoc-crypto-private.h>
 #include <mongoc/mongoc-handshake-private.h>
 #include <mongoc/mongoc-scram-private.h>
@@ -148,6 +149,10 @@ typedef struct mongoc_topology_scanner {
    mongoc_server_api_t *api;
    mongoc_log_and_monitor_instance_t *log_and_monitor; // Not null.
    bool loadbalanced;
+
+   // oidc is used to create the OIDC speculative auth command.
+   mongoc_oidc_t *oidc;
+   mongoc_set_t *oidc_connection_cache;
 } mongoc_topology_scanner_t;
 
 mongoc_topology_scanner_t *
@@ -210,6 +215,9 @@ mongoc_topology_scanner_get_node (mongoc_topology_scanner_t *ts, uint32_t id);
 void
 _mongoc_topology_scanner_add_speculative_authentication (bson_t *cmd,
                                                          const mongoc_uri_t *uri,
+                                                         mongoc_oidc_t *oidc /* OPTIONAL */,
+                                                         mongoc_set_t *oidc_connection_cache /* OPTIONAL */,
+                                                         uint32_t server_id,
                                                          mongoc_scram_t *scram /* OUT */);
 
 void
@@ -270,6 +278,13 @@ mongoc_topology_scanner_uses_server_api (const mongoc_topology_scanner_t *ts);
 /* Returns true if load balancing mode has been selected, otherwise false. */
 bool
 mongoc_topology_scanner_uses_loadbalanced (const mongoc_topology_scanner_t *ts);
+
+void
+_mongoc_topology_scanner_set_oidc (mongoc_topology_scanner_t *ts, mongoc_oidc_t *oidc);
+
+// _mongoc_topology_scanner_set_oidc_connection_cache is only used for single-threaded scanner.
+void
+_mongoc_topology_scanner_set_oidc_connection_cache (mongoc_topology_scanner_t *ts, mongoc_set_t *oidc_connection_cache);
 
 BSON_END_DECLS
 

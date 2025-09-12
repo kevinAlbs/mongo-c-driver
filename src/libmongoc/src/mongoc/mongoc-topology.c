@@ -391,7 +391,7 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
 
    topology = (mongoc_topology_t *) bson_malloc0 (sizeof *topology);
 
-   bson_mutex_init (&topology->oidc.cache.lock);
+   topology->oidc = mongoc_oidc_new ();
 
    // Check if requested to use TCP for SRV lookup.
    {
@@ -467,7 +467,7 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
                                                     _mongoc_topology_scanner_cb,
                                                     topology,
                                                     topology->connect_timeout_msec);
-
+   _mongoc_topology_scanner_set_oidc (topology->scanner, topology->oidc);
    bson_mutex_init (&topology->tpld_modification_mtx);
    mongoc_cond_init (&topology->cond_client);
 
@@ -719,8 +719,7 @@ mongoc_topology_destroy (mongoc_topology_t *topology)
 
    bson_destroy (topology->encrypted_fields_map);
 
-   bson_free (topology->oidc.cache.access_token);
-   bson_mutex_destroy (&topology->oidc.cache.lock);
+   mongoc_oidc_destroy (topology->oidc);
 
    bson_free (topology);
 }

@@ -1160,6 +1160,9 @@ _mongoc_client_new_from_topology (mongoc_topology_t *topology)
 
    mongoc_cluster_init (&client->cluster, client->uri, client);
 
+   _mongoc_topology_scanner_set_oidc_connection_cache (client->topology->scanner,
+                                                       client->cluster.oidc_connection_cache);
+
 #ifdef MONGOC_ENABLE_SSL
    client->use_ssl = false;
    if (mongoc_uri_get_tls (client->uri)) {
@@ -2736,5 +2739,5 @@ mongoc_client_set_oidc_callback (mongoc_client_t *client, const mongoc_oidc_call
       return;
    }
 
-   client->topology->oidc.callback = mongoc_oidc_callback_copy (callback);
+   mongoc_oidc_set_callback (client->topology->oidc, callback);
 }

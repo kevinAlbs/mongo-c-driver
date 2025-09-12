@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <mongoc/mongoc-counters-private.h>
 #include <mongoc/mongoc-topology-private.h> // To poison the client cache.
 
 #include <mongoc/mongoc-oidc-callback.h>
@@ -118,6 +119,46 @@ fail:
 }
 
 static bool
+do_find_with_session (mongoc_client_t *client, bson_error_t *error)
+{
+   mongoc_collection_t *coll = NULL;
+   mongoc_cursor_t *cursor = NULL;
+   bool ret = false;
+   bson_t filter = BSON_INITIALIZER;
+   bson_t opts = BSON_INITIALIZER;
+   mongoc_client_session_t *sess = NULL;
+
+   // Create session:
+   sess = mongoc_client_start_session (client, NULL, error);
+   if (!sess) {
+      goto fail;
+   }
+
+   if (!mongoc_client_session_append (sess, &opts, error)) {
+      goto fail;
+   }
+
+   coll = mongoc_client_get_collection (client, "test", "test");
+   cursor = mongoc_collection_find_with_opts (coll, &filter, &opts, NULL);
+
+   const bson_t *doc;
+   while (mongoc_cursor_next (cursor, &doc))
+      ;
+
+   if (mongoc_cursor_error (cursor, error)) {
+      goto fail;
+   }
+
+   ret = true;
+fail:
+   mongoc_client_session_destroy (sess);
+   bson_destroy (&opts);
+   mongoc_cursor_destroy (cursor);
+   mongoc_collection_destroy (coll);
+   return ret;
+}
+
+static bool
 do_insert (mongoc_client_t *client, bson_error_t *error)
 {
    mongoc_collection_t *coll = NULL;
@@ -148,23 +189,23 @@ static BSON_THREAD_FUN (do_100_finds, pool_void)
    BSON_THREAD_RETURN;
 }
 
+extern void
+mongoc_oidc_overwrite_access_token (mongoc_oidc_t *oidc, const char *access_token);
+
 static void
 poison_client_cache (mongoc_client_t *client)
 {
    BSON_ASSERT_PARAM (client);
-   mongoc_topology_t *tp = client->topology;
-   BSON_ASSERT_PARAM (tp);
-   bson_mutex_lock (&tp->oidc.cache.lock);
+   mongoc_oidc_overwrite_access_token (client->topology->oidc, "bad_token");
+}
 
-   if (tp->oidc.cache.access_token) {
-      bson_free (tp->oidc.cache.access_token);
-      tp->oidc.cache.access_token = NULL;
-   }
-
-   // Insert an invalid token into the cache:
-   tp->oidc.cache.access_token = bson_strdup ("bad_token");
-
-   bson_mutex_unlock (&tp->oidc.cache.lock);
+static void
+populate_client_cache (mongoc_client_t *client)
+{
+   BSON_ASSERT_PARAM (client);
+   char *access_token = read_test_token ();
+   mongoc_oidc_overwrite_access_token (client->topology->oidc, access_token);
+   bson_free (access_token);
 }
 
 static void
@@ -537,6 +578,104 @@ main (void)
       mongoc_uri_destroy (uri);
    }
 
-   ASSERT (false && "Not yet implemented");
+   // If counters are enabled, define operation count checks:
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
+#define OPCOUNT() mongoc_counter_op_egress_total_count ()
+#define ASSERT_OPCOUNT(x) ASSERT_CMPINT32 (mongoc_counter_op_egress_total_count (), ==, x)
+#else
+#define OPCOUNT() 0
+#define ASSERT_OPCOUNT(x) ((void) 0)
+#endif
+
+   PROSE_TEST ("4.4 Speculative Authentication should be ignored on Reauthentication")
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      ASSERT_OR_PRINT (client, error);
+      mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {0};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      // Populate client cache with a valid access token to enforce speculative authentication:
+      populate_client_cache (client);
+
+      // Expect successful auth without sending saslStart:
+      {
+         int32_t opcount = OPCOUNT ();
+
+         // Expect auth to succeed:
+         ASSERT_OR_PRINT (do_insert (client, &error), error);
+
+         // Expect callback was not called:
+         ASSERT_CMPINT (ctx.call_count, ==, 0);
+
+         // Expect two commands sent: hello + insert.
+         // Expect saslStart was not sent.
+         // TODO(CDRIVER-2669): check command started events instead of counters.
+         ASSERT_OPCOUNT (opcount + 2);
+      }
+
+      // Expect successful reauth with sending saslStart:
+      {
+         // Configure failpoint:
+         configure_failpoint (BSON_STR ({
+            "configureFailPoint" : "failCommand",
+            "mode" : {"times" : 1},
+            "data" : {"failCommands" : ["insert"], "errorCode" : 391}
+         }));
+
+         int32_t opcount = OPCOUNT ();
+
+         // Expect auth to succeed (after reauth):
+         ASSERT_OR_PRINT (do_insert (client, &error), error);
+
+         // Expect callback was called:
+         ASSERT_CMPINT (ctx.call_count, ==, 1);
+
+         // Check that three commands were sent: insert (fails) + saslStart + insert (succeeds).
+         // TODO(CDRIVER-2669): check command started events instead.
+         ASSERT_OPCOUNT (opcount + 3);
+      }
+
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
+   }
+
+   PROSE_TEST ("4.5 Reauthentication Succeeds when a Session is involved")
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      ASSERT_OR_PRINT (client, error);
+      mongoc_client_set_error_api (client, MONGOC_ERROR_API_VERSION_2);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {0};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      // Configure failpoint:
+      configure_failpoint (BSON_STR ({
+         "configureFailPoint" : "failCommand",
+         "mode" : {"times" : 1},
+         "data" : {"failCommands" : ["find"], "errorCode" : 391}
+      }));
+
+      // Expect find on a session succeeds:
+      ASSERT (do_find_with_session (client, &error));
+
+      // Expect callback was called twice:
+      ASSERT_CMPINT (ctx.call_count, ==, 2);
+
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
+      mongoc_uri_destroy (uri);
+   }
+
    mongoc_cleanup ();
 }

@@ -22,7 +22,132 @@
 #include <mongoc/mongoc-server-description-private.h>
 #include <mongoc/mongoc-stream-private.h>
 
+struct mongoc_oidc_t {
+   // oidc.callback is owned. NULL if unset. Setting oidc.callback is only expected before
+   // creating connections. Setting oidc_callback does not require locking.
+   mongoc_oidc_callback_t *callback;
+
+   struct {
+      // access_token is a cached OIDC access token.
+      char *access_token;
+
+      // lock is used to prevent concurrent calls to oidc.callback and guard access to oidc.cache.
+      bson_mutex_t lock;
+   } cache;
+};
+
+mongoc_oidc_t *
+mongoc_oidc_new (void)
+{
+   mongoc_oidc_t *oidc = bson_malloc0 (sizeof (mongoc_oidc_t));
+   bson_mutex_init (&oidc->cache.lock);
+   return oidc;
+}
+
+void
+mongoc_oidc_set_callback (mongoc_oidc_t *oidc, const mongoc_oidc_callback_t *cb)
+{
+   BSON_ASSERT_PARAM (oidc);
+   BSON_ASSERT_PARAM (cb);
+   oidc->callback = mongoc_oidc_callback_copy (cb);
+}
+
+void
+mongoc_oidc_destroy (mongoc_oidc_t *oidc)
+{
+   if (!oidc) {
+      return;
+   }
+   bson_mutex_destroy (&oidc->cache.lock);
+   mongoc_oidc_callback_destroy (oidc->callback);
+   bson_free (oidc);
+}
+
+// mongoc_oidc_overwrite_access_token is used by tests to override cached tokens.
+void
+mongoc_oidc_overwrite_access_token (mongoc_oidc_t *oidc, const char *access_token)
+{
+   BSON_ASSERT_PARAM (oidc);
+   bson_mutex_lock (&oidc->cache.lock);
+
+   if (oidc->cache.access_token) {
+      bson_free (oidc->cache.access_token);
+      oidc->cache.access_token = NULL;
+   }
+
+   oidc->cache.access_token = access_token ? bson_strdup (access_token) : NULL;
+   bson_mutex_unlock (&oidc->cache.lock);
+}
+
 #define SET_ERROR(...) _mongoc_set_error (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, __VA_ARGS__)
+
+bool
+mongoc_oidc_append_speculative_auth (mongoc_oidc_t *oidc,
+                                     mongoc_set_t *oidc_connection_cache,
+                                     uint32_t server_id,
+                                     bson_t *cmd,
+                                     bool *has_auth,
+                                     bson_error_t *error)
+{
+   BSON_ASSERT_PARAM (oidc);
+   BSON_ASSERT_PARAM (cmd);
+   BSON_ASSERT_PARAM (has_auth);
+   BSON_OPTIONAL_PARAM (error);
+   bool ok = false;
+
+   char *access_token = NULL;
+   {
+      bson_mutex_lock (&oidc->cache.lock);
+      if (oidc->cache.access_token) {
+         access_token = bson_strdup (oidc->cache.access_token);
+      }
+      bson_mutex_unlock (&oidc->cache.lock);
+   }
+
+   if (!access_token) {
+      // No token cached yet. Not an error, but do not add auth command.
+      *has_auth = false;
+      return true;
+   }
+
+   // TODO: use a specific interface for updating connection cache.
+   {
+      // Remove cached token if exists.
+      mongoc_set_rm (oidc_connection_cache, server_id);
+      mongoc_set_add (oidc_connection_cache, server_id, (void *) bson_strdup (access_token));
+   }
+
+   *has_auth = true;
+
+   // Build `saslStart` command:
+   {
+      bsonBuildDecl (jwt_doc, kv ("jwt", cstr (access_token)));
+      if (bsonBuildError) {
+         SET_ERROR ("BSON error: %s", bsonBuildError);
+         goto fail;
+      }
+
+      bson_init (cmd);
+      bsonBuild (*cmd,
+                 kv ("saslStart", int32 (1)),
+                 kv ("mechanism", cstr ("MONGODB-OIDC")),
+                 kv ("payload", binary (BSON_SUBTYPE_BINARY, bson_get_data (&jwt_doc), jwt_doc.len)),
+                 kv ("db", cstr ("$external")));
+
+      if (bsonBuildError) {
+         SET_ERROR ("BSON error: %s", bsonBuildError);
+         bson_destroy (&jwt_doc);
+         goto fail;
+      }
+
+      bson_destroy (&jwt_doc);
+   }
+
+   ok = true;
+fail:
+   bson_free (access_token);
+   return ok;
+}
 
 static char *
 get_access_token (mongoc_client_t *client, bool *is_cache, bson_error_t *error)
@@ -36,11 +161,11 @@ get_access_token (mongoc_client_t *client, bool *is_cache, bson_error_t *error)
 
    *is_cache = false;
 
-   bson_mutex_lock (&tp->oidc.cache.lock);
+   bson_mutex_lock (&tp->oidc->cache.lock);
 
-   if (NULL != tp->oidc.cache.access_token) {
+   if (NULL != tp->oidc->cache.access_token) {
       // Access token is cached.
-      access_token = bson_strdup (tp->oidc.cache.access_token);
+      access_token = bson_strdup (tp->oidc->cache.access_token);
       *is_cache = true;
       goto done;
    }
@@ -48,26 +173,26 @@ get_access_token (mongoc_client_t *client, bool *is_cache, bson_error_t *error)
    // From spec: "If both ENVIRONMENT and an OIDC Callback [...] are provided the driver MUST raise an error."
    bson_t authMechanismProperties = BSON_INITIALIZER;
    mongoc_uri_get_mechanism_properties (client->uri, &authMechanismProperties);
-   if (tp->oidc.callback && bson_has_field (&authMechanismProperties, "ENVIRONMENT")) {
+   if (tp->oidc->callback && bson_has_field (&authMechanismProperties, "ENVIRONMENT")) {
       SET_ERROR ("MONGODB-OIDC requested with both ENVIRONMENT and an OIDC Callback. Use one or the other.");
       goto done;
    }
 
-   if (!tp->oidc.callback) {
+   if (!tp->oidc->callback) {
       SET_ERROR ("MONGODB-OIDC requested, but no callback set. Use mongoc_client_set_oidc_callback or "
                  "mongoc_client_pool_set_oidc_callback.");
       goto done;
    }
 
    mongoc_oidc_callback_params_t *params = mongoc_oidc_callback_params_new ();
-   mongoc_oidc_callback_params_set_user_data (params, mongoc_oidc_callback_get_user_data (tp->oidc.callback));
+   mongoc_oidc_callback_params_set_user_data (params, mongoc_oidc_callback_get_user_data (tp->oidc->callback));
    {
       // From spec: "If CSOT is not applied, then the driver MUST use 1 minute as the timeout."
       // The timeout parameter (when set) is meant to be directly compared against bson_get_monotonic_time(). It is a
       // time point, not a duration.
       mongoc_oidc_callback_params_set_timeout (params, bson_get_monotonic_time () + 60 * 1000 * 1000);
    }
-   cred = mongoc_oidc_callback_get_fn (tp->oidc.callback) (params);
+   cred = mongoc_oidc_callback_get_fn (tp->oidc->callback) (params);
    mongoc_oidc_callback_params_destroy (params);
 
    if (!cred) {
@@ -76,10 +201,10 @@ get_access_token (mongoc_client_t *client, bool *is_cache, bson_error_t *error)
    }
 
    access_token = bson_strdup (mongoc_oidc_credential_get_access_token (cred));
-   tp->oidc.cache.access_token = bson_strdup (access_token); // Cache a copy.
+   tp->oidc->cache.access_token = bson_strdup (access_token); // Cache a copy.
 
 done:
-   bson_mutex_unlock (&tp->oidc.cache.lock);
+   bson_mutex_unlock (&tp->oidc->cache.lock);
    mongoc_oidc_credential_destroy (cred);
    return access_token;
 }
@@ -162,14 +287,14 @@ invalidate_cache (mongoc_cluster_t *cluster, const char *access_token)
 
    mongoc_topology_t *tp = cluster->client->topology;
 
-   bson_mutex_lock (&tp->oidc.cache.lock);
+   bson_mutex_lock (&tp->oidc->cache.lock);
 
-   if (tp->oidc.cache.access_token && 0 == strcmp (tp->oidc.cache.access_token, access_token)) {
-      bson_free (tp->oidc.cache.access_token);
-      tp->oidc.cache.access_token = NULL;
+   if (tp->oidc->cache.access_token && 0 == strcmp (tp->oidc->cache.access_token, access_token)) {
+      bson_free (tp->oidc->cache.access_token);
+      tp->oidc->cache.access_token = NULL;
    }
 
-   bson_mutex_unlock (&tp->oidc.cache.lock);
+   bson_mutex_unlock (&tp->oidc->cache.lock);
 }
 
 bool
@@ -190,31 +315,34 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
    bool is_cache = false;
    access_token = get_access_token (cluster->client, &is_cache, error);
    if (!access_token) {
-      goto fail;
+      goto done;
    }
 
    if (is_cache) {
       mongoc_cluster_set_oidc_connection_cache_token (cluster, sd->id, access_token);
       if (!run_sasl_start (cluster, stream, sd, access_token, error)) {
          if (error->code != MONGOC_SERVER_ERR_AUTHENTICATION) {
-            goto fail;
+            goto done;
          }
          // Retry getting the access token once:
          invalidate_cache (cluster, access_token);
          access_token = get_access_token (cluster->client, &is_cache, error);
+      } else {
+         ok = true;
+         goto done;
       }
    }
 
    if (!access_token) {
-      goto fail;
+      goto done;
    }
    mongoc_cluster_set_oidc_connection_cache_token (cluster, sd->id, access_token);
    if (!run_sasl_start (cluster, stream, sd, access_token, error)) {
-      goto fail;
+      goto done;
    }
 
    ok = true;
-fail:
+done:
    bson_free (access_token);
    return ok;
 }

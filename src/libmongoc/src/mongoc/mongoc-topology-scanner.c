@@ -178,6 +178,9 @@ _mongoc_topology_scanner_get_speculative_auth_mechanism (const mongoc_uri_t *uri
 void
 _mongoc_topology_scanner_add_speculative_authentication (bson_t *cmd,
                                                          const mongoc_uri_t *uri,
+                                                         mongoc_oidc_t *oidc,
+                                                         mongoc_set_t *oidc_connection_cache,
+                                                         uint32_t server_id,
                                                          mongoc_scram_t *scram /* OUT */)
 {
    bson_t auth_cmd;
@@ -218,6 +221,12 @@ _mongoc_topology_scanner_add_speculative_authentication (bson_t *cmd,
       }
    }
 #endif
+
+   if (strcasecmp (mechanism, "MONGODB-OIDC") == 0) {
+      if (!mongoc_oidc_append_speculative_auth (oidc, oidc_connection_cache, server_id, &auth_cmd, &has_auth, &error)) {
+         MONGOC_ERROR ("Error adding MONGODB-OIDC speculative auth: %s", error.message);
+      }
+   }
 
    if (has_auth) {
       BSON_APPEND_DOCUMENT (cmd, "speculativeAuthenticate", &auth_cmd);
@@ -382,7 +391,8 @@ _begin_hello_cmd (mongoc_topology_scanner_node_t *node,
 
    if (node->ts->speculative_authentication && !node->has_auth && bson_empty (&node->speculative_auth_response) &&
        node->scram.step == 0) {
-      _mongoc_topology_scanner_add_speculative_authentication (&cmd, ts->uri, &node->scram);
+      _mongoc_topology_scanner_add_speculative_authentication (
+         &cmd, ts->uri, ts->oidc, ts->oidc_connection_cache, node->id, &node->scram);
    }
 
    if (!bson_empty (&ts->cluster_time)) {
@@ -1475,4 +1485,20 @@ mongoc_topology_scanner_uses_loadbalanced (const mongoc_topology_scanner_t *ts)
 {
    BSON_ASSERT_PARAM (ts);
    return ts->loadbalanced;
+}
+
+void
+_mongoc_topology_scanner_set_oidc (mongoc_topology_scanner_t *ts, mongoc_oidc_t *oidc)
+{
+   BSON_ASSERT_PARAM (ts);
+   BSON_ASSERT_PARAM (oidc);
+   ts->oidc = oidc;
+}
+
+void
+_mongoc_topology_scanner_set_oidc_connection_cache (mongoc_topology_scanner_t *ts, mongoc_set_t *oidc_connection_cache)
+{
+   BSON_ASSERT_PARAM (ts);
+   BSON_ASSERT_PARAM (oidc_connection_cache);
+   ts->oidc_connection_cache = oidc_connection_cache;
 }

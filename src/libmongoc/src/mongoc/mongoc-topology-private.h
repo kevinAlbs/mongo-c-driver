@@ -21,6 +21,7 @@
 
 #include <common-atomic-private.h>
 #include <mongoc/mongoc-client-session-private.h>
+#include <mongoc/mongoc-cluster-oidc-private.h>
 #include <mongoc/mongoc-crypt-private.h>
 #include <mongoc/mongoc-error-private.h>
 #include <mongoc/mongoc-log-and-monitor-private.h>
@@ -235,20 +236,7 @@ typedef struct _mongoc_topology_t {
    // Some DNS servers truncate UDP responses without setting the truncated (TC) flag. This may result in no TCP retry.
    bool srv_prefer_tcp;
 
-   struct {
-      // oidc.callback is owned. NULL if unset. Setting oidc.callback is only expected before
-      // creating connections. Setting oidc_callback does not require locking.
-      mongoc_oidc_callback_t *callback;
-
-      struct {
-         // access_token is a cached OIDC access token.
-         char *access_token;
-
-         // lock is used to prevent concurrent calls to oidc.callback and guard access to oidc.cache.
-         bson_mutex_t lock;
-      } cache;
-
-   } oidc;
+   mongoc_oidc_t *oidc;
 
 
 } mongoc_topology_t;
