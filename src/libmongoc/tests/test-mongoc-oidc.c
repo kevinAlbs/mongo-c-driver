@@ -87,6 +87,31 @@ fail:
 }
 
 static void
+configure_failpoint (const char *failpoint_json)
+// Configure failpoint on a separate client:
+{
+   bson_error_t error;
+   mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+   mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+   ASSERT_OR_PRINT (client, error);
+
+   // Configure OIDC callback:
+   mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+   callback_ctx_t ctx = {0};
+   mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+   mongoc_client_set_oidc_callback (client, oidc_callback);
+
+   // Configure fail point:
+   bson_t *failpoint = tmp_bson (failpoint_json);
+
+   ASSERT_OR_PRINT (mongoc_client_command_simple (client, "admin", failpoint, NULL, NULL, &error), error);
+
+   mongoc_oidc_callback_destroy (oidc_callback);
+   mongoc_client_destroy (client);
+   mongoc_uri_destroy (uri);
+}
+
+static void
 test_oidc (void *unused)
 {
    BSON_UNUSED (unused);
@@ -183,6 +208,42 @@ test_oidc (void *unused)
       mongoc_oidc_callback_destroy (oidc_callback);
       mongoc_client_pool_push (pool, client);
       mongoc_client_pool_destroy (pool);
+      mongoc_uri_destroy (uri);
+   }
+
+   // Expect a minimum required time between OIDC calls:
+   {
+      mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017/?retryReads=false&authMechanism=MONGODB-OIDC");
+      mongoc_client_t *client = mongoc_client_new_from_uri_with_error (uri, &error);
+      ASSERT_OR_PRINT (client, error);
+
+      // Configure OIDC callback:
+      mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+      callback_ctx_t ctx = {0};
+      mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+      mongoc_client_set_oidc_callback (client, oidc_callback);
+
+      // Configure failpoint:
+      configure_failpoint (BSON_STR ({
+         "configureFailPoint" : "failCommand",
+         "mode" : {"times" : 1},
+         "data" : {"failCommands" : ["find"], "errorCode" : 391}
+      }));
+
+      int64_t start_us = bson_get_monotonic_time ();
+
+      // Expect auth to succeed:
+      ASSERT_OR_PRINT (do_find (client, &error), error);
+
+      // Expect callback was called twice: once for initial auth, once for reauth.
+      ASSERT_CMPINT (ctx.call_count, ==, 2);
+
+      int64_t end_us = bson_get_monotonic_time ();
+
+      ASSERT_CMPINT64 (end_us - start_us, >=, 100 * 1000); // At least 100ms between calls to the callback.
+
+      mongoc_oidc_callback_destroy (oidc_callback);
+      mongoc_client_destroy (client);
       mongoc_uri_destroy (uri);
    }
 }
