@@ -31,7 +31,10 @@ struct mongoc_oidc_t {
       // access_token is a cached OIDC access token.
       char *access_token;
 
-      // lock is used to prevent concurrent calls to oidc.callback and guard access to oidc.cache.
+      // Time of last call.
+      int64_t last_called;
+
+      // lock is used to prevent concurrent calls to oidc.callback and guard access to oidc.cache and oidc.last_called.
       bson_mutex_t lock;
    } cache;
 };
@@ -192,7 +195,19 @@ get_access_token (mongoc_client_t *client, bool *is_cache, bson_error_t *error)
       // time point, not a duration.
       mongoc_oidc_callback_params_set_timeout (params, bson_get_monotonic_time () + 60 * 1000 * 1000);
    }
+
+   // From spec: "Wait until it has been at least 100ms since the last callback invocation"
+   if (tp->oidc->cache.last_called != 0) {
+      int64_t time_since = bson_get_monotonic_time () - tp->oidc->cache.last_called;
+      if (time_since < 100 * 1000) {
+         int64_t remaining = 100 * 1000 - time_since;
+         tp->usleep_fn (remaining, tp->usleep_data);
+      }
+   }
+
    cred = mongoc_oidc_callback_get_fn (tp->oidc->callback) (params);
+
+   tp->oidc->cache.last_called = bson_get_monotonic_time ();
    mongoc_oidc_callback_params_destroy (params);
 
    if (!cred) {
