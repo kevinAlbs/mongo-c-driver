@@ -123,6 +123,27 @@ uri_apply_options (mongoc_uri_t *uri, bson_t *opts, bson_error_t *error)
          mongoc_uri_set_appname (uri, bson_iter_utf8 (&iter, NULL));
       } else if (0 == bson_strcasecmp (MONGOC_URI_SERVERMONITORINGMODE, key)) {
          mongoc_uri_set_option_as_utf8 (uri, key, bson_iter_utf8 (&iter, NULL));
+      } else if (0 == bson_strcasecmp (MONGOC_URI_AUTHMECHANISM, key)) {
+         mongoc_uri_set_auth_mechanism (uri, bson_iter_utf8 (&iter, NULL));
+      } else if (0 == bson_strcasecmp (MONGOC_URI_AUTHMECHANISMPROPERTIES, key)) {
+         bson_t props;
+         if (!_mongoc_iter_document_as_bson (&iter, &props, error)) {
+            goto done;
+         }
+         bson_t *expect = BCON_NEW ("$$placeholder", BCON_INT32 (1));
+         if (!bson_equal (&props, expect)) {
+            test_set_error (error, "expected authMechanismProperties to be placeholder");
+            bson_destroy (expect);
+            goto done;
+         }
+
+         if (!test_framework_is_oidc ()) {
+            test_set_error (error, "expected test with authMechanismProperties to only apply to OIDC");
+            bson_destroy (expect);
+            goto done;
+         }
+
+         //  OIDC callback is already set in test framework.
       } else {
          test_set_error (error, "Unimplemented test runner support for URI option: %s", key);
          goto done;

@@ -1078,6 +1078,10 @@ test_framework_get_uri_str_no_auth (const char *database_name)
    // non-single-threaded Drivers which implicitly set this by default.
    add_option_to_uri_str (&uri_string, MONGOC_URI_SERVERSELECTIONTRYONCE, "false");
 
+   if (test_framework_is_oidc ()) {
+      add_option_to_uri_str (&uri_string, MONGOC_URI_AUTHMECHANISM, "MONGODB-OIDC");
+   }
+
    return mcommon_string_from_append_destroy_with_steal (&uri_string);
 }
 
@@ -1393,6 +1397,58 @@ test_framework_set_ssl_opts (mongoc_client_t *client)
    }
 }
 
+static char *
+read_test_token (void)
+{
+   FILE *token_file = fopen ("/tmp/tokens/test_machine", "r");
+   ASSERT (token_file);
+
+   // Determine length of token:
+   ASSERT (0 == fseek (token_file, 0, SEEK_END));
+   long token_len = ftell (token_file);
+   ASSERT (token_len > 0);
+   ASSERT (0 == fseek (token_file, 0, SEEK_SET));
+
+   // Read file into buffer:
+   char *token = bson_malloc (token_len + 1);
+   size_t nread = fread (token, 1, token_len, token_file);
+   ASSERT (nread == (size_t) token_len);
+   token[token_len] = '\0';
+   fclose (token_file);
+   return token;
+}
+
+static mongoc_oidc_credential_t *
+oidc_callback_fn (mongoc_oidc_callback_params_t *params)
+{
+   char *token = read_test_token ();
+   mongoc_oidc_credential_t *cred = mongoc_oidc_credential_new (token);
+   bson_free (token);
+   return cred;
+}
+
+void
+test_framework_set_oidc_callback (mongoc_client_t *client)
+{
+   if (!test_framework_is_oidc ()) {
+      return;
+   }
+   mongoc_oidc_callback_t *callback = mongoc_oidc_callback_new (oidc_callback_fn);
+   mongoc_client_set_oidc_callback (client, callback);
+   mongoc_oidc_callback_destroy (callback);
+}
+
+void
+test_framework_set_oidc_callback_pooled (mongoc_client_pool_t *pool)
+{
+   if (!test_framework_is_oidc ()) {
+      return;
+   }
+   mongoc_oidc_callback_t *callback = mongoc_oidc_callback_new (oidc_callback_fn);
+   mongoc_client_pool_set_oidc_callback (pool, callback);
+   mongoc_oidc_callback_destroy (callback);
+}
+
 
 /*
  *--------------------------------------------------------------------------
@@ -1417,6 +1473,7 @@ test_framework_new_default_client (void)
 
    BSON_ASSERT (client);
    test_framework_set_ssl_opts (client);
+   test_framework_set_oidc_callback (client);
 
    bson_free (test_uri_str);
 
@@ -1447,6 +1504,7 @@ test_framework_client_new_no_server_api (void)
 
    BSON_ASSERT (client);
    test_framework_set_ssl_opts (client);
+   test_framework_set_oidc_callback (client);
 
    mongoc_uri_destroy (uri);
 
@@ -1560,6 +1618,8 @@ test_framework_client_new_from_uri (const mongoc_uri_t *uri, const mongoc_server
 
    mongoc_server_api_destroy (default_api);
 
+   test_framework_set_oidc_callback (client);
+
    return client;
 }
 
@@ -1643,6 +1703,7 @@ test_framework_new_default_client_pool (void)
 
    BSON_ASSERT (pool);
    test_framework_set_pool_ssl_opts (pool);
+   test_framework_set_oidc_callback_pooled (pool);
 
    mongoc_uri_destroy (test_uri);
    BSON_ASSERT (pool);
@@ -1827,6 +1888,10 @@ test_framework_has_auth (void)
    /* requires SSL for SCRAM implementation, can't test auth */
    return false;
 #endif
+
+   if (test_framework_is_oidc ()) {
+      return true;
+   }
 
    /* checks if the MONGOC_TEST_USER env var is set */
    user = test_framework_get_admin_user ();
@@ -2424,6 +2489,12 @@ bool
 test_framework_is_serverless (void)
 {
    return test_framework_getenv_bool ("MONGOC_TEST_IS_SERVERLESS");
+}
+
+bool
+test_framework_is_oidc (void)
+{
+   return test_framework_getenv_bool ("MONGOC_TEST_OIDC");
 }
 
 int

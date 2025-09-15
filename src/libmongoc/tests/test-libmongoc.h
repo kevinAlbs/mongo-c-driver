@@ -282,6 +282,9 @@ test_framework_skip_if_no_exhaust_cursors (void);
 bool
 test_framework_is_serverless (void);
 
+bool
+test_framework_is_oidc (void);
+
 int
 test_framework_skip_if_serverless (void);
 
