@@ -65,8 +65,13 @@ typedef struct {
    callback_ctx_t ctx;
 } test_fixture_t;
 
+typedef struct {
+   bool use_pool;
+   bool use_error_api_v1;
+} test_config_t;
+
 static test_fixture_t *
-test_fixture_new (bool use_pooled)
+test_fixture_new (test_config_t cfg)
 {
    test_fixture_t *tf = bson_malloc0 (sizeof (*tf));
 
@@ -76,12 +81,14 @@ test_fixture_new (bool use_pooled)
    mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
    mongoc_oidc_callback_set_user_data (oidc_callback, &tf->ctx);
 
-   if (use_pooled) {
+   if (cfg.use_pool) {
       tf->pool = mongoc_client_pool_new (uri);
+      mongoc_client_pool_set_error_api (tf->pool, MONGOC_ERROR_API_VERSION_2);
       mongoc_client_pool_set_oidc_callback (tf->pool, oidc_callback);
       tf->client = mongoc_client_pool_pop (tf->pool);
    } else {
       tf->client = mongoc_client_new_from_uri (uri);
+      mongoc_client_set_error_api (tf->client, MONGOC_ERROR_API_VERSION_2);
       mongoc_client_set_oidc_callback (tf->client, oidc_callback);
    }
 
@@ -151,7 +158,7 @@ static void
 test_oidc_works (void *use_pool_void)
 {
    bool use_pool = *(bool *) use_pool_void;
-   test_fixture_t *tf = test_fixture_new (use_pool);
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
 
    // Expect callback not-yet called:
    ASSERT_CMPINT (tf->ctx.call_count, ==, 0);
@@ -186,7 +193,7 @@ static void
 test_oidc_caches_token (void *use_pool_void)
 {
    bool use_pool = *(bool *) use_pool_void;
-   test_fixture_t *tf = test_fixture_new (use_pool);
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
 
    // Expect nothing cached yet:
    ASSERT (!mongoc_cluster_get_oidc_connection_cache_token (&tf->client->cluster, 1));
@@ -221,9 +228,70 @@ static void
 test_oidc_delays (void *use_pool_void)
 {
    bool use_pool = *(bool *) use_pool_void;
-   test_fixture_t *tf = test_fixture_new (use_pool);
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
 
-   // Configure failpoint:
+   // Configure failpoint to return ReauthenticationError (391):
+   configure_failpoint (BSON_STR ({
+      "configureFailPoint" : "failCommand",
+      "mode" : {"times" : 1},
+      "data" : {"failCommands" : ["find"], "errorCode" : 391}
+   }));
+
+   int64_t start_us = bson_get_monotonic_time ();
+
+   // Expect auth to succeed:
+   bson_error_t error;
+   ASSERT_OR_PRINT (do_find (tf->client, &error), error);
+
+   // Expect callback was called twice: once for initial auth, once for reauth.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 2);
+
+   int64_t end_us = bson_get_monotonic_time ();
+
+   ASSERT_CMPINT64 (end_us - start_us, >=, 100 * 1000); // At least 100ms between calls to the callback.
+
+   test_fixture_destroy (tf);
+}
+
+// test_oidc_reauth_twice tests a reauth error occurring twice in a row.
+static void
+test_oidc_reauth_twice (void *use_pool_void)
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
+
+   // Configure failpoint to return ReauthenticationError (391):
+   configure_failpoint (BSON_STR ({
+      "configureFailPoint" : "failCommand",
+      "mode" : {"times" : 2},
+      "data" : {"failCommands" : ["find"], "errorCode" : 391}
+   }));
+
+   int64_t start_us = bson_get_monotonic_time ();
+
+   // Expect error:
+   bson_error_t error;
+   ASSERT (!do_find (tf->client, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, MONGOC_SERVER_ERR_REAUTHENTICATION_REQUIRED, "failpoint");
+
+   // Expect callback was called twice: once for initial auth, once for reauth.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 2);
+
+   int64_t end_us = bson_get_monotonic_time ();
+
+   ASSERT_CMPINT64 (end_us - start_us, >=, 100 * 1000); // At least 100ms between calls to the callback.
+
+   test_fixture_destroy (tf);
+}
+
+// test_oidc_reauth_error_v1 tests a reauth error using the V1 error API.
+static void
+test_oidc_reauth_error_v1 (void *use_pool_void)
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool, .use_error_api_v1 = true});
+
+   // Configure failpoint to return ReauthenticationError (391):
    configure_failpoint (BSON_STR ({
       "configureFailPoint" : "failCommand",
       "mode" : {"times" : 1},
@@ -259,11 +327,20 @@ test_oidc_auth_install (TestSuite *suite)
    static bool single = false;
    static bool pooled = true;
 
+   TestSuite_AddFull (suite, "/oidc/bad_config", test_oidc_bad_config, NULL, NULL, skip_if_no_oidc);
+
    TestSuite_AddFull (suite, "/oidc/works/single", test_oidc_works, NULL, &single, skip_if_no_oidc);
    TestSuite_AddFull (suite, "/oidc/works/pooled", test_oidc_works, NULL, &pooled, skip_if_no_oidc);
-   TestSuite_AddFull (suite, "/oidc/bad_config", test_oidc_bad_config, NULL, NULL, skip_if_no_oidc);
+
    TestSuite_AddFull (suite, "/oidc/caches_token/single", test_oidc_caches_token, NULL, &single, skip_if_no_oidc);
    TestSuite_AddFull (suite, "/oidc/caches_token/pooled", test_oidc_caches_token, NULL, &pooled, skip_if_no_oidc);
+
    TestSuite_AddFull (suite, "/oidc/delays/single", test_oidc_delays, NULL, &single, skip_if_no_oidc);
    TestSuite_AddFull (suite, "/oidc/delays/pooled", test_oidc_delays, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/reauth_twice/single", test_oidc_reauth_twice, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/reauth_twice/pooled", test_oidc_reauth_twice, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/reauth_error_v1/single", test_oidc_reauth_error_v1, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/reauth_error_v1/pooled", test_oidc_reauth_error_v1, NULL, &pooled, skip_if_no_oidc);
 }
