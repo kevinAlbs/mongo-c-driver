@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <mongoc/mongoc-counters-private.h>
+
 #include <TestSuite.h>
 #include <test-conveniences.h>
 #include <test-libmongoc.h>
@@ -40,10 +42,15 @@ read_test_token (void)
 }
 
 typedef struct {
-   int call_count;
    bool validate_params;
    bool return_null;
    bool return_bad_token;
+   bool return_bad_token_after_first_call;
+} callback_config_t;
+
+typedef struct {
+   int call_count;
+   callback_config_t config;
 } callback_ctx_t;
 
 static mongoc_oidc_credential_t *
@@ -53,11 +60,38 @@ oidc_callback_fn (mongoc_oidc_callback_params_t *params)
    ASSERT (ctx);
    ctx->call_count += 1;
 
+   if (ctx->config.return_null) {
+      return NULL;
+   }
+
+   if (ctx->config.return_bad_token) {
+      return mongoc_oidc_credential_new ("bad_token");
+   }
+
+   if (ctx->config.return_bad_token_after_first_call && ctx->call_count > 1) {
+      return mongoc_oidc_credential_new ("bad_token");
+   }
+
+   if (ctx->config.validate_params) {
+      const int64_t *timeout = mongoc_oidc_callback_params_get_timeout (params);
+      ASSERT (timeout);
+      // Expect the timeout to be set to 60 seconds from the start.
+      ASSERT_CMPINT64 (*timeout, >=, bson_get_monotonic_time ());
+      ASSERT_CMPINT64 (*timeout, <=, bson_get_monotonic_time () + 60 * 1000 * 1000);
+
+      int version = mongoc_oidc_callback_params_get_version (params);
+      ASSERT_CMPINT (version, ==, 1);
+
+      const char *username = mongoc_oidc_callback_params_get_username (params);
+      ASSERT (!username);
+   }
+
    char *token = read_test_token ();
    mongoc_oidc_credential_t *cred = mongoc_oidc_credential_new (token);
    bson_free (token);
    return cred;
 }
+
 
 typedef struct {
    mongoc_client_pool_t *pool; // May be NULL.
@@ -68,6 +102,7 @@ typedef struct {
 typedef struct {
    bool use_pool;
    bool use_error_api_v1;
+   callback_config_t callback_config;
 } test_config_t;
 
 static test_fixture_t *
@@ -75,10 +110,12 @@ test_fixture_new (test_config_t cfg)
 {
    test_fixture_t *tf = bson_malloc0 (sizeof (*tf));
 
-   mongoc_uri_t *uri = test_framework_get_uri ();
+   mongoc_uri_t *uri = mongoc_uri_new ("mongodb://localhost:27017"); // Direct connect for simpler op counters.
+   mongoc_uri_set_auth_mechanism (uri, "MONGODB-OIDC");
    mongoc_uri_set_option_as_bool (uri, MONGOC_URI_RETRYREADS, false); // Disable retryable reads per spec.
 
    mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+   tf->ctx.config = cfg.callback_config;
    mongoc_oidc_callback_set_user_data (oidc_callback, &tf->ctx);
 
    if (cfg.use_pool) {
@@ -111,7 +148,6 @@ test_fixture_destroy (test_fixture_t *tf)
    }
    bson_free (tf);
 }
-
 
 static bool
 do_find (mongoc_client_t *client, bson_error_t *error)
@@ -154,6 +190,7 @@ configure_failpoint (const char *failpoint_json)
    mongoc_client_destroy (client);
 }
 
+// test_oidc_works tests a simple happy path.
 static void
 test_oidc_works (void *use_pool_void)
 {
@@ -173,19 +210,16 @@ test_oidc_works (void *use_pool_void)
    test_fixture_destroy (tf);
 }
 
+// test_oidc_bad_config tests authenticating with MONGODB-OIDC and no environment or callback is specified.
 static void
 test_oidc_bad_config (void *unused)
 {
    bson_error_t error;
-
-   // Test authenticating with MONGODB-OIDC and no environment or callback is specified.
-   {
-      mongoc_client_t *client = mongoc_client_new ("mongodb://localhost/?authMechanism=MONGODB-OIDC");
-      bool ok = mongoc_client_command_simple (client, "db", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
-      ASSERT (!ok);
-      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "no callback set");
-      mongoc_client_destroy (client);
-   }
+   mongoc_client_t *client = mongoc_client_new ("mongodb://localhost/?authMechanism=MONGODB-OIDC");
+   bool ok = mongoc_client_command_simple (client, "db", tmp_bson ("{'ping': 1}"), NULL, NULL, &error);
+   ASSERT (!ok);
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "no callback set");
+   mongoc_client_destroy (client);
 }
 
 // test_oidc_caches_token tests the connection token cache.
@@ -314,6 +348,432 @@ test_oidc_reauth_error_v1 (void *use_pool_void)
    test_fixture_destroy (tf);
 }
 
+#define PROSE_TEST(maj, min, desc) static void test_oidc_prose_##maj##_##min (void *use_pool_void)
+
+PROSE_TEST (1, 1, "Callback is called during authentication")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
+
+   // Expect auth to succeed:
+   bson_error_t error;
+   ASSERT_OR_PRINT (do_find (tf->client, &error), error);
+
+   // Expect callback was called.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 1);
+
+   test_fixture_destroy (tf);
+}
+
+static BSON_THREAD_FUN (do_100_finds, pool_void)
+{
+   mongoc_client_pool_t *pool = pool_void;
+   for (int i = 0; i < 100; i++) {
+      mongoc_client_t *client = mongoc_client_pool_pop (pool);
+      bson_error_t error;
+      bool ok = do_find (client, &error);
+      ASSERT_OR_PRINT (ok, error);
+      mongoc_client_pool_push (pool, client);
+   }
+   BSON_THREAD_RETURN;
+}
+
+PROSE_TEST (1, 2, "Callback is called once for multiple connections")
+{
+   BSON_UNUSED (use_pool_void); // Test only runs for pooled.
+   bool use_pool = true;
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
+
+   // Start 10 threads. Each thread runs 100 find operations:
+   bson_thread_t threads[10];
+   for (int i = 0; i < 10; i++) {
+      ASSERT (0 == mcommon_thread_create (&threads[i], do_100_finds, tf->pool));
+   }
+
+   // Wait for threads to finish:
+   for (int i = 0; i < 10; i++) {
+      mcommon_thread_join (threads[i]);
+   }
+
+   // Expect callback was called.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 1);
+
+   test_fixture_destroy (tf);
+}
+
+PROSE_TEST (2, 1, "Valid Callback Inputs")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf =
+      test_fixture_new ((test_config_t) {.use_pool = use_pool, .callback_config = {.validate_params = true}});
+
+   // Expect auth to succeed:
+   bson_error_t error;
+   ASSERT_OR_PRINT (do_find (tf->client, &error), error);
+
+   test_fixture_destroy (tf);
+}
+
+PROSE_TEST (2, 2, "OIDC Callback Returns Null")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf =
+      test_fixture_new ((test_config_t) {.use_pool = use_pool, .callback_config = {.return_null = true}});
+
+   // Expect auth to fail:
+   bson_error_t error;
+   ASSERT (!do_find (tf->client, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "OIDC callback failed");
+
+   test_fixture_destroy (tf);
+}
+
+PROSE_TEST (2, 3, "OIDC Callback Returns Missing Data")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {
+      .use_pool = use_pool,
+      .callback_config = {
+         // mongoc_oidc_credential_t cannot be partially created. Instead of "missing" data, return a bad token.
+         .return_bad_token = true}});
+
+   // Expect auth to fail:
+   bson_error_t error;
+   ASSERT (!do_find (tf->client, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 18, "Authentication failed");
+
+   test_fixture_destroy (tf);
+}
+
+PROSE_TEST (2, 4, "Invalid Client Configuration with Callback")
+{
+   BSON_UNUSED (use_pool_void);
+
+   mongoc_uri_t *uri = test_framework_get_uri ();
+   mongoc_uri_set_mechanism_properties (uri, tmp_bson (BSON_STR ({"ENVIRONMENT" : "test"})));
+
+   callback_ctx_t ctx;
+   mongoc_oidc_callback_t *oidc_callback = mongoc_oidc_callback_new (oidc_callback_fn);
+   mongoc_oidc_callback_set_user_data (oidc_callback, &ctx);
+
+   mongoc_client_t *client = mongoc_client_new_from_uri (uri);
+   mongoc_client_set_oidc_callback (client, oidc_callback);
+
+   // Expect auth to fail:
+   bson_error_t error;
+   ASSERT (!do_find (client, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "Use one or the other");
+
+   mongoc_client_destroy (client);
+   mongoc_oidc_callback_destroy (oidc_callback);
+   mongoc_uri_destroy (uri);
+}
+
+PROSE_TEST (2, 5, "Invalid Client Configuration with Callback")
+{
+   BSON_UNUSED (use_pool_void);
+
+   bson_error_t error;
+   mongoc_uri_t *uri = mongoc_uri_new_with_error (
+      "mongodb://localhost:27017/"
+      "?retryReads=false&authMechanism=MONGODB-OIDC&authMechanismProperties=ENVIRONMENT:azure,ALLOWED_HOSTS:",
+      &error);
+   ASSERT (!uri);
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_COMMAND, MONGOC_ERROR_COMMAND_INVALID_ARG, "Unsupported");
+   mongoc_uri_destroy (uri);
+}
+
+extern void
+mongoc_oidc_overwrite_access_token (mongoc_oidc_t *oidc, const char *access_token);
+
+static void
+poison_client_cache (mongoc_client_t *client)
+{
+   BSON_ASSERT_PARAM (client);
+   mongoc_oidc_overwrite_access_token (client->topology->oidc, "bad_token");
+}
+
+PROSE_TEST (3, 1, "Authentication failure with cached tokens fetch a new token and retry auth")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
+
+   poison_client_cache (tf->client);
+
+   // Expect auth to succeed:
+   bson_error_t error;
+   ASSERT_OR_PRINT (do_find (tf->client, &error), error);
+
+   // Expect callback was called.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 1);
+
+   test_fixture_destroy (tf);
+}
+
+PROSE_TEST (3, 2, "Authentication failures without cached tokens return an error")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf =
+      test_fixture_new ((test_config_t) {.use_pool = use_pool, .callback_config = {.return_bad_token = true}});
+
+   // Expect auth to fail:
+   bson_error_t error;
+   ASSERT (!do_find (tf->client, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 18, "Authentication failed");
+
+   // Expect callback was called.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 1);
+
+   test_fixture_destroy (tf);
+}
+
+PROSE_TEST (3, 3, "Unexpected error code does not clear the cache")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
+
+   // Configure failpoint:
+   configure_failpoint (BSON_STR ({
+      "configureFailPoint" : "failCommand",
+      "mode" : {"times" : 1},
+      "data" : {"failCommands" : ["saslStart"], "errorCode" : 20}
+   }));
+
+   // Expect auth to fail:
+   bson_error_t error;
+   ASSERT (!do_find (tf->client, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 20, "Failing command");
+
+   // Expect callback was called.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 1);
+
+   // Expect second attempt succeeds:
+   ASSERT_OR_PRINT (do_find (tf->client, &error), error);
+
+   // Expect callback was not called again.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 1);
+
+   test_fixture_destroy (tf);
+}
+
+PROSE_TEST (4, 1, "Reauthentication Succeeds")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
+
+   // Configure failpoint:
+   configure_failpoint (BSON_STR ({
+      "configureFailPoint" : "failCommand",
+      "mode" : {"times" : 1},
+      "data" : {"failCommands" : ["find"], "errorCode" : 391}
+   }));
+
+   // Expect auth to succeed:
+   bson_error_t error;
+   ASSERT_OR_PRINT (do_find (tf->client, &error), error);
+
+   // Expect callback was called twice: once for initial auth, once for reauth.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 2);
+
+   test_fixture_destroy (tf);
+}
+
+PROSE_TEST (4, 2, "Read Commands Fail If Reauthentication Fails")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new (
+      (test_config_t) {.use_pool = use_pool, .callback_config = {.return_bad_token_after_first_call = true}});
+
+   // Configure failpoint:
+   configure_failpoint (BSON_STR ({
+      "configureFailPoint" : "failCommand",
+      "mode" : {"times" : 1},
+      "data" : {"failCommands" : ["find"], "errorCode" : 391}
+   }));
+
+
+   // Expect auth to fail:
+   bson_error_t error;
+   ASSERT (!do_find (tf->client, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 18, "Authentication failed");
+
+   // Expect callback was called twice: once for initial auth, once for reauth.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 2);
+   test_fixture_destroy (tf);
+}
+
+static bool
+do_insert (mongoc_client_t *client, bson_error_t *error)
+{
+   mongoc_collection_t *coll = NULL;
+   bool ret = false;
+   bson_t doc = BSON_INITIALIZER;
+
+   coll = mongoc_client_get_collection (client, "test", "test");
+   if (!mongoc_collection_insert_one (coll, &doc, NULL, NULL, error)) {
+      goto fail;
+   }
+
+   ret = true;
+fail:
+   mongoc_collection_destroy (coll);
+   return ret;
+}
+
+PROSE_TEST (4, 3, "Write Commands Fail If Reauthentication Fails")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new (
+      (test_config_t) {.use_pool = use_pool, .callback_config = {.return_bad_token_after_first_call = true}});
+
+   // Configure failpoint:
+   configure_failpoint (BSON_STR ({
+      "configureFailPoint" : "failCommand",
+      "mode" : {"times" : 1},
+      "data" : {"failCommands" : ["insert"], "errorCode" : 391}
+   }));
+
+   // Expect auth to fail:
+   bson_error_t error;
+   ASSERT (!do_insert (tf->client, &error));
+   ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_SERVER, 18, "Authentication failed");
+
+   // Expect callback was called twice: once for initial auth, once for reauth.
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 2);
+   test_fixture_destroy (tf);
+}
+
+// If counters are enabled, define operation count checks:
+#ifdef MONGOC_ENABLE_SHM_COUNTERS
+#define OPCOUNT() mongoc_counter_op_egress_total_count ()
+#define ASSERT_OPCOUNT(x) ASSERT_CMPINT32 (mongoc_counter_op_egress_total_count (), ==, x)
+#else
+#define OPCOUNT() 0
+#define ASSERT_OPCOUNT(x) ((void) 0)
+#endif
+
+static void
+populate_client_cache (mongoc_client_t *client)
+{
+   BSON_ASSERT_PARAM (client);
+   char *access_token = read_test_token ();
+   mongoc_oidc_overwrite_access_token (client->topology->oidc, access_token);
+   bson_free (access_token);
+}
+
+PROSE_TEST (4, 4, "Speculative Authentication should be ignored on Reauthentication")
+{
+   BSON_UNUSED (use_pool_void);
+   bool use_pool = false; // Only run on single to avoid counters being updated by background threads.
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
+
+   bson_error_t error;
+
+   // Populate client cache with a valid access token to enforce speculative authentication:
+   populate_client_cache (tf->client);
+
+   // Expect successful auth without sending saslStart:
+   {
+      int32_t opcount = OPCOUNT ();
+
+      // Expect auth to succeed:
+      ASSERT_OR_PRINT (do_insert (tf->client, &error), error);
+
+      // Expect callback was not called:
+      ASSERT_CMPINT (tf->ctx.call_count, ==, 0);
+
+      // Expect two commands sent: hello + insert.
+      // Expect saslStart was not sent.
+      // TODO(CDRIVER-2669): check command started events instead of counters.
+      ASSERT_OPCOUNT (opcount + 2);
+   }
+
+   // Expect successful reauth with sending saslStart:
+   {
+      // Configure failpoint:
+      configure_failpoint (BSON_STR ({
+         "configureFailPoint" : "failCommand",
+         "mode" : {"times" : 1},
+         "data" : {"failCommands" : ["insert"], "errorCode" : 391}
+      }));
+
+      int32_t opcount = OPCOUNT ();
+
+      // Expect auth to succeed (after reauth):
+      ASSERT_OR_PRINT (do_insert (tf->client, &error), error);
+
+      // Expect callback was called:
+      ASSERT_CMPINT (tf->ctx.call_count, ==, 1);
+
+      // Check that three commands were sent: insert (fails) + saslStart + insert (succeeds).
+      // TODO(CDRIVER-2669): check command started events instead.
+      ASSERT_OPCOUNT (opcount + 3);
+   }
+
+   test_fixture_destroy (tf);
+}
+
+static bool
+do_find_with_session (mongoc_client_t *client, bson_error_t *error)
+{
+   mongoc_collection_t *coll = NULL;
+   mongoc_cursor_t *cursor = NULL;
+   bool ret = false;
+   bson_t filter = BSON_INITIALIZER;
+   bson_t opts = BSON_INITIALIZER;
+   mongoc_client_session_t *sess = NULL;
+
+   // Create session:
+   sess = mongoc_client_start_session (client, NULL, error);
+   if (!sess) {
+      goto fail;
+   }
+
+   if (!mongoc_client_session_append (sess, &opts, error)) {
+      goto fail;
+   }
+
+   coll = mongoc_client_get_collection (client, "test", "test");
+   cursor = mongoc_collection_find_with_opts (coll, &filter, &opts, NULL);
+
+   const bson_t *doc;
+   while (mongoc_cursor_next (cursor, &doc))
+      ;
+
+   if (mongoc_cursor_error (cursor, error)) {
+      goto fail;
+   }
+
+   ret = true;
+fail:
+   mongoc_client_session_destroy (sess);
+   bson_destroy (&opts);
+   mongoc_cursor_destroy (cursor);
+   mongoc_collection_destroy (coll);
+   return ret;
+}
+
+PROSE_TEST (4, 5, "Reauthentication Succeeds when a Session is involved")
+{
+   bool use_pool = *(bool *) use_pool_void;
+   test_fixture_t *tf = test_fixture_new ((test_config_t) {.use_pool = use_pool});
+
+   // Configure failpoint:
+   configure_failpoint (BSON_STR ({
+      "configureFailPoint" : "failCommand",
+      "mode" : {"times" : 1},
+      "data" : {"failCommands" : ["find"], "errorCode" : 391}
+   }));
+
+   // Expect find on a session succeeds:
+   bson_error_t error;
+   ASSERT_OR_PRINT (do_find_with_session (tf->client, &error), error);
+
+   // Expect callback was called twice:
+   ASSERT_CMPINT (tf->ctx.call_count, ==, 2);
+
+   test_fixture_destroy (tf);
+}
 
 static int
 skip_if_no_oidc (void)
@@ -343,4 +803,45 @@ test_oidc_auth_install (TestSuite *suite)
 
    TestSuite_AddFull (suite, "/oidc/reauth_error_v1/single", test_oidc_reauth_error_v1, NULL, &single, skip_if_no_oidc);
    TestSuite_AddFull (suite, "/oidc/reauth_error_v1/pooled", test_oidc_reauth_error_v1, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/1.1/single", test_oidc_prose_1_1, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/1.1/pooled", test_oidc_prose_1_1, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/1.2", test_oidc_prose_1_2, NULL, NULL, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/2.1/single", test_oidc_prose_2_1, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/2.1/pooled", test_oidc_prose_2_1, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/2.2/single", test_oidc_prose_2_2, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/2.2/pooled", test_oidc_prose_2_2, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/2.3/single", test_oidc_prose_2_3, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/2.3/pooled", test_oidc_prose_2_3, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/2.4", test_oidc_prose_2_4, NULL, NULL, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/2.5", test_oidc_prose_2_5, NULL, NULL, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/3.1/single", test_oidc_prose_3_1, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/3.1/pooled", test_oidc_prose_3_1, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/3.2/single", test_oidc_prose_3_2, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/3.2/pooled", test_oidc_prose_3_2, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/3.3/single", test_oidc_prose_3_3, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/3.3/pooled", test_oidc_prose_3_3, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/4.1/single", test_oidc_prose_4_1, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/4.1/pooled", test_oidc_prose_4_1, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/4.2/single", test_oidc_prose_4_2, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/4.2/pooled", test_oidc_prose_4_2, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/4.3/single", test_oidc_prose_4_3, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/4.3/pooled", test_oidc_prose_4_3, NULL, &pooled, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/4.4", test_oidc_prose_4_4, NULL, NULL, skip_if_no_oidc);
+
+   TestSuite_AddFull (suite, "/oidc/prose/4.5/single", test_oidc_prose_4_5, NULL, &single, skip_if_no_oidc);
+   TestSuite_AddFull (suite, "/oidc/prose/4.5/pooled", test_oidc_prose_4_5, NULL, &pooled, skip_if_no_oidc);
 }
