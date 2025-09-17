@@ -18,6 +18,7 @@
 #ifndef MONGOC_CLUSTER_OIDC_PRIVATE_H
 #define MONGOC_CLUSTER_OIDC_PRIVATE_H
 
+#include <mongoc/mongoc-oidc-private.h>
 #include <mongoc/mongoc-server-description-private.h>
 #include <mongoc/mongoc-set-private.h>
 #include <mongoc/mongoc-stream-private.h>
@@ -26,20 +27,6 @@ struct _mongoc_cluster_t; // Forward declare.
 
 #include <bson/error.h>
 
-
-// mongoc_oidc_t stores the OIDC callback, cache, and lock.
-// Can be shared among all clients in a pool.
-typedef struct mongoc_oidc_t mongoc_oidc_t;
-
-mongoc_oidc_t *
-mongoc_oidc_new (void);
-
-// mongoc_oidc_set_callback is not thread safe. Call before any authentication can occur.
-void
-mongoc_oidc_set_callback (mongoc_oidc_t *oidc, const mongoc_oidc_callback_t *cb);
-
-void
-mongoc_oidc_destroy (mongoc_oidc_t *);
 
 // mongoc_oidc_append_speculative_auth adds speculative auth if a token is cached.
 // Sets *has_auth=false if speculative auth is not added.

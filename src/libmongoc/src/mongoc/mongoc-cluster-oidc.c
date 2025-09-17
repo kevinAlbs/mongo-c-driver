@@ -18,69 +18,8 @@
 #include <mongoc/mongoc-client-private.h>
 #include <mongoc/mongoc-cluster-private.h>
 #include <mongoc/mongoc-error-private.h>
-#include <mongoc/mongoc-oidc-callback-private.h>
 #include <mongoc/mongoc-server-description-private.h>
 #include <mongoc/mongoc-stream-private.h>
-
-struct mongoc_oidc_t {
-   // oidc.callback is owned. NULL if unset. Setting oidc.callback is only expected before
-   // creating connections. Setting oidc_callback does not require locking.
-   mongoc_oidc_callback_t *callback;
-
-   struct {
-      // access_token is a cached OIDC access token.
-      char *access_token;
-
-      // Time of last call.
-      int64_t last_called;
-
-      // lock is used to prevent concurrent calls to oidc.callback and guard access to oidc.cache and oidc.last_called.
-      bson_mutex_t lock;
-   } cache;
-};
-
-mongoc_oidc_t *
-mongoc_oidc_new (void)
-{
-   mongoc_oidc_t *oidc = bson_malloc0 (sizeof (mongoc_oidc_t));
-   bson_mutex_init (&oidc->cache.lock);
-   return oidc;
-}
-
-void
-mongoc_oidc_set_callback (mongoc_oidc_t *oidc, const mongoc_oidc_callback_t *cb)
-{
-   BSON_ASSERT_PARAM (oidc);
-   BSON_ASSERT_PARAM (cb);
-   oidc->callback = mongoc_oidc_callback_copy (cb);
-}
-
-void
-mongoc_oidc_destroy (mongoc_oidc_t *oidc)
-{
-   if (!oidc) {
-      return;
-   }
-   bson_mutex_destroy (&oidc->cache.lock);
-   mongoc_oidc_callback_destroy (oidc->callback);
-   bson_free (oidc);
-}
-
-// mongoc_oidc_overwrite_access_token is used by tests to override cached tokens.
-void
-mongoc_oidc_overwrite_access_token (mongoc_oidc_t *oidc, const char *access_token)
-{
-   BSON_ASSERT_PARAM (oidc);
-   bson_mutex_lock (&oidc->cache.lock);
-
-   if (oidc->cache.access_token) {
-      bson_free (oidc->cache.access_token);
-      oidc->cache.access_token = NULL;
-   }
-
-   oidc->cache.access_token = access_token ? bson_strdup (access_token) : NULL;
-   bson_mutex_unlock (&oidc->cache.lock);
-}
 
 #define SET_ERROR(...) _mongoc_set_error (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, __VA_ARGS__)
 
@@ -98,14 +37,7 @@ mongoc_oidc_append_speculative_auth (mongoc_oidc_t *oidc,
    BSON_OPTIONAL_PARAM (error);
    bool ok = false;
 
-   char *access_token = NULL;
-   {
-      bson_mutex_lock (&oidc->cache.lock);
-      if (oidc->cache.access_token) {
-         access_token = bson_strdup (oidc->cache.access_token);
-      }
-      bson_mutex_unlock (&oidc->cache.lock);
-   }
+   char *access_token = mongoc_oidc_get_cached_token (oidc);
 
    if (!access_token) {
       // No token cached yet. Not an error, but do not add auth command.
@@ -150,78 +82,6 @@ mongoc_oidc_append_speculative_auth (mongoc_oidc_t *oidc,
 fail:
    bson_free (access_token);
    return ok;
-}
-
-static char *
-get_access_token (mongoc_client_t *client, bool *is_cache, bson_error_t *error)
-{
-   BSON_ASSERT_PARAM (client);
-   BSON_ASSERT_PARAM (is_cache);
-
-   mongoc_topology_t *tp = client->topology;
-   char *access_token = NULL;
-   mongoc_oidc_credential_t *cred = NULL;
-
-   *is_cache = false;
-
-   bson_mutex_lock (&tp->oidc->cache.lock);
-
-   if (NULL != tp->oidc->cache.access_token) {
-      // Access token is cached.
-      access_token = bson_strdup (tp->oidc->cache.access_token);
-      *is_cache = true;
-      goto done;
-   }
-
-   // From spec: "If both ENVIRONMENT and an OIDC Callback [...] are provided the driver MUST raise an error."
-   bson_t authMechanismProperties = BSON_INITIALIZER;
-   mongoc_uri_get_mechanism_properties (client->uri, &authMechanismProperties);
-   if (tp->oidc->callback && bson_has_field (&authMechanismProperties, "ENVIRONMENT")) {
-      SET_ERROR ("MONGODB-OIDC requested with both ENVIRONMENT and an OIDC Callback. Use one or the other.");
-      goto done;
-   }
-
-   if (!tp->oidc->callback) {
-      SET_ERROR ("MONGODB-OIDC requested, but no callback set. Use mongoc_client_set_oidc_callback or "
-                 "mongoc_client_pool_set_oidc_callback.");
-      goto done;
-   }
-
-   mongoc_oidc_callback_params_t *params = mongoc_oidc_callback_params_new ();
-   mongoc_oidc_callback_params_set_user_data (params, mongoc_oidc_callback_get_user_data (tp->oidc->callback));
-   {
-      // From spec: "If CSOT is not applied, then the driver MUST use 1 minute as the timeout."
-      // The timeout parameter (when set) is meant to be directly compared against bson_get_monotonic_time(). It is a
-      // time point, not a duration.
-      mongoc_oidc_callback_params_set_timeout (params, bson_get_monotonic_time () + 60 * 1000 * 1000);
-   }
-
-   // From spec: "Wait until it has been at least 100ms since the last callback invocation"
-   if (tp->oidc->cache.last_called != 0) {
-      int64_t time_since = bson_get_monotonic_time () - tp->oidc->cache.last_called;
-      if (time_since < 100 * 1000) {
-         int64_t remaining = 100 * 1000 - time_since;
-         tp->usleep_fn (remaining, tp->usleep_data);
-      }
-   }
-
-   cred = mongoc_oidc_callback_get_fn (tp->oidc->callback) (params);
-
-   tp->oidc->cache.last_called = bson_get_monotonic_time ();
-   mongoc_oidc_callback_params_destroy (params);
-
-   if (!cred) {
-      SET_ERROR ("MONGODB-OIDC callback failed.");
-      goto done;
-   }
-
-   access_token = bson_strdup (mongoc_oidc_credential_get_access_token (cred));
-   tp->oidc->cache.access_token = bson_strdup (access_token); // Cache a copy.
-
-done:
-   bson_mutex_unlock (&tp->oidc->cache.lock);
-   mongoc_oidc_credential_destroy (cred);
-   return access_token;
 }
 
 static bool
@@ -294,24 +154,6 @@ fail:
    return ok;
 }
 
-static void
-invalidate_cache (mongoc_cluster_t *cluster, const char *access_token)
-{
-   BSON_ASSERT_PARAM (cluster);
-   BSON_ASSERT_PARAM (access_token);
-
-   mongoc_topology_t *tp = cluster->client->topology;
-
-   bson_mutex_lock (&tp->oidc->cache.lock);
-
-   if (tp->oidc->cache.access_token && 0 == strcmp (tp->oidc->cache.access_token, access_token)) {
-      bson_free (tp->oidc->cache.access_token);
-      tp->oidc->cache.access_token = NULL;
-   }
-
-   bson_mutex_unlock (&tp->oidc->cache.lock);
-}
-
 bool
 _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
                                 mongoc_stream_t *stream,
@@ -326,9 +168,18 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
    bool ok = false;
    char *access_token = NULL;
 
+   // From spec: "If both ENVIRONMENT and an OIDC Callback [...] are provided the driver MUST raise an error."
+   bson_t authMechanismProperties = BSON_INITIALIZER;
+   mongoc_uri_get_mechanism_properties (cluster->client->uri, &authMechanismProperties);
+   if (mongoc_oidc_get_callback (cluster->client->topology->oidc) &&
+       bson_has_field (&authMechanismProperties, "ENVIRONMENT")) {
+      SET_ERROR ("MONGODB-OIDC requested with both ENVIRONMENT and an OIDC Callback. Use one or the other.");
+      goto done;
+   }
+
 
    bool is_cache = false;
-   access_token = get_access_token (cluster->client, &is_cache, error);
+   access_token = mongoc_oidc_get_token (cluster->client->topology->oidc, &is_cache, error);
    if (!access_token) {
       goto done;
    }
@@ -340,8 +191,8 @@ _mongoc_cluster_auth_node_oidc (mongoc_cluster_t *cluster,
             goto done;
          }
          // Retry getting the access token once:
-         invalidate_cache (cluster, access_token);
-         access_token = get_access_token (cluster->client, &is_cache, error);
+         mongoc_oidc_invalidate_cached_token (cluster->client->topology->oidc, access_token);
+         access_token = mongoc_oidc_get_token (cluster->client->topology->oidc, &is_cache, error);
       } else {
          ok = true;
          goto done;
@@ -371,7 +222,8 @@ _mongoc_cluster_reauth_node_oidc (mongoc_cluster_t *cluster,
    char *connection_cached_token = mongoc_cluster_get_oidc_connection_cache_token (cluster, sd->id);
    if (connection_cached_token) {
       // Invalidate shared cache:
-      invalidate_cache (cluster, connection_cached_token); // Does nothing if token was already invalidated.
+      mongoc_oidc_invalidate_cached_token (cluster->client->topology->oidc,
+                                           connection_cached_token); // Does nothing if token was already invalidated.
       // Clear connection cached:
       mongoc_cluster_set_oidc_connection_cache_token (cluster, sd->id, NULL);
    }

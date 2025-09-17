@@ -100,6 +100,9 @@ mongoc_client_set_usleep_impl (mongoc_client_t *client, mongoc_usleep_func_t usl
 {
    client->topology->usleep_fn = usleep_func;
    client->topology->usleep_data = user_data;
+   if (client->topology->oidc) {
+      mongoc_oidc_set_usleep_fn (client->topology->oidc, usleep_func, user_data);
+   }
 }
 
 void

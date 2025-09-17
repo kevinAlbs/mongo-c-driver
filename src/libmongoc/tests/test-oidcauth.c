@@ -190,13 +190,13 @@ static BSON_THREAD_FUN (do_100_finds, pool_void)
 }
 
 extern void
-mongoc_oidc_overwrite_access_token (mongoc_oidc_t *oidc, const char *access_token);
+mongoc_oidc_set_cached_token (mongoc_oidc_t *oidc, const char *access_token);
 
 static void
 poison_client_cache (mongoc_client_t *client)
 {
    BSON_ASSERT_PARAM (client);
-   mongoc_oidc_overwrite_access_token (client->topology->oidc, "bad_token");
+   mongoc_oidc_set_cached_token (client->topology->oidc, "bad_token");
 }
 
 static void
@@ -204,7 +204,7 @@ populate_client_cache (mongoc_client_t *client)
 {
    BSON_ASSERT_PARAM (client);
    char *access_token = read_test_token ();
-   mongoc_oidc_overwrite_access_token (client->topology->oidc, access_token);
+   mongoc_oidc_set_cached_token (client->topology->oidc, access_token);
    bson_free (access_token);
 }
 

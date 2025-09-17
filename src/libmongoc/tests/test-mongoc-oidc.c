@@ -484,13 +484,13 @@ PROSE_TEST (2, 5, "Invalid Client Configuration with Callback")
 }
 
 extern void
-mongoc_oidc_overwrite_access_token (mongoc_oidc_t *oidc, const char *access_token);
+mongoc_oidc_set_cached_token (mongoc_oidc_t *oidc, const char *token);
 
 static void
 poison_client_cache (mongoc_client_t *client)
 {
    BSON_ASSERT_PARAM (client);
-   mongoc_oidc_overwrite_access_token (client->topology->oidc, "bad_token");
+   mongoc_oidc_set_cached_token (client->topology->oidc, "bad_token");
 }
 
 PROSE_TEST (3, 1, "Authentication failure with cached tokens fetch a new token and retry auth")
@@ -657,7 +657,7 @@ populate_client_cache (mongoc_client_t *client)
 {
    BSON_ASSERT_PARAM (client);
    char *access_token = read_test_token ();
-   mongoc_oidc_overwrite_access_token (client->topology->oidc, access_token);
+   mongoc_oidc_set_cached_token (client->topology->oidc, access_token);
    bson_free (access_token);
 }
 
@@ -775,6 +775,91 @@ PROSE_TEST (4, 5, "Reauthentication Succeeds when a Session is involved")
    test_fixture_destroy (tf);
 }
 
+
+// test_oidc_struct tests the mongoc_oidc_t struct.
+static void
+test_oidc_struct (void *unused)
+{
+   bool is_cache = false;
+   bson_error_t error;
+
+   BSON_UNUSED (unused);
+   mongoc_oidc_t *oidc = mongoc_oidc_new ();
+   callback_ctx_t ctx = {0};
+   int64_t start_us;
+
+   // Expect error if no callback set:
+   {
+      ASSERT (!mongoc_oidc_get_token (oidc, &is_cache, &error));
+      ASSERT_ERROR_CONTAINS (error, MONGOC_ERROR_CLIENT, MONGOC_ERROR_CLIENT_AUTHENTICATE, "no callback set");
+      ASSERT (!mongoc_oidc_get_cached_token (oidc));
+   }
+
+   // Set a callback:
+   {
+      mongoc_oidc_callback_t *cb = mongoc_oidc_callback_new (oidc_callback_fn);
+      mongoc_oidc_callback_set_user_data (cb, &ctx);
+      mongoc_oidc_set_callback (oidc, cb);
+      mongoc_oidc_callback_destroy (cb);
+   }
+
+   // Expect callback is called to fetch token:
+   {
+      start_us = bson_get_monotonic_time ();
+      char *token = mongoc_oidc_get_token (oidc, &is_cache, &error);
+      ASSERT_OR_PRINT (token, error);
+      ASSERT_CMPINT (ctx.call_count, ==, 1);
+      ASSERT (!is_cache);
+      bson_free (token);
+   }
+
+   // Expect token is cached:
+   {
+      char *token = mongoc_oidc_get_cached_token (oidc);
+      ASSERT (token);
+      bson_free (token);
+   }
+
+   // Expect callback is not called if token is cached:
+   {
+      char *token = mongoc_oidc_get_token (oidc, &is_cache, &error);
+      ASSERT_OR_PRINT (token, error);
+      ASSERT_CMPINT (ctx.call_count, ==, 1);
+      ASSERT (is_cache);
+      bson_free (token);
+   }
+
+   // Invalidating a different token has no effect:
+   {
+      mongoc_oidc_invalidate_cached_token (oidc, "different_token");
+      char *token = mongoc_oidc_get_cached_token (oidc);
+      ASSERT (token);
+      bson_free (token);
+   }
+
+   // Invalidating same token clears cache:
+   {
+      char *token = mongoc_oidc_get_cached_token (oidc);
+      mongoc_oidc_invalidate_cached_token (oidc, token);
+      ASSERT (token);
+      bson_free (token);
+      ASSERT (!mongoc_oidc_get_cached_token (oidc));
+   }
+
+   // Expect subsequent call to fetch tokens waits at least 100ms.
+   {
+      char *token = mongoc_oidc_get_token (oidc, &is_cache, &error);
+      ASSERT_OR_PRINT (token, error);
+      int64_t end_us = bson_get_monotonic_time ();
+      ASSERT_CMPINT64 (end_us - start_us, >=, 100 * 1000);
+      ASSERT_CMPINT (ctx.call_count, ==, 2);
+      ASSERT (!is_cache);
+      bson_free (token);
+   }
+
+   mongoc_oidc_destroy (oidc);
+}
+
 static int
 skip_if_no_oidc (void)
 {
@@ -786,6 +871,8 @@ test_oidc_auth_install (TestSuite *suite)
 {
    static bool single = false;
    static bool pooled = true;
+
+   TestSuite_AddFull (suite, "/oidc/struct", test_oidc_struct, NULL, NULL, skip_if_no_oidc);
 
    TestSuite_AddFull (suite, "/oidc/bad_config", test_oidc_bad_config, NULL, NULL, skip_if_no_oidc);
 
