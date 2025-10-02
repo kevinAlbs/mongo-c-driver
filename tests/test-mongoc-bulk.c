@@ -4122,6 +4122,55 @@ test_bulk_no_client (void)
    bson_destroy (&reply);
 }
 
+// `test_bulk_big_opts` tests a bulk operation with a large options document to
+// reproduce CDRIVER-6112:
+static void
+test_bulk_big_opts (void)
+{
+   mongoc_client_t *client = test_framework_client_new ();
+   mongoc_collection_t *coll = get_test_collection (client, "test_big_let");
+   bson_error_t error;
+
+   // Create bulk operation similar to PHP driver:
+   mongoc_bulk_operation_t *bulk =
+      mongoc_bulk_operation_new (true /* ordered */);
+
+   // Create a large `opts` document { "testDocument": { "a": "aaa..." } }
+   bson_t opts = BSON_INITIALIZER;
+   {
+      bson_t testDocument;
+      bson_append_document_begin (&opts, "testDocument", -1, &testDocument);
+
+      // Append big string:
+      {
+         size_t num_chars = 79;
+         char *big_string = bson_malloc0 (num_chars + 1);
+         memset (big_string, 'a', num_chars);
+         BSON_APPEND_UTF8 (&testDocument, "a", big_string);
+         bson_free (big_string);
+      }
+
+      bson_append_document_end (&opts, &testDocument);
+   }
+
+
+   mongoc_bulk_operation_set_client (bulk, client);
+   mongoc_bulk_operation_set_database (bulk, "db");
+   mongoc_bulk_operation_set_collection (bulk, "coll");
+
+   ASSERT_OR_PRINT (mongoc_bulk_operation_insert_with_opts (
+                       bulk, tmp_bson ("{'foo': 'bar'}"), &opts, &error),
+                    error);
+
+   ASSERT_OR_PRINT (mongoc_bulk_operation_execute (bulk, NULL, &error), error);
+
+   bson_destroy (&opts);
+   mongoc_bulk_operation_destroy (
+      bulk); // Frees wrong object in mongoc-write-command.c:883
+   mongoc_collection_destroy (coll);
+   mongoc_client_destroy (client); // AddressSanitizer: heap-use-after-free
+}
+
 void
 test_bulk_install (TestSuite *suite)
 {
@@ -4399,4 +4448,5 @@ test_bulk_install (TestSuite *suite)
                   "/BulkOperation/update_one/error_message",
                   test_bulk_update_one_error_message);
    TestSuite_Add (suite, "/BulkOperation/no_client", test_bulk_no_client);
+   TestSuite_Add (suite, "/BulkOperation/big_opts", test_bulk_big_opts);
 }
