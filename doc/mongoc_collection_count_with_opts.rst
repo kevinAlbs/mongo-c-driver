@@ -58,7 +58,7 @@ Examples
   :caption: Basic Counting
 
   #include <mongoc.h>
-  #include <bcon.h>
+  
   #include <stdio.h>
 
   static void
@@ -87,7 +87,7 @@ Examples
   :caption: Counting with Collation
 
   #include <mongoc.h>
-  #include <bcon.h>
+  
   #include <stdio.h>
 
   static void

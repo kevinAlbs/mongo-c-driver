@@ -15,7 +15,6 @@
  */
 
 #include <bson.h>
-#include <bson-string.h>
 
 #include "mongoc-config.h"
 #include "mongoc-error.h"

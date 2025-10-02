@@ -547,7 +547,7 @@ Using the "mydb" database, the following example inserts an example document int
 
 .. code-block:: c
 
-  #include <bcon.h>
+  
   #include <bson.h>
   #include <mongoc.h>
   #include <stdio.h>
@@ -790,7 +790,7 @@ This example executes the `collStats <http://docs.mongodb.org/manual/reference/c
 .. code-block:: c
 
   #include <bson.h>
-  #include <bcon.h>
+  
   #include <mongoc.h>
   #include <stdio.h>
 

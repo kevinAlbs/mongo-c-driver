@@ -1,4 +1,3 @@
-#include <bcon.h>
 #include <mongoc.h>
 #include <mongoc-client-private.h>
 #include <mongoc-cursor-private.h>

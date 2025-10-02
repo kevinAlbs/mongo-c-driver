@@ -53,7 +53,7 @@ Example
 .. code-block:: c
 
   #include <mongoc.h>
-  #include <bcon.h>
+  
   #include <stdio.h>
 
   static void

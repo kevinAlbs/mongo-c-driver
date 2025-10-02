@@ -1,4 +1,3 @@
-#include <bcon.h>
 #include <mongoc.h>
 #include <mongoc-collection-private.h>
 #include <mongoc-find-and-modify-private.h>

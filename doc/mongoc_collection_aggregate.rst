@@ -63,7 +63,7 @@ Example
 
 .. code-block:: c
 
-  #include <bcon.h>
+  
   #include <mongoc.h>
 
   static mongoc_cursor_t *

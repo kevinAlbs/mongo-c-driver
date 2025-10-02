@@ -1,4 +1,4 @@
-#include <bcon.h>
+
 #include <mongoc.h>
 #include <stdio.h>
 
@@ -16,8 +16,7 @@ bulk_collation (mongoc_collection_t *collection)
    uint32_t ret;
 
    /* insert {_id: "one"} and {_id: "One"} */
-   bulk = mongoc_collection_create_bulk_operation_with_opts (
-      collection, NULL);
+   bulk = mongoc_collection_create_bulk_operation_with_opts (collection, NULL);
    doc = BCON_NEW ("_id", BCON_UTF8 ("one"));
    mongoc_bulk_operation_insert (bulk, doc);
    bson_destroy (doc);
