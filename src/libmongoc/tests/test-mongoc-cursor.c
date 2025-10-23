@@ -2391,7 +2391,6 @@ test_events_started_cb(const mongoc_apm_command_started_t *e)
 {
    test_events_t *te = mongoc_apm_command_started_get_context(e);
    ASSERT_CMPSIZE_T(te->commands_len, <, sizeof(te->commands) / sizeof(te->commands[0]));
-   printf("%s\n", tmp_json(mongoc_apm_command_started_get_command(e)));
    te->commands[te->commands_len++] = bson_strdup(mongoc_apm_command_started_get_command_name(e));
 }
 
@@ -2403,8 +2402,16 @@ slow_pipeline(void)
          {"$match" : {}},
          {
             "$project" : {
-               "output" :
-                  {"$function" : {"body" : "function() { sleep(1000); return \"foo\"; }", "args" : [], "lang" : "js"}}
+               "output" : {
+                  "$cond" : {
+                     "if" : {"$eq" : [ "$delay", "on" ]},
+                     "then" : {
+                        "$function" :
+                           {"body" : "function() { sleep(1000); return \"foo\"; }", "args" : [], "lang" : "js"}
+                     },
+                     "else" : "fast"
+                  }
+               }
             }
          }
       ]
@@ -2417,10 +2424,11 @@ static void
 test_cursor_timeout_killCursors(void)
 {
    bson_error_t error;
-   const bson_t *next_doc = NULL;
+   const bson_t *got = NULL;
 
    mongoc_client_t *client = mongoc_client_new("mongodb://localhost:27777/?socketTimeoutMS=500");
    mongoc_collection_t *coll = mongoc_client_get_collection(client, "db", "coll");
+   bson_t *pipeline = slow_pipeline();
    mongoc_collection_drop(coll, NULL);
 
    // Capture events:
@@ -2432,39 +2440,41 @@ test_cursor_timeout_killCursors(void)
       mongoc_apm_callbacks_destroy(cbs);
    }
 
-   // Insert a document to trigger a slow getMore later:
-   ASSERT_OR_PRINT(mongoc_collection_insert_one(coll, tmp_bson("{}"), NULL, NULL, &error), error);
+   // Insert documents to trigger a slow getMore later:
+   ASSERT_OR_PRINT(mongoc_collection_insert_one(coll, tmp_bson("{'delay': 'off'}"), NULL, NULL, &error), error);
+   ASSERT_OR_PRINT(mongoc_collection_insert_one(coll, tmp_bson("{'delay': 'on'}"), NULL, NULL, &error), error);
 
    // Establish cursor:
    {
-      bson_t *pipeline = slow_pipeline();
-      // Use batchSize:0 so "aggregate" establishes cursor without returning documents.
       mongoc_cursor_t *cursor =
-         mongoc_collection_aggregate(coll, MONGOC_QUERY_NONE, pipeline, tmp_bson("{'batchSize': 0 }"), NULL);
-      ASSERT(!mongoc_cursor_next(cursor, &next_doc)); // getMore times out.
+         mongoc_collection_aggregate(coll, MONGOC_QUERY_NONE, pipeline, tmp_bson("{'batchSize': 1 }"), NULL);
+
+      // First document returned fast:
+      ASSERT(mongoc_cursor_next(cursor, &got));
+      ASSERT(mongoc_cursor_get_id(cursor)); // Cursor established.
+
+      // Second document triggers timeout:
+      ASSERT(!mongoc_cursor_next(cursor, &got));
       ASSERT(mongoc_cursor_error(cursor, &error));
       ASSERT_ERROR_CONTAINS(error, MONGOC_ERROR_STREAM, MONGOC_ERROR_STREAM_SOCKET, "socket error or timeout");
-      ASSERT(mongoc_cursor_get_id(cursor)); // Cursor established.
-      bson_destroy(pipeline);
+
       mongoc_cursor_destroy(cursor); // Does not send killCursors!
    }
 
    // Check events:
    {
-      ASSERT(te.commands[0]);
       ASSERT_CMPSTR(te.commands[0], "insert");
-      ASSERT(te.commands[1]);
-      ASSERT_CMPSTR(te.commands[1], "aggregate");
-      ASSERT(te.commands[2]);
-      ASSERT_CMPSTR(te.commands[2], "getMore");
-      ASSERT(te.commands[3]); // Fails! No killCursors sent!
-      ASSERT_CMPSTR(te.commands[3], "killCursors");
+      ASSERT_CMPSTR(te.commands[1], "insert");
+      ASSERT_CMPSTR(te.commands[2], "aggregate");
+      ASSERT_CMPSTR(te.commands[3], "getMore");
+      ASSERT_CMPSTR(te.commands[4], "killCursors"); // Fails!
    }
 
    for (size_t i = 0; i < te.commands_len; i++) {
       bson_free(te.commands[i]);
    }
 
+   bson_destroy(pipeline);
    mongoc_collection_destroy(coll);
    mongoc_client_destroy(client);
 }
