@@ -2380,6 +2380,95 @@ test_open_cursor_from_reply(void)
    mongoc_client_destroy(client);
 }
 
+
+typedef struct {
+   char *commands[6];
+   size_t commands_len;
+} test_events_t;
+
+static void
+test_events_started_cb(const mongoc_apm_command_started_t *e)
+{
+   test_events_t *te = mongoc_apm_command_started_get_context(e);
+   ASSERT_CMPSIZE_T(te->commands_len, <, sizeof(te->commands) / sizeof(te->commands[0]));
+   printf("%s\n", tmp_json(mongoc_apm_command_started_get_command(e)));
+   te->commands[te->commands_len++] = bson_strdup(mongoc_apm_command_started_get_command_name(e));
+}
+
+static bson_t *
+slow_pipeline(void)
+{
+   const char *pipeline_str = BSON_STR({
+      "pipeline" : [
+         {"$match" : {}},
+         {
+            "$project" : {
+               "output" :
+                  {"$function" : {"body" : "function() { sleep(1000); return \"foo\"; }", "args" : [], "lang" : "js"}}
+            }
+         }
+      ]
+   });
+
+   return bson_new_from_json((const uint8_t *)pipeline_str, -1, NULL);
+}
+
+static void
+test_cursor_timeout_killCursors(void)
+{
+   bson_error_t error;
+   const bson_t *next_doc = NULL;
+
+   mongoc_client_t *client = mongoc_client_new("mongodb://localhost:27777/?socketTimeoutMS=500");
+   mongoc_collection_t *coll = mongoc_client_get_collection(client, "db", "coll");
+   mongoc_collection_drop(coll, NULL);
+
+   // Capture events:
+   test_events_t te = {.commands_len = 0};
+   {
+      mongoc_apm_callbacks_t *cbs = mongoc_apm_callbacks_new();
+      mongoc_apm_set_command_started_cb(cbs, test_events_started_cb);
+      ASSERT(mongoc_client_set_apm_callbacks(client, cbs, &te));
+      mongoc_apm_callbacks_destroy(cbs);
+   }
+
+   // Insert a document to trigger a slow getMore later:
+   ASSERT_OR_PRINT(mongoc_collection_insert_one(coll, tmp_bson("{}"), NULL, NULL, &error), error);
+
+   // Establish cursor:
+   {
+      bson_t *pipeline = slow_pipeline();
+      // Use batchSize:0 so "aggregate" establishes cursor without returning documents.
+      mongoc_cursor_t *cursor =
+         mongoc_collection_aggregate(coll, MONGOC_QUERY_NONE, pipeline, tmp_bson("{'batchSize': 0 }"), NULL);
+      ASSERT(!mongoc_cursor_next(cursor, &next_doc)); // getMore times out.
+      ASSERT(mongoc_cursor_error(cursor, &error));
+      ASSERT_ERROR_CONTAINS(error, MONGOC_ERROR_STREAM, MONGOC_ERROR_STREAM_SOCKET, "socket error or timeout");
+      ASSERT(mongoc_cursor_get_id(cursor)); // Cursor established.
+      bson_destroy(pipeline);
+      mongoc_cursor_destroy(cursor); // Does not send killCursors!
+   }
+
+   // Check events:
+   {
+      ASSERT(te.commands[0]);
+      ASSERT_CMPSTR(te.commands[0], "insert");
+      ASSERT(te.commands[1]);
+      ASSERT_CMPSTR(te.commands[1], "aggregate");
+      ASSERT(te.commands[2]);
+      ASSERT_CMPSTR(te.commands[2], "getMore");
+      ASSERT(te.commands[3]); // Fails! No killCursors sent!
+      ASSERT_CMPSTR(te.commands[3], "killCursors");
+   }
+
+   for (size_t i = 0; i < te.commands_len; i++) {
+      bson_free(te.commands[i]);
+   }
+
+   mongoc_collection_destroy(coll);
+   mongoc_client_destroy(client);
+}
+
 void
 test_cursor_install(TestSuite *suite)
 {
@@ -2426,4 +2515,5 @@ test_cursor_install(TestSuite *suite)
    TestSuite_AddLive(suite, "/Cursor/batchsize_override_decimal128", test_cursor_batchsize_override_decimal128);
    TestSuite_AddLive(suite, "/Cursor/batchsize_override_range_warning", test_cursor_batchsize_override_range_warning);
    TestSuite_AddLive(suite, "/Cursor/open_cursor_from_reply", test_open_cursor_from_reply);
+   TestSuite_AddLive(suite, "/Cursor/timeout_killCursors", test_cursor_timeout_killCursors);
 }
