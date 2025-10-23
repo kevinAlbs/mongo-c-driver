@@ -6947,6 +6947,48 @@ test_lookup_pre81(void *unused)
    }
 }
 
+static void
+test_access_token(void *unused)
+{
+   mongoc_client_t *keyvault_client = test_framework_new_default_client();
+   bson_error_t error = {0};
+
+   // Create KMS credentials:
+   bson_t *kms_providers; // { "azure": { "accessToken": "..." }}
+   {
+      char *azure_access_token = test_framework_getenv_required("AZURE_ACCESS_TOKEN");
+      kms_providers = tmp_bson("{'azure': {'accessToken': '%s' }}", azure_access_token);
+      bson_free(azure_access_token);
+   }
+
+   // Create ClientEncryption object:
+   mongoc_client_encryption_t *ce;
+
+   {
+      mongoc_client_encryption_opts_t *ce_opts = mongoc_client_encryption_opts_new();
+      mongoc_client_encryption_opts_set_kms_providers(ce_opts, kms_providers);
+      mongoc_client_encryption_opts_set_keyvault_namespace(ce_opts, "keyvault", "datakeys");
+      mongoc_client_encryption_opts_set_keyvault_client(ce_opts, keyvault_client);
+      ce = mongoc_client_encryption_new(ce_opts, &error);
+      ASSERT_OR_PRINT(ce, error);
+      mongoc_client_encryption_opts_destroy(ce_opts);
+   }
+
+   // Create a data key:
+   {
+      mongoc_client_encryption_datakey_opts_t *dk_opts = mongoc_client_encryption_datakey_opts_new();
+      mongoc_client_encryption_datakey_opts_set_masterkey(dk_opts, tmp_bson(BSON_STR({
+                                                             "provider" : "azure",
+                                                             "keyVaultEndpoint" : "key-vault-csfle.vault.azure.net",
+                                                             "keyName" : "key-name-csfle"
+                                                          })));
+
+      ASSERT_OR_PRINT(mongoc_client_encryption_create_datakey(ce, "azure", dk_opts, NULL, &error), error);
+      mongoc_client_encryption_datakey_opts_destroy(dk_opts);
+   }
+   mongoc_client_encryption_destroy(ce);
+}
+
 void
 test_client_side_encryption_install(TestSuite *suite)
 {
@@ -7396,6 +7438,13 @@ test_client_side_encryption_install(TestSuite *suite)
                         test_framework_skip_if_max_wire_version_more_than_25 /* require server < 8.1 */,
                         test_framework_skip_if_max_wire_version_less_than_21 /* require server > 7.0 for QE support */,
                         test_framework_skip_if_single, /* QE not supported on standalone */
+                        test_framework_skip_if_no_client_side_encryption);
+
+      TestSuite_AddFull(suite,
+                        "/client_side_encryption/access_token",
+                        test_access_token,
+                        NULL,
+                        NULL,
                         test_framework_skip_if_no_client_side_encryption);
    }
 }
