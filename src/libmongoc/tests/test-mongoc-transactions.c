@@ -1079,6 +1079,8 @@ test_transaction_labels(void *unused)
    if (!bson_equal(&reply, tmp_bson(expected))) {
       test_error("Unexpected reply: %s\nExpected: %s", tmp_json(&reply), expected);
    }
+   ASSERT_ERROR_CONTAINS(error, MONGOC_ERROR_STREAM, MONGOC_ERROR_STREAM_SOCKET, "socket error");
+   ASSERT_CMPUINT(error.reserved, ==, MONGOC_ERROR_CATEGORY);
 
    bson_destroy(&reply);
    mongoc_client_session_destroy(session);
