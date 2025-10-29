@@ -1027,6 +1027,64 @@ test_max_commit_time_ms_is_reset(void *ctx)
    mock_rs_destroy(rs);
 }
 
+static void
+test_transaction_labels(void *unused)
+{
+   BSON_UNUSED(unused);
+
+   mongoc_client_t *client = test_framework_new_default_client();
+
+   bool ok;
+   bson_error_t error;
+   mongoc_client_session_t *session = mongoc_client_start_session(client, NULL, &error);
+   ASSERT_OR_PRINT(session, error);
+   ASSERT_OR_PRINT(mongoc_client_session_start_transaction(session, NULL, &error), error);
+
+
+   // Insert a document in the transaction:
+   {
+      bson_t opts = BSON_INITIALIZER;
+      mongoc_collection_t *coll = get_test_collection(client, "transaction_labels");
+
+      ASSERT_OR_PRINT(mongoc_client_session_append(session, &opts, &error), error);
+      ok = mongoc_collection_insert_one(coll, tmp_bson("{}"), &opts, NULL, &error);
+      ASSERT_OR_PRINT(ok, error);
+
+      mongoc_collection_destroy(coll);
+      bson_destroy(&opts);
+   }
+
+   // Set a failpoint to make the commitTransaction fail with a network error:
+   {
+      // Fail twice so retry fails:
+      ok = mongoc_client_command_simple(client,
+                                        "admin",
+                                        tmp_bson(BSON_STR({
+                                           "configureFailPoint" : "failCommand",
+                                           "mode" : {"times" : 2},
+                                           "data" : {"failCommands" : ["commitTransaction"], "closeConnection" : true}
+                                        })),
+                                        NULL,
+                                        NULL,
+                                        &error);
+      ASSERT_OR_PRINT(ok, error);
+   }
+
+   bson_t reply;
+   ok = mongoc_client_session_commit_transaction(session, &reply, &error);
+
+   ASSERT(!ok);
+
+   const char *expected = BSON_STR({"errorLabels" : [ "UnknownTransactionCommitResult", "RetryableWriteError" ]});
+   if (!bson_equal(&reply, tmp_bson(expected))) {
+      test_error("Unexpected reply: %s\nExpected: %s", tmp_json(&reply), expected);
+   }
+
+   bson_destroy(&reply);
+   mongoc_client_session_destroy(session);
+   mongoc_client_destroy(client);
+}
+
 void
 test_transactions_install(TestSuite *suite)
 {
@@ -1085,4 +1143,7 @@ test_transactions_install(TestSuite *suite)
                      NULL,
                      NULL,
                      test_framework_skip_if_no_crypto);
+
+   TestSuite_AddFull(
+      suite, "/transactions/labels", test_transaction_labels, NULL, NULL, test_framework_skip_if_no_txns);
 }
