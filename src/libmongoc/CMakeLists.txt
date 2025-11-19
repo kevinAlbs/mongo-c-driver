@@ -1284,6 +1284,8 @@ if (ENABLE_EXAMPLES AND ENABLE_SHARED)
    mongoc_add_example (mongoc-tail ${PROJECT_SOURCE_DIR}/examples/mongoc-tail.c)
    mongoc_add_example (example-collection-command ${PROJECT_SOURCE_DIR}/examples/example-collection-command.c)
    mongoc_add_example (example-bulkwrite ${PROJECT_SOURCE_DIR}/examples/example-bulkwrite.c)
+   mongoc_add_example (example-oidc ${PROJECT_SOURCE_DIR}/examples/example-oidc.c)
+   mongoc_add_example (example-oidc-azure ${PROJECT_SOURCE_DIR}/examples/example-oidc-azure.c)
 
    # examples/aggregation/
    mongoc_add_example (aggregation1 ${PROJECT_SOURCE_DIR}/examples/aggregation/aggregation1.c)
