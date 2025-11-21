@@ -264,6 +264,7 @@ _mongoc_topology_scanner_add_speculative_authentication(
 #endif
 
    if (strcasecmp(mechanism, "MONGODB-OIDC") == 0 && oidc_access_token) {
+      MONGOC_DEBUG("Using access token for speculative auth: %s", oidc_access_token);
       if (mongoc_oidc_append_speculative_auth(oidc_access_token, server_id, &auth_cmd, &error)) {
          has_auth = true;
       } else {
