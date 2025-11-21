@@ -80,6 +80,8 @@ run_sasl_start(mongoc_cluster_t *cluster,
    bson_t reply = BSON_INITIALIZER;
    bool ok = false;
 
+   MONGOC_DEBUG("run_sasl_start with access token: %s", access_token);
+
    // Build `saslStart` command:
    {
       bsonBuildDecl(jwt_doc, kv("jwt", cstr(access_token)));
