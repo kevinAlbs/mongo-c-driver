@@ -20,6 +20,8 @@
 #include <test-conveniences.h>
 #include <test-libmongoc.h>
 
+#include "mongoc/mongoc.h"
+
 static char *
 read_test_token(void)
 {
@@ -900,6 +902,51 @@ skip_if_no_azure_oidc(void)
    return is_testing_azure_oidc() ? 1 : 0;
 }
 
+static void
+test_retry_until_expired(void *unused)
+{
+   BSON_UNUSED(unused);
+
+   mongoc_uri_t *uri = mongoc_uri_new(test_framework_getenv_required("MONGODB_URI"));
+   ASSERT(uri);
+
+   mongoc_client_t *client = mongoc_client_new_from_uri(uri);
+   ASSERT(client);
+
+   bson_error_t error;
+   bson_t *ping = tmp_bson("{'ping': 1}");
+   bson_t *failpoint = tmp_bson(BSON_STR({
+      "configureFailPoint" : "failCommand",
+      "mode" : {"times" : 1},
+      "data" : {"failCommands" : ["ping"], "closeConnection" : true}
+   }));
+
+   while (true) {
+      MONGOC_DEBUG("Sending ping (expect OK)...");
+      if (!mongoc_client_command_simple(client, "admin", ping, NULL, NULL, &error)) {
+         MONGOC_DEBUG("Ping (unexpectedly) failed: %s", error.message);
+      }
+      MONGOC_DEBUG("Sending ping (expect OK) ... done");
+
+      MONGOC_DEBUG("Setting failpoint to trigger network error ...");
+      if (!mongoc_client_command_simple(client, "admin", failpoint, NULL, NULL, &error)) {
+         MONGOC_DEBUG("Ping (unexpectedly) failed: %s", error.message);
+      }
+      MONGOC_DEBUG("Setting failpoint to trigger network error ... done");
+
+      MONGOC_DEBUG("Sending ping (expect error) ...");
+      if (!mongoc_client_command_simple(client, "admin", ping, NULL, NULL, &error)) {
+         MONGOC_DEBUG("Ping (unexpectedly) failed: %s", error.message);
+      }
+      MONGOC_DEBUG("Sending ping (expect error) ... done");
+
+      MONGOC_DEBUG("Sleeping 5 seconds ...");
+      // Trigger a client-side timeout to close connection.
+      mlib_sleep_for(mlib_duration(5, s));
+      MONGOC_DEBUG("Sleeping 5 seconds ... done");
+   }
+}
+
 void
 test_oidc_auth_install(TestSuite *suite)
 {
@@ -966,4 +1013,6 @@ test_oidc_auth_install(TestSuite *suite)
 
    TestSuite_AddFull(suite, "/oidc/prose/5.2/single", test_oidc_prose_5_2, NULL, &single, skip_if_no_azure_oidc);
    TestSuite_AddFull(suite, "/oidc/prose/5.2/pooled", test_oidc_prose_5_2, NULL, &pooled, skip_if_no_azure_oidc);
+
+   TestSuite_AddFull(suite, "/oidc/retry_until_expired", test_retry_until_expired, NULL, NULL, NULL);
 }
