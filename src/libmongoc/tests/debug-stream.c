@@ -78,6 +78,7 @@ static ssize_t
 _mongoc_stream_debug_readv(
    mongoc_stream_t *stream, mongoc_iovec_t *iov, size_t iovcnt, size_t min_bytes, int32_t timeout_msec)
 {
+   ((mongoc_stream_debug_t *)stream)->stats->last_timeout_readv = timeout_msec;
    return mongoc_stream_readv(((mongoc_stream_debug_t *)stream)->wrapped, iov, iovcnt, min_bytes, timeout_msec);
 }
 
@@ -85,6 +86,7 @@ _mongoc_stream_debug_readv(
 static ssize_t
 _mongoc_stream_debug_writev(mongoc_stream_t *stream, mongoc_iovec_t *iov, size_t iovcnt, int32_t timeout_msec)
 {
+   ((mongoc_stream_debug_t *)stream)->stats->last_timeout_writev = timeout_msec;
    return mongoc_stream_writev(((mongoc_stream_debug_t *)stream)->wrapped, iov, iovcnt, timeout_msec);
 }
 

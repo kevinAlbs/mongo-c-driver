@@ -223,6 +223,8 @@ typedef struct _debug_stream_stats_t {
    mongoc_client_t *client;
    int n_destroyed;
    int n_failed;
+   int32_t last_timeout_readv;
+   int32_t last_timeout_writev;
 } debug_stream_stats_t;
 
 void

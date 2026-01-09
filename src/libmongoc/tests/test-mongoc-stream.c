@@ -3,6 +3,8 @@
 #include <mongoc/mongoc.h>
 
 #include <TestSuite.h>
+#include <test-conveniences.h>
+#include <test-libmongoc.h>
 
 #include <fcntl.h>
 
@@ -250,6 +252,79 @@ test_stream_writev_timeout(void)
 }
 
 
+// `test_stream_passed_timeouts` tests how socketTimeoutMS values get passed to the underlying mongoc_stream_t.
+static void
+test_stream_passed_timeouts(void)
+{
+   bson_error_t error;
+   if (test_framework_get_ssl()) {
+      MONGOC_DEBUG("Skipping test with TLS. TLS streams may pass multiple timeouts to underlying streams");
+      return;
+   }
+
+   // Test socketTimeoutMS=-1
+   {
+      mongoc_uri_t *const uri = test_framework_get_uri();
+      mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, -1);
+      mongoc_client_t *const client = test_framework_client_new_from_uri(uri, NULL);
+
+      debug_stream_stats_t stats;
+      test_framework_set_debug_stream(client, &stats);
+      bool ok = mongoc_client_command_simple(client, "admin", tmp_bson("{'ping': 1}"), NULL, NULL, &error);
+      ASSERT_OR_PRINT(ok, error);
+      ASSERT_CMPINT32(stats.last_timeout_readv, ==, -1);       // After PR: -1
+      ASSERT_CMPINT32(stats.last_timeout_writev, ==, 3600000); // After PR: -1
+      mongoc_client_destroy(client);
+   }
+
+   // Test socketTimeoutMS=INT32_MIN
+   {
+      mongoc_uri_t *const uri = test_framework_get_uri();
+      mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, INT32_MIN);
+      mongoc_client_t *const client = test_framework_client_new_from_uri(uri, NULL);
+
+      debug_stream_stats_t stats;
+      test_framework_set_debug_stream(client, &stats);
+      bool ok = mongoc_client_command_simple(client, "admin", tmp_bson("{'ping': 1}"), NULL, NULL, &error);
+      ASSERT_OR_PRINT(ok, error);                               // After PR: error!
+      ASSERT_CMPINT32(stats.last_timeout_readv, ==, INT32_MIN); // After PR: 0
+      ASSERT_CMPINT32(stats.last_timeout_writev, ==, 3600000);  // After PR: 0
+      mongoc_client_destroy(client);
+   }
+
+   // Test socketTimeoutMS=INT32_MAX
+   {
+      mongoc_uri_t *const uri = test_framework_get_uri();
+      mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, INT32_MAX);
+      mongoc_client_t *const client = test_framework_client_new_from_uri(uri, NULL);
+
+      debug_stream_stats_t stats;
+      test_framework_set_debug_stream(client, &stats);
+      bool ok = mongoc_client_command_simple(client, "admin", tmp_bson("{'ping': 1}"), NULL, NULL, &error);
+      ASSERT_OR_PRINT(ok, error);
+      ASSERT_CMPINT32(stats.last_timeout_readv, ==, INT32_MAX);  // After PR: INT32_MAX
+      ASSERT_CMPINT32(stats.last_timeout_writev, ==, INT32_MAX); // After PR: INT32_MAX
+      mongoc_client_destroy(client);
+   }
+
+   // Test socketTimeoutMS=0
+   {
+      mongoc_uri_t *const uri = test_framework_get_uri();
+      mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, 0);
+      mongoc_client_t *const client = test_framework_client_new_from_uri(uri, NULL);
+
+      debug_stream_stats_t stats;
+      test_framework_set_debug_stream(client, &stats);
+      bool ok = mongoc_client_command_simple(client, "admin", tmp_bson("{'ping': 1}"), NULL, NULL, &error);
+      ASSERT_OR_PRINT(ok, error);
+      ASSERT_CMPINT32(stats.last_timeout_readv, ==, 300000);  // After PR: 300000
+      ASSERT_CMPINT32(stats.last_timeout_writev, ==, 300000); // After PR: 300000
+      mongoc_client_destroy(client);
+   }
+
+   // TODO: Test socketTimeoutMS=inf
+}
+
 void
 test_stream_install(TestSuite *suite)
 {
@@ -257,4 +332,5 @@ test_stream_install(TestSuite *suite)
    TestSuite_Add(suite, "/Stream/buffered/oversized", test_buffered_oversized);
    TestSuite_Add(suite, "/Stream/writev/full", test_stream_writev_full);
    TestSuite_Add(suite, "/Stream/writev/timeout", test_stream_writev_timeout);
+   TestSuite_AddLive(suite, "/Stream/passed_timeouts", test_stream_passed_timeouts);
 }
