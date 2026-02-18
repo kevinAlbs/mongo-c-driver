@@ -5,6 +5,8 @@
 #include <openssl/err.h>
 #endif
 
+#include <mongoc/mongoc-host-list-private.h>
+
 #include <TestSuite.h>
 #include <ssl-test.h>
 #include <test-conveniences.h>
@@ -410,6 +412,30 @@ test_mongoc_tls_insecure_nowarning(void)
    mongoc_uri_destroy(uri);
 }
 
+static void
+test_tls_aws(void)
+{
+   bson_error_t error;
+
+   const int32_t connecttimeoutms = 10 * 1000; // 10 seconds.
+
+   // Create TCP stream:
+   mongoc_host_list_t host;
+   ASSERT_OR_PRINT(_mongoc_host_list_from_string_with_err(&host, "sts.amazonaws.com:443", &error), error);
+   mongoc_stream_t *base_stream = mongoc_client_connect_tcp(connecttimeoutms, &host, &error);
+   ASSERT_OR_PRINT(base_stream, error);
+
+   // Wrap TCP stream with TLS stream with default options:
+   mongoc_ssl_opt_t ssl_opts = *mongoc_ssl_opt_get_default();
+   const int is_client = 1;
+   mongoc_stream_t *tls_stream = mongoc_stream_tls_new_with_hostname(base_stream, host.host, &ssl_opts, is_client);
+
+   // Check that TLS handshake succeeds.
+   ASSERT_OR_PRINT(mongoc_stream_tls_handshake_block(tls_stream, host.host, connecttimeoutms, &error), error);
+
+   mongoc_stream_destroy(tls_stream); // Also destroys base_stream
+}
+
 void
 test_stream_tls_install(TestSuite *suite)
 {
@@ -446,4 +472,5 @@ test_stream_tls_install(TestSuite *suite)
 
    TestSuite_AddLive(suite, "/TLS/insecure_nowarning", test_mongoc_tls_insecure_nowarning);
 #endif
+   TestSuite_Add(suite, "/TLS/aws", test_tls_aws);
 }
