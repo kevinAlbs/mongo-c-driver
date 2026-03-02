@@ -100,10 +100,20 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
    else((void)0)
 
 /**
- * @brief Expands to a call to bson_append_{Kind}, with the three first
- * arguments filled in by the DSL context variables.
+ * @brief Expands to a call to bson_append_{Kind} or bson_array_builder_append_{Kind}, using DSL context variables.
  */
-#define _bsonBuildAppendArgs bsonBuildContext.doc, bsonBuildContext.key, bsonBuildContext.key_len
+#define _bson_append(name, ...)                                                                                \
+   (bsonBuildContext.doc                                                                                       \
+       ? bson_append_##name(bsonBuildContext.doc, bsonBuildContext.key, bsonBuildContext.key_len, __VA_ARGS__) \
+       : bson_array_builder_append_##name(bsonBuildContext.arr, __VA_ARGS__))
+
+#define _bson_append_no_args(name)                                                                                  \
+   (bsonBuildContext.doc ? bson_append_##name(bsonBuildContext.doc, bsonBuildContext.key, bsonBuildContext.key_len) \
+                         : bson_array_builder_append_##name(bsonBuildContext.arr))
+
+#define _bson_append_end(name, child)                                            \
+   (bsonBuildContext.doc ? bson_append_##name##_end(bsonBuildContext.doc, child) \
+                         : bson_array_builder_append_##name##_end(bsonBuildContext.arr, child))
 
 /**
  * The _bsonDocOperation_XYZ macros handle the top-level bsonBuild()
@@ -156,12 +166,12 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
    _bsonDSL_begin("doc(%s)", _bsonDSL_strElide(30, __VA_ARGS__));                             \
    /* Write to this variable as the child: */                                                 \
    bson_t _bbChildDoc = BSON_INITIALIZER;                                                     \
-   if (!bson_append_document_begin(_bsonBuildAppendArgs, &_bbChildDoc)) {                     \
+   if (!_bson_append(document_begin, &_bbChildDoc)) {                                         \
       bsonBuildError = "Error while initializing child document: " _bsonDSL_str(__VA_ARGS__); \
    } else {                                                                                   \
       _bsonBuildAppend(_bbChildDoc, __VA_ARGS__);                                             \
       if (!bsonBuildError) {                                                                  \
-         if (!bson_append_document_end(bsonBuildContext.doc, &_bbChildDoc)) {                 \
+         if (!_bson_append_end(document, &_bbChildDoc)) {                                     \
             bsonBuildError = "Error while finalizing document: " _bsonDSL_str(__VA_ARGS__);   \
          }                                                                                    \
       }                                                                                       \
@@ -172,32 +182,32 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 /// evaluation
 #define _bsonValueOperation_array _bsonValueOperationDeferred_array _bsonDSL_nothing()
 #define _bsonArrayOperation_array(...) _bsonArrayAppendValue(array(__VA_ARGS__))
-
-#define _bsonValueOperationDeferred_array(...)                                                 \
-   _bsonDSL_begin("array(%s)", _bsonDSL_strElide(30, __VA_ARGS__));                            \
-   /* Write to this variable as the child array: */                                            \
-   bson_t _bbArray = BSON_INITIALIZER;                                                         \
-   if (!bson_append_array_begin(_bsonBuildAppendArgs, &_bbArray)) {                            \
-      bsonBuildError = "Error while initializing child array: " _bsonDSL_str(__VA_ARGS__);     \
-   } else {                                                                                    \
-      _bsonBuildArray(_bbArray, __VA_ARGS__);                                                  \
-      if (!bsonBuildError) {                                                                   \
-         if (!bson_append_array_end(bsonBuildContext.doc, &_bbArray)) {                        \
-            bsonBuildError = "Error while finalizing child array: " _bsonDSL_str(__VA_ARGS__); \
-         }                                                                                     \
-      } else {                                                                                 \
-         _bsonDSLDebug("Got bsonBuildError: [%s]", bsonBuildError);                            \
-      }                                                                                        \
-   }                                                                                           \
+#define _bsonValueOperationDeferred_array(...)                                                                         \
+   _bsonDSL_begin("array2(%s)", _bsonDSL_strElide(30, __VA_ARGS__));                                                   \
+   /* Write to this variable as the child array builder: */                                                            \
+   bson_array_builder_t _bbArray;                                                                                      \
+   if (!_bson_append(array_builder_inline_begin, &_bbArray)) {                                                         \
+      bsonBuildError = "Error while initializing child array: " _bsonDSL_str(__VA_ARGS__);                             \
+   } else {                                                                                                            \
+      _bsonBuildArray(_bbArray, __VA_ARGS__);                                                                          \
+      if (!bsonBuildError) {                                                                                           \
+         if (!(bsonBuildContext.doc ? bson_append_array_builder_end(bsonBuildContext.doc, &_bbArray)                   \
+                                    : bson_array_builder_append_array_builder_end(bsonBuildContext.arr, &_bbArray))) { \
+            bsonBuildError = "Error while finalizing child array: " _bsonDSL_str(__VA_ARGS__);                         \
+         }                                                                                                             \
+      } else {                                                                                                         \
+         _bsonDSLDebug("Got bsonBuildError: [%s]", bsonBuildError);                                                    \
+      }                                                                                                                \
+   }                                                                                                                   \
    _bsonDSL_end
 
 /// Append a UTF-8 string with an explicit length
 #define _bsonValueOperation_utf8_w_len(String, Len)                                \
-   if (!bson_append_utf8(_bsonBuildAppendArgs, (String), (int)(Len))) {            \
+   if (!_bson_append(utf8, (String), (int)(Len))) {                                \
       bsonBuildError = "Error while appending utf8 string: " _bsonDSL_str(String); \
    } else                                                                          \
       ((void)0)
-#define _bsonArrayOperation_utf8_w_len(X) _bsonArrayAppendValue(utf8_w_len(X))
+#define _bsonArrayOperation_utf8_w_len(String, Len) _bsonArrayAppendValue(utf8_w_len(String, Len))
 
 /// Append a "cstr" as UTF-8
 #define _bsonValueOperation_cstr(String) _bsonValueOperation_utf8_w_len((String), strlen(String))
@@ -205,7 +215,7 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 
 /// Append an int32
 #define _bsonValueOperation_int32(Integer)                                       \
-   if (!bson_append_int32(_bsonBuildAppendArgs, (Integer))) {                    \
+   if (!_bson_append(int32, (Integer))) {                                        \
       bsonBuildError = "Error while appending int32(" _bsonDSL_str(Integer) ")"; \
    } else                                                                        \
       ((void)0)
@@ -213,7 +223,7 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 
 /// Append an int64
 #define _bsonValueOperation_int64(Integer)                                       \
-   if (!bson_append_int64(_bsonBuildAppendArgs, (Integer))) {                    \
+   if (!_bson_append(int64, (Integer))) {                                        \
       bsonBuildError = "Error while appending int64(" _bsonDSL_str(Integer) ")"; \
    } else                                                                        \
       ((void)0)
@@ -221,7 +231,7 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 
 /// Append the value referenced by a given iterator
 #define _bsonValueOperation_iterValue(Iter)                                       \
-   if (!bson_append_iter(_bsonBuildAppendArgs, &(Iter))) {                        \
+   if (!_bson_append(iter, &(Iter))) {                                            \
       bsonBuildError = "Error while appending iterValue(" _bsonDSL_str(Iter) ")"; \
    } else                                                                         \
       ((void)0)
@@ -229,7 +239,7 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 
 /// Append the BSON document referenced by the given pointer
 #define _bsonValueOperation_bson(Doc)                                                    \
-   if (!bson_append_document(_bsonBuildAppendArgs, &(Doc))) {                            \
+   if (!_bson_append(document, &(Doc))) {                                                \
       bsonBuildError = "Error while appending subdocument: bson(" _bsonDSL_str(Doc) ")"; \
    } else                                                                                \
       ((void)0)
@@ -237,7 +247,7 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 
 /// Append the BSON document referenced by the given pointer as an array
 #define _bsonValueOperation_bsonArray(Arr)                         \
-   if (!bson_append_array(_bsonBuildAppendArgs, &(Arr))) {         \
+   if (!_bson_append(array, &(Arr))) {                             \
       bsonBuildError = "Error while appending subdocument array: " \
                        "bsonArray(" _bsonDSL_str(Arr) ")";         \
    } else                                                          \
@@ -245,7 +255,7 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 #define _bsonArrayOperation_bsonArray(X) _bsonArrayAppendValue(bsonArray(X))
 
 #define _bsonValueOperation_bool(b)                                       \
-   if (!bson_append_bool(_bsonBuildAppendArgs, (b))) {                    \
+   if (!_bson_append(bool, b)) {                                          \
       bsonBuildError = "Error while appending bool(" _bsonDSL_str(b) ")"; \
    } else                                                                 \
       ((void)0)
@@ -253,14 +263,14 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 #define _bsonValueOperation_boolean(b) _bsonValueOperation_bool(b)
 
 #define _bsonValueOperation_oid(o)                                       \
-   if (!bson_append_oid(_bsonBuildAppendArgs, (o))) {                    \
+   if (!_bson_append(oid, o)) {                                          \
       bsonBuildError = "Error while appending oid(" _bsonDSL_str(o) ")"; \
    } else                                                                \
       ((void)0)
 #define _bsonArrayOperation_oid(X) _bsonArrayAppendValue(oid(X))
 
 #define _bsonValueOperation_null                       \
-   if (!bson_append_null(_bsonBuildAppendArgs)) {      \
+   if (!_bson_append_no_args(null)) {                  \
       bsonBuildError = "Error while appending a null"; \
    } else                                              \
       ((void)0)
@@ -270,13 +280,13 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 
 #define _bsonValueOperation_value(Value)                                       \
    _bsonDSL_begin("value(%s)", _bsonDSL_str(Value));                           \
-   if (!bson_append_value(_bsonBuildAppendArgs, &(Value))) {                   \
+   if (!_bson_append(value, &(Value))) {                                       \
       bsonBuildError = "Error while appending value(" _bsonDSL_str(Value) ")"; \
    }                                                                           \
    _bsonDSL_end
 
 #define _bsonValueOperation_binary(SubType, Data, Len)                         \
-   if (!bson_append_binary(_bsonBuildAppendArgs, (SubType), (Data), (Len))) {  \
+   if (!_bson_append(binary, (SubType), (Data), (Len))) {                      \
       bsonBuildError = "Error while appending binary(" _bsonDSL_str(Data) ")"; \
    } else                                                                      \
       ((void)0)
@@ -311,14 +321,10 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
    _bsonVisitEach(OtherArr, if (Pred, then(do(_bsonArrayOperation_iterValue(bsonVisitIter))))); \
    _bsonDSL_end
 
-#define _bsonArrayAppendValue(ValueOperation)                                                          \
-   _bsonDSL_begin("[%d] => [%s]", (int)bsonBuildContext.index, _bsonDSL_strElide(30, ValueOperation)); \
-   /* Set the doc key to the array index as a string: */                                               \
-   _bsonBuild_setKeyToArrayIndex(bsonBuildContext.index);                                              \
-   /* Append a value: */                                                                               \
-   _bsonValueOperation_##ValueOperation;                                                               \
-   /* Increment the array index: */                                                                    \
-   ++_bbCtx.index;                                                                                     \
+#define _bsonArrayAppendValue(ValueOperation)                                              \
+   _bsonDSL_begin("_bsonArrayAppendValue => [%s]", _bsonDSL_strElide(30, ValueOperation)); \
+   /* Append a value: */                                                                   \
+   _bsonValueOperation_##ValueOperation;                                                   \
    _bsonDSL_end
 
 
@@ -833,16 +839,19 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 
 #define bsonBuildArray(BSON, ...)                                                                    \
    _bsonDSL_begin("bsonBuildArray(%s, %s)", _bsonDSL_str(BSON), _bsonDSL_strElide(30, __VA_ARGS__)); \
-   _bsonDSL_eval(_bsonBuildArray(BSON, __VA_ARGS__));                                                \
+   bson_array_builder_t *_bbArr = bson_array_builder_new();                                          \
+   _bsonDSL_eval(_bsonBuildArray(*_bbArr, __VA_ARGS__));                                             \
+   if (!bsonBuildError) {                                                                            \
+      bson_array_builder_build(_bbArr, &(BSON));                                                     \
+   }                                                                                                 \
+   bson_array_builder_destroy(_bbArr);                                                               \
    _bsonDSL_end
-
 #define _bsonBuildArray(BSON, ...)                     \
    do {                                                \
       _bsonDSL_disableWarnings();                      \
       struct _bsonBuildContext_t _bbCtx = {            \
-         .doc = &(BSON),                               \
+         .arr = &(BSON),                               \
          .parent = _bsonBuildContextThreadLocalPtr,    \
-         .index = 0,                                   \
       };                                               \
       _bsonBuildContextThreadLocalPtr = &_bbCtx;       \
       _bsonBuildArrayWithCurrentContext(__VA_ARGS__);  \
@@ -896,14 +905,12 @@ BSON_IF_GNU_LIKE(_Pragma("GCC diagnostic ignored \"-Wshadow\""))
 struct _bsonBuildContext_t {
    /// The document that is being built
    bson_t *doc;
+   /// The array that is being built
+   bson_array_builder_t *arr;
    /// The key that is pending an append
    const char *key;
    /// The length of the string given in 'key'
    int key_len;
-   /// The index of the array being built (if applicable)
-   size_t index;
-   /// A buffer for formatting key strings
-   char index_key_str[16];
    /// The parent context (if building a sub-document)
    struct _bsonBuildContext_t *parent;
 };

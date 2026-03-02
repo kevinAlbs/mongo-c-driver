@@ -2398,6 +2398,122 @@ do_assert_bson_equal(const bson_t *actual, const bson_t *expected, const char *f
 #define ASSERT_BSON_EQUAL_BSON(Actual, Expected) do_assert_bson_equal(&(Actual), &(Expected), __FILE__, __LINE__)
 
 static void
+test_bson_dsl_build_array(void)
+{
+   bson_t doc = BSON_INITIALIZER;
+
+   // Test a BSON array with each ValueOperation:
+
+   {
+      bsonBuild(doc, kv("arr", array(null)));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [null]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bsonBuild(doc, kv("arr", array(boolean(true))));
+      // Use tmp_bson. Cannot use true macro.
+      bson_t *expected = tmp_bson("{'arr': [true]}");
+      ASSERT_BSON_EQUAL_BSON(doc, *expected);
+      bson_destroy(&doc);
+   }
+
+   {
+      bsonBuild(doc, kv("arr", array(int32(1))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [1]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bsonBuild(doc, kv("arr", array(int64(1))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [ {"$numberLong" : "1"} ]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bsonBuild(doc, kv("arr", array(cstr("foo"))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : ["foo"]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bson_oid_t oid;
+      bson_oid_init_from_string(&oid, "507f1f77bcf86cd799439011");
+      bsonBuild(doc, kv("arr", array(oid(&oid))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [ {"$oid" : "507f1f77bcf86cd799439011"} ]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bsonBuild(doc, kv("arr", array(utf8_w_len("foo", 3))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : ["foo"]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bson_t subdoc = BSON_INITIALIZER;
+      BSON_APPEND_INT32(&subdoc, "x", 1);
+      bson_iter_t iter;
+      ASSERT(bson_iter_init_find(&iter, &subdoc, "x"));
+      bsonBuild(doc, kv("arr", array(iterValue(iter))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [1]});
+      bson_destroy(&doc);
+      bson_destroy(&subdoc);
+   }
+
+   {
+      bson_t subdoc = BSON_INITIALIZER;
+      BSON_APPEND_INT32(&subdoc, "x", 1);
+      bsonBuild(doc, kv("arr", array(bson(subdoc))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [ {"x" : 1} ]});
+      bson_destroy(&doc);
+      bson_destroy(&subdoc);
+   }
+
+   {
+      bson_t subarray = BSON_INITIALIZER;
+      BSON_APPEND_INT32(&subarray, "0", 1);
+      bsonBuild(doc, kv("arr", array(bsonArray(subarray))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [[1]]});
+      bson_destroy(&doc);
+      bson_destroy(&subarray);
+   }
+
+   {
+      bsonBuild(doc, kv("arr", array(doc(kv("x", int32(1))))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [ {"x" : 1} ]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bsonBuild(doc, kv("arr", array(array(int32(1), int32(2), int32(3)))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [[ 1, 2, 3 ]]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bson_value_t val = (bson_value_t){.value_type = BSON_TYPE_INT32, .value.v_int32 = 1};
+      bsonBuild(doc, kv("arr", array(value(val))));
+      ASSERT_BSON_EQUAL(doc, {"arr" : [1]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bool cond = true;
+      bsonBuild(doc, kv("arr", array(if (cond, then(int32(1)), else(int32(2))))););
+      ASSERT_BSON_EQUAL(doc, {"arr" : [1]});
+      bson_destroy(&doc);
+   }
+
+   {
+      bson_t arr;
+      bsonBuildArray(arr, int32(1), int32(2), int32(3));
+      ASSERT_BSON_EQUAL(arr, [ 1, 2, 3 ]);
+      bson_destroy(&arr);
+   }
+}
+
+static void
 test_bson_dsl_build(void)
 {
    // Create a very simple empty document
@@ -3148,6 +3264,7 @@ test_bson_install(TestSuite *suite)
    TestSuite_Add(suite, "/bson/dsl/parse", test_bson_dsl_parse);
    TestSuite_Add(suite, "/bson/dsl/visit", test_bson_dsl_visit);
    TestSuite_Add(suite, "/bson/dsl/build", test_bson_dsl_build);
+   TestSuite_Add(suite, "/bson/dsl/build/array", test_bson_dsl_build_array);
    TestSuite_Add(suite, "/bson/with_duplicate_keys", test_bson_with_duplicate_keys);
    TestSuite_Add(suite, "/bson/uint32_to_string", test_bson_uint32_to_string);
    TestSuite_Add(suite, "/bson/array_builder", test_bson_array_builder);
