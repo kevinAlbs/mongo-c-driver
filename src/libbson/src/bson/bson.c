@@ -2862,7 +2862,7 @@ bson_append_array_builder_begin(bson_t *bson, const char *key, int key_length, b
    BSON_ASSERT_PARAM(key);
    BSON_ASSERT_PARAM(child);
    *child = bson_array_builder_new();
-   bool ok = bson_append_array_begin(bson, key, key_length, &(*child)->bson);
+   bool ok = _bson_append_bson_begin(bson, key, key_length, BSON_TYPE_ARRAY, &(*child)->bson);
    if (!ok) {
       bson_array_builder_destroy(*child);
       *child = NULL;
@@ -2877,7 +2877,7 @@ bson_append_array_builder_inline_begin(bson_t *bson, const char *key, int key_le
    BSON_ASSERT_PARAM(key);
    BSON_ASSERT_PARAM(child);
    *child = (bson_array_builder_t){.index = 0, .flags = BSON_FLAG_NO_FREE_OBJECT, .bson = BSON_INITIALIZER};
-   return bson_append_array_begin(bson, key, key_length, &child->bson);
+   return _bson_append_bson_begin(bson, key, key_length, BSON_TYPE_ARRAY, &child->bson);
 }
 
 bool
