@@ -12,7 +12,7 @@ find_program (CARGO_EXECUTABLE cargo REQUIRED)
 find_program (CARGO_CBINDGEN_EXECUTABLE cbindgen REQUIRED)
 
 set (MONGOC_RUST_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/target")
-set (MONGOC_RUST_LIBRARY "${MONGOC_RUST_TARGET_DIR}/debug/libmongoc_rust.so")
+set (MONGOC_RUST_LIBRARY "${MONGOC_RUST_TARGET_DIR}/debug/libmongoc_rust.a")
 set (MONGOC_RUST_HEADER "${CMAKE_CURRENT_BINARY_DIR}/include/mongoc/mongoc-rust-private.h")
 
 file (
