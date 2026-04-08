@@ -1185,6 +1185,7 @@ set (test-libmongoc-sources
 
 if (ENABLE_RUST)
    list (APPEND test-libmongoc-sources ${PROJECT_SOURCE_DIR}/tests/test-mongoc-rust.c)
+   list (APPEND test-libmongoc-sources ${PROJECT_SOURCE_DIR}/tests/rust-unified/runner.c)
 endif ()
 
 if (MONGOC_ENABLE_SSL)

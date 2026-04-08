@@ -1,0 +1,16 @@
+- [x] Design future type: error reporting
+- [x] Design future type: thread safe progress
+- [x] Add insertOne + insertMany
+- [x] Add find + cursors
+- [x] Unified test runner for async driver (crud/unified JSON tests; passes 123/123 files)
+- [x] Add command event listeners
+- [x] Add runCommand
+- [x] Add Collection/Database helpers: list, create, rename, drop
+- [x] Add update, replace, delete (one + many variants; findOneAnd* deferred)
+- [x] Add Client.bulkWrite
+- [x] Add Client/Database/Collection Aggregate
+- [x] Add Collection distinct + count
+- [x] Add sessions + transactions (no withTransaction)
+- [x] Add index management (only Standard API)
+- [x] Add change streams
+- [ ] Test performance of client bulk write.

@@ -5,7 +5,28 @@ if (NOT ENABLE_RUST)
 endif ()
 
 if (ENABLE_RUST_SYSTEM)
-    message (FATAL_ERROR "ENABLE_RUST_SYSTEM is not yet implemented")
+    if (NOT DEFINED MONGOC_RUST_LIBRARY)
+        message (FATAL_ERROR
+            "ENABLE_RUST_SYSTEM requires -DMONGOC_RUST_LIBRARY=<path to libmongoc_rust.a>")
+    endif ()
+    if (NOT DEFINED MONGOC_RUST_INCLUDE_DIR)
+        message (FATAL_ERROR
+            "ENABLE_RUST_SYSTEM requires -DMONGOC_RUST_INCLUDE_DIR=<dir containing mongoc/mongoc-rust-private.h>")
+    endif ()
+    if (NOT EXISTS "${MONGOC_RUST_LIBRARY}")
+        message (FATAL_ERROR "MONGOC_RUST_LIBRARY not found: ${MONGOC_RUST_LIBRARY}")
+    endif ()
+    if (NOT EXISTS "${MONGOC_RUST_INCLUDE_DIR}/mongoc/mongoc-rust-private.h")
+        message (FATAL_ERROR
+            "mongoc-rust-private.h not found at ${MONGOC_RUST_INCLUDE_DIR}/mongoc/mongoc-rust-private.h")
+    endif ()
+
+    add_library (mongoc-rust INTERFACE)
+    target_link_libraries (mongoc-rust INTERFACE bson::shared "${MONGOC_RUST_LIBRARY}")
+    target_include_directories (mongoc-rust INTERFACE "${MONGOC_RUST_INCLUDE_DIR}")
+
+    message (STATUS "Using pre-built mongoc-rust library: ${MONGOC_RUST_LIBRARY}")
+    return ()
 endif ()
 
 find_program (CARGO_EXECUTABLE cargo REQUIRED)

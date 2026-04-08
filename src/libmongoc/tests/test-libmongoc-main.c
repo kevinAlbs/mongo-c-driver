@@ -169,7 +169,8 @@ main(int argc, char *argv[])
    TEST_INSTALL(test_oidc_auth_install);
    TEST_INSTALL(test_backpressure_install);
 
-   TEST_INSTALL(test_mongoc_rust_install);
+   TEST_INSTALL(test_mongoc_async_install);
+   TEST_INSTALL(test_mongoc_async_unified_install);
 
    const int ret = TestSuite_Run(&suite);
 

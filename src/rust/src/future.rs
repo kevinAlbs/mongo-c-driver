@@ -14,6 +14,10 @@ pub enum FutureValue {
     Int32(FutureValueType<i32>),
     UInt64(FutureValueType<u64>),
     Document(FutureValueType<mongodb::bson::Document>),
+    /// For `find_one`, `run_command`, and `distinct` — None means "not found".
+    OptionalDocument(FutureValueType<Option<mongodb::bson::Document>>),
+    /// For `update_one`, `update_many`, and `replace_one`.
+    UpdateResult(FutureValueType<mongodb::results::UpdateResult>),
     // ...
 }
 
@@ -29,9 +33,21 @@ macro_rules! future_value_op {
             FutureValue::Int32($v) => $e,
             FutureValue::UInt64($v) => $e,
             FutureValue::Document($v) => $e,
+            FutureValue::OptionalDocument($v) => $e,
+            FutureValue::UpdateResult($v) => $e,
             // ...
         }
     };
+}
+
+impl<T> FutureValueType<T> {
+    pub fn error(&self) -> Option<&mongodb::error::Error> {
+        if let Some(Err(e)) = &self.result {
+            Some(e)
+        } else {
+            None
+        }
+    }
 }
 
 trait Pollable {
@@ -95,7 +111,7 @@ impl<T> PollableWithTimeout for FutureValueType<T> {
 
 /// Destroy the future.
 #[unsafe(no_mangle)]
-pub extern "C" fn mongoc_rust_future_destroy(future: *mut Future) {
+pub extern "C" fn mongoc_async_future_destroy(future: *mut Future) {
     if !future.is_null() {
         unsafe {
             drop(Box::from_raw(future));
@@ -105,7 +121,7 @@ pub extern "C" fn mongoc_rust_future_destroy(future: *mut Future) {
 
 /// Force progress on IO and timer drivers.
 #[unsafe(no_mangle)]
-pub extern "C" fn mongoc_rust_future_make_progress(future: *mut Future) {
+pub extern "C" fn mongoc_async_future_make_progress(future: *mut Future) {
     let Future { runtime, .. } = unsafe { &*future };
     let _guard = runtime.enter();
 
@@ -143,7 +159,7 @@ pub extern "C" fn mongoc_rust_future_make_progress(future: *mut Future) {
 
 /// Poll the future.
 #[unsafe(no_mangle)]
-pub extern "C" fn mongoc_rust_future_poll(future: *mut Future) -> bool {
+pub extern "C" fn mongoc_async_future_poll(future: *mut Future) -> bool {
     let Future { runtime, value } = unsafe { &mut *future };
     let _guard = runtime.enter();
 
@@ -167,7 +183,7 @@ pub extern "C" fn mongoc_rust_future_poll(future: *mut Future) -> bool {
 
 /// Poll the future with a timeout.
 #[unsafe(no_mangle)]
-pub extern "C" fn mongoc_rust_future_poll_with_timeout(
+pub extern "C" fn mongoc_async_future_poll_with_timeout(
     future: *mut Future,
     timeout_ms: i64,
 ) -> bool {
@@ -179,6 +195,20 @@ pub extern "C" fn mongoc_rust_future_poll_with_timeout(
     }
 
     value.poll_with_timeout(runtime, timeout_ms as u64) // TODO(cdriver-6204): error handling.
+}
+
+/// Return the error from the future, if any.
+///
+/// Returns null if the future is not yet ready or completed successfully.
+/// The caller must destroy the returned error with [`mongoc_rust_error_destroy`].
+#[unsafe(no_mangle)]
+pub extern "C" fn mongoc_async_future_get_error(future: *mut Future) -> *mut crate::error::Error {
+    let Future { value, .. } = unsafe { &*future };
+    let maybe_err = future_value_op!(value, v => v.error());
+    match maybe_err {
+        Some(e) => Box::into_raw(Box::new(crate::error::Error::from_mongodb(e))),
+        None => std::ptr::null_mut(),
+    }
 }
 
 #[cfg(test)]
@@ -269,7 +299,7 @@ mod tests {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mongoc_rust_future_get_void(future: *mut Future) -> bool {
+pub extern "C" fn mongoc_async_future_get_void(future: *mut Future) -> bool {
     let Future { value, .. } = unsafe { &mut *future };
 
     if let FutureValue::Void(FutureValueType { result: Some(Ok(_)), .. }) = value {
@@ -280,7 +310,7 @@ pub extern "C" fn mongoc_rust_future_get_void(future: *mut Future) -> bool {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mongoc_rust_future_get_int32(
+pub extern "C" fn mongoc_async_future_get_int32(
     future: *mut Future,
     result_out_ptr: *mut i32,
 ) -> bool {
@@ -296,7 +326,7 @@ pub extern "C" fn mongoc_rust_future_get_int32(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mongoc_rust_future_get_uint64(
+pub extern "C" fn mongoc_async_future_get_uint64(
     future: *mut Future,
     result_out_ptr: *mut u64,
 ) -> bool {
@@ -308,5 +338,58 @@ pub extern "C" fn mongoc_rust_future_get_uint64(
         true
     } else {
         false
+    }
+}
+
+/// Extract the update result counts from an `UpdateResult` future.
+///
+/// Returns true on success. `matched_count_out` and `modified_count_out` may
+/// each be null if the caller doesn't need that value.
+#[unsafe(no_mangle)]
+pub extern "C" fn mongoc_async_future_get_update_result(
+    future: *mut Future,
+    matched_count_out: *mut u64,
+    modified_count_out: *mut u64,
+) -> bool {
+    let Future { value, .. } = unsafe { &mut *future };
+
+    if let FutureValue::UpdateResult(FutureValueType { result: Some(Ok(r)), .. }) = value {
+        if !matched_count_out.is_null() {
+            unsafe { *matched_count_out = r.matched_count };
+        }
+        if !modified_count_out.is_null() {
+            unsafe { *modified_count_out = r.modified_count };
+        }
+        true
+    } else {
+        false
+    }
+}
+
+/// Extract a `*mut BsonOwned` from an `OptionalDocument` or `Document` future.
+///
+/// Returns null when the future yielded no document (not-found case), completed
+/// with an error, or is not yet ready.  The caller must destroy a non-null
+/// return value with [`mongoc_rust_bson_destroy`].
+#[unsafe(no_mangle)]
+pub extern "C" fn mongoc_async_future_get_bson(
+    future: *mut Future,
+) -> *mut crate::bson_owned::BsonOwned {
+    let Future { value, .. } = unsafe { &mut *future };
+
+    match value {
+        FutureValue::OptionalDocument(FutureValueType { result: Some(Ok(Some(doc))), .. }) => {
+            match crate::bson_owned::BsonOwned::from_doc(doc) {
+                Some(b) => Box::into_raw(Box::new(b)),
+                None => std::ptr::null_mut(),
+            }
+        }
+        FutureValue::Document(FutureValueType { result: Some(Ok(doc)), .. }) => {
+            match crate::bson_owned::BsonOwned::from_doc(doc) {
+                Some(b) => Box::into_raw(Box::new(b)),
+                None => std::ptr::null_mut(),
+            }
+        }
+        _ => std::ptr::null_mut(),
     }
 }

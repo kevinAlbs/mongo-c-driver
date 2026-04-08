@@ -454,6 +454,10 @@ if (ENABLE_MONGOC)
 
    add_subdirectory (src/libmongoc)
 
+   if (ENABLE_RUST)
+      add_subdirectory (src/rust/examples)
+   endif ()
+
    if (MONGOC_ENABLE_MONGODB_AWS_AUTH)
       message (STATUS "Building with MONGODB-AWS auth support")
    endif ()
