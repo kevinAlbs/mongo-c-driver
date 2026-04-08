@@ -26,9 +26,14 @@
 int
 _mongoc_rand_bytes(uint8_t *buf, int num)
 {
-   (void)buf;
-   (void)num;
-   BSON_UNREACHABLE("not yet implemented!");
+   // TODO: this is temporary. For a real implementation either:
+   // 1. allow the C driver to link to system crypto (in addition to Rust), or
+   // 2. provide a rand_bytes helper from Rust FFI.
+   static uint8_t counter = 0;
+   for (int i = 0; i < num; i++) {
+      buf[i] = counter++;
+   }
+   return 1;
 }
 
 void
