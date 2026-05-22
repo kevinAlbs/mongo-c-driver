@@ -1,6 +1,8 @@
 use std::pin::pin;
 use std::task::{Context, Poll, Waker};
 
+const MONGOC_LOG_DOMAIN: &str = "future";
+
 use async_ffi::{FfiFuture, FutureExt};
 use tokio;
 
@@ -302,10 +304,13 @@ mod tests {
 pub extern "C" fn mongoc_async_future_get_void(future: *mut Future) -> bool {
     let Future { value, .. } = unsafe { &mut *future };
 
-    if let FutureValue::Void(FutureValueType { result: Some(Ok(_)), .. }) = value {
-        true
-    } else {
-        false
+    match value {
+        FutureValue::Void(FutureValueType { result: Some(Ok(_)), .. }) => true,
+        FutureValue::Void(FutureValueType { result: Some(Err(e)), .. }) => {
+            crate::log::error(MONGOC_LOG_DOMAIN, &e.to_string());
+            false
+        }
+        _ => false,
     }
 }
 
@@ -317,11 +322,16 @@ pub extern "C" fn mongoc_async_future_get_int32(
     let Future { value, .. } = unsafe { &mut *future };
     let result_out = unsafe { &mut *result_out_ptr };
 
-    if let FutureValue::Int32(FutureValueType { result: Some(Ok(v)), .. }) = value {
-        *result_out = *v;
-        true
-    } else {
-        false
+    match value {
+        FutureValue::Int32(FutureValueType { result: Some(Ok(v)), .. }) => {
+            *result_out = *v;
+            true
+        }
+        FutureValue::Int32(FutureValueType { result: Some(Err(e)), .. }) => {
+            crate::log::error(MONGOC_LOG_DOMAIN, &e.to_string());
+            false
+        }
+        _ => false,
     }
 }
 
@@ -333,11 +343,16 @@ pub extern "C" fn mongoc_async_future_get_uint64(
     let Future { value, .. } = unsafe { &mut *future };
     let result_out = unsafe { &mut *result_out_ptr };
 
-    if let FutureValue::UInt64(FutureValueType { result: Some(Ok(v)), .. }) = value {
-        *result_out = *v;
-        true
-    } else {
-        false
+    match value {
+        FutureValue::UInt64(FutureValueType { result: Some(Ok(v)), .. }) => {
+            *result_out = *v;
+            true
+        }
+        FutureValue::UInt64(FutureValueType { result: Some(Err(e)), .. }) => {
+            crate::log::error(MONGOC_LOG_DOMAIN, &e.to_string());
+            false
+        }
+        _ => false,
     }
 }
 
@@ -353,16 +368,21 @@ pub extern "C" fn mongoc_async_future_get_update_result(
 ) -> bool {
     let Future { value, .. } = unsafe { &mut *future };
 
-    if let FutureValue::UpdateResult(FutureValueType { result: Some(Ok(r)), .. }) = value {
-        if !matched_count_out.is_null() {
-            unsafe { *matched_count_out = r.matched_count };
+    match value {
+        FutureValue::UpdateResult(FutureValueType { result: Some(Ok(r)), .. }) => {
+            if !matched_count_out.is_null() {
+                unsafe { *matched_count_out = r.matched_count };
+            }
+            if !modified_count_out.is_null() {
+                unsafe { *modified_count_out = r.modified_count };
+            }
+            true
         }
-        if !modified_count_out.is_null() {
-            unsafe { *modified_count_out = r.modified_count };
+        FutureValue::UpdateResult(FutureValueType { result: Some(Err(e)), .. }) => {
+            crate::log::error(MONGOC_LOG_DOMAIN, &e.to_string());
+            false
         }
-        true
-    } else {
-        false
+        _ => false,
     }
 }
 
@@ -389,6 +409,11 @@ pub extern "C" fn mongoc_async_future_get_bson(
                 Some(b) => Box::into_raw(Box::new(b)),
                 None => std::ptr::null_mut(),
             }
+        }
+        FutureValue::OptionalDocument(FutureValueType { result: Some(Err(e)), .. })
+        | FutureValue::Document(FutureValueType { result: Some(Err(e)), .. }) => {
+            crate::log::error(MONGOC_LOG_DOMAIN, &e.to_string());
+            std::ptr::null_mut()
         }
         _ => std::ptr::null_mut(),
     }
