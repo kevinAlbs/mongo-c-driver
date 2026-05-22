@@ -4,6 +4,20 @@ if (NOT ENABLE_RUST)
     return ()
 endif ()
 
+# Link libmongoc_rust.a with --whole-archive so that all exported Rust symbols
+# are retained in the shared library even though no C code calls them directly.
+macro (mongoc_rust_link_library TARGET LIBRARY)
+    if (UNIX AND NOT APPLE)
+        target_link_libraries (${TARGET} INTERFACE bson::shared
+            "-Wl,--whole-archive" "${LIBRARY}" "-Wl,--no-whole-archive")
+    elseif (APPLE)
+        target_link_libraries (${TARGET} INTERFACE bson::shared
+            "-Wl,-force_load,${LIBRARY}")
+    else ()
+        target_link_libraries (${TARGET} INTERFACE bson::shared "${LIBRARY}")
+    endif ()
+endmacro ()
+
 if (ENABLE_RUST_SYSTEM)
     if (NOT DEFINED MONGOC_RUST_LIBRARY)
         message (FATAL_ERROR
@@ -22,7 +36,7 @@ if (ENABLE_RUST_SYSTEM)
     endif ()
 
     add_library (mongoc-rust INTERFACE)
-    target_link_libraries (mongoc-rust INTERFACE bson::shared "${MONGOC_RUST_LIBRARY}")
+    mongoc_rust_link_library (mongoc-rust "${MONGOC_RUST_LIBRARY}")
     target_include_directories (mongoc-rust INTERFACE "${MONGOC_RUST_INCLUDE_DIR}")
 
     message (STATUS "Using pre-built mongoc-rust library: ${MONGOC_RUST_LIBRARY}")
@@ -66,7 +80,7 @@ add_custom_target (mongoc-rust-target DEPENDS "${MONGOC_RUST_LIBRARY}" "${MONGOC
 
 add_library (mongoc-rust INTERFACE)
 add_dependencies(mongoc-rust mongoc-rust-target)
-target_link_libraries (mongoc-rust INTERFACE bson::shared "${MONGOC_RUST_LIBRARY}")
+mongoc_rust_link_library (mongoc-rust "${MONGOC_RUST_LIBRARY}")
 target_include_directories(mongoc-rust INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/include")
 
 message (STATUS "Building mongoc-rust... done.")
