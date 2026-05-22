@@ -765,6 +765,10 @@ set (HEADERS
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-bulkwrite.h
 )
 
+if (ENABLE_RUST)
+   list (APPEND HEADERS "${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-async.h")
+endif ()
+
 configure_file (
    "${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-config.h.in"
    "${PROJECT_BINARY_DIR}/src/mongoc/mongoc-config.h"
@@ -1393,6 +1397,13 @@ install (
    FILES ${HEADERS}
    DESTINATION "${MONGOC_INSTALL_INCLUDEDIR}/mongoc"
 )
+
+if (ENABLE_RUST AND DEFINED MONGOC_RUST_PRIVATE_HEADER)
+   install (
+      FILES "${MONGOC_RUST_PRIVATE_HEADER}"
+      DESTINATION "${MONGOC_INSTALL_INCLUDEDIR}/mongoc"
+   )
+endif ()
 
 # Collect link items for the static library to be inserted into the pkg-config
 if(TARGET mongoc_static)

@@ -39,6 +39,8 @@ if (ENABLE_RUST_SYSTEM)
     mongoc_rust_link_library (mongoc-rust "${MONGOC_RUST_LIBRARY}")
     target_include_directories (mongoc-rust INTERFACE "${MONGOC_RUST_INCLUDE_DIR}")
 
+    set (MONGOC_RUST_PRIVATE_HEADER "${MONGOC_RUST_INCLUDE_DIR}/mongoc/mongoc-rust-private.h" PARENT_SCOPE)
+
     message (STATUS "Using pre-built mongoc-rust library: ${MONGOC_RUST_LIBRARY}")
     return ()
 endif ()
@@ -82,5 +84,7 @@ add_library (mongoc-rust INTERFACE)
 add_dependencies(mongoc-rust mongoc-rust-target)
 mongoc_rust_link_library (mongoc-rust "${MONGOC_RUST_LIBRARY}")
 target_include_directories(mongoc-rust INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/include")
+
+set (MONGOC_RUST_PRIVATE_HEADER "${MONGOC_RUST_HEADER}" PARENT_SCOPE)
 
 message (STATUS "Building mongoc-rust... done.")

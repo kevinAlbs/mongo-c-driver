@@ -66,5 +66,8 @@
 #endif
 #undef MONGOC_INSIDE
 
+#if MONGOC_ENABLE_RUST()
+#include <mongoc/mongoc-async.h>
+#endif
 
 #endif /* MONGOC_H */
