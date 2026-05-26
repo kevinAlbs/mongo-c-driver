@@ -1,69 +1,58 @@
-# Build Async C Driver with Pre-built Rust Component
+# Async C Driver — RHEL9 Pre-built Libraries
 
-These instructions are for building the async C driver **without a Rust toolchain** on RHEL9.
-The Rust component (`libmongoc_rust.a` + `mongoc-rust-private.h`) is pre-built.
+Pre-built static libraries for RHEL9 x86_64. No Rust toolchain or C driver build
+required — unpack and link.
 
-## Get prerequisites
+## Contents of the tarball
 
-- `gcc`, `cmake`, `tar`, `git`, `pkg-config`
-- OpenSSL development headers: `sudo dnf install openssl-devel`
+```
+mongoc-async-rhel9-x86_64/
+  lib64/
+    libbson2.a
+    libmongoc2.a
+    libmongoc_rust.a
+  include/
+    bson-2.3.0/
+    mongoc-2.3.0/
+```
 
-No Rust toolchain (`cargo`, `rustc`, `cbindgen`) is required.
-
-## Get pre-built Rust component
-
-Extract the RHEL9 archive:
+## Unpack
 
 ```bash
-# RHEL 9 x86_64
-mkdir -p $HOME/mongoc-rust
-tar xzf mongoc-rust-rhel9-x86_64.tar.gz --strip-components=1 -C $HOME/mongoc-rust
+mkdir -p $HOME/mongoc-async
+tar xzf mongoc-async-rhel9-x86_64.tar.gz --strip-components=1 -C $HOME/mongoc-async
 ```
 
-## Clone the driver
+## Compile an application
 
 ```bash
-git clone https://github.com/kevinAlbs/mongo-c-driver --branch async-rust-poc
-cd mongo-c-driver
+gcc -o example-ping example-ping.c \
+  -I$HOME/mongoc-async/include/bson-2.3.0 \
+  -I$HOME/mongoc-async/include/mongoc-2.3.0 \
+  -Wl,--whole-archive $HOME/mongoc-async/lib64/libmongoc_rust.a -Wl,--no-whole-archive \
+  $HOME/mongoc-async/lib64/libmongoc2.a \
+  $HOME/mongoc-async/lib64/libbson2.a \
+  -lssl -lcrypto -lpthread -ldl -lm -lresolv
 ```
 
-## Configure
+`--whole-archive` is required around `libmongoc_rust.a` because the async entry points
+(`mongoc_async_*`) are not called from within libmongoc itself, so the linker would
+otherwise discard them.
+
+## Run
 
 ```bash
-cmake -S . -B cmake-build \
-  -DENABLE_RUST=ON \
-  -DENABLE_RUST_SYSTEM=ON \
-  -DMONGOC_RUST_LIBRARY=$HOME/mongoc-rust/lib/libmongoc_rust.a \
-  -DMONGOC_RUST_INCLUDE_DIR=$HOME/mongoc-rust/include \
-  -DCMAKE_INSTALL_PREFIX=$HOME/mongoc-async \
-  -DENABLE_TESTS=OFF
-```
-
-Expect output to include:
-```
--- Using pre-built mongoc-rust library [...]
-```
-
-## Install
-
-```bash
-cmake --build cmake-build --parallel --target install
-```
-
-## Build example
-
-`example-ping.c` runs a "ping" command using the async future API. Compile it against the installed driver:
-
-```bash
-export PKG_CONFIG_PATH=$HOME/mongoc-async/lib64/pkgconfig/
-gcc -o example-ping example-ping.c $(pkg-config --libs --cflags mongoc2)
-```
-
-Run:
-
-```bash
-export LD_LIBRARY_PATH=$HOME/mongoc-async/lib64
-
-# Set URI to MongoDB cluster
 MONGODB_URI="mongodb://localhost:27017" ./example-ping
+# Ping reply: { "ok" : 1 }
 ```
+
+## External link dependencies
+
+| Library | Notes |
+|---------|-------|
+| `libssl`, `libcrypto` | OpenSSL — `sudo dnf install openssl` |
+| `libpthread`, `libdl`, `libm`, `libresolv` | glibc — always present on RHEL9 |
+
+## Rebuild from source
+
+See `etc/build-all.sh` to rebuild the tarball on a RHEL9 host with a Rust toolchain.

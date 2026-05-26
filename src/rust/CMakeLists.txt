@@ -7,14 +7,19 @@ endif ()
 # Link libmongoc_rust.a with --whole-archive so that all exported Rust symbols
 # are retained in the shared library even though no C code calls them directly.
 macro (mongoc_rust_link_library TARGET LIBRARY)
+    if (TARGET bson::shared)
+        set (_mongoc_rust_bson bson::shared)
+    else ()
+        set (_mongoc_rust_bson bson::static)
+    endif ()
     if (UNIX AND NOT APPLE)
-        target_link_libraries (${TARGET} INTERFACE bson::shared
+        target_link_libraries (${TARGET} INTERFACE ${_mongoc_rust_bson}
             "-Wl,--whole-archive" "${LIBRARY}" "-Wl,--no-whole-archive")
     elseif (APPLE)
-        target_link_libraries (${TARGET} INTERFACE bson::shared
+        target_link_libraries (${TARGET} INTERFACE ${_mongoc_rust_bson}
             "-Wl,-force_load,${LIBRARY}")
     else ()
-        target_link_libraries (${TARGET} INTERFACE bson::shared "${LIBRARY}")
+        target_link_libraries (${TARGET} INTERFACE ${_mongoc_rust_bson} "${LIBRARY}")
     endif ()
 endmacro ()
 
