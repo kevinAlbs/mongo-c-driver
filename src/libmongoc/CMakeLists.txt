@@ -1291,6 +1291,11 @@ if (ENABLE_EXAMPLES AND ENABLE_SHARED)
    mongoc_add_example (mongoc-tail ${PROJECT_SOURCE_DIR}/examples/mongoc-tail.c)
    mongoc_add_example (example-collection-command ${PROJECT_SOURCE_DIR}/examples/example-collection-command.c)
    mongoc_add_example (example-bulkwrite ${PROJECT_SOURCE_DIR}/examples/example-bulkwrite.c)
+   if (WIN32)
+      # Demonstrates DnsQuery_UTF8 returns UTF-8 (narrow) strings even under UNICODE (CDRIVER-6346).
+      mongoc_add_example (example-dnsquery-utf8 ${PROJECT_SOURCE_DIR}/examples/example-dnsquery-utf8.c)
+      target_link_libraries (example-dnsquery-utf8 PRIVATE Dnsapi)
+   endif ()
 
    # examples/aggregation/
    mongoc_add_example (aggregation1 ${PROJECT_SOURCE_DIR}/examples/aggregation/aggregation1.c)
