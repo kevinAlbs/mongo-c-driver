@@ -1,0 +1,91 @@
+#######################################
+#  Disaggregated Storage Testing      #
+#######################################
+
+# Testing against a disaggregated storage server (DRIVERS-3190). The server
+# docker images are published to the SRE-owned 'mms-scratch' AWS account ECR
+# registry: 664315256653.dkr.ecr.us-east-1.amazonaws.com/disagg-storage/*.
+#
+# NOTE: which Evergreen projects may assume these roles is controlled by an
+# allowlist in xgen-cloud/gosre (ops/terraform/tfgen/env/cloud.10gen.cc.yml).
+# If the ec2.assume_role command below fails with an STS AccessDenied error,
+# the mongo-c-driver Evergreen project likely needs to be added to that list.
+# (The read-only '-ro' role is the one suggested for consumers pulling the
+# images; the SLS project assumes 'disagg-storage-tf-project'.)
+
+functions:
+
+  # Authenticate with the mms-scratch ECR registry hosting the disagg-storage
+  # docker images, and pull the most recently pushed image as a probe.
+  "disagg ecr login and pull":
+    - command: ec2.assume_role
+      type: setup
+      params:
+        role_arn: "arn:aws:iam::664315256653:role/disagg-storage-tf-project-ro"
+    - command: shell.exec
+      type: test
+      params:
+        add_expansions_to_env: true # AWS_* credentials from ec2.assume_role
+        script: |
+          set -o errexit
+          set -o verbose
+
+          fail() {
+            echo "ERROR: $*" >&2
+            exit 1
+          }
+
+          ecr_account=664315256653.dkr.ecr.us-east-1.amazonaws.com
+          ecr_repo=disagg-storage/log
+
+          command -v aws >/dev/null 2>&1 \
+            || fail "the 'aws' CLI is not installed on this distro"
+          command -v docker >/dev/null 2>&1 \
+            || fail "'docker' is not installed on this distro"
+
+          aws ecr get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin "$ecr_account" \
+            || fail "docker login to '$ecr_account' failed"
+
+          # NOTE: do not use --query to select the newest tag: with more images
+          # than one page, the AWS CLI applies --query to each page, not to the
+          # merged result.
+          tag=$(aws ecr describe-images \
+            --region us-east-1 \
+            --repository-name "$ecr_repo" \
+            --filter tagStatus=TAGGED \
+            --output json \
+            | python3 -c 'import json, sys; ds = [i for i in json.load(sys.stdin)["imageDetails"] if i.get("imageTags")]; print(max(ds, key=lambda i: i["imagePushedAt"])["imageTags"][0])') \
+            || fail "failed to list image tags in '$ecr_repo'"
+          if [[ -z "$tag" || "$tag" == "None" ]]; then
+            fail "no tagged images found in '$ecr_repo'"
+          fi
+
+          image="$ecr_account/$ecr_repo:$tag"
+          docker pull "$image" || fail "docker pull of '$image' failed"
+          echo "Successfully pulled '$image'"
+
+#######################################
+#               Tasks                 #
+#######################################
+
+tasks:
+
+  - name: disagg-storage-ecr-pull
+    tags:
+      - disagg-storage
+    commands:
+      - func: "disagg ecr login and pull"
+
+#######################################
+#           Buildvariants             #
+#######################################
+
+buildvariants:
+
+  - name: disagg-storage-testing
+    display_name: "Disaggregated Storage Testing"
+    run_on:
+      - ubuntu2204-large
+    tasks:
+      - name: disagg-storage-ecr-pull
