@@ -15,6 +15,24 @@
 
 functions:
 
+  # Authenticate docker with the mms-scratch ECR registry hosting the
+  # disagg-storage docker images.
+  "disagg ecr docker login":
+    - command: ec2.assume_role
+      type: setup
+      params:
+        role_arn: "arn:aws:iam::664315256653:role/disagg-storage-tf-project-ro"
+    - command: shell.exec
+      type: setup
+      params:
+        add_expansions_to_env: true # AWS_* credentials from ec2.assume_role
+        script: |
+          set -o errexit
+          set -o verbose
+
+          aws ecr get-login-password --region us-east-1 |
+            docker login --username AWS --password-stdin 664315256653.dkr.ecr.us-east-1.amazonaws.com
+
   # Authenticate with the mms-scratch ECR registry hosting the disagg-storage
   # docker images, and pull the most recently pushed image as a probe.
   "disagg ecr login and pull":
@@ -77,6 +95,26 @@ tasks:
     commands:
       - func: "disagg ecr login and pull"
 
+  # Experiment (DRIVERS-3190): start a full disagg-storage cluster with the
+  # SLS 'slslocal' tool (docker-compose mode, all components from ECR images,
+  # LocalStack for S3/SQS), ping a mongod node over the wire protocol, then
+  # tear the cluster down again.
+  - name: disagg-storage-cluster-smoke
+    tags:
+      - disagg-storage
+    commands:
+      - func: "disagg ecr docker login"
+      - command: shell.exec
+        type: test
+        params:
+          add_expansions_to_env: true # AWS_* for the tag resolution in the script
+          working_dir: mongoc
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ./.evergreen/scripts/disagg-cluster.sh smoke
+
 #######################################
 #           Buildvariants             #
 #######################################
@@ -85,7 +123,14 @@ buildvariants:
 
   - name: disagg-storage-testing
     display_name: "Disaggregated Storage Testing"
+    # The same docker-capable distros used by the Earthly tasks (see
+    # CONTAINER_RUN_DISTROS in .evergreen/config_generator/components/earthly.py).
     run_on:
+      - amazon2
+      - debian11-latest-large
+      - debian12-latest-large
       - ubuntu2204-large
+      - ubuntu2404-large
     tasks:
       - name: disagg-storage-ecr-pull
+      - name: disagg-storage-cluster-smoke
