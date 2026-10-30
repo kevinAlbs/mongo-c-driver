@@ -1,0 +1,78 @@
+# Produce `mongoac-0.1.0-dev-<DATE>-<SHORT-SHA>-<PLATFORM>.tar.xz` using the AlmaLinux 9 environment.
+#
+# Usage:
+#   dagger -M mongoac-almalinux9.dagger
+#
+# Must be executed from the mongo-c-driver project root directory.
+
+# The archive bundles libbson.
+
+# Standalone mongoac configuration.
+SRC=$(host | directory src/libmongoac)
+
+# AlmaLinux 9 (x86_64) with EPEL packages.
+BASE=$(container --platform linux/amd64 | from almalinux:9 | with-exec -- dnf install -y -q epel-release | with-exec -- dnf upgrade -y -q)
+
+# Build Requirements:
+# - cargo + rust (1.92.0): mongoac.
+# - cmake (3.31.8): mongoac.
+# - gcc (11.5.0): aws-lc-sys, ring, zstd-sys.
+# - git (2.52.0): archive naming (short SHA).
+# - make (4.3): mongoac.
+# - patchelf (0.15.0): mongoac.
+# - perl (5.32.1): aws-lc, ring (perlasm).
+BASE=$($BASE | with-exec -- dnf install -y -q cargo cmake gcc git make patchelf perl rust)
+
+# Reusable cache directories.
+BASE=$($BASE | with-mounted-cache /root/.cargo/registry cargo-registry)
+BASE=$($BASE | with-mounted-cache /build/target mongoac-target-almalinux9)
+
+# Mount src/libmongoac to /src.
+BASE=$($BASE | with-mounted-directory /src $SRC)
+
+# Mount the repository (for the libbson build) to /repo.
+REPO=$(host | directory . --exclude .git --exclude .ignored --exclude cmake-build --exclude .venv)
+BASE=$($BASE | with-mounted-directory /repo $REPO)
+
+# Derive the archive filename from VERSION_CURRENT (0.1.0-dev), the build date,
+# the Git short SHA of the working copy, and the target platform (strip
+# "unknown-" from "unknown-linux").
+VERSION=$($BASE | with-exec -- sh -c 'printf "%s" "$(cat /src/VERSION_CURRENT)"' | stdout)
+DATE=$($BASE | with-exec -- sh -c 'printf "%s" "$(date +%Y%m%d)"' | stdout)
+SHA=$($BASE | with-mounted-directory /.git $(host | directory .git) | with-exec -- sh -c 'printf "%s" "$(git --git-dir=/.git rev-parse --short HEAD)"' | stdout)
+PLATFORM=$($BASE | with-exec -- sh -c 'printf "%s" "$(rustc --print host-tuple | sed "s/-unknown-linux-/-linux-/")"' | stdout)
+INSTALL_PREFIX="/install/mongoac-$VERSION"
+ARCHIVE="mongoac-$VERSION-$DATE-$SHA-$PLATFORM.tar.xz"
+
+# Release configuration with no tests.
+CONFIGURE_FLAGS=" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX \
+  -DBUILD_TESTING=OFF \
+"
+CONFIGURE=$($BASE | with-exec -- cmake $CONFIGURE_FLAGS -B /build -S /src)
+
+# Build both shared and static libraries.
+BUILD=$($CONFIGURE | with-exec -- cmake --build /build)
+
+# Build and install libbson (only) into the same install prefix.
+LIBBSON_FLAGS=" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX \
+  -DBUILD_TESTING=OFF \
+  -DENABLE_MONGOC=OFF \
+"
+LIBBSON=$($BUILD | with-exec -- cmake $LIBBSON_FLAGS -B /bson-build -S /repo)
+LIBBSON=$($LIBBSON | with-exec -- cmake --build /bson-build)
+LIBBSON=$($LIBBSON | with-exec -- cmake --install /bson-build)
+
+# Install libraries with package files.
+INSTALL=$($LIBBSON | with-exec -- cmake --install /build)
+
+# Strip installed libraries. Cannot use CMake `--strip` due to mongoac using INTERFACE targets.
+INSTALL=$($INSTALL | with-exec -- strip $INSTALL_PREFIX/lib64/libmongoac0.so.0.1.0)
+INSTALL=$($INSTALL | with-exec -- strip --strip-debug $INSTALL_PREFIX/lib64/libmongoac0.a)
+
+# Export archive to the host's working directory.
+OUTPUT=$($INSTALL | with-exec -- tar -cJf "/$ARCHIVE" -C /install .)
+$OUTPUT | file "/$ARCHIVE" | export "$ARCHIVE"
