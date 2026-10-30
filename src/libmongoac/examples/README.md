@@ -12,8 +12,6 @@ Sending ping from libmongoac ... OK!
 ## Running with RHEL-9 prebuild
 
 ```bash
-# Everything is contained in $HOME/mongoac-alpha.
-# Delete that directory to completely reset and retry.
 ALPHA="$HOME/mongoac-alpha"
 mkdir -p "$ALPHA"
 cd "$ALPHA"
@@ -41,7 +39,7 @@ cmake -B build -DCMAKE_PREFIX_PATH="$ALPHA/mongoac-0.1.0-dev"
 cmake --build build
 
 # Run.
-MONGODB_URI='mongodb+srv://<user>:<password>@<cluster>/' ./build/hello-mongoac
+MONGODB_URI='mongodb+srv://<host>/' ./build/hello-mongoac
 
 # Expected output: Sending ping from libmongoac ... OK!
 ```
